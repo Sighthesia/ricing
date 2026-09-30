@@ -52,10 +52,36 @@ Variants {
         readonly property bool revealed: _revealState.revealed
         // 0 while collapsed, 1 while shown. Drives the slide offset and the edge
         // hint only — the bar itself does not fade.
-        property real revealProgress: revealed ? 1 : 0
-        Behavior on revealProgress {
-            enabled: !MotionTokens.reducedMotion
-            NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutCubic }
+        //
+        // A plain property, not a binding on `revealed`: the slide animation
+        // writes it, and an animated target that is also bound is written
+        // against its own binding. `onRevealedChanged` moves it instead, which
+        // is also the only way to vary easing by direction. Starts shown, to
+        // match initialState() and so the first frame is correct before any
+        // event arrives.
+        property real revealProgress: 1
+        // Match the hover-popup reveal (see BarPopupHost.setRevealTarget): an
+        // explicit NumberAnimation rather than a Behavior, because the popup
+        // varies its easing per direction and a Behavior cannot. `onRevealedChanged`
+        // sets duration/easing/to and restarts it.
+        NumberAnimation {
+            id: revealMotion
+            target: screenScope
+            property: "revealProgress"
+            running: false
+        }
+
+        // Scale the duration by the distance still to travel, so an interrupted
+        // slide resumes at a proportional speed instead of jumping or lingering.
+        // This is the popup's rule verbatim; without it, revealing the bar and
+        // then crossing the edge halfway back stalls for a full-duration wait.
+        function revealDuration() {
+            if (MotionTokens.reducedMotion)
+                return MotionTokens.fast
+            const distance = Math.abs((screenScope.revealed ? 1 : 0) - screenScope.revealProgress)
+            if (distance < 0.001)
+                return 0
+            return Math.max(MotionTokens.fast, Math.round(MotionTokens.slow * distance))
         }
         // Anything that draws against the bar's own geometry pins it open: an
         // open bar popup, the launcher wave and the settings panel all anchor
@@ -155,6 +181,9 @@ Variants {
                 distance: distance
             })
             _revealState = next
+            // `revealed` is a binding on `_revealState`, so it has not been
+            // re-read yet at this point. The animation is kicked off from the
+            // reveal edge below, against the state we actually computed.
             if (wasRevealed && !next.revealed) {
                 // A bar popup is opened by hovering a widget, and the pointer
                 // cannot be on one while the bar is off-screen.
@@ -165,6 +194,27 @@ Variants {
             } else if (next.revealed && !wasRevealed) {
                 _hideTimer.restart()
             }
+        }
+
+        // Fire the slide. Driven off the state rather than a Behavior, so the
+        // duration and easing can follow the direction of travel.
+        //
+        // Enter uses OutCubic and exit InOutQuad, the popup's pair. The
+        // direction matters: OutCubic front-loads travel, so a bar leaving that
+        // way spends its last frames barely moving and the departure looks like
+        // it stalls at the edge. InOutQuad spends the whole duration visibly in
+        // motion, which reads as the bar leaving rather than being erased.
+        onRevealedChanged: {
+            revealMotion.stop()
+            const target = revealed ? 1 : 0
+            if (Math.abs(target - revealProgress) < 0.001) {
+                revealProgress = target
+                return
+            }
+            revealMotion.duration = revealDuration()
+            revealMotion.easing.type = revealed ? Easing.OutCubic : Easing.InOutQuad
+            revealMotion.to = target
+            revealMotion.restart()
         }
 
         // Last known distance of the pointer from the bar's anchored edge, valid
