@@ -33,6 +33,14 @@ QtObject {
     readonly property string _lowPriority: "nice -n 19"
     property bool _revealInFlight: false
     property string _heldPath: ""
+    // Path currently owned by the extraction process. When a reveal starts
+    // while that process is active, it is moved back into the deferred queue
+    // before the process is stopped.
+    property string _runningPath: ""
+    // Process.running can remain true until the exit signal is delivered. Keep
+    // the reveal interruption explicit so that late onExited cannot restart a
+    // queued extraction while the transition is still in flight.
+    property bool _processStopRequested: false
 
     // Debounce rapid wallpaper changes. `delay` overrides the coalescing window.
     property string _pendingPath: ""
@@ -73,16 +81,38 @@ QtObject {
         _pendingPath = wallpaperPath
         if (_revealInFlight) {
             _heldPath = wallpaperPath
+            _pendingPath = ""
+            _debounce.stop()
             return
         }
         _debounce.interval = delay ? Math.max(0, Number(delay)) : 500
         _debounce.restart()
     }
 
+    // Move a request that has not started yet into the reveal-held slot. The
+    // running path is the fallback when the process itself has to be stopped.
+    function _holdCurrentRequest() {
+        if (_pendingPath) {
+            _heldPath = _pendingPath
+            _pendingPath = ""
+        } else if (!_heldPath && _runningPath) {
+            _heldPath = _runningPath
+        }
+    }
+
     // Announced by the wallpaper window: a reveal is about to animate the
     // screen, so palette work waits.
     function revealStarted() {
         _revealInFlight = true
+        _debounce.stop()
+        _holdCurrentRequest()
+        // A boot extraction can already be running when the asynchronously
+        // decoded image becomes ready. Leaving it alive still competes with
+        // the full-screen mask, so stop it and replay its path after the reveal.
+        if (_proc.running) {
+            _processStopRequested = true
+            _proc.running = false
+        }
         _holdTimer.restart()
     }
 
@@ -93,6 +123,7 @@ QtObject {
         _revealInFlight = false
         _holdTimer.stop()
         if (_heldPath) {
+            _pendingPath = _heldPath
             _heldPath = ""
             _debounce.interval = 120
             _debounce.restart()
@@ -220,6 +251,15 @@ QtObject {
     property Timer _debounce: Timer {
         interval: 500
         onTriggered: {
+            if (root._revealInFlight) {
+                root._holdCurrentRequest()
+                return
+            }
+            // A stopped process is still draining its exit signal. Do not reuse
+            // this Process until onExited has acknowledged that stop, otherwise
+            // the old callback can clear the new run's path and busy state.
+            if (root._processStopRequested)
+                return
             if (extractProcess.running) {
                 extractProcess.running = false
             } else {
@@ -229,9 +269,15 @@ QtObject {
     }
 
     function _execute() {
+        if (_revealInFlight) {
+            _holdCurrentRequest()
+            return
+        }
         if (!_pendingPath) return
         var outputPath = Quickshell.cacheDir + "/colors.json"
         var cmd = commandFor(_pendingPath, outputPath, requestedMode)
+        _runningPath = _pendingPath
+        _processStopRequested = false
         _pendingPath = ""
         extractProcess.command = ["sh", "-c", cmd]
         isExtracting = true
@@ -243,8 +289,20 @@ QtObject {
         running: false
 
         onExited: function(exitCode, exitStatus) {
+            var stoppedForReveal = root._processStopRequested
+            root._processStopRequested = false
             root.isExtracting = false
             root.pendingScheme = ""
+            root._runningPath = ""
+            if (root._revealInFlight || stoppedForReveal) {
+                // If the reveal ended before the process delivered onExited,
+                // make sure the deferred request still gets another attempt.
+                if (!root._revealInFlight && root._pendingPath) {
+                    root._debounce.interval = 120
+                    root._debounce.restart()
+                }
+                return
+            }
             if (root._pendingPath) {
                 root._execute()
             }
