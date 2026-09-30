@@ -377,32 +377,6 @@ PanelWindow {
         return root._pointInRect(p.x, p.y, r)
     }
 
-    // Capture the QML hit-test chain for the second-level catcher. The
-    // compositor region can cover a point while an intermediate item still
-    // prevents Qt from descending into an overflowing child.
-    function _hitChain(item) {
-        var chain = []
-        var current = item
-        var guard = 0
-        while (current && guard < 24) {
-            chain.push({
-                "objectName": String(current.objectName || ""),
-                "x": Math.round(Number(current.x) * 10) / 10,
-                "y": Math.round(Number(current.y) * 10) / 10,
-                "width": Math.round(Number(current.width) * 10) / 10,
-                "height": Math.round(Number(current.height) * 10) / 10,
-                "visible": current.visible === true,
-                "enabled": current.enabled === true,
-                "clip": current.clip === true,
-                "containsMouse": current.containsMouse === true
-                    ? true : (current.containsMouse === false ? false : null),
-            })
-            current = current.parent
-            guard++
-        }
-        return chain
-    }
-
     function _thiefAt(p) {
         if (!p)
             return "none"
@@ -537,9 +511,6 @@ PanelWindow {
                 "firstPrimary": String(tc ? tc._evFirstPrimary : "none"),
                 "firstBand": String(tc ? tc._evFirstBand : "none"),
                 "firstPanel": String(tc ? tc._evFirstPanel : "none"),
-                "bandContainsMouse": tc && tc.submenuColumn
-                    ? tc.submenuColumn.containsMouse === true : null,
-                "hitChain": root._hitChain(tc ? tc.submenuColumn : null),
             },
             "host": {
                 "phase": root.open ? "open" : (root.surfaceActive ? "revealing" : "closed"),
@@ -954,6 +925,16 @@ PanelWindow {
     readonly property real incomingPopupWidth: popupWidthForIntent(root.currentIntent)
     readonly property real outgoingPopupWidth: popupWidthForIntent(root._transitionOutgoingIntent)
     readonly property real popupSlotWidth: Math.max(root.incomingPopupWidth, root.outgoingPopupWidth)
+    // Reserve the complete tray input canvas from the first tray frame. The
+    // action body and its menu root become wide enough for the second-level
+    // catcher, while their primary visuals stay on the fixed 260/244 columns.
+    readonly property real trayInputWidth: root.popupSlotWidth
+        + (popupActions && popupActions.trayMenuContent
+            ? Number(popupActions.trayMenuContent.primaryMenuWidth) : 244)
+    readonly property real popupContentWidth: root.currentIntent
+        && String(root.currentIntent.actionKind || "") === "tray"
+        ? Math.max(root.popupSlotWidth, root.trayInputWidth, root.targetWidth)
+        : root.popupSlotWidth
 
     function popupHeightForIntent(intentObj) {        if (!intentObj)
             return 1
@@ -1010,12 +991,14 @@ PanelWindow {
     function computeAndCommitTargets(intentObj) {
         var trayContent = popupActions ? popupActions.trayMenuContent : null
         var trayExtraWidth = trayContent ? Number(trayContent.extraWidth) : 0
+        var displayedIntent = root.currentIntent || intentObj
+        var isTrayIntent = displayedIntent
+            && String(displayedIntent.actionKind || "") === "tray"
         var baseWidth = Math.max(240, popup.sidebarLayer.implicitWidth || 260,
-                popup.contentLayer.implicitWidth || 260)
+                isTrayIntent ? 260 : (popup.contentLayer.implicitWidth || 260))
         var width = baseWidth
         if (isFinite(trayExtraWidth) && trayExtraWidth > 0)
             width = baseWidth + trayExtraWidth
-        var displayedIntent = root.currentIntent || intentObj
         var sidebarHeight = Math.max(Number(popup.sidebarLayer.implicitHeight),
                 Number(popup.sidebarLayer.height), 48)
         var height = sidebarHeight + popupHeightForIntent(displayedIntent) + 1
@@ -1029,8 +1012,6 @@ PanelWindow {
         // the submenu left and expand the container left instead.
         var baseGeometry = targetGeometryFor(intentObj, baseWidth, height)
         var geometry = targetGeometryFor(intentObj, width, height)
-        var trayContent = popupActions ? popupActions.trayMenuContent : null
-        var isTrayIntent = displayedIntent && String(displayedIntent.actionKind || "") === "tray"
         if (isFinite(trayExtraWidth) && trayExtraWidth > 0 && isTrayIntent) {
             var maxLeft = root.activeScreenWidth - width - 8
             if (maxLeft < 8) maxLeft = 8
@@ -1691,8 +1672,8 @@ PanelWindow {
                 // intent contributes to the popup height and visible surface.
                 contentData: Item {
                      objectName: "popupContentSlot"
-                     width: root.popupSlotWidth
-                     implicitWidth: root.popupSlotWidth
+                     width: root.popupContentWidth
+                     implicitWidth: root.popupContentWidth
                      implicitHeight: root.popupHeightForIntent(root.currentIntent)
                      height: implicitHeight
                      // Visible height channel: animate toward the new content's
@@ -1718,7 +1699,9 @@ PanelWindow {
                         objectName: "popupContentSurface"
                         x: 0
                         y: root.direction === "down" ? -1 : 0
-                        width: parent.width
+                        width: root.currentIntent
+                            && String(root.currentIntent.actionKind || "") === "tray"
+                            ? 260 : parent.width
                         height: parent.height + 1
                         color: LazerTheme.settingsSection
                     }

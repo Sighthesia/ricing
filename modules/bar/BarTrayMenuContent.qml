@@ -10,6 +10,9 @@ Item {
     id: root
     objectName: "trayMenuRoot"
     implicitWidth: 244
+    // The root may widen into an input canvas for the overflowing submenu;
+    // primary visuals stay on this fixed column width.
+    readonly property real primaryMenuWidth: implicitWidth
     implicitHeight: {
         if (emptyStateVisible) return 32
         if (menuLoading) return Math.max(heldHeight, 72)
@@ -376,7 +379,7 @@ Item {
         objectName: "trayMenuFace"
         z: 2
         x: -root.submenuPad
-        width: parent.width + root.submenuPad * 2
+        width: root.primaryMenuWidth + root.submenuPad * 2
         height: menuFlick.height
         color: Lazer.LazerTheme.settingsSection
     }
@@ -710,7 +713,7 @@ Item {
         objectName: "trayMenuFlick"
         anchors.left: parent.left
         anchors.top: parent.top
-        width: parent.width
+        width: root.primaryMenuWidth
         height: Math.min(menuColumn.implicitHeight, maxMenuHeight)
         contentHeight: menuColumn.implicitHeight
         clip: true
@@ -849,7 +852,7 @@ Item {
         objectName: "traySubmenuSurface"
         z: 1
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
-        width: parent.width
+        width: root.primaryMenuWidth
         height: submenuNeedsHeight ? submenuSurfaceHeight : menuFlick.height
         // Flush against the primary, with no gap. The pad here was an 8px strip
         // of nothing between the two panels: visibly empty, so a pointer moving
@@ -858,7 +861,7 @@ Item {
         // left edge, the pointer never advancing past the seam. The breathing
         // room belongs INSIDE the panel, where the title and rows already pad
         // themselves, not between the two surfaces.
-        x: submenuFlipped ? -width : parent.width
+        x: submenuFlipped ? -width : root.primaryMenuWidth
         // Panel top tracks the anchor from the first frame (even before
         // rows arrive) so cold-fetch cursor memory stays valid across
         // the batch; hidden anyway until content lands.
@@ -1010,7 +1013,7 @@ Item {
     Item {
         objectName: "traySubmenuBridge"
         z: 0
-        x: submenuFlipped ? -root.submenuPad : parent.width
+        x: submenuFlipped ? -root.submenuPad : root.primaryMenuWidth
         y: submenuSurface.y
         width: submenuProgress > 0 ? root.submenuPad : 0
         height: submenuProgress > 0 ? submenuSurface.height : 0

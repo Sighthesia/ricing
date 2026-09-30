@@ -768,7 +768,9 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.margins: 8
+        anchors.leftMargin: 8
+        anchors.rightMargin: root.actionKind === "tray" ? 0 : 8
+        anchors.topMargin: 8
         spacing: 8
         visible: true
 
@@ -1847,8 +1849,10 @@ Item {
 
             Rectangle {
                 objectName: "trayContentBackground"
-                anchors.fill: parent
-                anchors.margins: -8
+                x: -8
+                y: -8
+                width: trayMenu.primaryMenuWidth + 16
+                height: parent.height + 16
                 color: LazerTheme.settingsSection
                 visible: root.actionKind === "tray"
             }

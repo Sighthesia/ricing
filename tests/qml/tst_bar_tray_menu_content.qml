@@ -1036,6 +1036,47 @@ Item {
                 function() { return item.highlightedSubmenuRow !== null }),
                 "a narrow ancestor blocked hover on the overflowing column")
         }
+        function test_wideInputRootKeepsPrimaryVisualColumnNarrow() {
+            // The real popup widens its content owner for the second level.
+            // That owner must not widen the primary face or its flickable.
+            var parent = fakeEntry("More", { hasChildren: true })
+            var item = createTemporaryObject(menuComp, root, {
+                useStubEntries: true,
+                width: 496,
+                menuHandle: { id: "stub" },
+                entries: [fakeEntry("Top"), parent, fakeEntry("Bottom")]
+            })
+            item.submenuEntries = [fakeEntry("Child")]
+            item.openSubmenu(parent, null)
+            var ready = false
+            for (var i = 0; i < 300 && !ready; i++) {
+                wait(10)
+                ready = item.submenuPhase === "open"
+                    && findByName(item, "traySubmenuFlick")
+                    && findByName(item, "traySubmenuFlick").height > 0
+            }
+            verify(ready, "wide input root never laid out")
+            var primary = findByName(item, "trayMenuFlick")
+            var face = findByName(item, "trayMenuFace")
+            var surface = findByName(item, "traySubmenuSurface")
+            var band = findByName(item, "traySubmenuColumnCatcher")
+            compare(item.width, 496)
+            compare(primary.width, item.primaryMenuWidth)
+            compare(face.width, item.primaryMenuWidth + item.submenuPad * 2)
+            compare(surface.width, item.primaryMenuWidth)
+            compare(band.x, item.primaryMenuWidth)
+            verify(band.x + band.width <= item.width,
+                "wide input root does not contain the submenu catcher")
+            var dismissed = 0
+            item.dismissRequested.connect(function() { dismissed++ })
+            var rowPoint = findByName(item, "traySubmenuFlick").mapToItem(item, 40, 16)
+            verify(pollAct(function() { mouseMove(item, rowPoint.x, rowPoint.y) },
+                function() { return item.highlightedSubmenuRow !== null }),
+                "wide input root did not deliver submenu hover")
+            verify(pollAct(function() { mouseClick(item, rowPoint.x, rowPoint.y) },
+                function() { return dismissed === 1 }),
+                "wide input root did not deliver submenu click")
+        }
         function test_lateBatchAfterFlightStillOpensAndTakesHover() {
             // Coldest first-open shape: the DBus fetch outlasts the flight, so
             // the panel settles on an EMPTY body and the rows land afterwards.
