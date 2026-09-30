@@ -210,6 +210,47 @@ Singleton {
         windowsUpdated()
     }
 
+    // Apply a WindowLayoutsChanged batch. niri reports pure geometry changes —
+    // and fullscreen toggling is exactly that — through a dedicated event, NOT
+    // through WindowsChanged. Missing this event is what left a bar collapsed
+    // after leaving fullscreen: entering fullscreen also changes the window's
+    // toplevel state and so arrives via WindowOpenedOrChanged, but leaving it is
+    // geometry-only, so the fullscreen verdict kept its stale `true` until some
+    // unrelated event (a workspace switch) forced a full re-pull.
+    //
+    // Update in place instead of re-pulling: this fires per frame while a window
+    // is being dragged or animated, and a Process spawn per batch would be both
+    // wasteful and racy against the event stream.
+    function updateWindowLayouts(changes) {
+        if (!Array.isArray(changes) || !changes.length)
+            return
+        for (let i = 0; i < changes.length; i++) {
+            const entry = changes[i]
+            // Each entry is a (window id, layout) pair, serialized as a 2-item
+            // array. Ignore anything that does not match that shape rather than
+            // guessing: a silently misread layout would misjudge fullscreen.
+            if (!Array.isArray(entry) || entry.length < 2)
+                continue
+            const winId = String(entry[0])
+            const layout = entry[1] || {}
+            const rawTile = layout.tile_size
+            const tile = (Array.isArray(rawTile) && rawTile.length >= 2) ? rawTile : null
+            if (!tile)
+                continue
+
+            for (let w = 0; w < windows.count; w++) {
+                if (windows.get(w).winId !== winId)
+                    continue
+                windows.setProperty(w, "tileWidth", Number(tile[0]))
+                windows.setProperty(w, "tileHeight", Number(tile[1]))
+                break
+            }
+        }
+        root._windowsRevision++
+        root.recomputeFullscreenOutputs()
+        windowsUpdated()
+    }
+
     // Record each output's logical extents. niri reports these through
     // OutputsChanged (and once at startup); a disconnect drops the entry so a
     // stale size can never keep a bar collapsed.
@@ -431,6 +472,8 @@ Singleton {
                         root.setFocusedWindow(event.WindowFocusChanged.id)
                     else if (event.WindowsChanged)
                         root.updateWindows(event.WindowsChanged.windows)
+                    else if (event.WindowLayoutsChanged)
+                        root.updateWindowLayouts(event.WindowLayoutsChanged.changes)
                     else if (event.OutputsChanged)
                         root.updateOutputs(event.OutputsChanged)
                     else if (event.WindowOpenedOrChanged || event.WindowClosed)

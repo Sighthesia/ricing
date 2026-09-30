@@ -24,6 +24,7 @@ Item {
         function() { root.checkRealFullscreenGeometry() },
         function() { root.checkSyntheticFullscreen() },
         function() { root.checkBindingTracksServiceState() },
+        function() { root.checkLeavingFullscreenClearsTheVerdict() },
         function() { root.finish() }
     ]
 
@@ -268,6 +269,84 @@ Item {
 
         root.compare(probe.viaMap, true, "map binding follows the service")
         root.compare(probe.viaFunction, true, "function binding follows the service")
+    }
+
+    // niri reports geometry-only changes through WindowLayoutsChanged, and
+    // leaving fullscreen is geometry-only. Replay the real sequence — enter
+    // fullscreen, then leave it via a layout event alone — and require the
+    // verdict to come back false. This is the regression that shipped: the
+    // service ignored the event, so the verdict stuck at `true` and the bar
+    // stayed collapsed until a workspace switch forced a full re-pull.
+    function checkLeavingFullscreenClearsTheVerdict() {
+        const name = root.activeOutputName()
+        const ws = root.activeWorkspaceId(name)
+        if (!name || !ws) {
+            root.ok(false, "found an active workspace to replay the exit against")
+            return
+        }
+        const size = Services.NiriService.outputSizes[name] || {}
+        const realWindows = Services.NiriService.windows
+        const snapshot = []
+        for (let i = 0; i < realWindows.count; i++)
+            snapshot.push(realWindows.get(i))
+
+        // Enter fullscreen, the way a real session would report it.
+        realWindows.clear()
+        realWindows.append({
+            winId: "777777", title: "exiting", appId: "harness", isFocused: true,
+            workspaceId: ws, colIdx: 1, rowIdx: 1,
+            tileWidth: 1646.2857142857142, tileHeight: 1029.142857142857
+        })
+        Services.NiriService.recomputeFullscreenOutputs()
+        root.ok(Services.NiriService.isOutputFullscreen(name), "entered fullscreen")
+
+        // Leave fullscreen. niri sends ONLY WindowLayoutsChanged for this.
+        Services.NiriService.updateWindowLayouts([
+            [777777, {
+                tile_size: [1614.2857142857142, 949.142857142857],
+                window_size: [1606, 941],
+                window_offset_in_tile: [4, 4]
+            }]
+        ])
+        root.compare(
+            Services.NiriService.isOutputFullscreen(name), false,
+            "leaving fullscreen clears the verdict from a layout event alone")
+
+        // And back in, through a layout event, to prove the round trip holds.
+        Services.NiriService.updateWindowLayouts([
+            [777777, {
+                tile_size: [1646.2857142857142, 1029.142857142857],
+                window_size: [1646, 1029],
+                window_offset_in_tile: [0, 0]
+            }]
+        ])
+        root.ok(
+            Services.NiriService.isOutputFullscreen(name),
+            "re-entering fullscreen through a layout event works again")
+
+        // A layout event for an unknown window must not corrupt the verdict.
+        Services.NiriService.updateWindowLayouts([
+            [424242, { tile_size: [10, 10], window_size: [10, 10] }]
+        ])
+        root.ok(
+            Services.NiriService.isOutputFullscreen(name),
+            "a layout event for an unknown window leaves state intact")
+
+        // Malformed entries must be ignored, not crash or misjudge.
+        Services.NiriService.updateWindowLayouts([
+            null, [], [777777], [777777, {}], [777777, { tile_size: null }],
+            "not-a-pair", [777777, { tile_size: [1] }]
+        ])
+        root.ok(
+            Services.NiriService.isOutputFullscreen(name),
+            "malformed layout entries are ignored without corrupting state")
+        Services.NiriService.updateWindowLayouts(null)
+        Services.NiriService.updateWindowLayouts([])
+
+        realWindows.clear()
+        for (let i = 0; i < snapshot.length; i++)
+            realWindows.append(snapshot[i])
+        Services.NiriService.recomputeFullscreenOutputs()
     }
 
     function finish() {

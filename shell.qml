@@ -59,30 +59,53 @@ ShellRoot {
     }
 
     // Read-only window onto the fullscreen auto-hide chain, so the live state can
-    // be inspected from outside instead of inferred. Returns the service verdicts
-    // alongside what each bar screen resolved from them, which is the join the
+    // be inspected from outside instead of inferred. Logs the service verdicts
+    // alongside what each bar screen resolves from them, which is the join the
     // feature depends on (niri's output connector vs Quickshell's screen name).
+    //
+    // Prints instead of returning: Quickshell rejects a non-void IPC handler and
+    // calls it with no receiver, so a returning `state()` looks like a silent
+    // no-op. The shell's own stdout carries the console.log.
     IpcHandler {
         target: "debugFullscreenBar"
 
         function state() {
             const verdicts = Services.NiriService.fullscreenOutputs
             const screens = Quickshell.screens
+            const ws = Services.NiriService.workspaces
+            const wins = Services.NiriService.windows
+
             const rows = []
             for (let i = 0; i < screens.length; i++) {
                 const name = String(screens[i].name || "")
-                rows.push({
-                    screenName: name,
-                    matched: Object.prototype.hasOwnProperty.call(verdicts || {}, name),
-                    fullscreen: (verdicts || {})[name] === true
-                })
+                rows.push(name + "->fullscreen:"
+                    + ((verdicts || {})[name] === true)
+                    + ",matched:"
+                    + Object.prototype.hasOwnProperty.call(verdicts || {}, name))
             }
-            return {
-                outputSizes: Services.NiriService.outputSizes,
-                verdicts: verdicts,
-                settingEnabled: Services.SettingsService.bar.autoHideFullscreen === true,
-                screens: rows
+
+            let activeWs = "-"
+            let covering = "none"
+            for (let i = 0; i < ws.count; i++) {
+                const w = ws.get(i)
+                if (!w.isActive)
+                    continue
+                activeWs = w.wsId + "@" + w.output
+                for (let k = 0; k < wins.count; k++) {
+                    const win = wins.get(k)
+                    if (String(win.workspaceId) !== String(w.wsId))
+                        continue
+                    covering = win.appId + " " + win.tileWidth + "x" + win.tileHeight
+                }
             }
+
+            console.log("[fsbar] settingEnabled="
+                + (Services.SettingsService.bar.autoHideFullscreen === true)
+                + " outputSizes=" + JSON.stringify(Services.NiriService.outputSizes)
+                + " verdicts=" + JSON.stringify(verdicts)
+                + " screens=[" + rows.join(" | ") + "]"
+                + " activeWs=" + activeWs
+                + " coveringTile=" + covering)
         }
     }
 
@@ -153,6 +176,11 @@ ShellRoot {
                 root.adoptLockOwner(lockModule)
                 Services.LauncherService.primeApps()
                 Services.ClipboardService.warmup()
+                // Start the hold-key listener now, so the evdev bridge is
+                // already reading the keyboard by the time the user reaches for
+                // the hint key. QML singletons are lazy, so naming the property
+                // is what spawns the bridge; the value itself is unused here.
+                var hintWarm = Services.WindowHintService.hintHeld
                 if (!lockModule.selfTestEnabled)
                     Qt.callLater(() => lockModule.startupLock())
             }
