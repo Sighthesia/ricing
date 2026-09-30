@@ -184,11 +184,30 @@ Item {
             compare(Logic.distanceFromEdge(NaN, 48, true), Infinity)
         }
 
-        function test_revealStripIsThinAndIdleDelayIsPositive() {
-            // The collapsed bar's input region must stay thin enough to feel
-            // like an edge hint, and the idle collapse must actually wait.
+        function test_revealStripIsThin() {
+            // The collapsed bar's input region must stay thin enough to read as
+            // an edge hint rather than a second bar.
             compare(Logic.revealStripHeight, 3)
-            verify(Logic.idleHideDelay > 0)
+        }
+
+        function test_idleDelayIsImmediateButTimerIntervalIsUsable() {
+            // Leaving the bar already collapses it at once, so the idle fallback
+            // must not add a perceptible wait on top of that.
+            compare(Logic.idleHideDelay, 0)
+            // A Timer with interval 0 spins once per event-loop turn instead of
+            // firing once, so the tick handed to a Timer must stay positive.
+            verify(Logic.minTimerInterval > 0)
+        }
+
+        // The behaviour the zero delay is there to produce: pointer motion never
+        // leaves the bar waiting, whether it stays or leaves.
+        function test_barCollapsesOnLeaveWithoutWaiting() {
+            var revealed = apply(Logic.initialState(), "fullscreen", false)
+            revealed = apply(hidden({ revealed: true, armed: false }), "enter")
+            compare(revealed.revealed, true)
+            // No idle event in between: leaving is enough on its own.
+            var left = apply(revealed, "leave")
+            compare(left.revealed, false)
         }
 
         // The collapse path must be able to summon the bar back without a

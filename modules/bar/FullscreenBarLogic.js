@@ -21,7 +21,21 @@ var revealStripHeight = 3
 var revealArmSlack = 2
 
 // Collapse again after this long without pointer movement.
-var idleHideDelay = 1800
+//
+// Zero: leaving the bar already collapses it immediately (a `leave` event sets
+// the state directly, without consulting this). A positive delay therefore only
+// ever governed one case — the pointer parked on the bar, not moving — where it
+// read as sluggishness rather than intent, because a still mouse is exactly when
+// a user is looking at the bar, not when they want it gone.
+//
+// Kept as a named value rather than inlined: TopBar needs a non-zero Timer
+// interval to stay event-driven, and it derives the smallest usable tick from
+// this so the two cannot drift apart.
+var idleHideDelay = 0
+
+// Smallest non-zero interval to hand a Timer. A Timer with interval 0 is
+// not "immediate", it is a per-event-loop spin.
+var minTimerInterval = 1
 
 function initialState() {
     return {

@@ -191,9 +191,13 @@ Variants {
         }
 
         // Collapse again after a pause, but never out from under an open popup.
+        //
+        // `idleHideDelay` is 0 — leaving the bar already collapses it at once.
+        // A Timer cannot express that directly (interval 0 is a per-turn spin,
+        // not an immediate fire), so fall back to the smallest real tick.
         Timer {
             id: _hideTimer
-            interval: RevealLogic.idleHideDelay
+            interval: Math.max(RevealLogic.minTimerInterval, RevealLogic.idleHideDelay)
             onTriggered: {
                 if (!screenScope.revealed || !screenScope.fullscreenActive || screenScope._pinned)
                     return
