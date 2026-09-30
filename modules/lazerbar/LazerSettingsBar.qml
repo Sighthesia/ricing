@@ -15,6 +15,8 @@ LazerSettingsSection {
     property alias floatingMarginSlider: floatingMarginSliderControl
     property alias floatingMarginRow: floatingMarginRow
     property alias cornerRadiusSlider: cornerRadiusSliderControl
+    property alias autoHideFullscreenToggle: autoHideFullscreenToggleControl
+    property alias autoHideFullscreenRow: autoHideFullscreenRow
     property alias heightRow: heightRow
 
     function save() { if (root.saveCallback) root.saveCallback() }
@@ -82,5 +84,15 @@ LazerSettingsSection {
         currentValue: root.settingsObject ? root.settingsObject.cornerRadius : null
         resetCallback: function() { root.resetKey("cornerRadius") }
         LazerSettingsSlider { id: cornerRadiusSliderControl; from: 0; to: 24; stepSize: 1; defaultValue: root.defaultOf("cornerRadius"); value: root.settingsObject ? root.settingsObject.cornerRadius : 12; onValueModified: function(value) { if (root.settingsObject) { root.settingsObject.cornerRadius = Math.round(Math.max(0, Math.min(24, value))); root.save() } } }
+    }
+    LazerSettingsRow {
+        id: autoHideFullscreenRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: "全屏时自动隐藏"; descriptionText: "窗口全屏时收起顶部栏，鼠标移回边缘唤出"
+        defaultValue: root.defaultOf("autoHideFullscreen")
+        currentValue: root.settingsObject ? root.settingsObject.autoHideFullscreen : null
+        resetCallback: function() { root.resetKey("autoHideFullscreen") }
+        LazerSettingsToggle { id: autoHideFullscreenToggleControl; checked: root.settingsObject ? root.settingsObject.autoHideFullscreen : true; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.autoHideFullscreen = value; root.save() } } }
     }
 }

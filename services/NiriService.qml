@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "./" as Services
+import "./FullscreenDetect.js" as FullscreenDetect
 
 // Niri window manager IPC: tracks workspaces and windows via event stream.
 Singleton {
@@ -13,9 +14,24 @@ Singleton {
     // ListModel role changes do not reliably invalidate bindings that scan
     // `get()` rows, so expose an explicit revision for derived focus state.
     property int _windowsRevision: 0
+    // Logical output extents keyed by connector name, plus the fullscreen
+    // verdict derived from them. Both are plain vars recomputed imperatively,
+    // never bindings over `get()` rows, so a consumer can bind to them safely.
+    property var outputSizes: ({})
+    property var _fullscreenOutputs: ({})
     signal workspacesUpdated()
     signal workspaceActivated()
     signal windowsUpdated()
+
+    // True when a fullscreen window covers this output. See FullscreenDetect.js
+    // for why tile geometry is the only fullscreen signal niri exposes.
+    function isOutputFullscreen(outputName) {
+        const name = outputName == null ? "" : String(outputName)
+        if (!name)
+            return false
+        const map = root._fullscreenOutputs || {}
+        return map[name] === true
+    }
 
     readonly property string _homeDir: {
         const home = Quickshell.env("HOME")
@@ -163,6 +179,8 @@ Singleton {
             let win = windowListArray[i]
             const rawPos = win.layout ? win.layout.pos_in_scrolling_layout : null
             const pos = (Array.isArray(rawPos) && rawPos.length >= 2) ? rawPos : null
+            const rawTile = win.layout ? win.layout.tile_size : null
+            const tile = (Array.isArray(rawTile) && rawTile.length >= 2) ? rawTile : null
             windows.append({
                 winId: String(win.id),
                 title: win.title || "",
@@ -170,11 +188,65 @@ Singleton {
                 isFocused: win.is_focused || false,
                 workspaceId: win.workspace_id != null ? String(win.workspace_id) : "",
                 colIdx: pos ? pos[0] : 9999,
-                rowIdx: pos ? pos[1] : 9999
+                rowIdx: pos ? pos[1] : 9999,
+                // Tile geometry drives fullscreen detection: niri reports no
+                // is_fullscreen flag, but a fullscreen tile is the whole output.
+                tileWidth: tile ? Number(tile[0]) : 0,
+                tileHeight: tile ? Number(tile[1]) : 0
             })
         }
         root._windowsRevision++
+        root.recomputeFullscreenOutputs()
         windowsUpdated()
+    }
+
+    // Record each output's logical extents. niri reports these through
+    // OutputsChanged (and once at startup); a disconnect drops the entry so a
+    // stale size can never keep a bar collapsed.
+    function updateOutputs(outputMap) {
+        const source = (outputMap && outputMap.OutputsChanged)
+            ? outputMap.OutputsChanged.outputs
+            : outputMap
+        if (!source)
+            return
+        const sizes = ({})
+        for (let i = 0; i < source.length; i++) {
+            const out = source[i]
+            if (!out || !out.name)
+                continue
+            const logical = out.logical || {}
+            const width = Number(logical.width)
+            const height = Number(logical.height)
+            if (!isFinite(width) || !isFinite(height) || width <= 0 || height <= 0)
+                continue
+            sizes[String(out.name)] = { width: width, height: height }
+        }
+        root.outputSizes = sizes
+        root.recomputeFullscreenOutputs()
+    }
+
+    // Recompute the per-output fullscreen verdicts. Called imperatively after
+    // every windows/workspaces/outputs change so no consumer has to bind
+    // through ListModel rows, which do not reliably invalidate bindings.
+    function recomputeFullscreenOutputs() {
+        const active = ({})
+        for (let i = 0; i < workspaces.count; i++) {
+            const item = workspaces.get(i)
+            if (item.isActive && item.output)
+                active[String(item.output)] = String(item.wsId)
+        }
+
+        const rows = []
+        for (let k = 0; k < windows.count; k++) {
+            const win = windows.get(k)
+            rows.push({
+                workspaceId: win.workspaceId,
+                tileWidth: win.tileWidth,
+                tileHeight: win.tileHeight
+            })
+        }
+        root._fullscreenOutputs = FullscreenDetect
+            .fullscreenOutputs(root.outputSizes, active, rows)
     }
 
     function updateWorkspaces(workspacesEvent) {
@@ -201,7 +273,8 @@ Singleton {
                     wsId: workspaceId,
                     idx: ws.idx,
                     isActive: ws.is_active || false,
-                    name: ws.name || ""
+                    name: ws.name || "",
+                    output: ws.output ? String(ws.output) : ""
                 })
                 continue
             }
@@ -216,6 +289,8 @@ Singleton {
                 workspaces.setProperty(targetIndex, "isActive", ws.is_active || false)
             if (currentItem.name !== (ws.name || ""))
                 workspaces.setProperty(targetIndex, "name", ws.name || "")
+            if (currentItem.output !== (ws.output ? String(ws.output) : ""))
+                workspaces.setProperty(targetIndex, "output", ws.output ? String(ws.output) : "")
         }
 
         for (let index = workspaces.count - 1; index >= 0; index--) {
@@ -224,6 +299,7 @@ Singleton {
             workspaces.remove(index, 1)
         }
 
+        root.recomputeFullscreenOutputs()
         workspacesUpdated()
     }
 
@@ -235,6 +311,9 @@ Singleton {
             if (item.isActive !== isNowActive)
                 workspaces.setProperty(i, "isActive", isNowActive)
         }
+        // The active workspace decides which windows count for fullscreen, so
+        // re-derive before the async window re-pull lands.
+        root.recomputeFullscreenOutputs()
         workspaceActivated()
         root.reloadWindows()
     }
@@ -265,6 +344,42 @@ Singleton {
                 } catch (e) {}
             }
         }
+    }
+
+    // Initial output fetch. Output logical extents are the fullscreen yardstick:
+    // a fullscreen tile in niri is sized to the whole output, never the working
+    // area, so the bar can tell fullscreen from maximized without a flag the
+    // compositor does not publish.
+    property Process _outputFetcher: Process {
+        running: true
+        command: ["niri", "msg", "-j", "outputs"]
+        stdout: SplitParser {
+            onRead: data => {
+                try { root.updateOutputs(_flattenOutputs(JSON.parse(data.trim()))) } catch (e) {}
+            }
+        }
+    }
+
+    // `niri msg -j outputs` answers with a map keyed by connector (a mirror's
+    // entry is a list); the event stream's OutputsChanged carries a plain list.
+    function _flattenOutputs(parsed) {
+        if (Array.isArray(parsed))
+            return parsed
+        const list = []
+        for (let name in parsed || {}) {
+            if (!Object.prototype.hasOwnProperty.call(parsed, name))
+                continue
+            let entry = parsed[name]
+            if (Array.isArray(entry))
+                entry = entry.length ? entry[0] : null
+            if (!entry)
+                continue
+            list.push({
+                name: entry.name ? String(entry.name) : String(name),
+                logical: entry.logical || {}
+            })
+        }
+        return list
     }
 
     function reloadWindows() { fetcher.running = true }
@@ -299,6 +414,8 @@ Singleton {
                         root.setFocusedWindow(event.WindowFocusChanged.id)
                     else if (event.WindowsChanged)
                         root.updateWindows(event.WindowsChanged.windows)
+                    else if (event.OutputsChanged)
+                        root.updateOutputs(event.OutputsChanged)
                     else if (event.WindowOpenedOrChanged || event.WindowClosed)
                         root.reloadWindows()
                 } catch (e) {}

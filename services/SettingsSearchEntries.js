@@ -14,6 +14,8 @@ var settingsEntries = [
     { label: "Bar Position", category: "Bar", description: "Top or bottom placement", targetCategory: "bar" },
     { label: "Floating", category: "Bar", description: "Enable floating bar mode", targetCategory: "bar" },
     { label: "Floating Margin", category: "Bar", description: "Edge margin when floating", targetCategory: "bar" },
+    { label: "Fullscreen Auto Hide", category: "Bar", description: "Collapse the bar while a fullscreen window is up", targetCategory: "bar" },
+    { label: "全屏自动隐藏", category: "Bar", description: "全屏时自动收起顶部栏", targetCategory: "bar" },
     { label: "Corner Radius", category: "Bar", description: "Bar corner rounding", targetCategory: "bar" },
 
     // ── Appearance ──

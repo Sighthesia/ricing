@@ -70,6 +70,7 @@ QtObject {
         floating: false,
         floatingMargin: 4,
         cornerRadius: 12,
+        autoHideFullscreen: true,
     })
     readonly property var notificationDefaults: ({
         maxVisible: 3,
@@ -444,6 +445,9 @@ QtObject {
                 property bool floating: false
                 property int floatingMargin: 4
                 property int cornerRadius: 12
+                // Collapse the bar off-screen while a fullscreen window covers
+                // the output; moving the pointer back to the bar edge reveals it.
+                property bool autoHideFullscreen: true
             }
 
             property JsonObject appearance: JsonObject {
