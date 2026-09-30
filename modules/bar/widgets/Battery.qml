@@ -82,7 +82,11 @@ BarPill {
                 charging: root.charging,
                 pluggedIn: root.pluggedIn,
                 low: root.low,
-                critical: root.critical
+                critical: root.critical,
+                chargeRate: Services.BatteryService.chargeRate,
+                dischargeRate: Services.BatteryService.dischargeRate,
+                timeToEmpty: Services.BatteryService.timeToEmpty,
+                timeToFull: Services.BatteryService.timeToFull
             }
         }
     }

@@ -54,6 +54,17 @@ function maskedPassword(text) {
     return masked
 }
 
+// The horizontal center of the password field: the control minus the glyph
+// inset on the left and the right inset. The masked bullets are centered here,
+// and so is the empty-field caret, so clearing the input cannot leave the
+// insertion mark sitting somewhere the text had never been.
+function passwordTextAxis(controlWidth, leftInset, rightInset) {
+    var left = Number(leftInset) || 0
+    var right = Number(rightInset) || 0
+    var width = Number(controlWidth) || 0
+    return left + (width - left - right) / 2
+}
+
 // Choose the visible status line and its tone for the current auth state.
 // An empty PAM message still surfaces a spoken failure instead of silence.
 var authTones = {

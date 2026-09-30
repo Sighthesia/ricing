@@ -377,6 +377,26 @@ Item {
             verify(masked.indexOf("x") < 0)
         }
 
+        // An emptied field must not shift its insertion mark. The bullets are
+        // centered between the insets, and the caret reads the same axis, so
+        // the mark lands where the text was instead of drifting left.
+        function test_passwordAxisCentersBetweenTheInsets() {
+            compare(SurfaceLogic.passwordTextAxis(360, 56, 20), 198)
+            // The control center is 180: reusing it is exactly the bug.
+            verify(SurfaceLogic.passwordTextAxis(360, 56, 20) !== 180)
+            compare(SurfaceLogic.passwordTextAxis(360, 0, 0), 180)
+            compare(SurfaceLogic.passwordTextAxis(68, 56, 20), 52)
+        }
+
+        // A collapsed or not-yet-measured control must still yield a finite
+        // axis: a NaN here would park the caret off-screen instead of hiding it.
+        function test_passwordAxisToleratesMissingGeometry() {
+            compare(SurfaceLogic.passwordTextAxis(undefined, 56, 20), 18)
+            verify(isFinite(SurfaceLogic.passwordTextAxis(null, null, null)))
+            compare(SurfaceLogic.passwordTextAxis(360, null, null), 180)
+            compare(SurfaceLogic.passwordTextAxis(360, undefined, undefined), 180)
+        }
+
         function test_authStatusCoversProgressFailureAndIdle() {
             var progress = SurfaceLogic.authStatus(true, false, "")
             compare(progress.message, "Verifying...")

@@ -43,6 +43,15 @@ WlSessionLockSurface {
     // sharing this margin is what puts them on the same horizontal line.
     readonly property real authControlBottomMargin: 56
     readonly property real authControlHeight: 48
+    // The password field occupies the control between the glyph inset and the
+    // right inset. The masked bullets and the empty-field caret are both
+    // centered on this one axis: the caret used to center on the whole control
+    // instead, so an emptied field showed its mark 18px left of where the
+    // bullets had been.
+    readonly property real passwordTextLeftInset: 56
+    readonly property real passwordTextRightInset: 20
+    readonly property real passwordTextAxis: SurfaceLogic.passwordTextAxis(
+        authControl.width, root.passwordTextLeftInset, root.passwordTextRightInset)
     readonly property color authControlColor: root.themeSnapshotReady
             ? root.lockThemeSnapshot.control
             : (root.lightScheme ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.settingsControlSurface)
@@ -493,8 +502,8 @@ WlSessionLockSurface {
             Text {
                 id: passwordDisplay
                     anchors.fill: parent
-                anchors.leftMargin: 56
-                anchors.rightMargin: 20
+                anchors.leftMargin: root.passwordTextLeftInset
+                anchors.rightMargin: root.passwordTextRightInset
                 anchors.topMargin: 4
                 anchors.bottomMargin: 4
                 visible: root.inputMode && text.length > 0
@@ -512,14 +521,17 @@ WlSessionLockSurface {
                 }
             }
 
-            // Show a non-text insertion marker only for an empty focused field.
+            // Empty focused field: a slim caret on the bullets' own axis. It
+            // was a 12x6 pill centered on the whole control, which had the same
+            // footprint as one masked character and sat left of the text, so a
+            // cleared field read as a stray circle rather than a cursor.
             Rectangle {
                 id: emptyPasswordMarker
-                anchors.horizontalCenter: parent.horizontalCenter
+                x: root.passwordTextAxis - width / 2
                 anchors.verticalCenter: parent.verticalCenter
-                width: 12
-                height: 6
-                radius: 3
+                width: 3
+                height: 18
+                radius: 1.5
                 color: root.authIconColor
                 opacity: root.inputMode && keyboardOwner.activeFocus
                     && (!root.lockContext || root.lockContext.currentText.length === 0) ? 1 : 0

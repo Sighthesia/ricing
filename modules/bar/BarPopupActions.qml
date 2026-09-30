@@ -1,6 +1,7 @@
 import QtQuick
 import "../lazerbar"
 import "widgets" as ClockWidgets
+import "widgets/BatteryMetrics.js" as BatteryMetrics
 import "./BarTrayMenuLogic.js" as Logic
 
 // Content body for volume, brightness, media, notifications, tray and clock.
@@ -101,6 +102,38 @@ Item {
             return !!payload.low || !!payload.critical
         return false
     }
+    readonly property real batteryChargeRate: {
+        var raw = root.batteryService && root.batteryService.chargeRate !== undefined
+            ? Number(root.batteryService.chargeRate)
+            : (payload && payload.chargeRate !== undefined ? Number(payload.chargeRate) : 0)
+        return isFinite(raw) && raw > 0 ? raw : 0
+    }
+    readonly property real batteryDischargeRate: {
+        var raw = root.batteryService && root.batteryService.dischargeRate !== undefined
+            ? Number(root.batteryService.dischargeRate)
+            : (payload && payload.dischargeRate !== undefined ? Number(payload.dischargeRate) : 0)
+        return isFinite(raw) && raw > 0 ? raw : 0
+    }
+    readonly property real batteryTimeToEmpty: {
+        var raw = root.batteryService && root.batteryService.timeToEmpty !== undefined
+            ? Number(root.batteryService.timeToEmpty)
+            : (payload && payload.timeToEmpty !== undefined ? Number(payload.timeToEmpty) : 0)
+        return isFinite(raw) && raw > 0 ? raw : 0
+    }
+    readonly property real batteryTimeToFull: {
+        var raw = root.batteryService && root.batteryService.timeToFull !== undefined
+            ? Number(root.batteryService.timeToFull)
+            : (payload && payload.timeToFull !== undefined ? Number(payload.timeToFull) : 0)
+        return isFinite(raw) && raw > 0 ? raw : 0
+    }
+    readonly property bool batteryChargeMode: root.batteryCharging || root.batteryPluggedIn
+    readonly property string batteryRateLabel: root.batteryChargeMode ? "Charge rate" : "Discharge rate"
+    readonly property string batteryRateText: BatteryMetrics.formatRate(root.batteryChargeMode
+        ? root.batteryChargeRate : root.batteryDischargeRate)
+    readonly property string batteryTimeLabel: root.batteryChargeMode ? "Time to full" : "Remaining"
+    readonly property string batteryTimeText: root.batteryPluggedIn && !root.batteryCharging
+        ? "Full" : BatteryMetrics.formatDuration(root.batteryChargeMode
+            ? root.batteryTimeToFull : root.batteryTimeToEmpty)
     readonly property string batteryStateText: {
         if (!root.batteryReady)
             return "Unknown"
@@ -1161,7 +1194,7 @@ Item {
             }
         }
 
-        // Battery content: percentage readout plus state and level bar.
+        // Battery content: percentage, power metrics, state, and level bar.
         Item {
             id: batteryContent
             objectName: "batteryContent"
@@ -1169,12 +1202,12 @@ Item {
             height: batteryCard.height
             visible: root.actionKind === "battery"
 
-            // Settings-row card hosts the battery readout.
+            // Settings-row card hosts the live battery readout and estimates.
             Rectangle {
                 id: batteryCard
                 objectName: "batteryCard"
                 width: parent.width
-                height: 64
+                height: 116
                 radius: 6
                 color: batteryCardHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
@@ -1203,6 +1236,68 @@ Item {
                 font.pixelSize: 10
             }
 
+            // Charge or discharge rate row follows the state label.
+            Item {
+                id: batteryRateRow
+                objectName: "batteryRateRow"
+                anchors.left: parent.left
+                anchors.leftMargin: 16
+                anchors.right: parent.right
+                anchors.rightMargin: 16
+                anchors.top: batteryStateText.bottom
+                anchors.topMargin: 6
+                height: 16
+
+                Text {
+                    objectName: "batteryRateLabelText"
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.batteryRateLabel
+                    color: LazerTheme.textMuted
+                    font.pixelSize: 10
+                }
+
+                Text {
+                    objectName: "batteryRateValueText"
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.batteryReady ? root.batteryRateText : "—"
+                    color: LazerTheme.textPrimary
+                    font.pixelSize: 10
+                }
+            }
+
+            // Remaining or time-to-full estimate row sits above the level bar.
+            Item {
+                id: batteryTimeRow
+                objectName: "batteryTimeRow"
+                anchors.left: parent.left
+                anchors.leftMargin: 16
+                anchors.right: parent.right
+                anchors.rightMargin: 16
+                anchors.top: batteryRateRow.bottom
+                height: 16
+
+                Text {
+                    objectName: "batteryTimeLabelText"
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.batteryTimeLabel
+                    color: LazerTheme.textMuted
+                    font.pixelSize: 10
+                }
+
+                Text {
+                    objectName: "batteryTimeValueText"
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.batteryReady ? root.batteryTimeText : "—"
+                    color: LazerTheme.textPrimary
+                    font.pixelSize: 10
+                }
+            }
+
+            // Level bar remains the final visual anchor in the expanded card.
             Rectangle {
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 8
