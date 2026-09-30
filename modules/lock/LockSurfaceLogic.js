@@ -76,6 +76,17 @@ function inputEscapeAction(inputMode, unlockInProgress) {
     return inputMode === true || unlockInProgress === true ? "cancel-input" : "none"
 }
 
+// The unlock fall reuses the notification card's fling: a free-fall drop that
+// accelerates with t² and the same InQuad fade. Only those two carry over — the
+// card's leftward impulse and rotation come from the user's throw, and lock
+// content is not thrown. One curve drives every block at once, so the lock
+// content leaves as a single motion rather than a cascade.
+function contentFallCurve(progress) {
+    var t = progress < 0 ? 0 : (progress > 1 ? 1 : progress)
+    var eased = t * t
+    return { drop: eased, fade: eased }
+}
+
 // Keep keyboard editing on one focused owner instead of handing events off to
 // a native TextInput after the first key.
 function passwordInputEdit(currentText, isSubmit, isBackspace, eventText) {

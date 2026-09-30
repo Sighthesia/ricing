@@ -25,6 +25,9 @@ WlSessionLockSurface {
     // Single reveal driver; the backdrop derives the trailing mask from it
     // so bands and wallpaper edge always move as one curtain.
     property real waveProgress: 0
+    // Unlock fall driver: 0 keeps every content block in place, 1 has dropped
+    // and faded all of them away. The wave sweep waits for it.
+    property real contentFallProgress: 0
     property bool reducedMotion: Lazer.MotionTokens.reducedMotion
     property bool exitStarted: false
     property bool releaseSent: false
@@ -97,6 +100,7 @@ WlSessionLockSurface {
         exitStarted = false
         releaseSent = false
         inputMode = false
+        contentFallProgress = 0
         authControlState = SurfaceLogic.AuthControlStates.idle
         unlockFeedbackTimer.stop()
         unlockCollapseTimer.stop()
@@ -109,16 +113,28 @@ WlSessionLockSurface {
         revealStartTimer.restart()
     }
 
+    // The unlock choreography runs in two beats: every content block drops away
+    // on the notification fling, and only then does the wave close over the now
+    // empty surface. The release still lands on the wave's own completion.
     function startExit(): void {
         if (exitStarted)
             return
         exitStarted = true
         if (reducedMotion) {
+            contentFallProgress = 1
             SurfaceLogic.applyExitImmediately(root, allAnimations())
             requestRelease()
             return
         }
         SurfaceLogic.stopAll(allAnimations())
+        if (contentFallProgress <= 0) {
+            contentFallAnimation.restart()
+            return
+        }
+        startWaveExit()
+    }
+
+    function startWaveExit(): void {
         exitAnimation.from = waveProgress
         exitAnimation.start()
     }
@@ -131,8 +147,15 @@ WlSessionLockSurface {
     }
 
     function allAnimations(): var {
-        return [enterAnimation, exitAnimation]
+        return [enterAnimation, exitAnimation, contentFallAnimation]
     }
+
+    // One curve, one clock: the clock, the lock entry and the power row all
+    // fall together on this single sample. The progress read stays in the
+    // binding itself — a bare read from inside the JS helper is not part of the
+    // capture set.
+    readonly property var contentFall: SurfaceLogic.contentFallCurve(root.contentFallProgress)
+    readonly property real fallDistance: Lazer.MotionTokens.lockContentFallDistance
 
     // Enter the inline authentication mode without changing PAM state.
     function enterInputMode(): void {
@@ -283,6 +306,9 @@ WlSessionLockSurface {
         lightScheme: root.lightScheme
         lockTheme: root.themeSnapshotReady ? root.lockThemeSnapshot : null
         entranceRevealed: backdrop.revealContentInteractive
+        // The power row falls on the same curve as the rest of the content.
+        opacity: 1 - root.contentFall.fade
+        transform: Translate { y: root.contentFall.drop * root.fallDistance }
         z: 3.5
 
         onKeyboardReleased: keyboardOwner.forceActiveFocus()
@@ -322,6 +348,11 @@ WlSessionLockSurface {
                 x: root.clockCenterX * parent.width - width / 2
                 y: root.clockCenterY * parent.height - height / 2
                 spacing: 8
+                // The clock and its date fall with everything else. The drop
+                // rides a transform so the centered layout binding above stays
+                // authoritative.
+                opacity: 1 - root.contentFall.fade
+                transform: Translate { y: root.contentFall.drop * root.fallDistance }
 
                 Behavior on x {
                     enabled: !root.reducedMotion
@@ -408,7 +439,13 @@ WlSessionLockSurface {
                 enabled: !root.reducedMotion
                 ColorAnimation { duration: Lazer.MotionTokens.fast }
             }
-            transform: Translate { x: authControl.failureOffset }
+            // The failure shake and the unlock fall are separate offsets, so a
+            // stale shake can never ride the drop away.
+            transform: [
+                Translate { x: authControl.failureOffset },
+                Translate { y: root.contentFall.drop * root.fallDistance }
+            ]
+            opacity: 1 - root.contentFall.fade
 
             // Keep the glyph visible while the same rectangle opens for input.
             Item {
@@ -572,6 +609,20 @@ WlSessionLockSurface {
         duration: Lazer.MotionTokens.waveExit
         easing.type: Easing.OutQuad
         onFinished: root.requestRelease()
+    }
+
+    // Content fall owner: a plain linear driver whose gravity and fade shapes
+    // live in SurfaceLogic, so every block samples one curve. Linear here is
+    // deliberate — easing twice would bend the free-fall acceleration.
+    NumberAnimation {
+        id: contentFallAnimation
+        target: root
+        property: "contentFallProgress"
+        from: 0
+        to: 1
+        duration: Lazer.MotionTokens.lockContentFall
+        easing.type: Easing.Linear
+        onFinished: root.startWaveExit()
     }
 
     Connections {

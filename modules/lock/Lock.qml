@@ -340,9 +340,14 @@ Scope {
     }
 
     // Bounded fallback so a stalled exit can never hold the lock after a
-    // successful authentication; it stays armed only in the exiting state.
+    // successful authentication; it stays armed only in the exiting state. The
+    // budget covers the whole unlock choreography — unlock feedback, the
+    // control collapse, the content fall, then the wave sweep — plus a margin.
     property Timer _exitFailsafe: Timer {
-        interval: Lazer.MotionTokens.waveExit + Lazer.MotionTokens.slow
+        interval: Lazer.MotionTokens.medium + Lazer.MotionTokens.instant
+                  + Lazer.MotionTokens.lockContentFall
+                  + Lazer.MotionTokens.waveExit
+                  + Lazer.MotionTokens.slow
         repeat: false
         onTriggered: {
             if (!Controller.exitFailsafeShouldRelease(root._state, root._exitFailsafeArmed))

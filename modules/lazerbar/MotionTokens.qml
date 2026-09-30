@@ -19,6 +19,13 @@ QtObject {
     // Backdrop waves lead the body so they stay visible while content slides over them.
     readonly property int waveBackdropEnter: 600
 
+    // Lock-screen unlock: every content block drops away together on the osu
+    // notification fling (gravity drop + InQuad fade) before the wave closes
+    // over the empty surface. The drop stays inside the frame: the bottom row
+    // already sits one control height above the screen edge.
+    readonly property int lockContentFall: 360
+    readonly property real lockContentFallDistance: 56
+
     // Wallpaper swaps are large-surface reveals; keep them calm but not slow.
     readonly property int wallpaperSwap: 480
     readonly property int waveRoute: 160

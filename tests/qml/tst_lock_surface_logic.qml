@@ -25,23 +25,26 @@ Item {
     }
 
     // Harness mirrors the production contract exactly: one reveal driver,
-    // enter 800ms OutQuad, exit 500ms OutQuad, release owned by the landing.
+    // enter 800ms OutQuad, exit 500ms OutQuad, plus the single 360ms content
+    // fall that every block shares; release is still owned by the wave landing.
     Item {
         id: lockSurface
         anchors.fill: parent
         property real waveProgress: 0
+        property real contentFallProgress: 0
         property bool reducedMotion: false
         property bool exitStarted: false
         property bool releaseSent: false
         signal releaseRequested()
 
         function allAnimations() {
-            return [enterAnimation, exitAnimation]
+            return [enterAnimation, exitAnimation, contentFallAnimation]
         }
 
         function startReveal() {
             exitStarted = false
             releaseSent = false
+            contentFallProgress = 0
             if (reducedMotion) {
                 SurfaceLogic.applyRevealImmediately(lockSurface, allAnimations())
                 return
@@ -60,6 +63,7 @@ Item {
                 return
             exitStarted = true
             if (reducedMotion) {
+                contentFallProgress = 1
                 SurfaceLogic.applyExitImmediately(lockSurface, allAnimations())
                 if (!releaseSent) {
                     releaseSent = true
@@ -68,6 +72,14 @@ Item {
                 return
             }
             SurfaceLogic.stopAll(allAnimations())
+            if (contentFallProgress <= 0) {
+                contentFallAnimation.restart()
+                return
+            }
+            startWaveExit()
+        }
+
+        function startWaveExit() {
             exitAnimation.from = waveProgress
             exitAnimation.start()
         }
@@ -97,6 +109,17 @@ Item {
             }
         }
 
+        NumberAnimation {
+            id: contentFallAnimation
+            target: lockSurface
+            property: "contentFallProgress"
+            from: 0
+            to: 1
+            duration: 360
+            easing.type: Easing.Linear
+            onFinished: lockSurface.startWaveExit()
+        }
+
         Component.onCompleted: startReveal()
     }
 
@@ -114,6 +137,7 @@ Item {
             lockSurface.stopAnimation()
             lockSurface.reducedMotion = false
             lockSurface.waveProgress = 0
+            lockSurface.contentFallProgress = 0
             lockSurface.exitStarted = false
             lockSurface.releaseSent = false
         }
@@ -132,7 +156,7 @@ Item {
             verify(lockSurface.waveProgress > 0 && lockSurface.waveProgress < 1)
             lockSurface.startExit()
             verify(!harness.released)
-            tryCompare(harness, "released", true, 900)
+            tryCompare(harness, "released", true, 1200)
             compare(lockSurface.waveProgress, 0)
         }
 
@@ -141,8 +165,23 @@ Item {
             tryCompare(lockSurface, "waveProgress", 1, 1200)
             lockSurface.startExit()
             verify(!harness.released)
-            tryCompare(harness, "released", true, 900)
+            tryCompare(harness, "released", true, 1200)
             tryCompare(lockSurface, "waveProgress", 0, 100)
+        }
+
+        // The content blocks drop away together: one curve, no stagger, and the
+        // wave must not start moving until the fall has landed.
+        function test_exitPlaysTheContentFallBeforeTheWave() {
+            lockSurface.startReveal()
+            tryCompare(lockSurface, "waveProgress", 1, 1200)
+            lockSurface.startExit()
+            wait(200)
+            verify(lockSurface.contentFallProgress > 0, "the fall must be running")
+            compare(lockSurface.waveProgress, 1, "the wave waits for the fall")
+            verify(!harness.released)
+            tryCompare(lockSurface, "contentFallProgress", 1, 600)
+            tryCompare(harness, "released", true, 900)
+            compare(lockSurface.waveProgress, 0)
         }
 
         function test_reducedMotionUsesFinalValuesImmediately() {
@@ -151,6 +190,7 @@ Item {
             compare(lockSurface.waveProgress, 1)
             lockSurface.startExit()
             compare(lockSurface.waveProgress, 0)
+            compare(lockSurface.contentFallProgress, 1, "reduced motion settles the fall")
             verify(harness.released)
         }
 
@@ -365,6 +405,35 @@ Item {
             compare(SurfaceLogic.inputEscapeAction(true, false), "cancel-input")
             compare(SurfaceLogic.inputEscapeAction(false, true), "cancel-input")
             compare(SurfaceLogic.inputEscapeAction(false, false), "none")
+        }
+
+        // The unlock fall borrows the notification card's free fall: the drop
+        // accelerates with t² and the fade follows the same curve, so a linear
+        // time base still reads as a fall rather than a slide.
+        function test_contentFallAcceleratesAndFadesOnOneCurve() {
+            const start = SurfaceLogic.contentFallCurve(0)
+            compare(start.drop, 0)
+            compare(start.fade, 0)
+            const quarter = SurfaceLogic.contentFallCurve(0.25)
+            compare(quarter.drop, 0.0625)
+            compare(quarter.fade, 0.0625)
+            compare(SurfaceLogic.contentFallCurve(0.5).drop, 0.25)
+            const end = SurfaceLogic.contentFallCurve(1)
+            compare(end.drop, 1)
+            compare(end.fade, 1)
+            compare(SurfaceLogic.contentFallCurve(2).drop, 1, "clamped past the end")
+            compare(SurfaceLogic.contentFallCurve(-1).fade, 0, "clamped before the start")
+        }
+
+        // Every block reads one curve, so the clock, the lock entry and the
+        // power row are always at the same point of the fall. There is no
+        // per-block delay left to sample.
+        function test_everyBlockFallsOnTheSameSample() {
+            const half = SurfaceLogic.contentFallCurve(0.5)
+            compare(half.drop, 0.25)
+            compare(half.fade, 0.25)
+            verify(SurfaceLogic.staggeredFallProgress === undefined,
+                   "no per-block delay may survive")
         }
 
         function test_passwordInputKeepsMixedCaseAndDigitsOnOnePath() {
