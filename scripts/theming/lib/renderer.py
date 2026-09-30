@@ -18,6 +18,7 @@ Supports:
   {name}, on_{name}, {name}_container, on_{name}_container tokens
 """
 
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -90,6 +91,30 @@ KNOWN_FORMATS = frozenset({
     "hex", "hex_stripped", "rgb", "rgb_csv", "rgba", "hsl", "hsla",
     "red", "green", "blue", "alpha", "hue", "saturation", "lightness",
 })
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    """Write `text` to `path` so a reader never sees a half-written file.
+
+    `Path.write_text` truncates first: between the truncate and the last write
+    the file on disk is empty or partial. Every consumer of these templates is
+    a live process watching the file (opencode reloads its theme, kitty and
+    niri re-read their colors), and a reader that catches the window reads
+    invalid content and falls back to its own defaults — which looks exactly
+    like "the theme randomly reverted". Write a sibling temp file, fsync it,
+    then rename over the target: readers see either the old file or the new
+    one, never a torn one.
+    """
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with open(tmp, "w") as fh:
+            fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 class TemplateRenderer:
@@ -1009,7 +1034,7 @@ class TemplateRenderer:
                     except OSError:
                         pass
                 if not skip_write:
-                    out.write_text(rendered_text)
+                    _atomic_write(out, rendered_text)
                     wrote = True
                 success = True
         except FileNotFoundError:
