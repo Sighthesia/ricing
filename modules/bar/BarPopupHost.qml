@@ -377,6 +377,32 @@ PanelWindow {
         return root._pointInRect(p.x, p.y, r)
     }
 
+    // Capture the QML hit-test chain for the second-level catcher. The
+    // compositor region can cover a point while an intermediate item still
+    // prevents Qt from descending into an overflowing child.
+    function _hitChain(item) {
+        var chain = []
+        var current = item
+        var guard = 0
+        while (current && guard < 24) {
+            chain.push({
+                "objectName": String(current.objectName || ""),
+                "x": Math.round(Number(current.x) * 10) / 10,
+                "y": Math.round(Number(current.y) * 10) / 10,
+                "width": Math.round(Number(current.width) * 10) / 10,
+                "height": Math.round(Number(current.height) * 10) / 10,
+                "visible": current.visible === true,
+                "enabled": current.enabled === true,
+                "clip": current.clip === true,
+                "containsMouse": current.containsMouse === true
+                    ? true : (current.containsMouse === false ? false : null),
+            })
+            current = current.parent
+            guard++
+        }
+        return chain
+    }
+
     function _thiefAt(p) {
         if (!p)
             return "none"
@@ -511,6 +537,9 @@ PanelWindow {
                 "firstPrimary": String(tc ? tc._evFirstPrimary : "none"),
                 "firstBand": String(tc ? tc._evFirstBand : "none"),
                 "firstPanel": String(tc ? tc._evFirstPanel : "none"),
+                "bandContainsMouse": tc && tc.submenuColumn
+                    ? tc.submenuColumn.containsMouse === true : null,
+                "hitChain": root._hitChain(tc ? tc.submenuColumn : null),
             },
             "host": {
                 "phase": root.open ? "open" : (root.surfaceActive ? "revealing" : "closed"),
@@ -911,11 +940,13 @@ PanelWindow {
     }
 
     // Popup width follows the intent: media carries a wide card (cover +
-    // identity + spectrum), everything else stays at the classic 260.
+    // identity + spectrum) and the window hint carries a workspace strip plus
+    // window titles, so both are wider than the classic 260 column.
     function popupWidthForIntent(intentObj) {
         if (!intentObj || String(intentObj.kind || "") === "context")
             return 260
-        return String(intentObj.actionKind || "") === "media" ? 420 : 260
+        var kind = String(intentObj.actionKind || "")
+        return kind === "media" ? 420 : (kind === "window-hint" ? 360 : 260)
     }
 
     // Slot width fits both sliding layers during an exchange so the
