@@ -36,6 +36,10 @@ WlSessionLockSurface {
     // before the shared theme palette has finished applying its new scheme.
     property bool lightScheme: Services.SettingsService.effectiveColorScheme === "light"
     readonly property real authInputWidth: Math.max(0, Math.min(360, root.width - 48))
+    // One baseline for the lock entry and the power row: both are 48 tall, so
+    // sharing this margin is what puts them on the same horizontal line.
+    readonly property real authControlBottomMargin: 56
+    readonly property real authControlHeight: 48
     readonly property color authControlColor: root.themeSnapshotReady
             ? root.lockThemeSnapshot.control
             : (root.lightScheme ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.settingsControlSurface)
@@ -156,6 +160,36 @@ WlSessionLockSurface {
         return true
     }
 
+    // One key path for the whole surface. The keyboard owner and any focused
+    // session button both go through it, so a power button can never become a
+    // second keyboard owner that swallows the password.
+    function applyAuthKey(key, text): bool {
+        if (key === Qt.Key_Escape) {
+            if (actionBar.handleEscape())
+                return true
+            return root.cancelInputMode()
+        }
+        if (!root.lockContext)
+            return false
+        const isSubmit = key === Qt.Key_Return || key === Qt.Key_Enter
+        const isBackspace = key === Qt.Key_Backspace
+        const isPrintable = text && text.length === 1
+        if (!isSubmit && !isBackspace && !isPrintable)
+            return false
+        root.enterInputMode()
+        const edit = SurfaceLogic.passwordInputEdit(
+                    root.lockContext.currentText, isSubmit, isBackspace, text)
+        if (edit.action === "submit") {
+            root.lockContext.submit()
+            return true
+        }
+        if (edit.action === "edit") {
+            root.lockContext.currentText = edit.text
+            return true
+        }
+        return false
+    }
+
     onLockContextChanged: {
         contextConnections.target = lockContext
     }
@@ -235,25 +269,27 @@ WlSessionLockSurface {
     }
 
     // Keep session actions inside this compositor-owned surface.
-    LockSessionMenu {
-        id: sessionMenu
+    LockActionBar {
+        id: actionBar
         parent: backdrop.revealContentHost
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: 28
-        anchors.bottomMargin: 28
+        // Share the lock entry's baseline: same height, same bottom margin, so
+        // the power row sits on the lock glyph's own horizontal line.
+        anchors.bottomMargin: root.authControlBottomMargin
         reducedMotion: root.reducedMotion
         sessionService: Services.SessionService
         lightScheme: root.lightScheme
         lockTheme: root.themeSnapshotReady ? root.lockThemeSnapshot : null
         entranceRevealed: backdrop.revealContentInteractive
         z: 3.5
-    }
 
-    Connections {
-        target: sessionMenu
-        function onOpenChanged() {
-            if (!sessionMenu.open)
+        onKeyboardReleased: keyboardOwner.forceActiveFocus()
+        onKeyForwarded: (key, text) => {
+            // A focused power button only forwards what the password field
+            // understands; anything else returns focus to the auth owner.
+            if (!root.applyAuthKey(key, text))
                 keyboardOwner.forceActiveFocus()
         }
     }
@@ -268,31 +304,7 @@ WlSessionLockSurface {
         z: 4
 
         Keys.onPressed: event => {
-            if (event.key === Qt.Key_Escape && sessionMenu.handleEscape()) {
-                event.accepted = true
-                return
-            }
-            if (event.key === Qt.Key_Escape && root.cancelInputMode()) {
-                event.accepted = true
-                return
-            }
-            if (!root.lockContext)
-                return
-            var isSubmit = event.key === Qt.Key_Return || event.key === Qt.Key_Enter
-            var isBackspace = event.key === Qt.Key_Backspace
-            var isPrintable = event.text && event.text.length === 1
-            if (!isSubmit && !isBackspace && !isPrintable)
-                return
-            root.enterInputMode()
-            var edit = SurfaceLogic.passwordInputEdit(
-                        root.lockContext.currentText, isSubmit, isBackspace, event.text)
-            if (edit.action === "submit") {
-                root.lockContext.submit()
-                event.accepted = true
-            } else if (edit.action === "edit") {
-                root.lockContext.currentText = edit.text
-                event.accepted = true
-            }
+            event.accepted = root.applyAuthKey(event.key, event.text)
         }
     }
 
@@ -363,9 +375,9 @@ WlSessionLockSurface {
             id: authControl
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 56
+            anchors.bottomMargin: root.authControlBottomMargin
             width: root.inputMode ? root.authInputWidth : 68
-            height: 48
+            height: root.authControlHeight
             radius: Lazer.LazerTheme.settingsChoiceRadius
             color: root.authControlColor
             border.width: root.authFailureVisible ? 2 : 1

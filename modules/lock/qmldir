@@ -6,5 +6,5 @@ LockSnapshot 1.0 LockSnapshot.qml
 LockSurface 1.0 LockSurface.qml
 LockBackdrop 1.0 LockBackdrop.qml
 WallpaperClockLayout 1.0 WallpaperClockLayout.qml
-LockSessionMenu 1.0 LockSessionMenu.qml
-LockSessionMenuItem 1.0 LockSessionMenuItem.qml
+LockActionBar 1.0 LockActionBar.qml
+LockActionButton 1.0 LockActionButton.qml
