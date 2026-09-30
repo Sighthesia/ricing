@@ -100,6 +100,65 @@ inside `/tmp/opencode/xdg-data/`.
   every test that runs after it.
 - Read the animation's *contract* (a token or a formula) rather than a copied
   constant, so a deliberate retune does not silently desync the test.
+- **Reassigning a `Repeater` model needs a real settle before synthesized
+  pointer events.** `mouseClick(item, …)` maps the item's geometry through the
+  scene graph, so a `wait(0)` after replacing the model is not enough: the
+  delegates are rebuilt but the scene transform is not synced yet, and the click
+  lands on nothing. Measured on the window-hint body: `wait(0)` made a chip tap
+  fail intermittently (2 green / 1 red across identical runs, while ten
+  back-to-back taps on the same chip with a settled scene missed 0), and
+  `wait(20)` gave 5/5 green. `init()` that swaps a model must wait long enough
+  for the rebuild.
+- For a click-flash, assert the **recipe**, not a sampled opacity: expose the
+  animation the way `OsuTopBarButton` does (`flashAnimationItem`,
+  `flashOverlayItem`) and compare `property` / `from` / `to` / `duration` /
+  `easing.type` against `MotionTokens`. `animation.restart()` sets `from`
+  synchronously, so `running` and a non-zero `opacity` are readable on the click
+  frame — no `wait` needed, and no dependence on where in the decay a poll lands.
+- `qmllint` on this machine reports **zero diagnostics even for a file with
+  unknown properties and unknown types**. It is not a usable signal here; do not
+  report "lint clean" on its strength. `qmlformat <file> >/dev/null` *is* usable
+  as a parse gate — it exits non-zero on a syntax error with empty stderr (it
+  has no `--check` option), so run it over every QML file you touched and treat
+  a non-zero exit as a hard stop. It only proves the file parses; semantics
+  still need a real load: a `tests/qml/` QtTest file for a plain `Item`, or a
+  root-level `qs -p` harness for anything that imports `Services.*`.
+- **`Repeater` leaves one role-less, zero-width placeholder in its parent's
+  `children`.** With two `ListModel` rows, `row.children.length` is 3: two real
+  delegates plus a placeholder whose every model role — including a `required`
+  property — reads `undefined`. The roles themselves do bind correctly
+  (`required property string slotKey` tracked a `setProperty` live), and the
+  placeholder's `width` stays 0 so layout ignores it. Any harness that walks
+  `row.children` to count delegates must filter those entries, or it counts a
+  slot that does not exist. Confirmed on a plain JS-array model too, so it is
+  the `Repeater`, not `ListModel`.
+- **QML `Animation` has no `delay` property** — `anim.delay = n` is a runtime
+  `Cannot assign to non-existent property "delay"`. Cascade delays need a
+  `Timer { onTriggered: anim.restart() }`, or a `PauseAnimation` inside a
+  `SequentialAnimation`.
+- **A `NumberAnimation` nested in a `ParallelAnimation` does not reliably fire
+  its `onFinished`.** Anything that must happen at the end of a grouped
+  animation (dropping a row, committing a removal) has to run from its own
+  `Timer` on the group's total duration, or it silently never happens.
+- **A JS function running in a `qs` harness cannot unbind a bound QML
+  property.** `tray.liveValues = [...]` left the
+  `property var liveValues: SystemTray.items.values` binding in place, and the
+  service list immediately overwrote the injected batch. Give the component an
+  explicit override property (null in production) for the harness to drive.
+- **Chain a `qs` harness's phases; never queue them side by side.** A step
+  queued with `at = elapsed + 0` after a polling step lands *before* that
+  polling step, so the check reads the widget mid-flight and fails for reasons
+  that have nothing to do with the code. Each phase must start from the previous
+  phase's completion callback.
+- **A QML binding cannot see a JS object being mutated in place.** `readonly
+  property int liveCount: registry.keys.length` evaluates **once**, when the
+  binding is first resolved, and never again — `registry.keys = [...]` inside a
+  library function does not invalidate anything, because the `registry`
+  reference itself never changed. The symptom is a derived count frozen at 0
+  while the model underneath is perfectly correct, and the assertion that
+  catches it is the one reading the count. Reassign a QML-owned property (a
+  `ListModel`, or a `property var` you replace wholesale) for anything a
+  binding must follow.
 
 ## Do not let tests touch the real environment
 

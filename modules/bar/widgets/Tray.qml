@@ -28,6 +28,9 @@ Item {
     // row is finally dropped.
     readonly property int slotGap: 2
 
+    // Read off `_liveKeys`, which syncSlots reassigns: a binding cannot see a
+// nested field of a JS object being mutated in place, so `_registry.keys`
+// would freeze at whatever it held when the binding first evaluated.
     readonly property int liveCount: root._liveKeys.length
     // Downward travel of a leaving icon, sized so the bar never slices it.
     readonly property real fallDistance: SlotLogic.fallDistance(LazerTheme.barWidgetHeight, LazerTheme.barGlyphSize)
@@ -60,6 +63,10 @@ Item {
                     ? SystemTray.items.values : [])
     property var _liveKeys: []
     property var _liveItems: ({})
+    // Registered object -> slot key, kept for as long as the object stays
+    // registered. See TraySlotLogic: a string derived from the item is not
+    // unique enough to file a slot under.
+    property var _registry: SlotLogic.emptyRegistry()
 
     // The very first population must not replay an arrival for every icon the
     // shell already had on screen.
@@ -123,18 +130,13 @@ Item {
     // exit) and surviving rows only have their snapshot roles rewritten.
     function syncSlots() {
         var values = root.liveValues || []
-        var keys = []
+        // Identity first: every live object keeps the slot key it already had,
+        // so a reordered list moves slots instead of re-deriving their names.
+        var registry = root._registry
+        var keys = SlotLogic.reindex(registry, values)
         var items = ({})
-        for (var i = 0; i < values.length; i++) {
-            var item = values[i]
-            if (!item) continue
-            var key = SlotLogic.slotKey(item, i)
-            // Two items can claim one id; keep both addressable.
-            if (items[key] !== undefined)
-                key = key + "#" + i
-            items[key] = item
-            keys.push(key)
-        }
+        for (var i = 0; i < keys.length; i++)
+            items[keys[i]] = registry.items[i]
 
         var change = SlotLogic.diff(root._liveKeys, keys)
         root._liveKeys = keys
@@ -197,8 +199,11 @@ Item {
         if (!item) return
         var row = slotModel.get(index)
         if (!row) return
+        // An app that briefly reports no icon (mid-reload) must not blank the
+        // slot: an empty source makes the icon vanish, and it only comes back if
+        // the app signs another icon change.
         var source = root.iconSourceFor(item)
-        if (row.iconSource !== source)
+        if (source !== "" && row.iconSource !== source)
             slotModel.setProperty(index, "iconSource", source)
         var label = root.labelFor(item)
         if (row.label !== label)
@@ -228,11 +233,14 @@ Item {
         }
         if (!isFinite(centerX)) centerX = 0
         var titleText = (delegateItem && delegateItem.label) ? delegateItem.label : (modelData.title || modelData.tooltipTitle || modelData.id || "Tray item")
-        // Stable per-icon identity: tray delegates share widgetId/instanceKey,
-        // so the host tells icons apart via this key. The same icon refreshing
-        // its label keeps the popup live; a different icon gets the full
+        // Tray delegates share widgetId/instanceKey, so the host tells icons
+        // apart by this key. It must be the slot key: an item's own `id` is not
+        // unique across registered items, and a collision here makes the popup
+        // replace itself with another icon's card. The same icon refreshing its
+        // label keeps the popup live; a different icon gets the full
         // glide/slide replacement.
-        var delegateKey = String((modelData && modelData.id) || titleText || "tray")
+        var delegateKey = String((delegateItem && delegateItem.slotKey)
+                || (modelData && modelData.id) || titleText || "tray")
         var iconSrc = normalizeTrayIconSource((delegateItem && delegateItem.iconSource)
                 ? delegateItem.iconSource : (modelData.icon || ""))
         var summaryText = modelData.tooltipTitle || modelData.tooltipSubTitle || ""

@@ -82,11 +82,49 @@ Item {
 
     readonly property var fakes: [itemA, itemB, itemC]
 
+    // A collision pair: two different apps that both report the same tooltip,
+    // which is what a string-keyed slot file collapsed into one another.
+    QtObject {
+        id: itemQ
+        property string title: "QQ"
+        property string icon: ""
+        property string tooltipTitle: "shared-id"
+        property bool hasMenu: false
+        property var menu: null
+    }
+    QtObject {
+        id: itemF
+        property string title: "输入法"
+        property string icon: ""
+        property string tooltipTitle: "shared-id"
+        property bool hasMenu: false
+        property var menu: null
+    }
+
     Widgets.Tray {
         id: tray
 
         width: 400
         height: Lazer.LazerTheme.barWidgetHeight
+    }
+
+    // The labels the strip is actually showing, left to right.
+    function stripLabels() {
+        var s = slots()
+        var names = []
+        for (var i = 0; i < s.length; i++)
+            names.push(s[i].label)
+        return names
+    }
+
+    // Which app each slot is showing, by slot identity rather than by name —
+    // the only way to see two icons trade places.
+    function slotPairs() {
+        var s = slots()
+        var pairs = []
+        for (var i = 0; i < s.length; i++)
+            pairs.push(s[i].slotKey + "=" + s[i].label)
+        return pairs
     }
 
     // The real delegates, in slot order.
@@ -379,7 +417,7 @@ Item {
                     && back.presence === 1 && back.ink === 1, "revived state")
             probe.check("revivalAddsNoDuplicate",
                     tray.implicitWidth === probe.settledWidth(tray.liveCount), tray.implicitWidth)
-            probe.after(20, phaseReducedMotion)
+            probe.after(20, phaseCollidingIds)
         })
     }
 
@@ -390,6 +428,52 @@ Item {
             probe.check("reducedMotionSkipsTheExit", probe.slotNamed("Beta") === null,
                     probe.slots().length)
             Lazer.MotionTokens.reducedMotionOverride = false
+        })
+    }
+
+    // Two apps reporting one identity must stay two icons, and a reordered
+    // service list must not trade them. This is the reported failure: the strip
+    // keyed slots on a string the items share, so QQ ended up wearing the input
+    // method's icon (and one of the two appeared to vanish mid-swap).
+    function phaseCollidingIds() {
+        var t = probe.tokens
+        var settle = t.fast + t.trayIconEnter + t.trayIconStagger + 120
+        var before = tray.liveCount
+        probe.after(20, function() { tray.liveValuesOverride = [itemQ, itemF] })
+        probe.pump(settle, 16, function() {
+            return probe.slots().length === 2 && probe.settled()
+        }, function() {
+            probe.check("collidingIdsKeepTwoSlots", probe.slots().length === 2, probe.slots().length)
+            probe.check("collidingIdsKeepTheReportedOrder",
+                    probe.stripLabels().join() === "QQ,输入法", probe.stripLabels().join())
+            var keys = []
+            var s = probe.slots()
+            for (var i = 0; i < s.length; i++)
+                keys.push(s[i].slotKey)
+            probe.check("collidingSlotsAreToldApart", keys[0] !== keys[1], keys.join())
+
+            // Which slot holds which app, so the reorder can be checked against
+            // identity rather than against the service's ordering.
+            var pairsBefore = probe.slotPairs()
+
+            // The service list reorders: the same two objects, swapped places.
+            probe.after(20, function() { tray.liveValuesOverride = [itemF, itemQ] })
+            // A service reorder is not a display event: the strip keeps the
+            // order it established, so the icons do not jump around while they
+            // are being used. Waiting on the reindex rather than on "settled",
+            // which is already true before it lands.
+            probe.pump(settle, 16, function() {
+                return tray.liveCount === 2 && probe.slots().length === 2 && probe.settled()
+            }, function() {
+                probe.check("reorderDoesNotChurnSlots",
+                        probe.slots().length === 2, probe.slots().length)
+                probe.check("reorderKeepsEachIconWithItsApp",
+                        probe.slotPairs().join() === pairsBefore.join(),
+                        probe.slotPairs().join() + " vs " + pairsBefore.join())
+                probe.check("reorderKeepsTheStripStable",
+                        probe.stripLabels().join() === "QQ,输入法", probe.stripLabels().join())
+                probe.after(20, phaseReducedMotion)
+            })
         })
     }
 }

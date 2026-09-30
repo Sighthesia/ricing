@@ -2,35 +2,96 @@ import QtQuick
 import QtTest
 import "../../modules/bar/widgets/TraySlotLogic.js" as SlotLogic
 
-// Tray slot bookkeeping: stable identity, the model diff that keeps a
-// surviving icon's delegate alive, and the enter/exit numbers the text
-// transition contributes.
+// Tray slot bookkeeping: the per-object identity a slot is filed under, the
+// model diff that keeps a surviving icon's delegate alive, and the enter/exit
+// numbers the text transition contributes.
 Item {
     TestCase {
         name: "TraySlotLogic"
-        id: traySlotCase
 
-        // --- stable identity -------------------------------------------------
+        // Fake tray items. Plain objects stand in for SystemTrayItem: identity
+        // is object identity, so the fakes need nothing from the real type.
+        property var qq: ({ id: "shared", title: "QQ", tooltipTitle: "shared" })
+        property var fcitx: ({ id: "shared", title: "输入法", tooltipTitle: "shared" })
+        property var clash: ({ id: "org.kde.clash", title: "Clash", tooltipTitle: "Clash" })
 
-        function test_keyPrefersSniId() {
-            compare(SlotLogic.slotKey({ id: "org.kde.tray", title: "Mail" }, 3),
-                    "org.kde.tray")
+        // --- identity -------------------------------------------------------
+
+        function test_objectsGetDistinctKeys() {
+            var registry = SlotLogic.emptyRegistry()
+            var keys = SlotLogic.reindex(registry, [qq, fcitx])
+            compare(keys.length, 2)
+            verify(keys[0] !== keys[1])
         }
 
-        function test_keyFallsBackToTitleThenTooltip() {
-            compare(SlotLogic.slotKey({ id: "", title: "Mail" }, 0), "Mail")
-            compare(SlotLogic.slotKey({ id: "", title: "", tooltipTitle: "Disk" }, 1), "Disk")
+        function test_twoItemsSharingOneIdStayApart() {
+            // The reported failure: QQ and the input method both report the
+            // same `id`. A string key would collapse or swap them.
+            var registry = SlotLogic.emptyRegistry()
+            var keys = SlotLogic.reindex(registry, [qq, fcitx])
+            compare(registry.items[0], qq)
+            compare(registry.items[1], fcitx)
         }
 
-        function test_keyFallsBackToIndex() {
-            compare(SlotLogic.slotKey({}, 4), "tray:4")
-            compare(SlotLogic.slotKey(null, 2), "tray:2")
+        function test_keysSurviveReordering() {
+            var registry = SlotLogic.emptyRegistry()
+            var before = SlotLogic.reindex(registry, [qq, fcitx])
+            var after = SlotLogic.reindex(registry, [fcitx, qq])
+            // Same objects, swapped places: each keeps its own key, and the
+            // diff reports no churn at all.
+            compare(after[0], before[1])
+            compare(after[1], before[0])
+            var change = SlotLogic.diff(before, after)
+            compare(change.added.length, 0)
+            compare(change.removed.length, 0)
         }
 
-        function test_keyIsStableAcrossLabelChanges() {
-            var before = SlotLogic.slotKey({ id: "app.tray", title: "One" }, 0)
-            var after = SlotLogic.slotKey({ id: "app.tray", title: "Two" }, 0)
-            compare(before, after)
+        function test_keysSurviveARepeatedRefresh() {
+            var registry = SlotLogic.emptyRegistry()
+            var first = SlotLogic.reindex(registry, [qq, fcitx, clash])
+            var second = SlotLogic.reindex(registry, [qq, fcitx, clash])
+            compare(second, first)
+        }
+
+        function test_departedObjectDropsItsKey() {
+            var registry = SlotLogic.emptyRegistry()
+            var before = SlotLogic.reindex(registry, [qq, fcitx])
+            SlotLogic.reindex(registry, [qq])
+            compare(registry.items.length, 1)
+            var again = SlotLogic.reindex(registry, [qq, fcitx])
+            // fcitx is a new registration as far as the strip is concerned: it
+            // must not resurrect the key it held when it left.
+            verify(again[1] !== before[1])
+        }
+
+        function test_freshKeyIsNotReusedAfterADeparture() {
+            var registry = SlotLogic.emptyRegistry()
+            var first = SlotLogic.reindex(registry, [qq])
+            SlotLogic.reindex(registry, [])
+            var second = SlotLogic.reindex(registry, [fcitx])
+            verify(second[0] !== first[0])
+        }
+
+        function test_nullEntriesAreSkipped() {
+            var registry = SlotLogic.emptyRegistry()
+            var keys = SlotLogic.reindex(registry, [null, qq, undefined])
+            compare(keys.length, 1)
+            compare(registry.items[0], qq)
+        }
+
+        function test_oneObjectListedTwiceGetsOneSlot() {
+            var registry = SlotLogic.emptyRegistry()
+            var keys = SlotLogic.reindex(registry, [qq, qq, fcitx])
+            compare(keys.length, 2)
+            compare(registry.items[1], fcitx)
+        }
+
+        function test_emptyListDropsEverything() {
+            var registry = SlotLogic.emptyRegistry()
+            SlotLogic.reindex(registry, [qq, fcitx])
+            var keys = SlotLogic.reindex(registry, [])
+            compare(keys.length, 0)
+            compare(registry.items.length, 0)
         }
 
         // --- model diff ------------------------------------------------------
