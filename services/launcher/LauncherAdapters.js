@@ -88,12 +88,12 @@ function appItem(entry, launchCounts, iconResolver) {
 // the afloat IPC helper.
 function builtinCommands() {
     return [{
-        id: "cmd-lock-test",
-        label: "测试锁屏（5 秒）",
-        description: "Start an isolated lock screen self-test",
-        keywords: "lock test lockscreen",
+        id: "cmd-lock",
+        label: "锁屏",
+        description: "Lock the session",
+        keywords: "lock lockscreen 锁屏 锁定 锁定屏幕",
         icon: "lock",
-        actionId: "shell.lock.test"
+        actionId: "shell.lock.lock"
     }]
 }
 

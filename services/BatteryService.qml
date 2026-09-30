@@ -19,6 +19,13 @@ Singleton {
     readonly property int percentage: root.ready ? root.getPercentage(root.primaryDevice) : 0
     readonly property bool charging: root.ready && root.isCharging(root.primaryDevice)
     readonly property bool pluggedIn: root.ready && root.isPluggedIn(root.primaryDevice)
+    // UPower reports positive changeRate while charging and negative while discharging.
+    readonly property real chargeRate: root.ready ? root.getChargeRate(root.primaryDevice) : 0
+    readonly property real dischargeRate: root.ready ? root.getDischargeRate(root.primaryDevice) : 0
+    readonly property real timeToEmpty: root.ready && !root.charging && !root.pluggedIn
+        ? root.getTimeEstimate(root.primaryDevice, "timeToEmpty") : 0
+    readonly property real timeToFull: root.ready && root.charging
+        ? root.getTimeEstimate(root.primaryDevice, "timeToFull") : 0
     readonly property bool low: root.ready && !root.charging && !root.pluggedIn && root.percentage <= 20 && root.percentage > 10
     readonly property bool critical: root.ready && !root.charging && !root.pluggedIn && root.percentage <= 10
     readonly property string iconText: {
@@ -52,6 +59,30 @@ Singleton {
             return 0
 
         return Math.round(device.percentage * 100)
+    }
+
+    function getChangeRate(device) {
+        if (!device || device.changeRate === undefined)
+            return 0
+
+        var value = Number(device.changeRate)
+        return isFinite(value) ? value : 0
+    }
+
+    function getChargeRate(device) {
+        return Math.max(0, root.getChangeRate(device))
+    }
+
+    function getDischargeRate(device) {
+        return Math.max(0, -root.getChangeRate(device))
+    }
+
+    function getTimeEstimate(device, propertyName) {
+        if (!device || device[propertyName] === undefined)
+            return 0
+
+        var value = Number(device[propertyName])
+        return isFinite(value) && value > 0 ? value : 0
     }
 
     function isCharging(device) {

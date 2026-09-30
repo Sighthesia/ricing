@@ -385,18 +385,10 @@ Scope {
         }
     }
 
-    // Compositor keybinds reach the lock through this target.
+    // Compositor keybinds and the launcher's lock item reach the session
+    // through this target.
     IpcHandler {
         target: "lock"
-
-        function test(): void {
-            if (root.selfTestEnabled || !Controller.canLock(root._state))
-                return
-            Quickshell.execDetached(["env", "AFLOAT_LOCK_SELFTEST=1",
-                "QS_DISABLE_FILE_WATCHER=1", "AFLOAT_LOCK_BACKGROUND=screenshot",
-                "AFLOAT_LOCK_WALLPAPER=" + root.wallpaperPath,
-                "qs", "-n", "-d", "-p", Quickshell.shellDir + "/lock-test.qml"])
-        }
 
         function lock(): void {
             root.lock()

@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 import "../../modules/bar" as Bar
 import "../../modules/bar/widgets/BatteryLevel.js" as BatteryLevel
+import "../../modules/bar/widgets/BatteryMetrics.js" as BatteryMetrics
 
 // Content contract for the battery/bluetooth/network popup kinds.
 // Uses fake/injected services so real singletons are never mutated.
@@ -56,7 +57,11 @@ Item {
             + ' property bool charging: true;'
             + ' property bool pluggedIn: false;'
             + ' property bool low: false;'
-            + ' property bool critical: false; }',
+            + ' property bool critical: false;'
+            + ' property real chargeRate: 18.4;'
+            + ' property real dischargeRate: 12.1;'
+            + ' property real timeToEmpty: 12480;'
+            + ' property real timeToFull: 2520; }',
             root, "fakeBattery")
     }
 
@@ -179,7 +184,32 @@ Item {
             verify(!findByName(item, "fallbackContent").visible)
             compare(findByName(item, "batteryPctText").text, "82%")
             compare(findByName(item, "batteryStateText").text, "Charging")
+            compare(findByName(item, "batteryRateLabelText").text, "Charge rate")
+            compare(findByName(item, "batteryRateValueText").text, "18.4 W")
+            compare(findByName(item, "batteryTimeLabelText").text, "Time to full")
+            compare(findByName(item, "batteryTimeValueText").text, "42 min")
             compare(item.batteryLevel, 0.82)
+        }
+
+        function test_batteryDischargeReadout() {
+            var svc = makeBatteryService()
+            svc.charging = false
+            svc.pluggedIn = false
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "battery", payload: { batteryService: svc }
+            })
+            compare(findByName(item, "batteryStateText").text, "Discharging")
+            compare(findByName(item, "batteryRateLabelText").text, "Discharge rate")
+            compare(findByName(item, "batteryRateValueText").text, "12.1 W")
+            compare(findByName(item, "batteryTimeLabelText").text, "Remaining")
+            compare(findByName(item, "batteryTimeValueText").text, "3 h 28 min")
+        }
+
+        function test_batteryMetricFormattingFallsBackWhenUnknown() {
+            compare(BatteryMetrics.formatRate(0), "—")
+            compare(BatteryMetrics.formatRate("invalid"), "—")
+            compare(BatteryMetrics.formatDuration(0), "—")
+            compare(BatteryMetrics.formatDuration(86400), "1 d")
         }
 
         function test_batteryUnknownState() {
@@ -190,6 +220,8 @@ Item {
             })
             compare(findByName(item, "batteryPctText").text, "—")
             compare(findByName(item, "batteryStateText").text, "Unknown")
+            compare(findByName(item, "batteryRateValueText").text, "—")
+            compare(findByName(item, "batteryTimeValueText").text, "—")
         }
 
         function test_batteryNullPayloadDoesNotThrow() {

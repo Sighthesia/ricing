@@ -142,17 +142,12 @@ Item {
             return { values: values }
         }
 
-        // Local command fixture: the builtin command list is an empty placeholder
-        // since the lock screen was removed, so command merge/filter/execute
-        // coverage injects a representative entry instead.
+        // Command fixture taken from the shipped builtin list, so merge/filter
+        // /execute coverage pins the real entry rather than a stand-in.
         function makeLockCommand() {
-            return {
-                id: "cmd-lock",
-                label: "锁定屏幕",
-                description: "Lock the session",
-                keywords: "lock 锁屏",
-                actionId: "shell.lock.activate"
-            }
+            var commands = LauncherAdapters.builtinCommands()
+            verify(commands.length > 0, "a lock command must ship")
+            return commands[0]
         }
 
         function makeRunner(outcome) {
@@ -428,8 +423,8 @@ Item {
             var lock = outcome[1]
             compare(lock.id, "cmd-lock")
             compare(lock.kind, "command")
-            compare(lock.displayName, "锁定屏幕")
-            compare(lock.actionId, "shell.lock.activate")
+            compare(lock.displayName, "锁屏")
+            compare(lock.actionId, "shell.lock.lock")
             verify(lock.managedByShell === true)
         }
 
@@ -453,6 +448,22 @@ Item {
             compare(miss.length, 0)
         }
 
+        // The launcher's lock item must reach the real session lock, not the
+        // 5s self-test probe: `lock test` was the only thing that ever spawned
+        // lock-test.qml, and it is gone.
+        function test_builtinLockCommandLocksTheRealSession() {
+            var commands = LauncherAdapters.builtinCommands()
+            compare(commands.length, 1)
+            var lock = commands[0]
+            compare(lock.id, "cmd-lock")
+            compare(lock.label, "锁屏")
+            compare(lock.icon, "lock")
+            compare(lock.actionId, "shell.lock.lock")
+            for (var i = 0; i < commands.length; ++i)
+                verify(String(commands[i].actionId) !== "shell.lock.test",
+                       "the self-test probe must not stay reachable from the launcher")
+        }
+
         function test_appsAdapterExecutesCommandsThroughIpcHelper() {
             var ran = []
             var adapters = LauncherAdapters.createAdapters({
@@ -464,15 +475,15 @@ Item {
 
             var outcome = null
             adapters.apps.execute({
-                id: "builtin-lock",
+                id: "cmd-lock",
                 kind: "command",
-                actionId: "shell.lock.activate",
+                actionId: "shell.lock.lock",
                 managedByShell: true
             }, function(result) { outcome = result })
 
             verify(outcome && outcome.ok === true)
             compare(ran.length, 1)
-            compare(ran[0].join(" "), "/opt/afloat-ipc lock activate")
+            compare(ran[0].join(" "), "/opt/afloat-ipc lock lock")
         }
 
         function test_appsAdapterCommandWithoutRunnerErrors() {
@@ -483,9 +494,9 @@ Item {
 
             var outcome = null
             adapters.apps.execute({
-                id: "builtin-lock",
+                id: "cmd-lock",
                 kind: "command",
-                actionId: "shell.lock.activate",
+                actionId: "shell.lock.lock",
                 managedByShell: true
             }, function(result) { outcome = result })
 
