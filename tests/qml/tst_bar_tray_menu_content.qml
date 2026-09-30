@@ -458,14 +458,14 @@ Item {
             // Flipped: second level renders left of the primary, primary untouched.
             item.submenuFlipped = true
             compare(item.popsRight, false)
-            // Flush against the primary on both sides: no gap, so a pointer
-            // crossing the joint lands on a row instead of on empty space.
-            compare(item.submenuSurface.x, -item.submenuSurface.width)
+            // The visual panel keeps the 8px meeting gap; the catcher owns
+            // that gap separately so traversal remains live.
+            compare(item.submenuSurface.x, -(item.submenuSurface.width + item.submenuPad))
             compare(item.extraWidth, item.submenuSurface.width)
             // Default: second level renders right of the primary.
             item.submenuFlipped = false
             compare(item.popsRight, true)
-            compare(item.submenuSurface.x, item.width)
+            compare(item.submenuSurface.x, item.primaryMenuWidth + item.submenuPad)
             // Opened submenu rests beside the root with no scale drift.
             compare(item.submenuSurface.transform.length, 1)
             compare(item.submenuSurface.transform[0].x, 0)
@@ -476,7 +476,8 @@ Item {
             item.submenuFlipped = true
             item.submenuProgress = 0.5
             compare(item.submenuSurface.transform[0].x, (item.submenuSurface.width + 8) * 0.5)
-            // Padding lives only on the outer edge; the meeting edge is flush.
+            // The catcher starts at the primary edge and includes the visual
+            // meeting gap, while row padding stays on the outer edge.
             compare(findByName(item, "traySubmenuFlick").anchors.leftMargin, 8)
             compare(findByName(item, "traySubmenuFlick").anchors.rightMargin, 0)
             item.submenuFlipped = false
@@ -1196,15 +1197,17 @@ Item {
             verify(settled, "submenu never settled")
             var surface = findByName(item, "traySubmenuSurface")
             verify(surface !== null, "no submenu surface")
-            // No seam: the panel must meet the primary exactly. An 8px gap
-            // between them reads as a boundary, and a pointer moving right stops
-            // on it — the event trace showed enter, a same-position
-            // re-delivery, and exit all at the band's left edge, never crossing.
+            // The visual panel keeps its 8px gap, while the input band begins
+            // at the primary edge and covers the gap so a pointer can cross it.
             var primary = findByName(item, "trayMenuFlick")
-            compare(surface.x, primary.width,
-                "a gap between the primary and the submenu panel stops the pointer")
+            compare(surface.x, primary.width + item.submenuPad,
+                "submenu visual gap was not restored")
             var band = findByName(item, "traySubmenuColumnCatcher")
             verify(band !== null, "no column band")
+            compare(band.x, primary.width,
+                "submenu input band must begin at the primary edge")
+            compare(band.width, surface.width + item.submenuPad,
+                "submenu input band must include the visual gap")
             // The first row must share the trigger row's band, so a pointer
             // that simply carries on going right lands on it.
             var firstRowY = surface.y + 48 + 8

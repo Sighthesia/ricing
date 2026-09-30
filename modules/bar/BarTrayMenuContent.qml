@@ -204,8 +204,8 @@ Item {
     property bool popsRight: true
     onSubmenuFlippedChanged: popsRight = !submenuFlipped
     // Submenu panel mirrors the primary panel: same button width, same 8
-    // padding on the outer edges. The meeting edge butts flush against the
-    // primary panel so paddings never stack into a band at the joint.
+    // padding on the outer edges. The 8px meeting gap belongs to the visual
+    // panels; the catcher below still owns that gap so traversal stays live.
     readonly property real submenuPad: 8
     // Container growth covers the surface exactly: it butts flush against
     // the primary panel, so growth equals the surface width. (Travel spans
@@ -854,14 +854,11 @@ Item {
         visible: submenuProgress > 0.01 && (hasSubmenuContent || submenuPhase === "closing")
         width: root.primaryMenuWidth
         height: submenuNeedsHeight ? submenuSurfaceHeight : menuFlick.height
-        // Flush against the primary, with no gap. The pad here was an 8px strip
-        // of nothing between the two panels: visibly empty, so a pointer moving
-        // right stopped on it and never crossed. The event trace showed exactly
-        // that — enter, a same-position re-delivery, exit, all at the band's
-        // left edge, the pointer never advancing past the seam. The breathing
-        // room belongs INSIDE the panel, where the title and rows already pad
-        // themselves, not between the two surfaces.
-        x: submenuFlipped ? -width : root.primaryMenuWidth
+        // Restore the visual 8px meeting gap. The input catcher deliberately
+        // starts at the primary edge and spans this gap, so the visual spacing
+        // does not recreate the old dead input seam.
+        x: submenuFlipped
+            ? -(width + root.submenuPad) : root.primaryMenuWidth + root.submenuPad
         // Panel top tracks the anchor from the first frame (even before
         // rows arrive) so cold-fetch cursor memory stays valid across
         // the batch; hidden anyway until content lands.
@@ -922,9 +919,8 @@ Item {
         Flickable {
             id: submenuFlick
             objectName: "traySubmenuFlick"
-            // Padding lives only on the OUTER edge, so the row that meets the
-            // primary is flush and the pointer crosses the joint onto a row
-            // rather than onto padding. The joint carries no gap at all now.
+            // Padding lives on the outer edge; the panel's 8px meeting gap is
+            // owned by the catcher rather than the row viewport.
             anchors.left: parent.left
             anchors.leftMargin: root.submenuFlipped ? root.submenuPad : 0
             anchors.right: parent.right
