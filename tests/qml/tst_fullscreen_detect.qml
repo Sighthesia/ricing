@@ -17,8 +17,21 @@ Item {
         readonly property real measuredFullscreenW: 1646.2857142857142
         readonly property real measuredFullscreenH: 1029.142857142857
 
-        function window(workspaceId, tileWidth, tileHeight) {
-            return { workspaceId: workspaceId, tileWidth: tileWidth, tileHeight: tileHeight }
+        function window(workspaceId, tileWidth, tileHeight, winId, focused) {
+            return {
+                winId: winId === undefined ? String(tileWidth) + "x" + tileHeight : winId,
+                workspaceId: workspaceId,
+                isFocused: focused === true,
+                tileWidth: tileWidth,
+                tileHeight: tileHeight
+            }
+        }
+
+        // The verdict for the only window on a focused workspace, which is the
+        // usual single-window case and needs no separate focus event.
+        function soleWindowVerdict(ws, tileWidth, tileHeight) {
+            return Detect.fullscreenOutputs(sizes, { "eDP-1": ws },
+                { "eDP-1": "sole" }, [window(ws, tileWidth, tileHeight, "sole", true)])["eDP-1"]
         }
 
         function test_fullscreenTileCoversWholeOutput() {
@@ -38,7 +51,8 @@ Item {
         function test_detectsTheRealMeasuredFullscreenTile() {
             // The exact tile size niri reported for a real fullscreen window.
             var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "1" },
-                [window("1", measuredFullscreenW, measuredFullscreenH)])
+                { "eDP-1": "fs" },
+                [window("1", measuredFullscreenW, measuredFullscreenH, "fs", true)])
             compare(result["eDP-1"], true)
         }
 
@@ -46,14 +60,14 @@ Item {
             // A 0.5-scaled output rounds tile geometry in coarser logical steps,
             // so a fixed 1px slack would miss fullscreen there entirely.
             var half = ({ "OUT": { width: 1440, height: 900, scale: 0.5 } })
-            compare(Detect.fullscreenOutputs(half, { "OUT": "1" },
-                [window("1", 1442, 902)])["OUT"], true)
+            compare(Detect.fullscreenOutputs(half, { "OUT": "1" }, { "OUT": "w" },
+                [window("1", 1442, 902, "w", true)])["OUT"], true)
             // An integer-scaled output needs only a little.
             var whole = ({ "OUT": { width: 1440, height: 900, scale: 1 } })
-            compare(Detect.fullscreenOutputs(whole, { "OUT": "1" },
-                [window("1", 1440, 900)])["OUT"], true)
-            compare(Detect.fullscreenOutputs(whole, { "OUT": "1" },
-                [window("1", 1436, 900)])["OUT"], false)
+            compare(Detect.fullscreenOutputs(whole, { "OUT": "1" }, { "OUT": "w" },
+                [window("1", 1440, 900, "w", true)])["OUT"], true)
+            compare(Detect.fullscreenOutputs(whole, { "OUT": "1" }, { "OUT": "w" },
+                [window("1", 1436, 900, "w", true)])["OUT"], false)
         }
 
         function test_slackStaysWellBelowTheGapThatMatters() {
@@ -64,14 +78,13 @@ Item {
                 verify(Detect.slackForScale(scales[i]) < 8,
                     "slack stays under 8px at scale " + scales[i])
             // The real measured tile minus one gap is a normal window.
-            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "1" },
-                [window("1", measuredFullscreenW, measuredFullscreenH - 16)])
-            compare(result["eDP-1"], false)
+            compare(soleWindowVerdict("1", measuredFullscreenW, measuredFullscreenH - 16),
+                false)
         }
 
         function test_explicitSlackOverridesTheScale() {
-            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "1" },
-                [window("1", measuredFullscreenW, measuredFullscreenH)], 0)
+            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "1" }, { "eDP-1": "w" },
+                [window("1", measuredFullscreenW, measuredFullscreenH, "w", true)], 0)
             compare(result["eDP-1"], false)
         }
 
@@ -95,32 +108,95 @@ Item {
         }
 
         function test_activeWorkspaceFullscreenMarksItsOutput() {
-            var windows = [window("1", 1645, 1028)]
-            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "1" }, windows)
-            compare(result["eDP-1"], true)
+            compare(soleWindowVerdict("1", 1645, 1028), true)
         }
 
         function test_windowOnBackgroundWorkspaceIsIgnored() {
             // A fullscreen window on a workspace the output is not showing must
             // not collapse that output's bar.
-            var windows = [window("7", 1645, 1028)]
-            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "2" }, windows)
+            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "2" }, { "eDP-1": "w" },
+                [window("7", 1645, 1028, "w", true)])
             compare(result["eDP-1"], false)
         }
 
         function test_outputWithoutActiveWorkspaceIsNotFullscreen() {
-            var windows = [window("2", 1645, 1028)]
-            var result = Detect.fullscreenOutputs(sizes, {}, windows)
+            var result = Detect.fullscreenOutputs(sizes, {}, { "eDP-1": "w" },
+                [window("2", 1645, 1028, "w", true)])
             compare(result["eDP-1"], false)
         }
 
         function test_anyFullscreenWindowOnTheActiveWorkspaceCounts() {
+            // The FOCUSED window is fullscreen; its neighbours are not.
             var windows = [
-                window("2", 403, 949),
-                window("2", 1614, 980),
-                window("2", 1645, 1028)
+                window("2", 403, 949, "a", false),
+                window("2", 1614, 980, "b", false),
+                window("2", 1645, 1028, "c", true)
             ]
-            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "2" }, windows)
+            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "2" }, { "eDP-1": "c" }, windows)
+            compare(result["eDP-1"], true)
+        }
+
+        // The regression found with the live probe: a fullscreen window that
+        // unfullscreened, or that merely lost focus, kept its fullscreen-sized
+        // geometry in the model. Scanning for "any fullscreen-sized window"
+        // reported true over a plainly tiled firefox and pinned the bar
+        // collapsed. Only the focused window may decide.
+        function test_unfocusedStaleFullscreenGeometryDoesNotCount() {
+            var windows = [
+                // Stale fullscreen geometry, backgrounded.
+                window("1", measuredFullscreenW, measuredFullscreenH, "stale", false),
+                // The window actually in front, plainly tiled.
+                window("1", 1614.2857, 949.1429, "front", true)
+            ]
+            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "1" }, { "eDP-1": "front" }, windows)
+            compare(result["eDP-1"], false)
+        }
+
+        function test_focusMovingOffAFullscreenWindowClearsTheVerdict() {
+            var windows = [
+                window("1", measuredFullscreenW, measuredFullscreenH, "fs", true),
+                window("1", 1614.2857, 949.1429, "other", false)
+            ]
+            compare(Detect.fullscreenOutputs(sizes, { "eDP-1": "1" },
+                { "eDP-1": "fs" }, windows)["eDP-1"], true)
+            // Same geometry, focus moved away: the bar must come back.
+            windows[0].isFocused = false
+            windows[1].isFocused = true
+            compare(Detect.fullscreenOutputs(sizes, { "eDP-1": "1" },
+                { "eDP-1": "other" }, windows)["eDP-1"], false)
+        }
+
+        function test_fullscreenCountsWithoutAFocusSignal() {
+            // A focus event can name a window the model has not caught up with
+            // yet. The isFocused flag alone must be enough.
+            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "1" }, null,
+                [window("1", measuredFullscreenW, measuredFullscreenH, "fs", true)])
+            compare(result["eDP-1"], true)
+        }
+
+        function test_soleWindowCountsWhenNoWindowIsFocused() {
+            // Nothing focused at all (e.g. a layer surface has focus). The single
+            // window on screen is still the one the user is looking at.
+            compare(soleWindowVerdict("1", measuredFullscreenW, measuredFullscreenH), true)
+            compare(soleWindowVerdict("1", 1614.2857, 949.1429), false)
+        }
+
+        function test_nothingFocusedOnAMultiWindowWorkspaceIsNotFullscreen() {
+            // With several windows and no focus signal there is no basis to judge
+            // one of them, so do not collapse.
+            var windows = [
+                window("1", measuredFullscreenW, measuredFullscreenH, "a", false),
+                window("1", 1614.2857, 949.1429, "b", false)
+            ]
+            compare(Detect.fullscreenOutputs(sizes, { "eDP-1": "1" }, null, windows)["eDP-1"],
+                false)
+        }
+
+        function test_focusPointingAtAMissingWindowFallsBack() {
+            // Focus names a window that is gone; a single remaining window is
+            // still the visible one.
+            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "1" }, { "eDP-1": "gone" },
+                [window("1", measuredFullscreenW, measuredFullscreenH, "real", false)])
             compare(result["eDP-1"], true)
         }
 
@@ -129,28 +205,33 @@ Item {
                 "eDP-1": { width: 1645, height: 1028 },
                 "DP-1": { width: 2560, height: 1440 }
             }
-            var windows = [window("2", 2560, 1440)]
+            var windows = [
+                window("1", 1614.2857, 949.1429, "a", false),
+                window("2", 2560, 1440, "b", true)
+            ]
             var result = Detect.fullscreenOutputs(sizes, {
                 "eDP-1": "1",
                 "DP-1": "2"
-            }, windows)
+            }, { "eDP-1": "a", "DP-1": "b" }, windows)
             compare(result["eDP-1"], false)
             compare(result["DP-1"], true)
         }
 
         function test_workspaceIdsCompareAsStrings() {
             // niri reports numeric ids; the model stores them as strings.
-            var windows = [window("2", 1645, 1028)]
-            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": 2 }, windows)
+            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": 2 }, { "eDP-1": 7 },
+                [window("2", 1645, 1028, 7, true)])
             compare(result["eDP-1"], true)
         }
 
         function test_emptyInputsAreSafe() {
-            compare(Detect.fullscreenOutputs({}, {}, []), {})
-            compare(Detect.fullscreenOutputs(null, null, null), {})
-            compare(Detect.fullscreenOutputs(sizes, { "eDP-1": "1" }, []), ({ "eDP-1": false }))
+            compare(Detect.fullscreenOutputs({}, {}, {}, []), {})
+            compare(Detect.fullscreenOutputs(null, null, null, null), {})
+            compare(Detect.fullscreenOutputs(sizes, { "eDP-1": "1" }, {}, []),
+                ({ "eDP-1": false }))
             // A window row missing geometry must not throw or match.
-            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "1" }, [null, {}])
+            var result = Detect.fullscreenOutputs(sizes, { "eDP-1": "1" }, { "eDP-1": "x" },
+                [null, {}])
             compare(result["eDP-1"], false)
         }
 
@@ -158,7 +239,8 @@ Item {
             // An output whose logical size never arrived must not appear in the
             // result at all, so no bar collapses on missing data.
             var result = Detect.fullscreenOutputs(
-                { "eDP-1": { width: 0, height: 1028 } }, { "eDP-1": "1" }, [window("1", 1645, 1028)])
+                { "eDP-1": { width: 0, height: 1028 } }, { "eDP-1": "1" },
+                { "eDP-1": "w" }, [window("1", 1645, 1028, "w", true)])
             compare(result["eDP-1"], undefined)
             compare(Object.keys(result).length, 0)
         }

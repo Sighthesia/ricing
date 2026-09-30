@@ -20,9 +20,18 @@
 // All inputs are plain objects/arrays so the logic stays testable under
 // qmltestrunner without instantiating NiriService:
 //
-//   outputSizes:      { "<connector>": { width, height } }   logical pixels
+//   outputSizes:      { "<connector>": { width, height, scale } }
 //   activeWorkspaces: { "<connector>": "<workspace id>" }
-//   windows:          [{ workspaceId, tileWidth, tileHeight }]
+//   focusedWindows:   { "<connector>": "<window id>" }
+//   windows:          [{ winId, workspaceId, isFocused, tileWidth, tileHeight }]
+//
+// The verdict follows the FOCUSED window of each output's active workspace, not
+// "some window that happens to look fullscreen". Any window-based scan is wrong
+// in practice: a window that was fullscreen and then unfullscreened, or that
+// scrolled out of the active workspace, can keep stale geometry in the model and
+// pin the verdict at true forever. Anchoring to the one window the user is
+// actually looking at makes every such case self-correcting, because leaving
+// fullscreen always changes which window is focused.
 
 // Default slack, used when an output's scale is unknown: one logical pixel.
 var tolerance = 1
@@ -77,10 +86,19 @@ function coversOutput(tileWidth, tileHeight, outputWidth, outputHeight, slack) {
     return Math.abs(width - outWidth) <= allowed && Math.abs(height - outHeight) <= allowed
 }
 
-// Fullscreen state for every known output. Windows on a workspace that is not
-// the active one on its output are ignored: niri is not showing them, so the
-// bar must not collapse for a fullscreen window the user cannot see.
-function fullscreenOutputs(outputSizes, activeWorkspaces, windows, slack) {
+// Fullscreen state for every known output.
+//
+// Only the FOCUSED window of the output's active workspace can make it true.
+// Requiring the active workspace alone is not enough — a background window on
+// that workspace keeps whatever geometry it had, and a fullscreen window that
+// was since unfullscreened is exactly that case. Scanning for "any fullscreen
+// sized window" is what left a bar collapsed over a plain tiled firefox: its
+// stale fullscreen geometry was still in the model, and nothing in the scan
+// could tell the difference.
+//
+// Falling back to the active workspace's only window keeps a single-window
+// output working, which is the common case and has no focus event to wait on.
+function fullscreenOutputs(outputSizes, activeWorkspaces, focusedWindows, windows, slack) {
     var result = ({})
     var sizes = outputSizes || {}
     for (var name in sizes) {
@@ -101,22 +119,48 @@ function fullscreenOutputs(outputSizes, activeWorkspaces, windows, slack) {
             continue
         }
 
-        var fullscreen = false
         var allowed = slack == null ? slackForScale(size.scale) : Math.max(0, Number(slack))
         if (!isFinite(allowed))
             allowed = tolerance
-        for (var i = 0; i < (windows || []).length; i++) {
-            var win = windows[i]
+
+        // Focus is per workspace, not per output: several outputs can be active
+        // at once, and only one window overall is focused. Resolve the caller's
+        // per-output id against the active workspace's own windows instead.
+        var focusedId = focusedWindows && focusedWindows[name] != null
+            ? String(focusedWindows[name])
+            : null
+        var target = null
+        var soleWindow = null
+        var soleCount = 0
+        var candidates = windows || []
+
+        for (var i = 0; i < candidates.length; i++) {
+            var win = candidates[i]
             if (!win)
                 continue
             if (String(win.workspaceId) !== activeId)
                 continue
-            if (coversOutput(win.tileWidth, win.tileHeight, size.width, size.height, allowed)) {
-                fullscreen = true
+            soleCount++
+            if (soleCount === 1)
+                soleWindow = win
+            if (String(win.winId) === focusedId) {
+                target = win
                 break
             }
+            // The focus map is empty or stale (nothing focused, or a window that
+            // just closed); the model's own flag is the next best evidence.
+            if (win.isFocused === true && target === null)
+                target = win
         }
-        result[name] = fullscreen
+
+        // A single window on the active workspace is the visible window whether
+        // or not any focus signal arrived — the common case, and one where a
+        // missing focus update must not strand the bar in the wrong state.
+        if (!target && soleCount === 1)
+            target = soleWindow
+
+        result[name] = !!target && coversOutput(
+            target.tileWidth, target.tileHeight, size.width, size.height, allowed)
     }
     return result
 }

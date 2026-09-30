@@ -294,17 +294,29 @@ Singleton {
                 active[String(item.output)] = String(item.wsId)
         }
 
+        // The focused window of each active workspace. Derived from the model
+        // rather than tracked separately, so it cannot drift out of sync with
+        // the focus events that feed it.
+        const focused = ({})
+        for (let k = 0; k < windows.count; k++) {
+            const win = windows.get(k)
+            if (win.isFocused)
+                focused[String(win.workspaceId)] = String(win.winId)
+        }
+
         const rows = []
         for (let k = 0; k < windows.count; k++) {
             const win = windows.get(k)
             rows.push({
+                winId: win.winId,
                 workspaceId: win.workspaceId,
+                isFocused: win.isFocused === true,
                 tileWidth: win.tileWidth,
                 tileHeight: win.tileHeight
             })
         }
         root._fullscreenOutputs = FullscreenDetect
-            .fullscreenOutputs(root.outputSizes, active, rows)
+            .fullscreenOutputs(root.outputSizes, active, focused, rows)
     }
 
     function updateWorkspaces(workspacesEvent) {
@@ -452,6 +464,9 @@ Singleton {
                 windows.setProperty(i, "isFocused", isNow)
         }
         root._windowsRevision++
+        // Focus decides which window the fullscreen verdict follows, so this is
+        // not just a focus-tracking update.
+        root.recomputeFullscreenOutputs()
         windowsUpdated()
     }
 

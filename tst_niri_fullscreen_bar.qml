@@ -25,6 +25,7 @@ Item {
         function() { root.checkSyntheticFullscreen() },
         function() { root.checkBindingTracksServiceState() },
         function() { root.checkLeavingFullscreenClearsTheVerdict() },
+        function() { root.checkStaleBackgroundGeometryCannotPinTheBar() },
         function() { root.finish() }
     ]
 
@@ -342,6 +343,65 @@ Item {
             "malformed layout entries are ignored without corrupting state")
         Services.NiriService.updateWindowLayouts(null)
         Services.NiriService.updateWindowLayouts([])
+
+        realWindows.clear()
+        for (let i = 0; i < snapshot.length; i++)
+            realWindows.append(snapshot[i])
+        Services.NiriService.recomputeFullscreenOutputs()
+    }
+
+    // The bug the live probe caught: verdicts said fullscreen while the covering
+    // window was an ordinary tiled firefox. A backgrounded window kept its stale
+    // fullscreen geometry and the "any window looks fullscreen" scan believed it.
+    // Replay exactly that shape against the real service.
+    function checkStaleBackgroundGeometryCannotPinTheBar() {
+        const name = root.activeOutputName()
+        const ws = root.activeWorkspaceId(name)
+        if (!name || !ws) {
+            root.ok(false, "found an active workspace to replay stale geometry against")
+            return
+        }
+        const realWindows = Services.NiriService.windows
+        const snapshot = []
+        for (let i = 0; i < realWindows.count; i++)
+            snapshot.push(realWindows.get(i))
+
+        realWindows.clear()
+        // A window that was fullscreen and then unfullscreened, left behind with
+        // its old geometry and no longer focused.
+        realWindows.append({
+            winId: "555", title: "stale fullscreen", appId: "harness",
+            isFocused: false, workspaceId: ws, colIdx: 1, rowIdx: 1,
+            tileWidth: 1646.2857142857142, tileHeight: 1029.142857142857
+        })
+        // The window actually in front: plainly tiled, like the firefox in the
+        // live probe.
+        realWindows.append({
+            winId: "556", title: "front", appId: "firefox",
+            isFocused: true, workspaceId: ws, colIdx: 2, rowIdx: 1,
+            tileWidth: 1614.2857142857142, tileHeight: 949.142857142857
+        })
+        Services.NiriService.recomputeFullscreenOutputs()
+        root.compare(
+            Services.NiriService.isOutputFullscreen(name), false,
+            "stale background fullscreen geometry does not pin the bar")
+
+        // Focus landing on the stale one must make it count, proving the check is
+        // about focus rather than about the geometry being present.
+        realWindows.setProperty(0, "isFocused", true)
+        realWindows.setProperty(1, "isFocused", false)
+        Services.NiriService.recomputeFullscreenOutputs()
+        root.ok(
+            Services.NiriService.isOutputFullscreen(name),
+            "the same geometry counts once it is the focused window")
+
+        // And focus moving back off it must clear it again.
+        realWindows.setProperty(0, "isFocused", false)
+        realWindows.setProperty(1, "isFocused", true)
+        Services.NiriService.recomputeFullscreenOutputs()
+        root.compare(
+            Services.NiriService.isOutputFullscreen(name), false,
+            "moving focus off the fullscreen window brings the bar back")
 
         realWindows.clear()
         for (let i = 0; i < snapshot.length; i++)
