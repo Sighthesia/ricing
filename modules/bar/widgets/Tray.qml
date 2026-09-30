@@ -4,8 +4,15 @@ import Quickshell.Widgets
 import Quickshell.Services.SystemTray
 import ".."
 import "../../lazerbar"
+import "TraySlotLogic.js" as SlotLogic
 
 // StatusNotifier tray icons with activate and secondary actions.
+//
+// The strip is not a Repeater over `SystemTray.items.values`: that array swap
+// rebuilds every delegate (flooding the async icon provider) and destroys a
+// leaving icon before it can animate out. Instead the live list is diffed into
+// a stable ListModel, so a surviving icon keeps its delegate and its decoded
+// pixmap while a departing slot stays resident for its exit.
 Item {
     id: root
 
@@ -15,7 +22,17 @@ Item {
     property string section: ""
     property string screenName: ""
 
-    implicitWidth: trayRow.implicitWidth
+    // Gap between slots. It lives *inside* each slot rather than in
+    // Row.spacing so a slot collapsing to zero takes its gap with it; with
+    // Row.spacing the icons after it would jump the gap's width the moment the
+    // row is finally dropped.
+    readonly property int slotGap: 2
+
+    readonly property int liveCount: root._liveKeys.length
+    // Downward travel of a leaving icon, sized so the bar never slices it.
+    readonly property real fallDistance: SlotLogic.fallDistance(LazerTheme.barWidgetHeight, LazerTheme.barGlyphSize)
+
+    implicitWidth: Math.max(0, trayRow.implicitWidth - root.slotGap)
     implicitHeight: LazerTheme.barWidgetHeight
 
     // Opt-in hover intent publication for BarPopupHost (per-delegate).
@@ -26,6 +43,35 @@ Item {
     // Track current hovered delegate for anchor updates when the tray moves.
     property var hoveredTrayModel: null
     property Item hoveredTrayDelegate: null
+
+    // --- Stable slot model -------------------------------------------------
+    // One row per live tray item plus any slot still playing its exit.
+    ListModel { id: slotModel }
+
+    // Live list from the tray service; the diff below is what mutates the model.
+    // `liveValuesOverride` is a test seam: a harness cannot unbind a QML
+    // property, so it swaps the service list for a synthetic batch through this
+    // instead. It stays null in production, leaving the binding as the only
+    // source.
+    property var liveValuesOverride: null
+    property var liveValues: root.liveValuesOverride !== null
+            ? root.liveValuesOverride
+            : ((SystemTray.items && SystemTray.items.values)
+                    ? SystemTray.items.values : [])
+    property var _liveKeys: []
+    property var _liveItems: ({})
+
+    // The very first population must not replay an arrival for every icon the
+    // shell already had on screen.
+    property bool _primed: false
+    readonly property bool primed: root._primed
+
+    onLiveValuesChanged: Qt.callLater(root.syncSlots)
+
+    Component.onCompleted: {
+        root.syncSlots()
+        Qt.callLater(function() { root._primed = true })
+    }
 
     // Build hover intent for a specific tray delegate.
     function resolveIconSource(source) {
@@ -46,6 +92,133 @@ Item {
         var dir = normalized.substring(pathSplit + 6)
         return resolveIconSource("file://" + dir + "/"
                 + name.substring(name.lastIndexOf("/") + 1))
+    }
+
+    function iconSourceFor(item) {
+        if (!item) return ""
+        return root.normalizeTrayIconSource(item.icon || "")
+    }
+
+    function labelFor(item) {
+        if (!item) return "Tray item"
+        return item.title || item.tooltipTitle || item.id || "Tray item"
+    }
+
+    function slotIndexFor(key) {
+        for (var i = 0; i < slotModel.count; i++) {
+            if (slotModel.get(i).slotKey === key)
+                return i
+        }
+        return -1
+    }
+
+    // Live StatusNotifier object behind a slot, or null once it is leaving.
+    function liveItemFor(key) {
+        root._liveItems
+        return root._liveItems[key] || null
+    }
+
+    // One tray refresh, expressed as surgery on the stable model: arrivals are
+    // appended, departures are flagged (their delegate keeps them alive for the
+    // exit) and surviving rows only have their snapshot roles rewritten.
+    function syncSlots() {
+        var values = root.liveValues || []
+        var keys = []
+        var items = ({})
+        for (var i = 0; i < values.length; i++) {
+            var item = values[i]
+            if (!item) continue
+            var key = SlotLogic.slotKey(item, i)
+            // Two items can claim one id; keep both addressable.
+            if (items[key] !== undefined)
+                key = key + "#" + i
+            items[key] = item
+            keys.push(key)
+        }
+
+        var change = SlotLogic.diff(root._liveKeys, keys)
+        root._liveKeys = keys
+        root._liveItems = items
+
+        var rows = ({})
+        for (var r = 0; r < slotModel.count; r++)
+            rows[slotModel.get(r).slotKey] = r
+
+        // Departures first: an arrival landing in the same batch must not be
+        // mistaken for the item that just left.
+        for (var d = 0; d < change.removed.length; d++) {
+            var gone = change.removed[d]
+            var goneIndex = rows[gone]
+            var goneRow = goneIndex === undefined ? null : slotModel.get(goneIndex)
+            // A slot can be dropped by its own retire timer between two syncs,
+            // so every index is re-read rather than trusted.
+            if (!goneRow || goneRow.retiring) continue
+            // Delay first: the delegate reads it the moment `retiring` flips.
+            slotModel.setProperty(goneIndex, "delayMs",
+                    SlotLogic.cascadeDelayMs(goneIndex, change.removed.length,
+                            MotionTokens.trayIconStagger, true))
+            slotModel.setProperty(goneIndex, "retiring", true)
+        }
+
+        for (var a = 0; a < change.added.length; a++) {
+            var added = change.added[a]
+            if (rows[added] !== undefined) continue
+            slotModel.append({
+                slotKey: added,
+                iconSource: root.iconSourceFor(items[added]),
+                label: root.labelFor(items[added]),
+                retiring: false,
+                delayMs: SlotLogic.cascadeDelayMs(a, change.added.length,
+                        MotionTokens.trayIconStagger, false)
+            })
+        }
+
+        for (var k = 0; k < keys.length; k++) {
+            var liveKey = keys[k]
+            var index = rows[liveKey]
+            var row = index === undefined ? null : slotModel.get(index)
+            if (!row) continue
+            if (row.retiring) {
+                // The item came back mid-exit: revive the slot instead of
+                // adding a second copy of the same identity.
+                slotModel.setProperty(index, "retiring", false)
+                slotModel.setProperty(index, "iconSource", root.iconSourceFor(items[liveKey]))
+                slotModel.setProperty(index, "label", root.labelFor(items[liveKey]))
+                continue
+            }
+            root.writeSnapshot(index, liveKey)
+        }
+    }
+
+    // Refresh one live row's snapshot. An app swapping its own icon (a badge,
+    // a play/pause glyph) reuses the slot instead of replacing it.
+    function writeSnapshot(index, key) {
+        var item = root.liveItemFor(key)
+        if (!item) return
+        var row = slotModel.get(index)
+        if (!row) return
+        var source = root.iconSourceFor(item)
+        if (row.iconSource !== source)
+            slotModel.setProperty(index, "iconSource", source)
+        var label = root.labelFor(item)
+        if (row.label !== label)
+            slotModel.setProperty(index, "label", label)
+    }
+
+    // The slot finished collapsing. Drop the row only if the item really is
+    // gone — one that returned during the exit keeps its slot.
+    function completeRetire(key) {
+        if (root.liveItemFor(key) !== null) return
+        var index = root.slotIndexFor(key)
+        if (index >= 0)
+            slotModel.remove(index)
+    }
+
+    // Reduced motion has no exit to show: the slot leaves in one step.
+    function retireNow(key) {
+        var index = root.slotIndexFor(key)
+        if (index >= 0)
+            slotModel.remove(index)
     }
 
     function buildTrayIntent(modelData, delegateItem) {
@@ -92,34 +265,68 @@ Item {
     Row {
         id: trayRow
 
-        anchors.centerIn: parent
-        spacing: 2
+        // The gap rides inside each slot, so this stays 0 (see root.slotGap).
+        spacing: 0
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.horizontalCenter: parent.horizontalCenter
+        // The row is one gap wider than the widget; shift it back so the icons
+        // land exactly where the old spacing-based layout put them.
+        anchors.horizontalCenterOffset: root.slotGap / 2
 
         Repeater {
-            model: SystemTray.items && SystemTray.items.values
-                   ? SystemTray.items.values : []
+            model: slotModel
 
-            // One hover square per tray item; icons stay theme-provided.
+            // One slot per tray item. The slot is the layout box: it opens
+            // before its ink starts and closes only once the ink is gone, so
+            // the strip never drags a neighbour across a half-drawn icon.
             delegate: Item {
                 id: trayIcon
 
-                required property SystemTrayItem modelData
+                // Snapshot contract from the stable model. Everything an exit
+                // needs lives here, so a leaving slot never reads a
+                // SystemTrayItem that has already been unregistered.
+                required property string slotKey
+                required property string iconSource
+                required property string label
+                required property bool retiring
+                required property int delayMs
+
+                // Live object for activation, menus and hover. Null the moment
+                // the slot starts leaving.
+                readonly property var liveItem: trayIcon.retiring
+                        ? null : root.liveItemFor(trayIcon.slotKey)
+
+                // 0 while the slot is closed, 1 while it is open. Drives the
+                // box width only, so the falling icon keeps the position it had.
+                property real presence: root.primed ? 0 : 1
+                // Ink opacity: 0 until the box has finished opening, 0 again
+                // once the icon has dissolved under the closing box.
+                property real ink: root.primed ? 0 : 1
+                // Downward travel of a leaving icon.
+                property real fall: 0
+
+                width: (LazerTheme.barWidgetHeight + root.slotGap) * trayIcon.presence
+                height: LazerTheme.barWidgetHeight
+                // Off while invisible: a slot mid-flight takes no hover, no tap.
+                enabled: !trayIcon.retiring && trayIcon.ink > 0.99
+                // Nothing clips here — the icon has to be able to leave the
+                // shrinking box, the same contract the marquee ghosts ride.
+                Accessible.role: Accessible.Button
+                Accessible.name: trayIcon.label
 
                 readonly property bool hovered: iconHover.hovered
-                readonly property string label:
-                    modelData.title || modelData.tooltipTitle || modelData.id || "Tray item"
-                readonly property string iconSource: {
-                    var icon = modelData ? (modelData.icon || "") : ""
-                    // SNI icons may carry a non-theme path suffix that the
-                    // image provider cannot resolve without conversion.
-                    return root.normalizeTrayIconSource(icon)
-                }
 
-                width: LazerTheme.barWidgetHeight
-                height: LazerTheme.barWidgetHeight
-                Accessible.role: Accessible.Button
-                Accessible.name: label
+                // Test seam: the enter/exit recipes, exposed the way
+                // OsuTopBarButton exposes its flash animation so a harness can
+                // assert the contract instead of sampling a frame mid-flight.
+                readonly property Animation openAnimationItem: openAnim
+                readonly property Animation enterAnimationItem: enterInkAnim
+                readonly property Animation exitAnimationItem: exitInkAnim
+                readonly property Animation fallAnimationItem: fallAnim
+                readonly property Animation closeAnimationItem: closeAnim
 
+                // One hover square per tray item; icons stay theme-provided.
+                // It fills the open slot, so it tracks the box as it collapses.
                 Rectangle {
                     anchors.fill: parent
                     radius: 0
@@ -128,15 +335,161 @@ Item {
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                 }
 
+                // The icon rides the slot's open box, not its shrinking width,
+                // so a closing slot closes around the falling icon instead of
+                // dragging it sideways.
                 IconImage {
-                    anchors.centerIn: parent
+                    id: glyph
+
+                    x: (LazerTheme.barWidgetHeight - LazerTheme.barGlyphSize) / 2
+                    y: (LazerTheme.barWidgetHeight - LazerTheme.barGlyphSize) / 2 + trayIcon.fall
                     width: LazerTheme.barGlyphSize
                     height: LazerTheme.barGlyphSize
                     asynchronous: true
                     backer.fillMode: Image.PreserveAspectFit
                     source: trayIcon.iconSource
                     // Failed loads stay invisible instead of rendering blank.
-                    opacity: status === Image.Ready ? 1 : 0
+                    opacity: trayIcon.ink * (status === Image.Ready ? 1 : 0)
+                }
+
+                // --- Arrival: open the box, then fade the ink in. ---
+                // Sequential on purpose. The slot has to be fully open before
+                // any ink lands in it, otherwise the icon it is pushing aside
+                // would slide across a half-drawn neighbour.
+                SequentialAnimation {
+                    id: enterAnim
+
+                    animations: [openAnim, enterInkAnim]
+                }
+                Timer {
+                    id: enterDelay
+
+                    interval: trayIcon.delayMs
+                    onTriggered: enterAnim.restart()
+                }
+                NumberAnimation {
+                    id: openAnim
+
+                    target: trayIcon
+                    property: "presence"
+                    to: 1
+                    duration: MotionTokens.fast
+                    easing.type: Easing.OutQuad
+                }
+                NumberAnimation {
+                    id: enterInkAnim
+
+                    target: trayIcon
+                    property: "ink"
+                    to: 1
+                    duration: MotionTokens.trayIconEnter
+                    easing.type: Easing.OutQuad
+                }
+
+                // --- Departure: drop and dissolve while the box closes. ---
+                // The ink fade is front-loaded and the box's collapse is
+                // InQuad on purpose: together they keep the neighbour that
+                // slides into the freed slot from ever crossing a readable icon.
+                ParallelAnimation {
+                    id: exitAnim
+
+                    animations: [exitInkAnim, fallAnim, closeAnim]
+                }
+                Timer {
+                    id: exitDelay
+
+                    interval: trayIcon.delayMs
+                    onTriggered: exitAnim.restart()
+                }
+                // The row is dropped on its own clock rather than from the
+                // collapse's onFinished: an animation nested in a group does
+                // not reliably report completion, and a slot left behind would
+                // hold its gap open forever.
+                Timer {
+                    id: retireTimer
+
+                    interval: trayIcon.delayMs + MotionTokens.slow
+                    onTriggered: root.completeRetire(trayIcon.slotKey)
+                }
+                NumberAnimation {
+                    id: exitInkAnim
+
+                    target: trayIcon
+                    property: "ink"
+                    to: 0
+                    duration: MotionTokens.trayIconExit
+                    easing.type: Easing.OutQuad
+                }
+                NumberAnimation {
+                    id: fallAnim
+
+                    target: trayIcon
+                    property: "fall"
+                    to: root.fallDistance
+                    duration: MotionTokens.trayIconExit
+                    easing.type: Easing.OutQuad
+                }
+                NumberAnimation {
+                    id: closeAnim
+
+                    target: trayIcon
+                    property: "presence"
+                    to: 0
+                    duration: MotionTokens.slow
+                    easing.type: Easing.InQuad
+                }
+
+                function startEnter() {
+                    exitDelay.stop()
+                    retireTimer.stop()
+                    exitAnim.stop()
+                    enterDelay.stop()
+                    if (MotionTokens.reducedMotion || !root.primed) {
+                        trayIcon.presence = 1
+                        trayIcon.ink = 1
+                        trayIcon.fall = 0
+                        return
+                    }
+                    if (trayIcon.presence >= 1 && trayIcon.ink >= 1)
+                        return
+                    // Captured before the restart: the sequential group reads
+                    // each `from` when its own leg begins.
+                    openAnim.from = trayIcon.presence
+                    enterInkAnim.from = trayIcon.ink
+                    enterDelay.restart()
+                }
+
+                function startExit() {
+                    enterDelay.stop()
+                    enterAnim.stop()
+                    if (MotionTokens.reducedMotion) {
+                        root.retireNow(trayIcon.slotKey)
+                        return
+                    }
+                    exitInkAnim.from = trayIcon.ink
+                    fallAnim.from = trayIcon.fall
+                    closeAnim.from = trayIcon.presence
+                    exitDelay.restart()
+                    retireTimer.restart()
+                }
+
+                onRetiringChanged: trayIcon.retiring ? trayIcon.startExit() : trayIcon.startEnter()
+                Component.onCompleted: trayIcon.startEnter()
+
+                Component.onDestruction: {
+                    if (root.hoveredTrayDelegate === trayIcon) {
+                        root.hoveredTrayModel = null
+                        root.hoveredTrayDelegate = null
+                        root.popupCloseRequested()
+                    }
+                }
+
+                // An app that swaps its own icon mid-life reuses the slot.
+                Connections {
+                    target: trayIcon.liveItem
+                    function onIconChanged() { root.writeSnapshot(trayIcon.slotIndex, trayIcon.slotKey) }
+                    function onTitleChanged() { root.writeSnapshot(trayIcon.slotIndex, trayIcon.slotKey) }
+                    function onTooltipTitleChanged() { root.writeSnapshot(trayIcon.slotIndex, trayIcon.slotKey) }
                 }
 
                 HoverHandler {
@@ -144,9 +497,10 @@ Item {
                     objectName: "trayHoverHandler"
                     onHoveredChanged: {
                         if (hovered) {
-                            root.hoveredTrayModel = trayIcon.modelData
+                            if (!trayIcon.liveItem) return
+                            root.hoveredTrayModel = trayIcon.liveItem
                             root.hoveredTrayDelegate = trayIcon
-                            root.popupRequested(root.buildTrayIntent(trayIcon.modelData, trayIcon))
+                            root.popupRequested(root.buildTrayIntent(trayIcon.liveItem, trayIcon))
                         } else {
                             if (root.hoveredTrayDelegate === trayIcon) {
                                 root.hoveredTrayModel = null
@@ -158,20 +512,20 @@ Item {
                 }
 
                 // Update anchor while the delegate or bar layout moves.
-                onXChanged: if (iconHover.hovered) root.popupAnchorUpdate(root.buildTrayIntent(trayIcon.modelData, trayIcon))
+                onXChanged: if (iconHover.hovered) root.popupAnchorUpdate(root.buildTrayIntent(trayIcon.liveItem, trayIcon))
 
                 TapHandler {
                     objectName: "trayActivateTap"
                     acceptedButtons: Qt.LeftButton
                     gesturePolicy: TapHandler.ReleaseWithinBounds
-                    onTapped: trayIcon.modelData.activate()
+                    onTapped: if (trayIcon.liveItem) trayIcon.liveItem.activate()
                 }
 
                 TapHandler {
                     objectName: "traySecondaryTap"
                     acceptedButtons: Qt.RightButton
                     gesturePolicy: TapHandler.ReleaseWithinBounds
-                    onTapped: trayIcon.modelData.secondaryActivate()
+                    onTapped: if (trayIcon.liveItem) trayIcon.liveItem.secondaryActivate()
                 }
             }
         }

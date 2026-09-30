@@ -58,6 +58,16 @@ QtObject {
     readonly property int clockMinuteFlip: 1200
     readonly property int clockSecondFlip: 300
     readonly property int clockFlipEasing: Easing.OutCubic
+    // Tray icons wear the text transition's numbers: a leaving icon drops and
+    // dissolves on the delete-ghost clock, an arriving one fades in on the scan
+    // reveal. Each icon's slot opens before its ink starts (MotionTokens.fast)
+    // and closes after the ink is gone (MotionTokens.slow), so a neighbouring
+    // icon can never slide across a half-drawn one.
+    readonly property int trayIconEnter: 140
+    readonly property int trayIconExit: 200
+    // Per-position cascade step for a batch of tray icons.
+    readonly property int trayIconStagger: 24
+
     readonly property int controlCommit: 120
     readonly property int tooltipIn: 120
     readonly property int tooltipOut: 160
