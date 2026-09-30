@@ -19,18 +19,28 @@ Singleton {
     // never bindings over `get()` rows, so a consumer can bind to them safely.
     property var outputSizes: ({})
     property var _fullscreenOutputs: ({})
+
+    // Public read-only view of the verdicts, for consumers that need a QML
+    // BINDING rather than a call. A binding that only invokes
+    // isOutputFullscreen() has no tracked dependency and would be evaluated once
+    // and never invalidated, so the bar would never learn a fullscreen window
+    // appeared. Reading this property inside the binding is what registers it.
+    readonly property var fullscreenOutputs: _fullscreenOutputs
     signal workspacesUpdated()
     signal workspaceActivated()
     signal windowsUpdated()
 
     // True when a fullscreen window covers this output. See FullscreenDetect.js
     // for why tile geometry is the only fullscreen signal niri exposes.
+    //
+    // Prefer reading `fullscreenOutputs` from a binding: a binding whose only
+    // call is this function still captures the property reads inside it, but
+    // reading the map directly is unambiguous and needs no reliance on that.
     function isOutputFullscreen(outputName) {
         const name = outputName == null ? "" : String(outputName)
         if (!name)
             return false
-        const map = root._fullscreenOutputs || {}
-        return map[name] === true
+        return (root._fullscreenOutputs || {})[name] === true
     }
 
     readonly property string _homeDir: {
@@ -219,7 +229,14 @@ Singleton {
             const height = Number(logical.height)
             if (!isFinite(width) || !isFinite(height) || width <= 0 || height <= 0)
                 continue
-            sizes[String(out.name)] = { width: width, height: height }
+            // Scale travels with the extents: the IPC integer logical size and a
+            // fullscreen tile's f64 size disagree by up to one physical pixel,
+            // so fullscreen detection needs it to size its tolerance.
+            sizes[String(out.name)] = {
+                width: width,
+                height: height,
+                scale: Number(logical.scale) || 1
+            }
         }
         root.outputSizes = sizes
         root.recomputeFullscreenOutputs()

@@ -68,8 +68,11 @@ function reduce(state, event) {
 
     if (type === "fullscreen") {
         const fullscreen = event.value === true
-        if (fullscreen === next.fullscreen)
-            return _settle(next)
+        // No early return when the value is unchanged. Repeating an event has to
+        // be idempotent in its RESULT, not skipped: a bar that only collapses on
+        // a strict false->true edge is exactly the bar that collapses once and
+        // then never again, because a previous collapse already left
+        // `fullscreen` true with the bar hidden.
         next.fullscreen = fullscreen
         if (fullscreen) {
             // Collapse straight away, even under the pointer, and disarm so the

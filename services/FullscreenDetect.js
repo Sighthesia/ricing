@@ -24,9 +24,36 @@
 //   activeWorkspaces: { "<connector>": "<workspace id>" }
 //   windows:          [{ workspaceId, tileWidth, tileHeight }]
 
-// Fullscreen tile_size comes straight from output_size(), but fractional-scale
-// rounding can still land a logical pixel off, so allow a one-pixel slack.
+// Default slack, used when an output's scale is unknown: one logical pixel.
 var tolerance = 1
+
+// Slack for one output, in logical pixels.
+//
+// Two independent errors stack between what niri publishes and what this code
+// compares, and they are different sizes.
+//
+// `niri msg -j outputs` reports `logical` extents as INTEGERS, while a
+// fullscreen tile is sized from `output_size()` in full f64 precision. On a
+// 2880x1800 panel at 1.75 that is 1645.714x1028.571 published as 1645x1028, so
+// the IPC size is short by up to one logical pixel per axis.
+//
+// The tile overshoots on top of that, because niri rounds tile geometry to a
+// physical pixel and then reports it in logical space. A fullscreen tile on that
+// same panel measures 1646.286x1029.143 — over one logical pixel PAST the
+// integer IPC size, not short of it. That is a 1/1.75 = 0.571 step, so the
+// error is bounded by a couple of physical pixels, not by one logical pixel.
+//
+// So the slack has to be a few PHYSICAL pixels, expressed in logical pixels:
+// 3/scale, plus half a pixel of headroom. That is 2.21 logical px at 1.75 and
+// 6.5 at 0.5 — still far below the 16px gaps that distinguish a fullscreen tile
+// from a tiled one, so the slack can never make an ordinary window read as
+// fullscreen.
+function slackForScale(scale) {
+    var value = Number(scale)
+    if (!isFinite(value) || value <= 0)
+        return tolerance
+    return 3 / value + 0.5
+}
 
 function _positive(value) {
     var number = Number(value)
@@ -75,13 +102,16 @@ function fullscreenOutputs(outputSizes, activeWorkspaces, windows, slack) {
         }
 
         var fullscreen = false
+        var allowed = slack == null ? slackForScale(size.scale) : Math.max(0, Number(slack))
+        if (!isFinite(allowed))
+            allowed = tolerance
         for (var i = 0; i < (windows || []).length; i++) {
             var win = windows[i]
             if (!win)
                 continue
             if (String(win.workspaceId) !== activeId)
                 continue
-            if (coversOutput(win.tileWidth, win.tileHeight, size.width, size.height, slack)) {
+            if (coversOutput(win.tileWidth, win.tileHeight, size.width, size.height, allowed)) {
                 fullscreen = true
                 break
             }

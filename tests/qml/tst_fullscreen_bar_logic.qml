@@ -50,6 +50,39 @@ Item {
             compare(twice.armed, once.armed)
         }
 
+        // The regression: a bar that collapsed once could not collapse again.
+        // Once hidden, `fullscreen` is already true, so an early return on an
+        // unchanged value silently turned every later fullscreen into a no-op.
+        function test_fullscreenCollapsesAgainAfterTheBarIsAlreadyHidden() {
+            // Collapse on the first fullscreen.
+            var state = apply(Logic.initialState(), "fullscreen", true)
+            compare(state.revealed, false)
+            // A first collapse disarms, so recall takes the real two-step: the
+            // pointer travels off the strip, then back onto it.
+            state = apply(state, "move", undefined, 24)
+            state = apply(state, "enter")
+            compare(state.revealed, true)
+            // Then it collapses again on the idle timer, with fullscreen never
+            // having toggled back to false in between.
+            state = apply(state, "leave")
+            compare(state.revealed, false)
+            compare(state.fullscreen, true)
+            // Fullscreen never toggled, so the edge is not re-crossed. The bar
+            // must still collapse when the event is re-sent.
+            state = apply(state, "enter")
+            compare(state.revealed, true)
+            state = apply(state, "fullscreen", true)
+            compare(state.revealed, false)
+        }
+
+        function test_fullscreenWhileHiddenStaysCollapsed() {
+            // Re-sending `fullscreen` true must not half-restore the bar.
+            var hiddenOnce = apply(Logic.initialState(), "fullscreen", true)
+            var again = apply(hiddenOnce, "fullscreen", true)
+            compare(again.revealed, false)
+            compare(again.armed, false)
+        }
+
         function test_enterRevealsAndDisarms() {
             var state = apply(hidden(), "enter")
             compare(state.revealed, true)

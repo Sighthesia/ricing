@@ -33,10 +33,13 @@ Variants {
         readonly property bool autoHideEnabled: Services.SettingsService.bar.autoHideFullscreen === true
         // Per-output: a fullscreen window on a background workspace of another
         // monitor must not collapse this screen's bar.
-        readonly property bool fullscreenActive:
-            screenScope.autoHideEnabled
-            && Services.NiriService.isOutputFullscreen(
-                screenScope.modelData ? String(screenScope.modelData.name || "") : "")
+        readonly property bool fullscreenActive: {
+            // Read the map, don't call the lookup: a binding needs a property it
+            // can subscribe to, and this is the one the service reassigns.
+            const verdicts = Services.NiriService.fullscreenOutputs
+            const name = screenScope.modelData ? String(screenScope.modelData.name || "") : ""
+            return screenScope.autoHideEnabled && !!verdicts && verdicts[name] === true
+        }
 
         // Fullscreen auto-hide state machine. `pinned` keeps the bar on screen
         // whenever something that anchors below it is open, so a popup or the

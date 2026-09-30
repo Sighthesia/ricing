@@ -58,6 +58,34 @@ ShellRoot {
         sourceComponent: chromeComponent
     }
 
+    // Read-only window onto the fullscreen auto-hide chain, so the live state can
+    // be inspected from outside instead of inferred. Returns the service verdicts
+    // alongside what each bar screen resolved from them, which is the join the
+    // feature depends on (niri's output connector vs Quickshell's screen name).
+    IpcHandler {
+        target: "debugFullscreenBar"
+
+        function state() {
+            const verdicts = Services.NiriService.fullscreenOutputs
+            const screens = Quickshell.screens
+            const rows = []
+            for (let i = 0; i < screens.length; i++) {
+                const name = String(screens[i].name || "")
+                rows.push({
+                    screenName: name,
+                    matched: Object.prototype.hasOwnProperty.call(verdicts || {}, name),
+                    fullscreen: (verdicts || {})[name] === true
+                })
+            }
+            return {
+                outputSizes: Services.NiriService.outputSizes,
+                verdicts: verdicts,
+                settingEnabled: Services.SettingsService.bar.autoHideFullscreen === true,
+                screens: rows
+            }
+        }
+    }
+
     // Stands in for the lock IPC surface that the chrome's LockModule.Lock owns
     // once it exists. Compositor keybinds and `afloat-ipc lock` reach the session
     // lock through the `lock` target, and moving that handler behind the
