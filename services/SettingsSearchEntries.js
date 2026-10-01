@@ -32,7 +32,7 @@ var settingsEntries = [
     { label: "Theme Glow Width", category: "Appearance", description: "Spread of the theme-color glass glow", targetCategory: "appearance" },
     { label: "Theme Glow Intensity", category: "Appearance", description: "Strength of the theme-color glass glow", targetCategory: "appearance" },
     { label: "Theme Adaptation", category: "Appearance", description: "Adapt glass colors to the wallpaper theme", targetCategory: "appearance" },
-    { label: "Ripple Pulse", category: "Appearance", description: "Flash screen ring on panel open", targetCategory: "appearance" },
+    { label: "Ripple Pulse", category: "Appearance", description: "Glow ring sweeping the notification card and top bar", targetCategory: "appearance" },
     { label: "透明终端清晰字", category: "Appearance", description: "透明背景下终端文字全亮度绘制", targetCategory: "appearance" },
     { label: "Overview Background", category: "Appearance", description: "Toggle overview background style", targetCategory: "appearance" },
     { label: "Overview Solid Color", category: "Appearance", description: "Solid color vs blurred overview", targetCategory: "appearance" },

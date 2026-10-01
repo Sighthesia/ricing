@@ -25,6 +25,36 @@ Variants {
             implicitWidth: notificationStack.implicitWidth + 560
             implicitHeight: Math.max(1, screenScope.modelData.height)
             exclusionMode: ExclusionMode.Ignore
+
+            // The four margins, named once: the anchors below and the
+            // screen-space position both read them, so the two can never
+            // disagree about where this window actually is.
+            readonly property real marginTop: Services.NotificationService.notificationTop
+                ? (Services.SettingsService.bar.position === "top"
+                   ? Math.max(8, Number(Services.SettingsService.bar.height) + 12) : 16) : 8
+            readonly property real marginBottom: Services.NotificationService.notificationBottom
+                ? (Services.SettingsService.bar.position === "bottom"
+                   ? Math.max(8, Number(Services.SettingsService.bar.height) + 12) : 16) : 8
+            readonly property real marginLeft: Services.NotificationService.notificationLeft ? 16 : 8
+            readonly property real marginRight: Services.NotificationService.notificationRight ? 16 : 8
+
+            readonly property real screenWidth: Number(screenScope.modelData ? screenScope.modelData.width : 0)
+            readonly property real screenHeight: Number(screenScope.modelData ? screenScope.modelData.height : 0)
+
+            // Where this window sits on its output, in screen coordinates. The
+            // shared glow ring is positioned in screen coordinates and
+            // `mapToGlobal` is per-window, so a right-anchored host would
+            // otherwise report its own window-local zero as the screen edge and
+            // every projection would be off by the width of this window. This
+            // window sets its own anchors, so it is the only place that knows.
+            readonly property real windowScreenX: Number(screenScope.modelData ? screenScope.modelData.x : 0)
+                + (Services.NotificationService.notificationLeft
+                   ? marginLeft
+                   : screenWidth - marginRight - implicitWidth)
+            readonly property real windowScreenY: Number(screenScope.modelData ? screenScope.modelData.y : 0)
+                + (Services.NotificationService.notificationTop
+                   ? marginTop
+                   : screenHeight - marginBottom - implicitHeight)
             anchors {
                 top: Services.NotificationService.notificationTop
                 bottom: Services.NotificationService.notificationBottom
@@ -32,14 +62,10 @@ Variants {
                 left: Services.NotificationService.notificationLeft
             }
             margins {
-                top: Services.NotificationService.notificationTop
-                    ? (Services.SettingsService.bar.position === "top"
-                       ? Math.max(8, Number(Services.SettingsService.bar.height) + 12) : 16) : 8
-                bottom: Services.NotificationService.notificationBottom
-                    ? (Services.SettingsService.bar.position === "bottom"
-                       ? Math.max(8, Number(Services.SettingsService.bar.height) + 12) : 16) : 8
-                left: Services.NotificationService.notificationLeft ? 16 : 8
-                right: Services.NotificationService.notificationRight ? 16 : 8
+                top: notificationWindow.marginTop
+                bottom: notificationWindow.marginBottom
+                left: notificationWindow.marginLeft
+                right: notificationWindow.marginRight
             }
             mask: Region { item: notificationStack.implicitHeight > 0 ? notificationStack : null }
 
@@ -87,6 +113,15 @@ Variants {
                 anchors.left: Services.NotificationService.notificationLeft ? parent.left : undefined
                 stackAtTop: Services.NotificationService.notificationTop
                 popupModel: Services.NotificationService.popupList
+                // One glow for the whole shell: the card triggers the shared
+                // ring and reveals the slice crossing it, and the bar answers
+                // the same event with the slice crossing the bar.
+                glowPulse: Services.RipplePulseService
+                glowEnabled: Services.SettingsService.appearance.ripplePulseEnabled !== false
+                screenWidth: notificationWindow.screenWidth
+                screenHeight: notificationWindow.screenHeight
+                hostScreenX: notificationWindow.windowScreenX
+                hostScreenY: notificationWindow.windowScreenY
                 onPopupDismissRequested: notifId => Services.NotificationService.dismissPopup(notifId)
                 onPopupActionRequested: (notifId, identifier) =>
                     Services.NotificationService.invokePopupAction(notifId, identifier)

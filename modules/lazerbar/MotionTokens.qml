@@ -51,6 +51,10 @@ QtObject {
     readonly property int clickFlashEasing: Easing.OutQuint
     // Spectrum beat-wave sweep across its host surface.
     readonly property int beatWave: 400
+    // Surface-scoped glow pulse (the pre-lazer full-screen ripple, re-hosted on
+    // the notification card and the bar). Shorter than the old 1800ms screen
+    // sweep: it now crosses one small surface, not the display.
+    readonly property int glowSweep: 700
     // Flip-clock rolling digits ported from the pre-lazer bar (main branch
     // RollingClockTime.qml): slow gliding rolls paced at the old
     // Motion.color.transitionDuration (300) x 8/4/1 with OutCubic easing.

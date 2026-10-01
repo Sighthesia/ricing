@@ -95,6 +95,21 @@ QtObject {
     // schemes so the hue survives the flash — pure white chalks fills.
     readonly property color flashWash: !adapt || !colorService ? textPrimary
         : Qt.lighter(colorService.mPrimary, 2.0)
+    // Glow-pulse ring: the one mark in the pulse that has to out-read the
+    // surface it crosses, so it gets its own token rather than riding on
+    // flashWash. A wallpaper palette can be dark enough that a 2x lighten
+    // still sits at the bar's own value, and the pulse then reads as a tint
+    // of the background instead of light crossing it; blending most of the
+    // way to paper white keeps it unmistakable on any dark surface. Light
+    // schemes invert the problem — white on paper is invisible — so the ring
+    // takes the accent at full strength there instead.
+    //
+    // Blended from `accentColor`, not the raw palette string: `mix` reads
+    // .r/.g/.b/.b off its arguments, and a plain JS string yields undefined,
+    // i.e. transparent black.
+    readonly property color glowPulseRing: lightScheme
+        ? accentColor
+        : mix(accentColor, paperWhite, 0.72)
     // Notification entry flash: luminous half-tint of the primary in
     // both schemes — bright with the wallpaper hue. Pastel container
     // tints collapse toward paper-white light cards on low-chroma

@@ -618,7 +618,7 @@ LazerSettingsSection {
         id: rippleRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "涟漪脉冲"
+        labelText: "辉光脉冲"; descriptionText: "通知到达与音量、亮度等瞬态变化时，在通知卡片和顶栏上扫过光环"
         defaultValue: root.defaultOf("ripplePulseEnabled")
         currentValue: root.settingsObject ? root.settingsObject.ripplePulseEnabled : null
         resetCallback: function() { root.resetKey("ripplePulseEnabled") }

@@ -49,7 +49,6 @@ QtObject {
         glassThemeAdaptive: true,
         themeAdaptation: true,
         ripplePulseEnabled: true,
-        ripplePulseFullscreen: false,
         transientMediaCover: false,
         fontDefault: "",
         fontFixed: "monospace",
@@ -497,8 +496,10 @@ QtObject {
                 property bool glassThemeAdaptive: true
                 // Recolor shell surfaces from the wallpaper-extracted palette.
                 property bool themeAdaptation: true
+                // Glow pulse: the pre-lazer full-screen ripple, re-hosted on
+                // the notification card and the top bar. No fullscreen variant
+                // any more, so the old mode flag is gone with the overlay.
                 property bool ripplePulseEnabled: true
-                property bool ripplePulseFullscreen: false
                 // Show album art in media transient messages (off by default since
                 // the adjacent media widget already displays the cover).
                 property bool transientMediaCover: false

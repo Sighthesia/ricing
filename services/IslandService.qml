@@ -18,7 +18,6 @@ Singleton {
     // result. Set before showSettingsCenter() and consumed once by
     // SettingsContent on load, then reset.
     property string settingsInitialFilter: ""
-    readonly property int ripplePulseToken: Services.RipplePulseService.token
 
     // Window-hint extension is active only in attached-island mode while the
     // hint is held; floating-capsule mode leaves the island untouched.
@@ -68,13 +67,6 @@ Singleton {
 
     function centerHoverFor(screenName) {
         return !!(screenName && centerHoverStates[screenName])
-    }
-
-    function triggerRipplePulse() {
-        if (!Services.SettingsService.appearance.ripplePulseEnabled)
-            return
-
-        Services.RipplePulseService.trigger()
     }
 
     // Delay query reset so mode stays stable during the collapse animation.

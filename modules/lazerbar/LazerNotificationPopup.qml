@@ -34,6 +34,42 @@ Item {
     property bool openState: false
     property bool closing: false
     readonly property bool reducedMotion: MotionTokens.reducedMotion
+    // The shell's single glow pulse, injected by the host. The card is not a
+    // separate glow: a notification arriving is simply this pulse triggered,
+    // and the card reveals the slice of that one ring which crosses it.
+    property var glowPulse: null
+    // Master switch for the pulse on this surface.
+    property bool glowEnabled: true
+    // The output the ring is defined against, so the card masks the same ring
+    // the bar shows rather than fitting one to its own box, and where the stack
+    // this card sits in stands on it.
+    property real glowScreenWidth: 0
+    property real glowScreenHeight: 0
+    // A card is never asked to map itself. `mapToGlobal` is a call rather than a
+    // dependency, so a binding over it in a freshly created delegate keeps
+    // whatever it first computed — and answering 0 threw the shared ring a whole
+    // card's width away from the card, which is how a later notification could
+    // sit inside the ring's path and still show nothing. The stack states where
+    // it stands and the card adds its own position to it.
+    property real glowStackScreenX: 0
+    property real glowStackScreenY: 0
+    readonly property real glowSelfScreenX: glowStackScreenX + x
+    readonly property real glowSelfScreenY: glowStackScreenY + y
+    // True while the card is actually showing the pulse — `visible`, not just
+    // the shared clock, so a card that filtered itself out cannot report a
+    // glow it never painted.
+    readonly property bool glowPlaying: entryGlow.visible
+    // Where the ring starts inside this card, and how big it is against the
+    // screen. Diagnostics for the glow host: the ring's own item is internal, so
+    // these are the only way a harness can assert the ring actually lands on
+    // the card instead of a screen's width away from it.
+    readonly property real glowOriginX: entryGlow.originX
+    readonly property real glowOriginY: entryGlow.originY
+    readonly property real glowCover: entryGlow.cover
+    // The ring's current radius inside this card. Diagnostics for the glow
+    // host: a card is only lit while the ring is small enough to still be
+    // inside it, and how long that is decides whether the pass reads at all.
+    readonly property real glowRadius: entryGlow.radius
     signal dismissRequested
     signal actionRequested(string identifier)
 
@@ -89,7 +125,22 @@ Item {
     opacity: openState ? 1 : 0
 
     Component.onCompleted: {
-        Qt.callLater(function() { root.openState = true })
+        // Deferred one turn: the delegate's width/height come from ListView
+        // bindings that only resolve during the first layout pass, and the glow
+        // pulse needs real geometry to size its ring.
+        Qt.callLater(function() {
+            root.openState = true
+            // A notification arriving *is* the glow pulse being triggered, and
+            // it is untagged: the popup model is shared, so every output shows
+            // this card and every bar is meant to answer the same event. The
+            // origin is this card's entry edge in screen coordinates, so the
+            // ring starts where the card flew in from and every surface shows
+            // that one ring.
+            if (root.glowPulse) {
+                const origin = root.entryOriginOnScreen()
+                root.glowPulse.trigger("", origin.x, origin.y)
+            }
+        })
         if (!root.reducedMotion) {
             slideInAnim.restart()
             flashFade.restart()
@@ -106,6 +157,16 @@ Item {
     // osu Interpolation.DampContinuously: exponential smoothing toward target.
     function _damp(current, target, lambda, dt) {
         return target + (current - target) * Math.exp(-lambda * dt)
+    }
+
+    // Where the card's entry edge sits on the output, in screen coordinates.
+    // The card slides in from its own right edge, so that is the point the ring
+    // starts from. Derived from `glowSelfScreenX` rather than a second
+    // `mapToGlobal`, so the published origin and the card's own position can
+    // never come from two disagreeing reads.
+    function entryOriginOnScreen() {
+        return { x: root.glowSelfScreenX + root.width,
+                 y: root.glowSelfScreenY + root.height / 2 }
     }
 
     // Play the osu fling: random leftward impulse, integrate gravity per
@@ -491,6 +552,28 @@ Item {
                     duration: root.reducedMotion ? 0 : 2000
                     easing.type: Easing.OutQuart
                 }
+            }
+
+            // The shell's glow pulse, hosted on the card: the same heavy ring
+            // and its two soft bands the bar plays, clipped to the card instead
+            // of the display. Inset by the corner radius so the rectangular
+            // clip cannot spill past the rounded corners onto the desktop.
+            //
+            // Painted above the entry flash on purpose: the flash is an opaque
+            // wash for its first beat, and a ring underneath it spends the
+            // whole sweep hidden under the very glow it belongs to.
+            RippleGlow {
+                id: entryGlow
+                anchors.fill: parent
+                anchors.margins: root.cardRadius
+                pulse: root.glowPulse
+                glowEnabled: root.glowEnabled
+                screenWidth: root.glowScreenWidth
+                screenHeight: root.glowScreenHeight
+                // The glow is inset by the card radius on every side, so it
+                // starts that far inside the card's own place on the output.
+                hostScreenX: root.glowSelfScreenX + root.cardRadius
+                hostScreenY: root.glowSelfScreenY + root.cardRadius
             }
         }
     }

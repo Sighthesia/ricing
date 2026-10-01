@@ -112,8 +112,14 @@ BarPill {
         if (step === root._lastFlashStep)
             return
         root._lastFlashStep = step
-        if (!MotionTokens.reducedMotion)
+        if (!MotionTokens.reducedMotion) {
             levelFlashAnimation.restart()
+            // The bar plays the shell's glow pulse for the same discrete step
+            // the level bar flashes for, starting under this control.
+            const origin = root.barGlowOrigin()
+            if (origin)
+                Services.RipplePulseService.trigger(root.screenName, origin.x, origin.y)
+        }
     }
 
     // Single level icon centered on the pill.

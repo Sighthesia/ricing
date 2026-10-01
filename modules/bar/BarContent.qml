@@ -9,6 +9,11 @@ Item {
     id: root
 
     property string screenName: ""
+    // The bar window's place on its output, forwarded to widgets so the shared
+    // glow ring is positioned in screen coordinates rather than the window's
+    // own. See BarPill.barGlowOrigin.
+    property real screenX: 0
+    property real screenY: 0
     readonly property int sidePadding: 12
 
     // Hover intent publication for BarPopupHost.
@@ -415,6 +420,12 @@ Item {
                     item.instanceKey = modelData.instanceKey || ""
                     item.section = sectionRow.section
                     item.screenName = root.screenName
+                    // Only the widgets that host a pulse need these, and only
+                    // BarPill descendants declare them.
+                    if (item.glowScreenX !== undefined) {
+                        item.glowScreenX = root.screenX
+                        item.glowScreenY = root.screenY
+                    }
                     root.attachPopupForwarding(item, widgetLoader)
                 }
 
