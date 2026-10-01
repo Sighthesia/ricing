@@ -19,9 +19,12 @@ Item {
     property int checks: 0
     property string source: ""
     property string ladder: ""
+    property string lock: ""
     property bool shellLoaded: false
     property bool ladderLoaded: false
+    property bool lockLoaded: false
     readonly property bool sourcesReady: root.shellLoaded && root.ladderLoaded
+            && root.lockLoaded
 
     // Read the shell as text. The components whose order matters here cannot be
     // instantiated headlessly: `WlSessionLock` has no offscreen backend, so
@@ -66,6 +69,27 @@ Item {
         }
     }
 
+    // The lock itself, for the one verdict the root needs from it: whether a
+    // session-start lock is still expected. Read as text for the same reason as
+    // shell.qml — `WlSessionLock` has no offscreen backend, so the property's
+    // wiring is the only honest check available here.
+    FileView {
+        id: lockSource
+        path: (Quickshell.env("PWD") || ".") + "/modules/lock/Lock.qml"
+        blockLoading: true
+        watchChanges: false
+        onLoaded: {
+            root.lock = lockSource.text()
+            root.lockLoaded = true
+            root.run()
+        }
+        onLoadFailed: error => {
+            console.log("FAIL: read Lock.qml |", error)
+            root.failures++
+            Qt.quit()
+        }
+    }
+
     function check(label, condition, detail) {
         root.checks++
         if (condition) {
@@ -94,6 +118,21 @@ Item {
         while (at >= 0) {
             total++
             at = root.source.indexOf(needle, at + needle.length)
+        }
+        return total
+    }
+
+    // Count non-overlapping occurrences of `needle` inside `haystack`, so a
+    // per-block assertion ("this timer stops twice") cannot be satisfied by
+    // another object's copy.
+    function countOccurrencesIn(haystack, needle) {
+        if (!needle || !haystack)
+            return 0
+        var total = 0
+        var at = haystack.indexOf(needle)
+        while (at >= 0) {
+            total++
+            at = haystack.indexOf(needle, at + needle.length)
         }
         return total
     }
@@ -129,6 +168,20 @@ Item {
         if (end < 0)
             return root.source.slice(start)
         return root.source.slice(start, end)
+    }
+
+    // End of the statement that starts at `at`: the next blank line, the next
+    // member-level comment, or a bounded fallback. Used to read one declaration
+    // instead of the file that contains it.
+    function statementEnd(text, at) {
+        const blank = text.indexOf("\n\n", at)
+        const comment = text.indexOf("\n    //", at)
+        let end = -1
+        if (blank >= 0)
+            end = blank
+        if (comment >= 0 && (end < 0 || comment < end))
+            end = comment
+        return end < 0 ? Math.min(text.length, at + 240) : end
     }
 
     // Collapsed to single spaces, so a multi-line expression can be asserted as
@@ -210,6 +263,11 @@ Item {
             Qt.quit()
             return
         }
+        if (root.lock.length < 500) {
+            console.log("FAIL: Lock.qml was not readable |", root.lock.length, "chars")
+            Qt.quit()
+            return
+        }
 
         // The lock must not be part of the lazily mounted chrome: a lock inside
         // it can only engage after the wallpaper reveal, which is exactly the
@@ -253,7 +311,9 @@ Item {
 
         root.checkStartupState()
         root.checkStageLadder()
+        root.checkReportingPath()
         root.checkRootLockBindings()
+        root.checkLockExpectation()
         root.checkChromeStaging()
         root.checkFallback()
         root.checkDeferredWarmup()
@@ -331,6 +391,72 @@ Item {
         }
     }
 
+    // The reporting path itself, not just the names of its parts: each report
+    // has to arrive from the handler that owns it, and each has to actually
+    // write the gate it claims to. Presence checks alone let a deleted call site
+    // pass, which is how a root can declare a coordinator that nothing drives.
+    function checkReportingPath() {
+        // The wallpaper's handler must reach the coordinator, behind its latch.
+        const wallpaperBlock = root.normalized(root.enclosingBlock("id: wallpaperBackground"))
+        root.check("the wallpaper report reaches the coordinator",
+                   wallpaperBlock.indexOf("{ id: wallpaperBackground") === 0
+                   && wallpaperBlock.indexOf("onBootReadyChanged") >= 0
+                   && wallpaperBlock.indexOf(
+                          "if (!bootReady || root.startupWallpaperReady)") >= 0
+                   && wallpaperBlock.indexOf("root.markWallpaperReady()") >= 0,
+                   "wallpaper: " + wallpaperBlock.slice(0, 160))
+
+        const wallpaperBody = root.normalized(root.bodyOf("function markWallpaperReady()"))
+        root.check("the wallpaper gate is written and mounts the chrome",
+                   wallpaperBody.indexOf("root.startupWallpaperReady = true") >= 0
+                   && wallpaperBody.indexOf("root.mountChrome()") >= 0
+                   && wallpaperBody.indexOf(
+                          "StartupReveal.Events.wallpaperReady") >= 0,
+                   "body: " + wallpaperBody.slice(0, 160))
+
+        // Both chrome paths must report: the loader's own status change (which
+        // covers a chrome that is already staged when the item attaches) and the
+        // item's readiness change. Either one alone leaves a boot unstaged.
+        const loaderBlock = root.normalized(root.enclosingBlock("id: chromeLoader"))
+        root.check("the chrome loader reports its own staged chrome",
+                   loaderBlock.indexOf("{ id: chromeLoader") === 0
+                   && loaderBlock.indexOf("onStatusChanged") >= 0
+                   && loaderBlock.indexOf("root.markChromeStaged()") >= 0,
+                   "loader: " + loaderBlock.slice(0, 200))
+        const itemBlock = root.normalized(
+            root.enclosingBlock("target: chromeLoader.item"))
+        root.check("the loaded chrome reports its readiness",
+                   itemBlock.indexOf("target: chromeLoader.item") >= 0
+                   && itemBlock.indexOf("function onStartupReadyChanged()") >= 0
+                   && itemBlock.indexOf("root.markChromeStaged()") >= 0,
+                   "item: " + itemBlock.slice(0, 200))
+
+        // A recorded gate has to be a write, not a stage bump on its own.
+        const stagedBody = root.normalized(root.bodyOf("function markChromeStaged()"))
+        root.check("the chrome gate is written, not only staged",
+                   stagedBody.indexOf("root.startupChromeReady = true") >= 0
+                   && stagedBody.indexOf("StartupReveal.Events.chromeReady") >= 0,
+                   "body: " + stagedBody.slice(0, 160))
+
+        // The wave arrives from the lock's signal, through the root's handler.
+        const waveBlock = root.normalized(root.enclosingBlock("target: lockModule"))
+        root.check("the lock's wave signal reaches the root handler",
+                   waveBlock.indexOf("target: lockModule") >= 0
+                   && waveBlock.indexOf("function onStartupWaveStarted()") >= 0
+                   && waveBlock.indexOf("root.markStartupWaveStarted()") >= 0,
+                   "wave: " + waveBlock.slice(0, 160))
+
+        // Progress must extend the watchdog's budget instead of spending it: a
+        // slow decode, then the bar's batches, each get the full window.
+        const advanceBody = root.normalized(root.bodyOf("function advanceStartup(event)"))
+        const armBody = root.normalized(root.bodyOf("function armStartupFallback()"))
+        root.check("ladder progress re-arms the fallback watchdog",
+                   advanceBody.indexOf("root.armStartupFallback()") >= 0
+                   && armBody.indexOf("startupFallbackTimer.restart()") >= 0
+                   && wallpaperBody.indexOf("root.armStartupFallback()") >= 0,
+                   "advance: " + advanceBody.slice(0, 160) + " arm: " + armBody.slice(0, 160))
+    }
+
     // Both startup gates reach the lock as bindings on the root's own state, so
     // the lock never decides a boot outcome by itself. Scoped to the lock's own
     // block: a binding written on some later surface must not count as the lock
@@ -357,12 +483,54 @@ Item {
         // Quiet-ready is the wave, so the lock's own scheduling signal is what
         // closes the last stage. Waiting on anything else (palette extraction,
         // launcher priming) is exactly what this ladder exists to avoid.
-        const waveBody = root.bodyOf("function markStartupWaveStarted()")
+        const waveBody = root.normalized(root.bodyOf("function markStartupWaveStarted()"))
         root.check("the lock's wave signal closes the startup ladder",
-                   root.indexOf("function onStartupWaveStarted()") >= 0
-                   && waveBody.indexOf("StartupReveal.Events.waveStarted") >= 0
-                   && waveBody.indexOf("root.startupQuietReady = true") >= 0,
-                   "body: " + root.normalized(waveBody).slice(0, 160))
+                   waveBody.indexOf("StartupReveal.Events.waveStarted") >= 0
+                   && waveBody.indexOf("root.startupQuietReady = true") >= 0
+                   && waveBody.indexOf("startupFallbackTimer.stop()") >= 0,
+                   "body: " + waveBody.slice(0, 160))
+    }
+
+    // The lock states whether a session-start lock is still to be expected, and
+    // that verdict — not a timer — decides whether the root arms its fallback.
+    // Without it, a reload inside a session whose marker was already spent would
+    // fire the watchdog 2.4 s later and record a degraded boot that never
+    // happened. Read Lock.qml as text for the same reason as shell.qml.
+    function checkLockExpectation() {
+        const declaration = "readonly property bool startupLockExpected:"
+        const at = root.lock.indexOf(declaration)
+        root.check("lock publishes a startup expectation",
+                   at >= 0, "declared at " + at)
+        if (at < 0)
+            return
+
+        // Its expression, pinned whole: the unresolved marker, an accepted
+        // startup request, and an attempt that is still armed — and nothing else.
+        // An extra term would make a spent session look expected again, which is
+        // the exact false degraded boot this verdict exists to prevent, so the
+        // text is asserted rather than merely probed for its three operands.
+        const text = root.normalized(
+            root.lock.slice(at, statementEnd(root.lock, at)))
+        root.check("the expectation is exactly marker, request or armed attempt",
+                   text === "readonly property bool startupLockExpected: "
+                       + "!_startupGateResolved || startupRequest || _startupLockArmed",
+                   "declaration: " + text.slice(0, 200))
+
+        // The root consumes the verdict when arming, and stands the watchdog
+        // down when it flips false — a reload must not record a degraded boot.
+        const armBody = root.normalized(root.bodyOf("function armStartupFallback()"))
+        root.check("every watchdog arm is gated on the lock's expectation",
+                   armBody.indexOf("if (root.startupQuietReady "
+                       + "|| !lockModule.startupLockExpected) return") >= 0
+                   && armBody.indexOf("startupFallbackTimer.restart()") >= 0,
+                   "arm: " + armBody.slice(0, 200))
+        const expectBlock = root.normalized(
+            root.enclosingBlock("function onStartupLockExpectedChanged()"))
+        root.check("a spent marker stands the watchdog down",
+                   expectBlock.indexOf("function onStartupLockExpectedChanged()") >= 0
+                   && expectBlock.indexOf("!lockModule.startupLockExpected") >= 0
+                   && expectBlock.indexOf("startupFallbackTimer.stop()") >= 0,
+                   "expectation: " + expectBlock.slice(0, 200))
     }
 
     // The chrome reports readiness only after the bar staged its widgets and the
@@ -433,15 +601,18 @@ Item {
 
         // A loader that never leaves Loading is an engine stall rather than a
         // component error, so the gate is bounded too. Scoped to the timer's own
-        // block: the app-theme timer further down must not vouch for it.
+        // block and to its exact budget: the app-theme timer further down must
+        // not vouch for it, and a shorter budget would cut the bar's batches off.
         const auxTimer = root.normalized(root.enclosingBlock("id: auxiliaryFallbackTimer"))
         root.check("auxiliary staging is bounded",
                    root.positionInChrome("id: auxiliaryFallbackTimer") >= 0
                    && auxTimer.indexOf("{ id: auxiliaryFallbackTimer") === 0
+                   && auxTimer.indexOf("interval: LazerBar.MotionTokens.slow * 2") >= 0
+                   && auxTimer.indexOf("running: chromeRoot.barStaged "
+                       + "&& !chromeRoot.auxiliariesReady") >= 0
                    && auxTimer.indexOf("repeat: false") >= 0
-                   && auxTimer.indexOf("LazerBar.MotionTokens.slow") >= 0
                    && auxTimer.indexOf("chromeRoot.releaseAuxiliaries()") >= 0,
-                   "timer: " + auxTimer.slice(0, 160))
+                   "timer: " + auxTimer.slice(0, 200))
     }
 
     // The root's own watchdog: it releases every gate, logs the reason, and
@@ -457,9 +628,19 @@ Item {
             if (body.indexOf(released[index]) < 0)
                 missing.push(released[index])
         }
+        // The fallback stops the watchdog on the way in and on the way out: the
+        // ladder events inside it re-arm the very watchdog that is firing, so a
+        // version that only stopped on entry would leave a second one pending
+        // and log itself a false degraded boot 2.4 s later.
+        const quietAt = body.indexOf("root.startupQuietReady = true")
+        const stops = root.countOccurrencesIn(body, "startupFallbackTimer.stop()")
         root.check("the bounded fallback releases every startup gate",
-                   body.length > 0 && missing.length === 0,
-                   "missing: " + missing.join(", "))
+                   body.length > 0 && missing.length === 0
+                   && stops === 2
+                   && body.lastIndexOf("startupFallbackTimer.stop()") > quietAt
+                   && body.indexOf("startupFallbackTimer.stop()") < body.indexOf(
+                          "if (root.startupQuietReady)"),
+                   "missing: " + missing.join(", ") + ", stops: " + stops)
 
         // The fallback may only write the root's startup booleans: no request is
         // made, cancelled or reclassified by it.
@@ -479,11 +660,31 @@ Item {
                    root.indexOf("id: startupFallbackTimer") >= 0
                    && root.indexOf("id: startupFallbackTimer") < root.chromeStart
                    && watchdog.indexOf("{ id: startupFallbackTimer") === 0
+                   // The exact budget: long enough for a slow decode plus the
+                   // bar's batches, and token-derived so a retune stays visible.
+                   && watchdog.indexOf("interval: LazerBar.MotionTokens.slow * 10") >= 0
+                   // `running` carries only the stop conditions, so the startup
+                   // expectation is a gate and never a restart trigger; the
+                   // starter timer below is what arms it.
+                   && watchdog.indexOf("running: false") >= 0
                    && watchdog.indexOf("repeat: false") >= 0
-                   && watchdog.indexOf("running: !root.startupQuietReady") >= 0
-                   && watchdog.indexOf("LazerBar.MotionTokens.slow") >= 0
                    && watchdog.indexOf("root.releaseStartupGates(") >= 0,
-                   "watchdog: " + watchdog.slice(0, 160))
+                   "watchdog: " + watchdog.slice(0, 220))
+
+        // Arming is explicit and happens in exactly two ways: one turn after the root
+        // exists, and every ladder step. A watchdog that only starts itself would
+        // measure time since construction and cut a slow decode's successors short.
+        const restarts = root.countOccurrences("startupFallbackTimer.restart()")
+        const starter = root.normalized(
+            root.enclosingBlock("onTriggered: root.armStartupFallback()"))
+        root.check("the watchdog is armed explicitly, once per progress step",
+                   restarts === 1
+                   && root.countOccurrences("root.armStartupFallback()") >= 3
+                   && starter.indexOf("onTriggered: root.armStartupFallback()") >= 0
+                   && starter.indexOf("interval: 0") >= 0
+                   && starter.indexOf("running: true") >= 0
+                   && starter.indexOf("repeat: false") >= 0,
+                   "restarts: " + restarts + ", starter: " + starter.slice(0, 160))
 
         // A chrome that cannot build is the same degraded boot: the gates open
         // instead of the session waiting on a loader that already failed.
@@ -493,7 +694,7 @@ Item {
                    && loaderBlock.indexOf("{ id: chromeLoader") === 0
                    && loaderBlock.indexOf("Loader.Error") >= 0
                    && loaderBlock.indexOf("root.releaseStartupGates(") >= 0,
-                   "loader: " + loaderBlock.slice(0, 160))
+                   "loader: " + loaderBlock.slice(0, 200))
 
         // The chrome mounts once and is never torn down, so a screen re-key or
         // a hotplug cannot remount every surface.

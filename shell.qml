@@ -44,6 +44,31 @@ ShellRoot {
     // that arrives later must still get its chrome.
     property bool _chromeMounted: false
 
+    // Keep the bounded fallback's budget measuring the work that is still
+    // outstanding rather than time since the root was constructed. Every real
+    // ladder step is progress, so it re-arms the same one-shot watchdog: a slow
+    // first decode spends the budget on the reveal, and the bar batches get a
+    // fresh one instead of inheriting whatever the decode left behind. It is a
+    // restart of one bounded timer, never a second timer and never a growing
+    // deadline, so a boot that keeps reporting cannot postpone the fallback
+    // forever — each restart needs a new report, and only four exist.
+    //
+    // The lock's own expectation gates every arm: once this compositor session
+    // has spent its one automatic lock there is no startup request left to hold,
+    // so a watchdog would only report a degraded boot that is not one. See
+    // Lock.startupLockExpected.
+    //
+    // `restart()` on a stopped timer is the same arming pattern BarContent uses
+    // for its batch timer, so `running: false` here costs no behaviour. The
+    // quiet-ready guard matters because releaseStartupGates advances the ladder
+    // before it closes that gate: without it, the fallback would re-arm the very
+    // watchdog that is firing and then log itself a second time.
+    function armStartupFallback() {
+        if (root.startupQuietReady || !lockModule.startupLockExpected)
+            return
+        startupFallbackTimer.restart()
+    }
+
     // One ladder step. Idempotent by construction: `advance()` returns the
     // current stage for an unknown or out-of-order event, and an unchanged
     // result is not written back.
@@ -52,6 +77,7 @@ ShellRoot {
         if (next === root.startupStage)
             return root.startupStage
         root.startupStage = next
+        root.armStartupFallback()
         return next
     }
 
@@ -74,6 +100,9 @@ ShellRoot {
             root.advanceStartup(StartupReveal.Events.wallpaperReady)
         }
         root.mountChrome()
+        // The mount is the last event the wallpaper contributes, so the bar
+        // batches get their own budget rather than sharing the decode's.
+        root.armStartupFallback()
     }
 
     // The chrome finished staging. Recorded as a gate rather than a stage: the
@@ -88,7 +117,10 @@ ShellRoot {
     // The lock committed to its entry wave: with motion it armed the bounded
     // image wait, under reduced motion it committed the settled state. Either
     // way that is the scheduling event, not an animation completion, and it is
-    // what closes the ladder — so quiet-ready is set here, exactly once.
+    // what closes the ladder — so quiet-ready is set here, exactly once. The
+    // watchdog is stopped explicitly rather than by a binding: arming owns this
+    // timer, and a fallback firing after quiet-ready would only add a log line
+    // about a session that already came up.
     function markStartupWaveStarted() {
         // The lock refuses to wave before both gates open, so this branch is
         // unreachable in a wired shell. It exists so an impossible wave still
@@ -97,6 +129,7 @@ ShellRoot {
             root.releaseStartupGates("wave-before-gates")
         root.advanceStartup(StartupReveal.Events.waveStarted)
         root.startupQuietReady = true
+        startupFallbackTimer.stop()
     }
 
     // Bounded fallback, so no boot can leave the session on an unlabelled static
@@ -107,10 +140,15 @@ ShellRoot {
     // build, a bar that never finishes staging. This releases every gate so the
     // startup lock waves and post-startup work runs, and says so in the log.
     //
+    // It is armed only while a session-start lock is still expected (see the
+    // watchdog below), so a reload inside a session whose marker was already
+    // spent never reports a degraded boot that is not one.
+    //
     // It only ever writes the root's own startup booleans: no request is made,
     // cancelled or reclassified, so a manual lock keeps the screenshot path it
     // has today, and the fallback cannot release the session lock.
     function releaseStartupGates(reason) {
+        startupFallbackTimer.stop()
         if (root.startupQuietReady) {
             console.warn("[startup] startup fallback fired after quiet-ready:", reason)
             return
@@ -133,6 +171,9 @@ ShellRoot {
         // markWallpaperReady and its surface waves as soon as it is created.
         root.advanceStartup(StartupReveal.Events.waveStarted)
         root.startupQuietReady = true
+        // The events above re-armed this watchdog on their way through; a
+        // fallback that has already run must not leave a second one pending.
+        startupFallbackTimer.stop()
     }
 
     // Inject the wallpaper palette into the shared LazerTheme singleton.
@@ -196,6 +237,19 @@ ShellRoot {
         }
     }
 
+    // A reload resolves its session marker asynchronously, so an armed watchdog
+    // has to stand down when the lock reports that no startup lock is expected
+    // any more — there is no startup surface left to wave, and the degraded-boot
+    // log line would name a session that booted fine.
+    Connections {
+        target: lockModule
+
+        function onStartupLockExpectedChanged() {
+            if (!lockModule.startupLockExpected)
+                startupFallbackTimer.stop()
+        }
+    }
+
     Loader {
         id: chromeLoader
         active: false
@@ -226,15 +280,35 @@ ShellRoot {
         }
     }
 
-    // The bounded fallback's clock, armed at boot and stopped by quiet-ready.
-    // Deliberately several times a healthy boot's cost: a normal session
-    // reaches quiet-ready in about one wallpaper swap plus the staged frames.
+    // The bounded fallback's clock. Its `running` is only the stop condition; arming
+    // is explicit (see armStartupFallback), so the lock's expectation verdict
+    // can gate every restart instead of being overridden by one. Deliberately
+    // several times a healthy boot's cost: a normal session reaches quiet-ready
+    // in about one wallpaper swap plus the staged frames, and each ladder step
+    // grants a fresh budget.
+    //
+    // A shell whose startup marker was already spent never arms it at all: no
+    // startup request is waiting, so there is nothing for this watchdog to
+    // unblock. `startupLockExpected` is read in armStartupFallback rather than
+    // bound here, so the watcher's own state stays the one thing that decides
+    // when the root is asked.
     Timer {
         id: startupFallbackTimer
         interval: LazerBar.MotionTokens.slow * 10
-        running: !root.startupQuietReady
+        running: false
         repeat: false
         onTriggered: root.releaseStartupGates("startup-watchdog")
+    }
+
+    // Arm the watchdog once the root exists. armStartupFallback() asks the lock
+    // whether a startup lock is still expected, so this first arm cannot
+    // pre-empt a session whose marker was already spent — the marker read may
+    // still be in flight here, and the gate closes the moment it resolves.
+    Timer {
+        interval: 0
+        repeat: false
+        running: true
+        onTriggered: root.armStartupFallback()
     }
 
     // Read-only window onto the fullscreen auto-hide chain, so the live state can

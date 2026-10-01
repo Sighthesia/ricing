@@ -35,6 +35,17 @@ Scope {
     property bool startupWallpaperReady: false
     property bool startupChromeReady: false
     property bool _startupWaveEmitted: false
+    // Whether a session-start lock is still to be expected at all. True while
+    // the marker decision is unresolved (a startup request may still follow),
+    // while a startup request is in flight, and while an unused attempt is still
+    // armed. It drops to false exactly once this compositor session has spent
+    // its one automatic lock — a reload, or a session whose first attempt was
+    // rejected. The root uses it to arm its bounded startup fallback only where
+    // a startup surface can still exist to wave: after the marker is spent there
+    // is no startup request to hold, so a watchdog would only report a degraded
+    // boot that is not one. Read-only: it reports state and requests nothing.
+    readonly property bool startupLockExpected: !_startupGateResolved
+            || startupRequest || _startupLockArmed
     // Emitted once per accepted startup request, when the first surface's
     // entry wave is scheduled: the surface has committed to wave (its bounded
     // image wait is armed and the 800ms enter follows), or, under reduced
