@@ -468,30 +468,35 @@ Item {
             root.check("tray switch moves identity out to left", trayOutIdentity.x < 0, true)
             // Regression: the tray content canvas reserves a second-level band so
             // the overflowing catcher has ancestors to hit-test against, and it is
-            // wider than the 260 face it paints. A body entering from outside the
-            // panel therefore has to be bounded by its own paint, or its face
-            // covers the desktop beside the panel for the whole exchange - a menu
-            // visibly sliding out of the popup.
+            // wider than the 260 panel it paints. A body entering from outside the
+            // panel has to be bounded by the slot, because `Item.clip` clips a
+            // child to the CLIPPING item's own rect - clipping the body itself
+            // only trims the body's own children and leaves it painting at x=260
+            // against a 260 panel, which reads as a menu smearing across the
+            // desktop while swapping icons.
             var traySlot = root.findByName(host.popupItem, "popupContentSlot")
             var trayInBody = root.findByName(host.popupItem, "popupActions")
             var trayOutBody = root.findByName(host.popupItem, "popupActionsOutgoing")
-            root.check("tray switch canvas is wider than the painted face",
-                host.popupContentWidth > host.trayFaceWidth, true)
-            root.check("tray switch bounds the incoming body to its own face",
-                trayInBody.width, host.trayFaceWidth)
-            root.check("tray switch bounds the outgoing body to its own face",
-                trayOutBody.width, host.trayFaceWidth)
-            root.check("tray switch clips both displaced bodies",
-                trayInBody.clip && trayOutBody.clip, true)
-            root.check("tray switch keeps the input canvas under the bodies",
-                traySlot.width, host.popupContentWidth)
+            root.check("tray switch canvas is wider than the painted panel",
+                host.popupContentWidth > host.popupSlotWidth, true)
+            // At the start of the slide the incoming body rests one panel width
+            // out, entirely outside what the panel owns. That is the frame that
+            // smears across the desktop when nothing bounds it, so park the
+            // clock there and confirm the slot is already the panel width.
+            host.contentSlideProgress = 0
+            root.check("tray switch starts the body one panel outside",
+                trayInBody.x, host._contentSlideDistance)
+            root.check("tray switch bounds the slot to the painted panel",
+                traySlot.width, host.popupSlotWidth)
+            root.check("tray switch clips the slot while displaced",
+                traySlot.clip, true)
             root.check("tray switch tracks one painted panel width",
-                host._contentSlideDistance, host.trayFaceWidth)
+                host._contentSlideDistance, host.popupSlotWidth)
             host.contentSlideProgress = 1
-            root.check("settled tray switch restores the input canvas width",
-                trayInBody.width, traySlot.width)
-            root.check("settled tray switch releases the body clips",
-                trayInBody.clip || trayOutBody.clip, false)
+            root.check("settled tray switch restores the input canvas",
+                traySlot.width, host.popupContentWidth)
+            root.check("settled tray switch rests both bodies at the origin",
+                trayInBody.x, 0)
             host.settleContentSlide()
             // Moving back left mirrors the track.
             host.updateIntent({

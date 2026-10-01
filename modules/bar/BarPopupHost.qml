@@ -946,23 +946,10 @@ PanelWindow {
         ? Math.max(root.popupSlotWidth, root.trayInputWidth, root.targetWidth)
         : root.popupSlotWidth
 
-    // How wide an action body actually paints, which is what bounds it while
-    // it is displaced: an Item clips to its own bounds, so a body has to be as
-    // narrow as its own paint for the clip to mean anything. Bodies differ
-    // across a hop (tray face 260 against a 420 media card), and both start
-    // outside the panel - incoming at the right edge, outgoing travelling left
-    // - so a shared canvas-sized clip let the incoming face cover the desktop
-    // beside the panel while a narrower incoming body clipped the wider
-    // outgoing one mid-flight.
-    function bodyPaintWidth(intentObj) {
-        if (!intentObj || String(intentObj.kind || "") === "context")
-            return root.popupSlotWidth
-        return String(intentObj.actionKind || "") === "tray"
-            ? root.trayFaceWidth : root.popupContentWidth
-    }
-    // True exactly while a body is off its resting position, which is also the
-    // whole window in which no tray submenu can be summoned: the canvas width
-    // that owns the catcher comes straight back when the slide settles.
+    // True exactly while a body is off its resting position. The content slot
+    // narrows to the painted panel for exactly this window and is the full input
+    // canvas again the moment the slide settles, which is also before a tray
+    // submenu can be summoned - so the catcher never loses its ancestors.
     readonly property bool contentBodiesDisplaced: root._exchangeCommitted
             && root.contentSlideProgress < 1
     function popupHeightForIntent(intentObj) {        if (!intentObj)
@@ -1701,7 +1688,19 @@ PanelWindow {
                 // intent contributes to the popup height and visible surface.
                 contentData: Item {
                      objectName: "popupContentSlot"
-                     width: root.popupContentWidth
+                     // The slot is the ancestor whose rect bounds a displaced
+                     // body: `Item.clip` clips a child to the CLIPPING item's own
+                     // rect, so clipping each body only trims that body's own
+                     // children and does nothing about where the body sits. A
+                     // body offset to x=260 paints 260..520 against a 260 panel.
+                     //
+                     // The slot is also the input canvas carrying the submenu
+                     // catcher, so it may not shrink while that catcher is
+                     // summonable. Displaced is exactly the slide, and the slide
+                     // ends before a submenu can be summoned, so binding to it
+                     // keeps both contracts without a second clip owner.
+                     width: root.contentBodiesDisplaced ? root.popupSlotWidth
+                             : root.popupContentWidth
                      implicitWidth: root.popupContentWidth
                      implicitHeight: root.popupHeightForIntent(root.currentIntent)
                      height: implicitHeight
@@ -1744,12 +1743,7 @@ PanelWindow {
                          opacity: root._exchangeCommitted ? root.contentSlideProgress : 1
                          x: root._exchangeCommitted
                                  ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
-                         // Slide inside the face, not the input canvas: the body
-                         // enters from outside the panel, so an unclipped canvas
-                         // width paints the tray face across the desktop beside it.
-                         width: root.contentBodiesDisplaced
-                                 ? root.bodyPaintWidth(root.currentIntent) : parent.width
-                         clip: root.contentBodiesDisplaced
+                         width: parent.width
                          height: implicitHeight
                          actionKind: root.currentIntent && root.currentIntent.kind !== "context"
                                  ? (root.currentIntent.actionKind || "") : "context"
@@ -1768,13 +1762,7 @@ PanelWindow {
                          enabled: false
                          x: root._exchangeCommitted
                                  ? -root.contentSlideSign * root._contentSlideDistance * root.contentSlideProgress : 0
-                         // Same bound as the incoming body: a wider outgoing card
-                         // keeps its own edge instead of losing a strip to the
-                         // incoming body's clip width.
-                         width: root.contentBodiesDisplaced
-                                 ? root.bodyPaintWidth(root._transitionOutgoingIntent)
-                                 : parent.width
-                         clip: root.contentBodiesDisplaced
+                         width: parent.width
                          height: implicitHeight
                          actionKind: root._transitionOutgoingIntent
                                  && root._transitionOutgoingIntent.kind !== "context"
