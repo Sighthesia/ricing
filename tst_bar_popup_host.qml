@@ -466,7 +466,32 @@ Item {
             var trayOutIdentity = root.findByName(host.popupItem, "popupIdentityOutgoing")
             root.check("tray switch moves identity in from right", trayInIdentity.x > 0, true)
             root.check("tray switch moves identity out to left", trayOutIdentity.x < 0, true)
+            // Regression: the tray content canvas reserves a second-level band so
+            // the overflowing catcher has ancestors to hit-test against, and it is
+            // wider than the 260 face it paints. A body entering from outside the
+            // panel therefore has to be bounded by its own paint, or its face
+            // covers the desktop beside the panel for the whole exchange - a menu
+            // visibly sliding out of the popup.
+            var traySlot = root.findByName(host.popupItem, "popupContentSlot")
+            var trayInBody = root.findByName(host.popupItem, "popupActions")
+            var trayOutBody = root.findByName(host.popupItem, "popupActionsOutgoing")
+            root.check("tray switch canvas is wider than the painted face",
+                host.popupContentWidth > host.trayFaceWidth, true)
+            root.check("tray switch bounds the incoming body to its own face",
+                trayInBody.width, host.trayFaceWidth)
+            root.check("tray switch bounds the outgoing body to its own face",
+                trayOutBody.width, host.trayFaceWidth)
+            root.check("tray switch clips both displaced bodies",
+                trayInBody.clip && trayOutBody.clip, true)
+            root.check("tray switch keeps the input canvas under the bodies",
+                traySlot.width, host.popupContentWidth)
+            root.check("tray switch tracks one painted panel width",
+                host._contentSlideDistance, host.trayFaceWidth)
             host.contentSlideProgress = 1
+            root.check("settled tray switch restores the input canvas width",
+                trayInBody.width, traySlot.width)
+            root.check("settled tray switch releases the body clips",
+                trayInBody.clip || trayOutBody.clip, false)
             host.settleContentSlide()
             // Moving back left mirrors the track.
             host.updateIntent({

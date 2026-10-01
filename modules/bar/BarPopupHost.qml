@@ -758,10 +758,16 @@ PanelWindow {
         var fromX = root.currentIntent ? Number(root.currentIntent.anchorX) : 0
         var toX = Number(root.pendingIntent.anchorX)
         root.contentSlideSign = isFinite(fromX) && isFinite(toX) && toX < fromX ? -1 : 1
-        root._contentSlideDistance = Math.max(root.popupItem.contentLayer.width, 260)
-        root.contentSlideProgress = 0
         root.currentIntent = root.pendingIntent
         root.pendingIntent = null
+        // One painted panel width, measured after currentIntent moved so the
+        // incoming face is counted. Reading the content layer instead picked up
+        // whatever the canvas happened to be wide - 504 for a tray, and the
+        // displaced body's own offset on later hops - so the outgoing body
+        // never cleared the panel and the incoming face swept the desktop
+        // beside it for the whole exchange.
+        root._contentSlideDistance = Math.max(root.popupSlotWidth, 260)
+        root.contentSlideProgress = 0
         if (MotionTokens.reducedMotion)
             root.contentSlideProgress = 1
         else
@@ -931,11 +937,34 @@ PanelWindow {
     readonly property real trayInputWidth: root.popupSlotWidth
         + (popupActions && popupActions.trayMenuContent
             ? Number(popupActions.trayMenuContent.primaryMenuWidth) : 244)
+    // The painted face stops at 260 even though the tray canvas below reserves
+    // a second-level band, so the canvas is a hit-test region and not a paint
+    // region.
+    readonly property real trayFaceWidth: 260
     readonly property real popupContentWidth: root.currentIntent
         && String(root.currentIntent.actionKind || "") === "tray"
         ? Math.max(root.popupSlotWidth, root.trayInputWidth, root.targetWidth)
         : root.popupSlotWidth
 
+    // How wide an action body actually paints, which is what bounds it while
+    // it is displaced: an Item clips to its own bounds, so a body has to be as
+    // narrow as its own paint for the clip to mean anything. Bodies differ
+    // across a hop (tray face 260 against a 420 media card), and both start
+    // outside the panel - incoming at the right edge, outgoing travelling left
+    // - so a shared canvas-sized clip let the incoming face cover the desktop
+    // beside the panel while a narrower incoming body clipped the wider
+    // outgoing one mid-flight.
+    function bodyPaintWidth(intentObj) {
+        if (!intentObj || String(intentObj.kind || "") === "context")
+            return root.popupSlotWidth
+        return String(intentObj.actionKind || "") === "tray"
+            ? root.trayFaceWidth : root.popupContentWidth
+    }
+    // True exactly while a body is off its resting position, which is also the
+    // whole window in which no tray submenu can be summoned: the canvas width
+    // that owns the catcher comes straight back when the slide settles.
+    readonly property bool contentBodiesDisplaced: root._exchangeCommitted
+            && root.contentSlideProgress < 1
     function popupHeightForIntent(intentObj) {        if (!intentObj)
             return 1
         // Track live height even while the two-layer reveal is in flight:
@@ -1701,7 +1730,7 @@ PanelWindow {
                         y: root.direction === "down" ? -1 : 0
                         width: root.currentIntent
                             && String(root.currentIntent.actionKind || "") === "tray"
-                            ? 260 : parent.width
+                            ? root.trayFaceWidth : parent.width
                         height: parent.height + 1
                         color: LazerTheme.settingsSection
                     }
@@ -1715,7 +1744,12 @@ PanelWindow {
                          opacity: root._exchangeCommitted ? root.contentSlideProgress : 1
                          x: root._exchangeCommitted
                                  ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
-                         width: parent.width
+                         // Slide inside the face, not the input canvas: the body
+                         // enters from outside the panel, so an unclipped canvas
+                         // width paints the tray face across the desktop beside it.
+                         width: root.contentBodiesDisplaced
+                                 ? root.bodyPaintWidth(root.currentIntent) : parent.width
+                         clip: root.contentBodiesDisplaced
                          height: implicitHeight
                          actionKind: root.currentIntent && root.currentIntent.kind !== "context"
                                  ? (root.currentIntent.actionKind || "") : "context"
@@ -1734,7 +1768,13 @@ PanelWindow {
                          enabled: false
                          x: root._exchangeCommitted
                                  ? -root.contentSlideSign * root._contentSlideDistance * root.contentSlideProgress : 0
-                         width: parent.width
+                         // Same bound as the incoming body: a wider outgoing card
+                         // keeps its own edge instead of losing a strip to the
+                         // incoming body's clip width.
+                         width: root.contentBodiesDisplaced
+                                 ? root.bodyPaintWidth(root._transitionOutgoingIntent)
+                                 : parent.width
+                         clip: root.contentBodiesDisplaced
                          height: implicitHeight
                          actionKind: root._transitionOutgoingIntent
                                  && root._transitionOutgoingIntent.kind !== "context"
