@@ -510,6 +510,12 @@ Variants {
                     }
                     onPopupCloseRequested: {
                         if (screenScope.hintOwnsPopup) return
+                        // A tray icon losing hover must not retire a context
+                        // menu, which is dismissed explicitly and not by the
+                        // pointer wandering off a widget.
+                        if (popupHost.currentIntent
+                                && String(popupHost.currentIntent.kind || "") === "context")
+                            return
                         popupHost.widgetHovered = false
                         popupHost.requestClose()
                     }

@@ -424,6 +424,10 @@ Item {
             root.check("dismissed glide leaves pending clear", host.pendingIntent, null)
             root.checkOpaque("dismissed glide leaves layers opaque")
 
+            // A context menu holds the popup until dismissed, and this is a
+            // hover intent: release the context one the way its close button
+            // does, or the replacement is refused.
+            host.dismissImmediately()
             Lazer.MotionTokens.reducedMotionOverride = true
             host.updateIntent({
                 widgetId: "volume", instanceKey: "volume:reduced", kind: "hover",
@@ -1201,6 +1205,22 @@ Item {
             root.check("settled exchange clears outgoing identity", outgoingIdentity.visible, false)
             root.check("settled exchange clears outgoing body", outgoingActions.visible, false)
 
+            // The exchange above committed the context intent, and a context
+            // menu holds the popup until it is dismissed - so release it the way
+            // its own close button does before the hover sequence continues.
+            root.check("context intent is what the exchange committed",
+                host.currentIntent.widgetId, "notifications")
+            host.dismissImmediately()
+            host.widgetHovered = true
+            // Reopen, then replace: the assertion below needs a live popup with a
+            // pending second intent, which a single fresh intent cannot produce.
+            host.updateIntent({
+                widgetId: "battery", instanceKey: "battery:0", kind: "hover",
+                actionKind: "battery", anchorX: 600, screenWidth: 1000,
+                screenHeight: 800, effectiveBarHeight: 48, barPosition: "top"
+            })
+            root.check("hover reopens after the context menu is dismissed",
+                host.currentIntent.widgetId, "battery")
             host.updateIntent({
                 widgetId: "brightness", instanceKey: "brightness:0", kind: "hover",
                 actionKind: "brightness", anchorX: 520, screenWidth: 1000,
@@ -1253,6 +1273,7 @@ Item {
                 root.check("context target follows context height", host.targetHeight,
                     Math.max(Number(host.popupItem.sidebarLayer.implicitHeight),
                         Number(host.popupItem.sidebarLayer.height), 48) + ctxSlotHeight + 1)
+                root.startContextHoldChecks()
                 root.startBottomBarChecks()
                 // Last, because it mutates the shared host: a first open commits
                 // its target geometry before the content has laid out, so
@@ -1277,6 +1298,65 @@ Item {
         })
     }
 
+    // B: a context menu holds the popup until it is explicitly dismissed. A
+    // hover intent arriving underneath must not take it over - that swap is what
+    // left the right-click menu mounted beside the tray menu, and reviving it
+    // mid-close is what made it flash during a fast sweep between two icons.
+    function startContextHoldChecks() {
+        var ctx = {
+            widgetId: "hold-ctx", instanceKey: "hold-ctx:0", kind: "context",
+            actionKind: "", anchorX: 300, screenWidth: 1000, screenHeight: 800,
+            effectiveBarHeight: 48, barPosition: "top", section: "center",
+            hasSettings: false, payload: {}
+        }
+        host.dismissImmediately()
+        host.widgetHovered = true
+        host.showIntent(ctx)
+        root.check("context menu opens as current", host.currentIntent.widgetId, "hold-ctx")
+
+        host.updateIntent({
+            widgetId: "tray", instanceKey: "tray:hold", kind: "hover",
+            actionKind: "tray", delegateKey: "sni-hold", anchorX: 320,
+            screenWidth: 1000, screenHeight: 800, effectiveBarHeight: 48,
+            barPosition: "top", payload: {}
+        })
+        root.check("hover cannot take over a context menu", host.currentIntent.widgetId, "hold-ctx")
+        root.check("context menu refuses the hover replacement",
+            host.pendingIntent, null)
+        root.check("context menu stays open against a hover", host.open, true)
+
+        // Another context menu may still replace it: a right-click elsewhere.
+        var ctx2 = {
+            widgetId: "hold-ctx2", instanceKey: "hold-ctx2:0", kind: "context",
+            actionKind: "", anchorX: 360, screenWidth: 1000, screenHeight: 800,
+            effectiveBarHeight: 48, barPosition: "top", section: "center",
+            hasSettings: false, payload: {}
+        }
+        host.updateIntent(ctx2)
+        root.check("a second context menu is accepted", host.intent.widgetId, "hold-ctx2")
+        host.transitionProgress = 0.5
+        host.commitExchange(host.transitionSerial)
+        root.check("a second context menu replaces the first",
+            host.currentIntent.widgetId, "hold-ctx2")
+
+        // Explicit dismissal releases the hold, and hover works again.
+        host.dismissImmediately()
+        host.widgetHovered = true
+        host.updateIntent({
+            widgetId: "tray", instanceKey: "tray:after-hold", kind: "hover",
+            actionKind: "tray", delegateKey: "sni-after", anchorX: 320,
+            screenWidth: 1000, screenHeight: 800, effectiveBarHeight: 48,
+            barPosition: "top", payload: {}
+        })
+        // The tray body owns widgetId, so identify the reopen by kind rather
+        // than by the id this harness happens to pass in.
+        root.check("hover reopens once the context menu is dismissed",
+            String(host.currentIntent.kind || ""), "hover")
+        root.check("reopened hover is the tray intent, not the context one",
+            String(host.currentIntent.actionKind || ""), "tray")
+        root.check("hold released, no pending intent left", host.pendingIntent, null)
+    }
+
     function startBottomBarChecks() {
         // Switch to bottom bar and verify direction flips without reopening window.
         var intentBottom = {
@@ -1290,6 +1370,10 @@ Item {
             screenWidth: 1000, screenHeight: 1080, effectiveBarHeight: 48,
             barPosition: "bottom"
         }
+        // A context menu holds the popup until it is dismissed, and this switch
+        // is a tray intent, so release the context one first - its own close
+        // button does exactly this.
+        host.dismissImmediately()
         Lazer.MotionTokens.reducedMotionOverride = true
         host.showIntent(intentBottom)
         Lazer.MotionTokens.reducedMotionOverride = false

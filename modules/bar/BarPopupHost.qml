@@ -619,6 +619,23 @@ PanelWindow {
         if (!intentObj)
             return
 
+        // A context menu holds the popup until it is explicitly dismissed (its
+        // close button, or an action). Hovering something else must not take it
+        // over: a tray icon under the pointer publishes a hover intent, and this
+        // host is a single instance, so accepting it swapped the content out
+        // from under the context menu while its body stayed mounted - the right
+        // -click menu flashed beside the tray menu. It also revived a context
+        // menu that was already closing, because updateIntent cancels a pending
+        // close before anything else.
+        //
+        // A context menu may still be replaced by another context menu (a
+        // right-click elsewhere on the bar), and an explicit dismissal clears
+        // the intent, so this does not make it immortal.
+        if (String(intentObj.kind || "hover") !== "context"
+                && root.open && root.currentIntent
+                && String(root.currentIntent.kind || "") === "context")
+            return
+
         // A new intent revives the live host before replacement is evaluated.
         // This prevents a pending close from racing the single popup instance.
         cancelClose()
