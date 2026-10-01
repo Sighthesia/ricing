@@ -38,6 +38,74 @@ Item {
         radius: 0
     }
 
+    // A wallpaper the host already owns: the wallpaper background keeps two
+    // image slots and hands the incoming one to the reveal, so the decoded
+    // pixels are never decoded a second time just to fill the mask.
+    Image {
+        id: injectedWallpaper
+        width: 400
+        height: 240
+        source: "data:image/svg+xml," + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240">'
+            + '<rect width="400" height="240" fill="blue"/></svg>')
+        visible: false
+    }
+
+    Lazer.WallpaperReveal {
+        id: injectedReveal
+        width: 400
+        height: 240
+        sourceItem: injectedWallpaper
+        radius: 24
+
+        // Same capability walk as above, so the internal fallback image is
+        // addressed by what it is rather than by its position.
+        readonly property var revealMask: {
+            for (var i = 0; i < children.length; i++) {
+                if (children[i].maskSource !== undefined)
+                    return children[i]
+            }
+            return null
+        }
+        // The private image only loads for a reveal that owns its source; with
+        // an injected item it must stay empty.
+        readonly property var fallbackImage: {
+            for (var i = 0; i < children.length; i++) {
+                var child = children[i]
+                if (child === revealMask || child.fillMode === undefined)
+                    continue
+                return child
+            }
+            return null
+        }
+    }
+
+    // A second injected pair for the failure contract. A broken source can
+    // never become Ready, so it cannot disturb the decoded pair above.
+    Image {
+        id: brokenWallpaper
+        width: 400
+        height: 240
+        source: "file:///tmp/does-not-exist-wallpaper.png"
+        visible: false
+    }
+
+    Lazer.WallpaperReveal {
+        id: brokenReveal
+        width: 400
+        height: 240
+        sourceItem: brokenWallpaper
+        radius: 24
+
+        readonly property var revealMask: {
+            for (var i = 0; i < children.length; i++) {
+                if (children[i].maskSource !== undefined)
+                    return children[i]
+            }
+            return null
+        }
+    }
+
     TestCase {
         name: "WallpaperReveal"
         when: windowShown
@@ -116,6 +184,34 @@ Item {
             // Boot explicitly opts into asynchronous decode before waiting for
             // Image.Ready; live switches retain the synchronous default.
             compare(bootReveal.children[0].asynchronous, true)
+        }
+
+        // The host owns the decoded wallpaper and injects it, so the mask must
+        // sample that item instead of a private copy of the same file.
+        function test_injectedSourceItemIsWhatTheMaskSamples() {
+            tryCompare(injectedWallpaper, "status", Image.Ready)
+            compare(injectedReveal.revealMask.source, injectedWallpaper)
+            compare(injectedReveal.imageReady, true)
+            compare(injectedReveal.imageFailed, false)
+            // The internal image is the fallback for a host with no slot to
+            // lend. Loading it here would decode the same wallpaper twice.
+            verify(injectedReveal.fallbackImage)
+            verify(injectedReveal.revealMask.source !== injectedReveal.fallbackImage)
+            compare(String(injectedReveal.fallbackImage.source), "")
+        }
+
+        // Readiness and failure are read from the injected item, so the boot
+        // wait and the boot error classification see the host's decode.
+        function test_injectedSourceItemDrivesReadinessAndFailure() {
+            tryCompare(brokenWallpaper, "status", Image.Error)
+            compare(brokenReveal.revealMask.source, brokenWallpaper)
+            compare(brokenReveal.imageReady, false)
+            compare(brokenReveal.imageFailed, true)
+            // A reveal with no injected item keeps decoding its own source, so
+            // injecting one is a host choice rather than a component change:
+            // the host-only instance is still empty and therefore not failed.
+            compare(bootReveal.imageFailed, false)
+            compare(String(bootReveal.children[0].source), "")
         }
     }
 }
