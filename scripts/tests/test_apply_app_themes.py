@@ -313,42 +313,167 @@ def _contrast(a: str, b: str) -> float:
     return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 
 
-# Roles that paint surfaces, rules, borders or focus plates rather than text.
-# They are meant to sit back, so they are exempt from the text contrast floor.
-_DECORATIVE = {
-    "background", "backgroundPanel", "backgroundElement",
-    "border", "borderActive", "borderSubtle",
-    "diffAddedBg", "diffRemovedBg", "diffContextBg",
-    "diffAddedLineNumberBg", "diffRemovedLineNumberBg",
-    "markdownHorizontalRule",
-}
+# opencode's native theme tree. The legacy flat format (one {dark, light} pair
+# per token) cannot express the action / form-field / feedback roles, and
+# opencode filled the gaps from its own defaults: a hardcoded white in light
+# mode and black in dark mode — invisible text on either surface. Every role
+# below must therefore be present and hold a real colour.
+_ACTION_STATES = ("base", "$hovered", "$focused", "$pressed", "$selected", "$disabled")
+_ACTION_VARIANTS = ("primary", "secondary", "destructive")
+_FEEDBACK = ("error", "warning", "success", "info")
 
 
-def test_opencode_theme_text_is_readable_in_both_modes(sandbox):
-    """Every colour opencode paints as text must clear 4.5:1 on its panel.
+def _action_group() -> dict:
+    return dict.fromkeys(_ACTION_STATES, str)
 
-    Material's light tones assume a near-neutral surface. This palette's light
-    surface is a strongly tinted pink, so the stock light accents land at
-    2.5-3.8:1 on it — headings, bullets, links, code and the footer all wash
-    out. The template darkens the light accents to compensate; this locks the
-    result in so a palette change cannot quietly reintroduce it.
-    """
+
+def opencode_token_tree() -> dict:
+    """The shape opencode accepts, mirrored from its own schema."""
+    return {
+        "text": {
+            "base": str,
+            "muted": str,
+            "action": {v: _action_group() for v in _ACTION_VARIANTS},
+            "formfield": _action_group(),
+            "feedback": {f: {"base": str, "muted": str} for f in _FEEDBACK},
+        },
+        "background": {
+            "base": str,
+            "raised": {"base": str, "high": str, "max": str},
+            "action": {v: _action_group() for v in _ACTION_VARIANTS},
+            "formfield": _action_group(),
+            "feedback": {f: {"base": str} for f in _FEEDBACK},
+        },
+        "border": {"base": str},
+        "scrollbar": {"base": str},
+        "diff": {
+            "text": {k: str for k in ("added", "removed", "context", "hunkHeader")},
+            "background": {k: str for k in ("added", "removed", "context")},
+            "highlight": {k: str for k in ("added", "removed")},
+            "lineNumber": {
+                "text": str,
+                "background": {k: str for k in ("added", "removed")},
+            },
+        },
+        "syntax": {k: str for k in (
+            "comment", "keyword", "function", "variable", "string", "number",
+            "type", "operator", "punctuation")},
+        "markdown": {k: str for k in (
+            "text", "heading", "link", "linkText", "code", "blockQuote",
+            "emphasis", "strong", "horizontalRule", "listItem",
+            "listEnumeration", "image", "imageText", "codeBlock")},
+    }
+
+
+def _opencode_theme(home: Path) -> dict:
     import json as _json
+    return _json.loads((home / ".config/opencode/themes/Afloat.json").read_text())
+
+
+def test_opencode_theme_defines_every_role(sandbox):
+    """No role may be left for opencode to fill with its own default.
+
+    A missing or malformed leaf is not a cosmetic problem: opencode substitutes
+    a hardcoded white (light mode) or black (dark mode) for it, which is exactly
+    the "some text is white on light / black on dark" report.
+    """
     tmp, palette = sandbox
     home = tmp / "home"
     assert run_apply(palette, "light", home).returncode == 0
-    theme = _json.loads((home / ".config/opencode/themes/Afloat.json").read_text())["theme"]
+    theme = _opencode_theme(home)
+    assert "light" in theme or "dark" in theme, "theme must provide at least one mode"
+
+    spec = opencode_token_tree()
+    problems: list[str] = []
+
+    def walk(node, expected, path):
+        if isinstance(expected, dict):
+            if not isinstance(node, dict):
+                problems.append(f"{path}: expected an object")
+                return
+            for key, sub in expected.items():
+                if key not in node:
+                    problems.append(f"{path}.{key}: missing")
+                else:
+                    walk(node[key], sub, f"{path}.{key}")
+            for key in node:
+                if key not in expected and key not in ("hue", "categorical", "@dialog"):
+                    problems.append(f"{path}.{key}: unknown role")
+            return
+        if not isinstance(node, str):
+            problems.append(f"{path}: expected a colour")
+        elif node != "transparent" and not re.fullmatch(r"#[0-9a-fA-F]{6}", node):
+            problems.append(f"{path}: {node!r} is not a colour")
+
+    for mode in ("base", "light", "dark"):
+        if mode in theme:
+            walk(theme[mode], spec, mode)
+    assert not problems, "\n".join(problems)
+
+
+def test_opencode_theme_text_is_readable_in_both_modes(sandbox):
+    """Every colour opencode paints as text must clear 4.5:1 on its surface.
+
+    Material's light tones assume a near-neutral surface. Afloat's light surface
+    is a strongly tinted wallpaper colour, so the stock light accents land at
+    2.5-3.8:1 on it — headings, bullets, links, code and the footer all wash
+    out. The template grades the light accents to compensate; this locks the
+    result in so a palette change cannot quietly reintroduce it.
+    """
+    tmp, palette = sandbox
+    home = tmp / "home"
+    assert run_apply(palette, "light", home).returncode == 0
+    theme = _opencode_theme(home)
+    spec = opencode_token_tree()
+
+    def luminance(colour: str) -> float:
+        if colour == "transparent":
+            return -1.0
+        channels = [int(colour[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        linear = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+    def contrast(fg: str, bg: str) -> float:
+        lf, lb = luminance(fg), luminance(bg)
+        if lf < 0 or lb < 0:
+            return 99.0  # transparent: whatever is underneath, checked elsewhere
+        return (max(lf, lb) + 0.05) / (min(lf, lb) + 0.05)
 
     for mode in ("light", "dark"):
-        for backdrop in ("background", "backgroundPanel", "backgroundElement"):
-            surface = theme[backdrop][mode]
-            for token, value in sorted(theme.items()):
-                if token in _DECORATIVE:
-                    continue
-                ratio = _contrast(value[mode], surface)
-                assert ratio >= 4.5, (
-                    f"{mode} {token} {value[mode]} on {backdrop} {surface} = {ratio:.2f}:1"
-                )
+        block = theme[mode]
+        pairs = [
+            ("text.base on page", block["text"]["base"], block["background"]["base"]),
+            ("text.base on raised", block["text"]["base"], block["background"]["raised"]["base"]),
+            ("text.base on form field", block["text"]["base"], block["background"]["formfield"]["base"]),
+            ("text.muted", block["text"]["muted"], block["background"]["base"]),
+            ("formfield ink on fill", block["text"]["formfield"]["base"], block["background"]["formfield"]["base"]),
+            ("action.primary label on plate",
+             block["text"]["action"]["primary"]["base"], block["background"]["action"]["primary"]["base"]),
+            ("action.destructive label on plate",
+             block["text"]["action"]["destructive"]["base"], block["background"]["action"]["destructive"]["base"]),
+            ("action.secondary on raised",
+             block["text"]["action"]["secondary"]["base"], block["background"]["raised"]["base"]),
+            ("diff.added", block["diff"]["text"]["added"], block["diff"]["background"]["added"]),
+            ("diff.removed", block["diff"]["text"]["removed"], block["diff"]["background"]["removed"]),
+            ("diff.context", block["diff"]["text"]["context"], block["diff"]["background"]["context"]),
+            ("diff.hunkHeader", block["diff"]["text"]["hunkHeader"], block["diff"]["background"]["context"]),
+            ("diff.lineNumber", block["diff"]["lineNumber"]["text"],
+             block["diff"]["lineNumber"]["background"]["added"]),
+            ("diff.highlight.added", block["diff"]["highlight"]["added"], block["diff"]["background"]["added"]),
+            ("diff.highlight.removed", block["diff"]["highlight"]["removed"],
+             block["diff"]["background"]["removed"]),
+        ]
+        for role in _FEEDBACK:
+            fill = block["background"]["feedback"][role]["base"]
+            pairs.append((f"feedback.{role}", block["text"]["feedback"][role]["base"], fill))
+            pairs.append((f"feedback.{role}.muted", block["text"]["feedback"][role]["muted"], fill))
+        pairs += [(f"syntax.{k}", block["syntax"][k], block["background"]["base"]) for k in spec["syntax"]]
+        pairs += [(f"markdown.{k}", block["markdown"][k], block["background"]["base"])
+                  for k in spec["markdown"] if k != "horizontalRule"]
+
+        for name, fg, bg in pairs:
+            ratio = contrast(fg, bg)
+            assert ratio >= 4.5, f"{mode} {name}: {fg} on {bg} = {ratio:.2f}:1"
 
 
 def test_generated_files_are_replaced_atomically(sandbox):
@@ -374,33 +499,23 @@ def test_generated_files_are_replaced_atomically(sandbox):
 
 
 def test_opencode_dual_variant(sandbox):
-    import json as _json
     tmp, palette = sandbox
     home = tmp / "home"
-    # Light apply must still carry the dark variant (opencode picks at runtime).
+    # Light apply must still carry the dark variant (opencode picks by terminal
+    # background at runtime).
     assert run_apply(palette, "light", home).returncode == 0
     rendered = (home / ".config/opencode/themes/Afloat.json").read_text()
-    theme = _json.loads(rendered)
-    text = theme["theme"]["text"]
-    assert text["light"] == "#4c4f69", text
-    assert text["dark"] == "#cdd6f4", text
-    # Every token must be a real colour. opencode only understands a hex,
-    # "transparent", or a reference to another token: anything else (the old
-    # "none") makes it substitute a near-black plate of its own, which in
-    # light mode is dark text on a dark plate and the UI goes unreadable.
-    for token, value in theme["theme"].items():
-        assert isinstance(value, dict), (token, value)
-        for variant, colour in value.items():
-            assert re.fullmatch(r"#[0-9a-fA-F]{6}", colour), (token, colour)
+    theme = _opencode_theme(home)
+    assert theme["light"]["text"]["base"] == "#4c4f69", theme["light"]["text"]["base"]
+    assert theme["dark"]["text"]["base"] == "#cdd6f4", theme["dark"]["text"]["base"]
     # The window surface tracks the terminal background (kitty renders
     # colors.surface), so opencode still reads as one piece with the terminal.
-    assert theme["theme"]["background"]["light"] == _kitty_background(home)
+    assert theme["light"]["background"]["base"] == _kitty_background(home)
     # Dark apply keeps the light variant too: the dual-variant file is
     # mode-independent, so the bytes must not move.
     assert run_apply(palette, "dark", home).returncode == 0
     assert (home / ".config/opencode/themes/Afloat.json").read_text() == rendered
-    theme = _json.loads(rendered)
-    assert theme["theme"]["background"]["dark"] == _kitty_background(home)
+    assert theme["dark"]["background"]["base"] == _kitty_background(home)
 
 
 def test_herdr_snippet(sandbox):
@@ -598,4 +713,7 @@ def test_single_mode_palette_renders_dual_variant(tmp_path):
     assert custom["light"]["text"] == "#4c4f69"
     assert custom["dark"]["text"] == "#4c4f69"
     theme = _json.loads((home / ".config/opencode/themes/Afloat.json").read_text())
-    assert theme["theme"]["text"] == {"dark": "#4c4f69", "light": "#4c4f69"}
+    # Both mode blocks render, and the missing variant falls back to the active
+    # mode rather than dropping a block.
+    assert theme["light"]["text"]["base"] == "#4c4f69"
+    assert theme["dark"]["text"]["base"] == "#4c4f69"
