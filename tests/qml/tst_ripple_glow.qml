@@ -14,18 +14,44 @@ Item {
     width: 800
     height: 600
 
-    // Stand-in for RipplePulseService: the same surface the real one exposes.
+    // Stand-in for RipplePulseService: the same surface the real one exposes —
+    // a list of rings in flight and the clock they are read against, not one
+    // origin and one progress.
     QtObject {
         id: fakePulse
         property int token: 0
-        property bool active: false
-        property real progress: 1
-        property real originScreenX: 0
-        property real originScreenY: 0
-        property string pulseScreen: ""
+        property real now: 0
+        property var rings: []
+        readonly property bool active: rings.length > 0
+
+        function progressOf(ring) {
+            if (!ring || !(ring.duration > 0))
+                return 1
+            const elapsed = (now - ring.startedAt) / ring.duration
+            return elapsed < 0 ? 0 : (elapsed > 1 ? 1 : elapsed)
+        }
+
+        function matchesRing(ring, screen) {
+            return !ring || ring.screen === ""
+                || ring.screen === String(screen == null ? "" : screen)
+        }
 
         function matchesScreen(screen) {
-            return pulseScreen === "" || pulseScreen === String(screen == null ? "" : screen)
+            return matchesRing(rings.length ? rings[rings.length - 1] : null, screen)
+        }
+
+        // Stand-in for the service's own trigger: adds a ring rather than
+        // replacing one, which is the contract under test.
+        function addRing(screen, originX, originY, startedAt, duration) {
+            const at = startedAt === undefined ? now : startedAt
+            rings.push({ screen: screen == null ? "" : String(screen),
+                         originX: originX, originY: originY,
+                         startedAt: at, duration: duration === undefined ? 1000 : duration })
+            // A new array, not the same one: assigning an identical reference
+            // raises no change signal, and the renderer would never hear about
+            // the ring it was just handed.
+            rings = rings.slice()
+            ++token
         }
     }
 
@@ -89,36 +115,28 @@ Item {
         name: "RippleGlow"
         when: windowShown
 
-        // Start a new pulse, as the service does: bump the token, set the
-        // origin, and reopen the clock.
+        // Add a ring, as the service does: one per event, each keeping its own
+        // start, so an event arriving mid-sweep joins the one in flight instead
+        // of replacing it.
         function pulseAt(x, y, screen) {
-            fakePulse.originScreenX = x
-            fakePulse.originScreenY = y
-            fakePulse.pulseScreen = screen === undefined ? "" : screen
-            fakePulse.progress = 0
-            fakePulse.token += 1
-            fakePulse.active = true
+            fakePulse.addRing(screen, x, y, undefined, 1000)
         }
 
+        // Move the clock to `fraction` of the way through every ring's sweep.
         function seek(fraction) {
-            fakePulse.progress = fraction
-            fakePulse.active = true
+            fakePulse.now = fraction * 1000
         }
 
         function init() {
             Lazer.MotionTokens.reducedMotionOverride = false
-            fakePulse.active = false
-            fakePulse.progress = 1
-            fakePulse.originScreenX = 0
-            fakePulse.originScreenY = 0
-            fakePulse.pulseScreen = ""
+            fakePulse.rings = []
+            fakePulse.now = 0
         }
 
         function cleanup() {
             Lazer.MotionTokens.reducedMotionOverride = false
-            fakePulse.active = false
-            fakePulse.progress = 1
-            fakePulse.pulseScreen = ""
+            fakePulse.rings = []
+            fakePulse.now = 0
         }
 
         // --- the one ring ---
@@ -251,22 +269,22 @@ Item {
             compare(barGlow.cover, cardGlow.cover)
             compare(barGlow.travelRadius, cardGlow.travelRadius)
             // Same seed, same screen-scale geometry.
-            compare(barGlow.originOnScreenX(), cardGlow.originOnScreenX())
+            compare(barGlow.newestRing.originX, cardGlow.newestRing.originX)
+            compare(barGlow.newestRing.originY, cardGlow.newestRing.originY)
 
             seek(0.5)
             verify(barGlow.progress > 0.4 && barGlow.progress < 0.6)
             compare(barGlow.progress, cardGlow.progress)
 
-            fakePulse.active = false
+            fakePulse.rings = []
             compare(barGlow.playing, false)
             compare(barGlow.visible, false)
         }
 
         // The origin is projected from screen coordinates into each host, so the
         // same ring reaches two surfaces at different places inside them. It is
-        // read live, not latched to a token: a trigger that arrives mid-sweep is
-        // coalesced rather than restarted, and a card sliding in while the ring
-        // is already travelling must reveal the ring where it actually is rather
+        // read live, not latched to a token: a card sliding in while a ring is
+        // already travelling must reveal that ring where it actually is rather
         // than miss the event.
         function test_originIsProjectedIntoEachHost() {
             // Two surfaces at different places on the same output, as the bar
@@ -280,8 +298,8 @@ Item {
             pulseAt(1200, 30, "")
             wait(0)
             // One ring, one screen origin...
-            compare(barGlow.originOnScreenX(), 1200)
-            compare(cardGlow.originOnScreenX(), 1200)
+            compare(barGlow.newestRing.originX, 1200)
+            compare(cardGlow.newestRing.originX, 1200)
             // ...projected through each host's own place on the screen: a point
             // to the right of the bar and far to the left of the card.
             compare(barGlow.originX, 1200 - 100)
@@ -290,33 +308,82 @@ Item {
             verify(cardGlow.originX < 0)
             compare(barGlow.originY, 30 - 0)
             compare(cardGlow.originY, 30 - 40)
+        }
 
-            // A later trigger moves the ring for both hosts at once, and neither
-            // has to re-latch anything to see it.
-            fakePulse.originScreenX = 300
-            fakePulse.token += 1
+        // The thing that made the effect look like it interrupted itself: a
+        // second event must not cut off the ring already travelling. Both stay,
+        // each with its own start, so they cross the screen together.
+        function test_severalRingsAreInFlightAtOnce() {
+            fakePulse.addRing("", 1200, 30, 0, 1000)
             wait(0)
-            compare(barGlow.originX, 300 - 100)
-            compare(cardGlow.originX, 300 - 1400)
+            compare(barGlow.rings.length, 1)
+
+            // A second event, half a sweep later, at the other end of the bar.
+            fakePulse.now = 500
+            fakePulse.addRing("", 300, 30, 500, 1000)
+            wait(0)
+            compare(barGlow.rings.length, 2)
+            compare(cardGlow.rings.length, 2)
+            // Both are actually drawn, not merely listed.
+            compare(barGlow.drawnRings, 2)
+
+            // Each keeps its own start, so the first is half way through and the
+            // second has only just left its seed.
+            compare(fakePulse.progressOf(barGlow.rings[0]), 0.5)
+            compare(fakePulse.progressOf(barGlow.rings[1]), 0)
+
+            // And both hosts still agree on where they are.
+            compare(barGlow.rings[0].originX, cardGlow.rings[0].originX)
+            compare(barGlow.rings[1].originX, cardGlow.rings[1].originX)
+        }
+
+        // A ring finishing takes only itself off the display; the one added
+        // after it keeps travelling. With a single clock there was nothing else
+        // for this to be true of, and it is the difference between a ring that
+        // leaves and one that blinks out mid-screen.
+        function test_aFinishedRingDoesNotCutOffTheOneAfterIt() {
+            fakePulse.addRing("", 1200, 30, 0, 1000)
+            fakePulse.addRing("", 300, 30, 600, 1000)
+            wait(0)
+            compare(barGlow.rings.length, 2)
+
+            // The clock passes the first ring's end but not the second's.
+            fakePulse.now = 1100
+            wait(0)
+            // The service retires the finished one; the renderer is left with the
+            // survivor, still lit.
+            fakePulse.rings = [fakePulse.rings[1]]
+            wait(0)
+            compare(barGlow.rings.length, 1)
+            verify(fakePulse.progressOf(barGlow.rings[0]) < 1)
+            verify(barGlow.playing)
+            verify(barGlow.visible)
         }
 
         // One shared clock means a pulse triggered anywhere would replay here,
-        // so the screen tag is what keeps surfaces on other outputs quiet.
+        // so the screen tag is what keeps surfaces on other outputs quiet — per
+        // ring, so one host can be answering a tagged ring and an untagged one
+        // at the same time.
         function test_onlyThePulsesOwnScreenAnswers() {
-            fakePulse.pulseScreen = "DP-1"
-            pulseAt(0, 0, "DP-1")
+            fakePulse.addRing("DP-1", 0, 0, 0, 1000)
+            wait(0)
             verify(otherScreenGlow.answersPulse)
             verify(otherScreenGlow.visible)
             verify(!barGlow.answersPulse)
             compare(barGlow.visible, false)
 
-            // Untagged — a notification — is every screen's to answer.
-            fakePulse.pulseScreen = ""
+            // A notification arriving afterwards is untagged, so the bar starts
+            // answering while the other output's tagged ring is untouched.
+            fakePulse.addRing("", 960, 0, 0, 1000)
+            wait(0)
             verify(otherScreenGlow.answersPulse)
+            verify(otherScreenGlow.rings.length, 1)
             verify(barGlow.answersPulse)
+            compare(barGlow.rings.length, 1)
         }
 
         function test_disabledHostNeverShows() {
+            pulseAt(960, 0, "")
             seek(0.3)
             compare(blockedGlow.playing, true)
             compare(blockedGlow.visible, false)
@@ -324,6 +391,7 @@ Item {
 
         // Reduced motion is a landing state, not a half-drawn ring.
         function test_reducedMotionHidesThePulse() {
+            pulseAt(960, 0, "")
             Lazer.MotionTokens.reducedMotionOverride = true
             seek(0.3)
             compare(barGlow.progress, 0.3)

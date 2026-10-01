@@ -89,18 +89,6 @@ Item {
                    root.tokenAtSecondRow > root.tokenAtFirstRow)
         root.check("and it was not folded into the first",
                    Services.RipplePulseService.coalescedCount === 0)
-
-        // Aimed at the second card's own entry edge, and below the first card:
-        // the two cards are stacked, so the only thing that distinguishes them
-        // vertically is where the sweep started.
-        const secondMidY = root.hostY + second.y + second.height / 2
-        root.check("the sweep moved down to the second card",
-                   Services.RipplePulseService.originScreenY >= secondMidY - 2)
-        root.check("and away from the first",
-                   Services.RipplePulseService.originScreenY > root.hostY + first.height)
-
-        // Both cards see the same pulse; the second is the one the ring starts
-        // on, so it is the one that must be painting.
         root.check("the second card was the one painted",
                    root.secondLitMs > 0)
 
@@ -173,6 +161,7 @@ Item {
                 return
             }
             if (root.phase === 3) {
+                const first = root.stack.cardAt(0)
                 const second = root.stack.cardAt(1)
                 if (!second || !second.openState)
                     return
@@ -185,6 +174,16 @@ Item {
                 root.check("the ring lands on the second card, not past it",
                            second.glowOriginX >= inner - 1
                            && second.glowOriginX <= second.width)
+                // Aimed at the second card's own entry edge, and below the first
+                // card: the two are stacked, so only where the ring started tells
+                // them apart. Asked here, while the rings are in flight, because
+                // once they retire there is no origin left to ask about.
+                const secondMidY = root.hostY + second.y + second.height / 2
+                root.check("the sweep moved down to the second card",
+                           Services.RipplePulseService.originScreenY >= secondMidY - 2)
+                root.check("and away from the first",
+                           Services.RipplePulseService.originScreenY
+                           > root.hostY + first.height)
                 root.phase = 4
                 return
             }

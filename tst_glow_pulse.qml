@@ -199,17 +199,23 @@ Item {
     property var lateCard: null
     property real midFlightProgress: 0
     property int tokenBeforeLateCard: 0
+    property real barRingStartedAt: 0
 
     // --- phase 3-5: a card that arrives while a ring is already crossing ---
 
     function checkLateCard() {
         // The case that made the pulse look like it could only ever fire once:
-        // a sweep is well out across the screen when a second notification
-        // lands. That is a new event in a new place, so it gets its own ring
-        // rather than being folded into the one already travelling.
-        root.check("a card arriving mid-sweep gets its own ring",
-                   Services.RipplePulseService.progress < root.midFlightProgress)
-        root.check("that ring is aimed at the late card",
+        // a ring is well out across the screen when a second notification lands.
+        // The new card gets its own ring *and* the one already travelling is
+        // left alone — two rings crossing at once, not one cutting off the last.
+        const rings = Services.RipplePulseService.rings
+        root.check("a card arriving mid-sweep adds a ring rather than replacing one",
+                   rings.length >= 2)
+        const survivor = rings.filter(r => r.originX === 300 && r.originY === 20)
+        root.check("the ring already in flight was not cut off",
+                   survivor.length === 1
+                   && survivor[0].startedAt === root.barRingStartedAt)
+        root.check("the new ring is aimed at the late card",
                    Math.abs(Services.RipplePulseService.originScreenX - 900) < 1)
         root.check("the late card is rendering it",
                    !!root.lateCard && root.lateCard.glowPlaying)
@@ -218,7 +224,23 @@ Item {
                    !!root.lateCard
                    && root.lateCard.glowOriginX >= lateEdge - 1
                    && root.lateCard.glowOriginX <= root.lateCard.width)
+        root.checkStacking()
         root.phase = 6
+    }
+
+    // Rings stack, but not without limit: past a handful the later ones are too
+    // faint to separate, so a burst retires the oldest rather than strobing.
+    function checkStacking() {
+        const service = Services.RipplePulseService
+        for (let i = 0; i < service.maxRings + 3; ++i)
+            service.trigger("eDP-1", 200 + i * 130, 20 + i * 90)
+        root.check("a burst is capped rather than stacked without limit",
+                   service.rings.length === service.maxRings,
+                   "rings: " + service.rings.length + " cap: " + service.maxRings)
+        // And the survivors are the newest ones.
+        const newest = service.rings[service.rings.length - 1]
+        root.check("the newest events are the ones that survive",
+                   newest.originX === 200 + (service.maxRings + 2) * 130)
     }
 
     // Three beats, in this order for a reason: the card is checked on its
@@ -245,8 +267,10 @@ Item {
             if (root.phase === 2) {
                 root.checkBus()
                 // Put a ring in flight the way a volume step would, so the late
-                // card has something real to interrupt.
+                // card has something real to arrive next to. Its start time is
+                // kept so "was not cut off" can be asserted rather than assumed.
                 Services.RipplePulseService.trigger("eDP-1", 300, 20)
+                root.barRingStartedAt = Services.RipplePulseService.newestRing.startedAt
                 root.phase = 3
                 return
             }
