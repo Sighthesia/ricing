@@ -66,49 +66,37 @@ Item {
         root.check("pulse is running", Services.RipplePulseService.active)
         root.check("pulse starts at the seed", Services.RipplePulseService.progress < 0.2)
 
-        // A repeat of the pulse in flight — the same control, one discrete step
-        // after the next — is the same event. Restarting the clock on each step
-        // snapped the ring back to the seed, so a dragged slider never got
-        // anywhere.
+        // Emission is continuous: every event starts its own ring, and none of them
+        // waits for the one before it. This is the case that used to be folded
+        // into the ring in flight, which meant one control being adjusted could
+        // produce one ring and then nothing until that ring had left the screen.
+        const before = Services.RipplePulseService.rings.length
         const inFlight = Services.RipplePulseService.progress
         Services.RipplePulseService.trigger("eDP-1", 1205, 43)
-        root.check("a repeat of the pulse in flight does not restart the clock",
-                   Services.RipplePulseService.progress >= inFlight)
-        root.check("the folded trigger is counted",
-                   Services.RipplePulseService.coalescedCount === 1)
-
-        // An event somewhere else is a new event. This is the case that used to
-        // be folded in and leave the new card with no ring at all: a
-        // notification arriving a moment after a volume step is something that
-        // actually happened, and it gets its own ring.
-        //
-        // Whether the clock was re-seeded cannot be read here — every trigger in
-        // this phase lands inside one tick, so the ring in flight has not moved
-        // and a restarted clock is indistinguishable from an idle one. The
-        // decisive version waits for a ring that is genuinely out across the
-        // screen; see checkLateCard.
-        Services.RipplePulseService.trigger("", 1600, 900)
-        root.check("that sweep is aimed at the card",
-                   Services.RipplePulseService.originScreenX === 1600
-                   && Services.RipplePulseService.originScreenY === 900)
-        root.check("a trigger elsewhere is not a continuation",
-                   Services.RipplePulseService.coalescedCount === 0)
+        root.check("a repeat a few pixels away is its own ring",
+                   Services.RipplePulseService.rings.length === before + 1)
+        root.check("and it starts at the seed rather than inheriting progress",
+                   Services.RipplePulseService.progress < 0.2
+                   && inFlight >= 0)
+        root.check("the ring before it is untouched",
+                   Services.RipplePulseService.rings[0].originX === 1200)
 
         // Two notifications arriving at the same corner within a second are two
         // separate things that happened, even though they fly in from the same
-        // edge and land within a few pixels of each other. The second one must
-        // not be folded into the first.
+        // edge and land within a few pixels of each other.
+        const beforeCorner = Services.RipplePulseService.rings.length
         Services.RipplePulseService.trigger("", 1600, 900)
-        root.check("a second card at the same corner is still its own event",
-                   Services.RipplePulseService.coalescedCount === 0)
+        Services.RipplePulseService.trigger("", 1600, 900)
+        root.check("two notifications at the same corner are two rings",
+                   Services.RipplePulseService.rings.length === beforeCorner + 2)
 
-        // And a widget on another screen is its own event even if it happens to
-        // report a point a few pixels away: a step on the left monitor must not
-        // continue the ring the right monitor started.
+        // And a widget on another screen reports its own event: a step on the
+        // left monitor does not continue the ring the right monitor started.
+        const beforeScreens = Services.RipplePulseService.rings.length
         Services.RipplePulseService.trigger("eDP-1", 1600, 902)
         Services.RipplePulseService.trigger("DP-2", 1601, 901)
-        root.check("a step on another screen is its own event",
-                   Services.RipplePulseService.coalescedCount === 0)
+        root.check("a step on each screen is its own ring",
+                   Services.RipplePulseService.rings.length === beforeScreens + 2)
 
         // An untagged pulse — a notification — is every screen's to answer.
         Services.RipplePulseService.trigger("", 100, 200)
@@ -117,10 +105,10 @@ Item {
         root.check("screen-agnostic matches an empty name",
                    Services.RipplePulseService.matchesScreen(""))
 
-        const before = Services.RipplePulseService.token
+        const tokenBefore = Services.RipplePulseService.token
         Services.RipplePulseService.trigger("eDP-1", 640, 24)
         root.check("token advances on trigger",
-                   Services.RipplePulseService.token === before + 1)
+                   Services.RipplePulseService.token === tokenBefore + 1)
 
         // A widget reports where it is at trigger time, so a pill that has
         // since moved still publishes its current place.
@@ -137,8 +125,8 @@ Item {
         root.check("the pulse reached its end", !Services.RipplePulseService.active)
         root.check("a finished pulse sits at its end state",
                    Services.RipplePulseService.progress >= 1)
-        root.check("a finished sweep coalesced nothing",
-                   Services.RipplePulseService.coalescedCount === 0)
+        root.check("a finished sweep leaves nothing in flight",
+                   Services.RipplePulseService.rings.length === 0)
     }
 
     // --- phase 0: the card's entry beat, which is what triggers the pulse ---
@@ -225,13 +213,20 @@ Item {
                    && root.lateCard.glowOriginX >= lateEdge - 1
                    && root.lateCard.glowOriginX <= root.lateCard.width)
         root.checkStacking()
+        root.checkContinuousEmission()
         root.phase = 6
     }
 
-    // Rings stack, but not without limit: past a handful the later ones are too
-    // faint to separate, so a burst retires the oldest rather than strobing.
+    // Rings stack, but not without limit: past a certain depth the later ones are
+    // too faint to separate, so a burst retires the oldest rather than strobing.
+    // The depth has to be generous, because emission is continuous — cap it low
+    // and a dragged slider's own rings pile up at the origin with an empty
+    // screen beyond them.
     function checkStacking() {
         const service = Services.RipplePulseService
+        root.check("the stack is deep enough for a stream to still be crossing",
+                   service.maxRings >= 8,
+                   "maxRings: " + service.maxRings)
         for (let i = 0; i < service.maxRings + 3; ++i)
             service.trigger("eDP-1", 200 + i * 130, 20 + i * 90)
         root.check("a burst is capped rather than stacked without limit",
@@ -241,6 +236,30 @@ Item {
         const newest = service.rings[service.rings.length - 1]
         root.check("the newest events are the ones that survive",
                    newest.originX === 200 + (service.maxRings + 2) * 130)
+    }
+
+    // Continuous emission, stated as the number that was failing: one control
+    // being adjusted must be able to put out a ring per step, with no waiting on
+    // the one before it.
+    function checkContinuousEmission() {
+        const service = Services.RipplePulseService
+        service.clear()
+        let allGrew = true
+        for (let step = 0; step < 6; ++step) {
+            const before = service.rings.length
+            // The same origin every time, the way one widget's steps report it.
+            service.trigger("eDP-1", 640, 24)
+            if (service.rings.length !== before + 1)
+                allGrew = false
+            // And each one starts at its own seed rather than inheriting the
+            // progress of the ring before it.
+            if (service.newestRing.startedAt < service.rings[0].startedAt)
+                allGrew = false
+        }
+        root.check("six steps in a row put out six rings", allGrew)
+        root.check("and none of them waited for the one before",
+                   service.rings.length === 6)
+        service.clear()
     }
 
     // Three beats, in this order for a reason: the card is checked on its

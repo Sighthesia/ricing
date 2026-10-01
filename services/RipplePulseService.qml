@@ -23,25 +23,27 @@ import QtQuick
 // is what keeps the effect from splitting into a glow for notifications and a
 // glow for the bar.
 //
-// Repeats of one event do not stack. A trigger that lands on a ring already in
-// flight — the same control being adjusted, one discrete step after the next — is
-// the same event, and folds into that ring so a dragged slider produces one sweep
-// instead of a stutter. Only a tagged trigger can repeat: a tag means one widget
-// announcing its own step, where the next step is the same event by definition.
-// An untagged trigger is a notification, an occurrence every time.
+// Repeats fire too. Folding a repeat into the ring already in flight was the
+// only way to keep a dragged slider from stuttering while there was a single
+// clock, and it cost a whole sweep's worth of waiting: one control being adjusted
+// could produce one ring and then nothing until that ring had left the screen.
+// With several rings in flight there is nothing left to stutter — a second ring
+// cannot reset the first — so every event gets its own and the cap below is what
+// bounds a burst.
 QtObject {
     id: root
 
-    // How many rings may be in flight at once. A burst of notifications should
-    // read as several rings crossing, not as a strobe; past a handful the later
-    // ones are too faint to separate anyway, so the oldest is retired.
-    readonly property int maxRings: 4
-
-    // How close two triggers have to be, in screen pixels, to count as the same
-    // event repeating. Sized to a couple of icon widths: consecutive steps on one
-    // control land within a pixel or two of each other, while two different
-    // widgets are further apart than this.
-    readonly property real continuationRadius: 24
+    // How many rings may be in flight at once, and the oldest is retired past it.
+    //
+    // Generous on purpose now that emission is continuous. A ring lives for the
+    // whole sweep, and the ring travels a screen's worth of radius in that time,
+    // so a stream of events arriving every few tens of milliseconds lands rings
+    // roughly a hundred pixels apart along the path. Capping at four would keep
+    // only the newest of those and pile them up into a lit blob at the origin,
+    // with an empty screen beyond it; the cap has to be deep enough for the train
+    // to still be crossing when the next one starts. Ten covers about a second of
+    // rapid steps, which is where the ring that started it is leaving anyway.
+    readonly property int maxRings: 10
 
     // Bumped on every trigger, for hosts that want an edge rather than a binding.
     property int token: 0
@@ -55,9 +57,6 @@ QtObject {
     // and rebuilding that model every frame would thrash them.
     property var rings: []
     readonly property bool active: rings.length > 0
-    // How many repeats have been folded into a ring already in flight, for
-    // diagnostics. Reset when a new ring actually starts.
-    property int coalescedCount: 0
     // Sweep length in ms. shell.qml injects MotionTokens.glowSweep, which is
     // where the project's motion timings live; the literal is only a fallback
     // for harnesses that mount the service without the shell.
@@ -105,30 +104,20 @@ QtObject {
 
     // Record an event: `screen` empty means every screen may answer, and the
     // origin is a point in that screen's coordinates.
+    //
+    // Every event starts a ring, including a repeat of one already in flight.
+    // That is what makes the effect continuous: a slider being dragged, or a
+    // burst of notifications, puts out one ring per event rather than one ring
+    // per sweep, and none of them waits for the one before it.
     function trigger(screen, originX, originY) {
-        const tag = screen == null ? "" : String(screen)
-        const x = Number(originX) || 0
-        const y = Number(originY) || 0
         const at = Date.now()
         root.now = at
         ++root.token
 
-        // A repeat of a ring already in flight is the same event, and folds into
-        // it: restarting the clock on every step snapped the ring back to the
-        // seed, so a dragged slider never got anywhere.
-        for (let i = root.rings.length - 1; i >= 0; --i) {
-            const ring = root.rings[i]
-            if (tag !== "" && ring.screen === tag
-                    && Math.abs(x - ring.originX) <= root.continuationRadius
-                    && Math.abs(y - ring.originY) <= root.continuationRadius) {
-                ++root.coalescedCount
-                return
-            }
-        }
-
-        root.coalescedCount = 0
         const kept = root.pruneFinished(at)
-        kept.push({ screen: tag, originX: x, originY: y,
+        kept.push({ screen: screen == null ? "" : String(screen),
+                    originX: Number(originX) || 0,
+                    originY: Number(originY) || 0,
                     startedAt: at, duration: root.duration })
         while (kept.length > root.maxRings)
             kept.shift()

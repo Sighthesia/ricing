@@ -87,8 +87,6 @@ Item {
         // one is dark however far the ring reaches.
         root.check("the second card triggered the sweep",
                    root.tokenAtSecondRow > root.tokenAtFirstRow)
-        root.check("and it was not folded into the first",
-                   Services.RipplePulseService.coalescedCount === 0)
         root.check("the second card was the one painted",
                    root.secondLitMs > 0)
 
@@ -184,6 +182,11 @@ Item {
                 root.check("and away from the first",
                            Services.RipplePulseService.originScreenY
                            > root.hostY + first.height)
+                // And it joined the first card's ring rather than replacing it:
+                // asked here because once the rings retire there is nothing left
+                // to count.
+                root.check("its ring joined the one already crossing",
+                           Services.RipplePulseService.rings.length >= 2)
                 root.phase = 4
                 return
             }
