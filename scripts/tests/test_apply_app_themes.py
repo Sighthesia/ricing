@@ -351,6 +351,31 @@ def test_opencode_theme_text_is_readable_in_both_modes(sandbox):
                 )
 
 
+def test_diff_lines_are_visibly_highlighted(sandbox):
+    """An added or removed line has to *look* marked, not just be readable.
+
+    The band used to be a barely-off-surface neutral, 1.07:1 against the page in
+    light mode and 1.01:1 in dark — technically a fill, visually nothing, so
+    light-mode changes read as plain text. Container tints carry the hue and
+    still leave room for the line ink.
+    """
+    tmp, palette = sandbox
+    home = tmp / "home"
+    assert run_apply(palette, "light", home).returncode == 0
+    theme = json.loads((home / ".config/opencode/themes/Afloat.json").read_text())["theme"]
+
+    for mode in ("light", "dark"):
+        page = theme["background"][mode]
+        for token, ink_token in (("diffAddedBg", "diffAdded"), ("diffRemovedBg", "diffRemoved")):
+            band = theme[token][mode]
+            assert _contrast(band, page) >= 1.10, (
+                f"{mode} {token} {band} is indistinguishable from the page {page}"
+            )
+            assert _contrast(theme[ink_token][mode], band) >= 4.5, (
+                f"{mode} {ink_token} on {token}: {theme[ink_token][mode]} on {band}"
+            )
+
+
 def test_generated_files_are_replaced_atomically(sandbox):
     """A live reader must never catch a half-written theme file.
 
