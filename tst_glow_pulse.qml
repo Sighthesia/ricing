@@ -316,4 +316,151 @@ Item {
             }
         }
     }
+
+    // Startup suppression must affect only new events. Existing rings continue
+    // on their own timeline, and clearing the gate restores normal emission.
+    function checkStartupMute() {
+        const service = Services.RipplePulseService
+        service.clear()
+        service.startupMuted = true
+        const token = service.token
+        const before = service.rings.length
+        service.trigger("eDP-1", 10, 20)
+        root.check("startup mute drops a new trigger",
+                   service.token === token && service.rings.length === before)
+        service.startupMuted = false
+        service.trigger("eDP-1", 10, 20)
+        root.check("post-startup trigger creates a ring",
+                   service.token === token + 1 && service.rings.length === before + 1)
+        service.clear()
+    }
 }
+/*
+    property int checks: 0
+
+    function check(label, condition, detail) {
+        root.checks++
+        if (condition) {
+            console.log("PASS:", label)
+            return
+        }
+        root.failures++
+        console.log("FAIL:", label, detail !== undefined ? "| " + detail : "")
+    }
+
+    // State the service must hold before and after every trigger: a suppressed
+    // one changes none of it, so a bare `active === false` is not enough to prove
+    // the early return happens before the token and the animation are touched.
+    function checkPulseUntouched(pulse, label, token, progress) {
+        root.check(label + " leaves the pulse inactive",
+                   pulse.active === false)
+        root.check(label + " does not spend the pulse token",
+                   pulse.token === token, "token: " + pulse.token)
+        root.check(label + " does not move the pulse timeline",
+                   pulse.progress === progress, "progress: " + pulse.progress)
+        root.check(label + " does not start the sweep animation",
+                   pulse.progressAnimation.running === false)
+    }
+
+    // Every check below runs through the service's own API. A regression that
+    // throws instead of gating would otherwise abort this function before
+    // Qt.quit() and turn a named failure into a two-minute timeout, so the body
+    // reports the exception as a failure and still leaves the engine.
+    function run() {
+        try {
+            root.checkPulse()
+        } catch (error) {
+            root.check("the pulse harness ran without an exception", false,
+                       "" + error)
+        }
+        console.log("Totals: " + (root.failures === 0
+            ? root.checks + " passed, 0 failed"
+            : root.failures + " failed"))
+        Qt.quit()
+    }
+
+    function checkPulse() {
+        const pulse = Services.RipplePulseService
+
+        // The default contract has to survive the new gate: inactive, timeline
+        // parked at the end, no token, and the pulse not muted for anything that
+        // is not the shell's own startup window.
+        root.check("the pulse starts unmuted", pulse.startupMuted === false)
+        root.check("the pulse starts inactive", pulse.active === false)
+        root.check("the pulse starts with no token", pulse.token === 0)
+        root.check("the pulse starts with its timeline parked",
+                   pulse.progress === 1)
+
+        // --- startup suppression ---------------------------------------------
+        pulse.startupMuted = true
+        root.check("the startup gate is armed", pulse.startupMuted === true)
+
+        pulse.trigger()
+        root.checkPulseUntouched(pulse, "a muted trigger", 0, 1)
+
+        // Muting is not a geometry change: the helpers the bar and the
+        // notification card call read the same before and after.
+        const diameterBefore = pulse.diameter(200)
+        const trailBefore = pulse.trailDiameter(200)
+        const ringBefore = pulse.ringOpacity()
+        pulse.trigger()
+        root.checkPulseUntouched(pulse, "a repeated muted trigger", 0, 1)
+        root.check("muting does not change the pulse geometry helpers",
+                   pulse.diameter(200) === diameterBefore
+                   && pulse.trailDiameter(200) === trailBefore
+                   && pulse.ringOpacity() === ringBefore)
+
+        // --- post-startup behaviour ------------------------------------------
+        pulse.startupMuted = false
+        root.check("the pulse is live again after the startup gate",
+                   pulse.startupMuted === false)
+        pulse.trigger()
+        root.check("a real trigger after startup pulses",
+                   pulse.active === true)
+        root.check("a real trigger spends exactly one token",
+                   pulse.token === 1, "token: " + pulse.token)
+        root.check("a real trigger restarts the timeline",
+                   pulse.progress === 0, "progress: " + pulse.progress)
+        root.check("a real trigger starts the sweep animation",
+                   pulse.progressAnimation.running === true)
+
+        // Geometry helpers are live too, and the ring is only visible because a
+        // pulse is running.
+        root.check("a running pulse drives the ring opacity",
+                   pulse.ringOpacity() > 0)
+        root.check("a restarted pulse starts from the minimum diameter",
+                   pulse.diameter(200) === pulse.minDiameter,
+                   "diameter: " + pulse.diameter(200))
+
+        // A permanent kill switch — "suppress everything, not just startup" —
+        // passes every check above and swallows the *second* real pulse, which
+        // is the exact failure this gate must not become.
+        pulse.trigger()
+        root.check("a second real trigger still pulses",
+                   pulse.active === true && pulse.token === 2,
+                   "token: " + pulse.token)
+        root.check("a second real trigger restarts the timeline",
+                   pulse.progress === 0, "progress: " + pulse.progress)
+
+        // --- re-muting must not swallow a running pulse ----------------------
+        // The gate guards trigger() only. If it also cancelled a pulse that was
+        // already under way, a notification that arrived during startup would
+        // leave the sweep frozen half way instead of simply not starting.
+        pulse.startupMuted = true
+        root.check("re-muting does not cancel a running pulse",
+                   pulse.active === true
+                   && pulse.progressAnimation.running === true)
+        pulse.startupMuted = false
+
+        // Leave nothing running behind: stop() drives the animation's onStopped,
+        // which is the only thing that clears `active` on its own.
+        pulse.progressAnimation.stop()
+        root.check("stopping the sweep returns the pulse to inactive",
+                   pulse.active === false)
+    }
+
+    // One turn after construction: a singleton is created on first access, so the
+    // first check has to run after the engine has finished wiring it up.
+    Component.onCompleted: Qt.callLater(root.run)
+}
+*/

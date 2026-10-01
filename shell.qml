@@ -176,6 +176,87 @@ ShellRoot {
         startupFallbackTimer.stop()
     }
 
+    // ---- Deferred background work ------------------------------------------
+    //
+    // Launcher priming, clipboard cache loading and the window-hint listener used
+    // to run inside the chrome's first completion callback, competing with the
+    // wallpaper reveal and the lock wave for the same frame. They now run here,
+    // after the startup wave, one task per tick, so nothing low-priority occupies
+    // the first screen. AppThemeService keeps its own delayed timer inside the
+    // chrome: external theme sync is a separate concern and was already deferred.
+    //
+    // The queue opens on quiet-ready, which is the lock's committed wave. A
+    // reload whose session marker was already spent is the case that has no wave
+    // at all — no startup lock, no lock surface, no signal — so waiting for one
+    // would leave that shell permanently without a launcher, a clipboard index or
+    // a hint listener. Chrome staging is the only report such a session can make,
+    // so the lock's own expectation is the second way in. See
+    // Lock.startupLockExpected.
+    readonly property bool startupWorkDue: root.startupChromeReady
+            && (root.startupQuietReady || !lockModule.startupLockExpected)
+    // Latch, because both conditions above can become true in either order and
+    // the queue must run exactly once for a shell lifetime.
+    property bool startupWorkStarted: false
+    // Index of the next warmup; raised by runStartupTask, never reset.
+    property int startupTaskIndex: 0
+
+    // One-way. Both reporters call this and the latch decides.
+    function beginStartupWork() {
+        if (root.startupWorkStarted)
+            return
+        root.startupWorkStarted = true
+        startupTaskTimer.restart()
+    }
+
+    // One warmup per call, and it reports whether there was anything left to do —
+    // so the queue ends on the task list itself instead of on a count that could
+    // drift away from it.
+    function runStartupTask(index) {
+        if (index === 0) Services.LauncherService.primeApps()
+        else if (index === 1) Services.ClipboardService.warmup()
+        // Reading a property is what instantiates WindowHintService; its
+        // Connections against NiriService are the hint listener itself.
+        else if (index === 2) Services.WindowHintService.hintHeld
+        else return false
+        root.startupTaskIndex = index + 1
+        return true
+    }
+
+    // The queue is done. Unmute first so a user action or notification is never
+    // swallowed while a long palette job is starting, then open the palette gate:
+    // the gate only arms a debounce, so neither step can delay the other.
+    function finishStartupWork() {
+        Services.RipplePulseService.startupMuted = false
+        Services.ColorService.startupQuietReady()
+    }
+
+    // Both reporters reach the queue through one condition: the lock's wave on a
+    // session that has one, and the lock's expectation flipping false on a
+    // reload that does not.
+    onStartupWorkDueChanged: {
+        if (startupWorkDue)
+            root.beginStartupWork()
+    }
+
+    // One warmup per tick. 16ms is the cadence BarContent already uses to release
+    // its startup widget batches, so three service warmups cannot land in the same
+    // frame as each other or as the palette job. Stopped on every tick and
+    // restarted only when a task remains, so the queue keeps exactly one pending
+    // wake-up and cannot stack timers if a boot reports twice.
+    Timer {
+        id: startupTaskTimer
+        interval: 16
+        repeat: true
+        running: false
+        onTriggered: {
+            startupTaskTimer.stop()
+            if (root.runStartupTask(root.startupTaskIndex))
+                startupTaskTimer.restart()
+            else
+                root.finishStartupWork()
+        }
+    }
+
     // Inject the wallpaper palette into the shared LazerTheme singleton.
     // Keeps LazerTheme loadable without Quickshell in qmltestrunner while
     // restoring the live theme-color path in the compositor. Stays on the root
@@ -189,6 +270,12 @@ ShellRoot {
         LazerBar.LazerTheme.settingsService = Services.SettingsService
         LazerBar.LazerTheme.colorService = Services.Color
         Services.RipplePulseService.duration = LazerBar.MotionTokens.glowSweep
+        // Mute the shared screen pulse for the whole staging window. A bar widget
+        // moving from its default to the service's real value here would otherwise
+        // sweep the display while the wallpaper reveal and the lock wave are
+        // already animating; finishStartupWork() hands the timeline back as soon
+        // as the deferred queue is done, so this is a gate and not a kill switch.
+        Services.RipplePulseService.startupMuted = true
         // Ask for the session-start lock now rather than from the chrome. It
         // waits for a screen and for the persisted session marker on its own, so
         // calling it early is safe and a reload inside an already-locked session
@@ -489,8 +576,8 @@ ShellRoot {
             // frames. gsettings, KDE/Niri sync, and template rendering are not
             // part of the shell's first-paint path and can otherwise compete
             // with the just-finished wallpaper transition. Launcher, clipboard
-            // and hint warmup used to sit here too; they now run after the
-            // startup wave, one event-loop turn apart.
+            // and hint warmup used to sit here too; they moved to the root's
+            // post-wave queue (see runStartupTask) and must not come back here.
             Timer {
                 interval: LazerBar.MotionTokens.slow * 5
                 repeat: false

@@ -52,12 +52,13 @@ Item {
 
     readonly property bool ready: root.shownReady
     readonly property bool hasWindows: columns.current.rows.length > 0
-    // The three columns are peers of one fixed width, and a column only gets a
-    // slot if it has something to show - so the panel is exactly as wide as the
-    // columns on screen and a workspace with no windows takes no space instead of
-    // leaving a hole.
+    // Three columns of one fixed width, always. The count does not vary with the
+    // content: the active workspace sits in the middle, and it can only stay in
+    // the middle if the frame around it is the same size whatever the neighbours
+    // are running. It also means the panel does not resize under the pointer as
+    // the user moves between an interior workspace and an edge one.
     readonly property int columnWidth: HintLogic.COLUMN_WIDTH
-    readonly property int shownColumnCount: HintLogic.columnCount(columns)
+    readonly property int shownColumnCount: HintLogic.COLUMN_COUNT
     // How far each layer travels: exactly the panel's own width, and NOT a
     // constant. This is the whole reason the panel is never left uncovered.
     //
@@ -278,9 +279,10 @@ Item {
         }
     }
 
-    // As wide as the columns that are actually on screen: one, two or three of
-    // them. The popup measures its geometry from this, so the host's `window-hint`
-    // width reads the body rather than keeping its own number.
+    // Three columns, always. The popup measures its geometry from this, so the host's
+    // `window-hint` width reads the body rather than keeping its own number - and
+    // the body reports the same number whether the neighbour workspaces are busy
+    // or empty, so the panel never changes size mid-hold.
     implicitWidth: shownColumnCount * columnWidth
     // The taller of the two layers while one is leaving, and the empty-workspace
     // line when the active column has nothing in it - that line lives outside the
@@ -506,10 +508,14 @@ Item {
         visible: !root.ready
     }
 
-    // An empty workspace is a real state, not a missing snapshot: the bar already
-    // names the workspace, so the body explains the bare list. Scoped to the ACTIVE
-    // column and carried by the incoming layer, so it does not sit still while the
-    // column it is about crosses the panel.
+    // The active workspace being empty is a real state, not a missing snapshot:
+    // the bar already names the workspace, so the body explains the bare list.
+    // Scoped to the ACTIVE column and carried by the incoming layer, so it does not
+    // sit still while the column it is about crosses the panel.
+    //
+    // Only the active column gets this line. The neighbours have their own inside
+    // the strip, worded without naming a workspace - two columns reporting the
+    // same fact in two different words would be two statements about one thing.
     Text {
         id: noWindows
         objectName: "windowHintNoWindows"

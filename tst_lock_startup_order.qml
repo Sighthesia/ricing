@@ -317,6 +317,7 @@ Item {
         root.checkChromeStaging()
         root.checkFallback()
         root.checkDeferredWarmup()
+        root.checkStartupTaskQueue()
 
         console.log("Totals: " + (root.failures === 0
             ? root.checks + " passed, 0 failed"
@@ -719,5 +720,139 @@ Item {
         root.check("external app theme keeps its delayed timer",
                    root.positionInChrome("Services.AppThemeService.apply()") >= 0
                    && root.positionInChrome("LazerBar.MotionTokens.slow * 5") >= 0)
+    }
+
+    // The root's deferred startup queue. Its whole reason to exist is that these
+    // three warmups left the chrome, so the checks here are about the wiring that
+    // replaced them: one task per tick, the palette gate and the pulse unmute at
+    // the end, and a queue that still opens on a reload which has no startup wave
+    // to wait for.
+    function checkStartupTaskQueue() {
+        const body = root.normalized(root.bodyOf("function runStartupTask(index)"))
+        // The three tasks, in this order, and one index per task. An order change
+        // or a dropped index would either move the launcher scan behind the
+        // clipboard load or run a task twice.
+        const prime = "index === 0) Services.LauncherService.primeApps()"
+        const warm = "index === 1) Services.ClipboardService.warmup()"
+        const hint = "Services.WindowHintService.hintHeld"
+        const advance = "root.startupTaskIndex = index + 1"
+        root.check("the startup queue runs the three warmups one index apart",
+                   body.length > 0
+                   && body.indexOf(prime) >= 0
+                   && body.indexOf(prime) < body.indexOf(warm)
+                   && body.indexOf(warm) < body.indexOf(hint)
+                   && body.indexOf(hint) < body.indexOf(advance)
+                   && body.indexOf(advance) < body.indexOf("return true")
+                   // An index past the list reports "nothing left", and it does so
+                   // before the success return the timer reads.
+                   && body.indexOf("else return false") >= 0
+                   && body.indexOf("return true") > body.indexOf("else return false"),
+                   "body: " + body.slice(0, 240))
+
+        // The timer is what keeps the tasks apart: one tick each, and stopped on
+        // entry so a boot that reports twice cannot stack a second queue. A
+        // one-shot timer restarted per task would still be correct; a repeating
+        // timer that is never stopped would call finishStartupWork repeatedly.
+        const queueTimer = root.normalized(root.enclosingBlock("id: startupTaskTimer"))
+        root.check("the startup queue runs one task per tick",
+                   root.indexOf("id: startupTaskTimer") >= 0
+                   && root.indexOf("id: startupTaskTimer") < root.chromeStart
+                   && queueTimer.indexOf("{ id: startupTaskTimer") === 0
+                   && queueTimer.indexOf("interval: 16") >= 0
+                   && queueTimer.indexOf("running: false") >= 0
+                   && queueTimer.indexOf("root.runStartupTask(root.startupTaskIndex)") >= 0
+                   && queueTimer.indexOf("startupTaskTimer.stop()") >= 0
+                   && queueTimer.indexOf("startupTaskTimer.restart()") >= 0
+                   && queueTimer.indexOf("root.finishStartupWork()") >= 0,
+                   "timer: " + queueTimer.slice(0, 240))
+
+        // The latch: both reporters can arrive, in either order, and the queue may
+        // only run once for a shell lifetime.
+        const beginBody = root.normalized(root.bodyOf("function beginStartupWork()"))
+        root.check("the startup queue starts once",
+                   beginBody.indexOf("if (root.startupWorkStarted)") >= 0
+                   && beginBody.indexOf("root.startupWorkStarted = true") >= 0
+                   && beginBody.indexOf("startupTaskTimer.restart()") >= 0
+                   && root.indexOf("property bool startupWorkStarted: false") >= 0,
+                   "begin: " + beginBody.slice(0, 200))
+
+        // Quiet-ready is the ladder's last stage, but it is *not* where the pulse comes
+        // back: the wave is still animating at that point, so handing the timeline
+        // over on quiet-ready would let a startup trigger draw over the wave the
+        // lock just committed to. Both hand-backs belong to the end of the queue.
+        const waveBody = root.normalized(root.bodyOf("function markStartupWaveStarted()"))
+        root.check("quiet-ready does not hand back the pulse or the palette",
+                   waveBody.length > 0
+                   && waveBody.indexOf("startupMuted") < 0
+                   && waveBody.indexOf("Services.ColorService") < 0
+                   && waveBody.indexOf("root.startupQuietReady = true") >= 0,
+                   "wave: " + waveBody.slice(0, 200))
+
+        // The marker-spent reload, and the reason the queue cannot be wired to the
+        // wave alone. That session has no startup lock, so no lock surface and no
+        // startupWaveStarted signal ever fires; a queue waiting only on quiet-ready
+        // would leave a reloaded shell with no launcher, no clipboard index and no
+        // hint listener for the rest of its life.
+        root.check("a reload with no startup wave still reaches the queue",
+                   root.normalized(root.source).indexOf(
+                       "readonly property bool startupWorkDue: root.startupChromeReady "
+                           + "&& (root.startupQuietReady || !lockModule.startupLockExpected)")
+                       >= 0,
+                   "condition: " + root.normalized(root.source).slice(
+                       Math.max(0, root.indexOf("startupWorkDue") - 80),
+                       root.indexOf("startupWorkDue") + 200))
+
+        // ...and the chrome readiness *guards* that pair rather than being one of
+        // two alternatives: these warmups are deferred past the staged bar, so a
+        // condition that opened on the lock's expectation alone would warm up
+        // before the bar exists. Read as a single declaration, so a comment below
+        // it cannot vouch for the expression above.
+        const dueAt = root.indexOf("readonly property bool startupWorkDue:")
+        const dueText = root.normalized(
+            root.source.slice(dueAt, statementEnd(root.source, dueAt)))
+        const chromeAt = dueText.indexOf("root.startupChromeReady")
+        root.check("the queue waits for the staged chrome",
+                   chromeAt >= 0
+                   && dueText.indexOf("&&") > chromeAt
+                   && dueText.indexOf("root.startupQuietReady") > chromeAt
+                   && dueText.indexOf("!lockModule.startupLockExpected") > chromeAt,
+                   "condition: " + dueText.slice(0, 200))
+
+        // Both reporters reach the queue through the one condition, not through two
+        // hand-written calls that could disagree about the latch.
+        const dueHandler = root.normalized(root.enclosingBlock("onStartupWorkDueChanged:"))
+        root.check("both startup reporters reach the queue through one condition",
+                   dueHandler.indexOf("onStartupWorkDueChanged:") >= 0
+                   && dueHandler.indexOf("if (startupWorkDue)") >= 0
+                   && dueHandler.indexOf("root.beginStartupWork()") >= 0,
+                   "handler: " + dueHandler.slice(0, 200))
+
+        // The palette gate and the pulse unmute belong to the end of the queue, not
+        // to the wave: nothing may pulse during staging, and nothing may keep
+        // pulsing suppressed afterwards. The unmute goes first so a user action in
+        // the same turn is never swallowed by the palette job.
+        const finishBody = root.normalized(root.bodyOf("function finishStartupWork()"))
+        const unmuteAt = finishBody.indexOf("Services.RipplePulseService.startupMuted = false")
+        const paletteAt = finishBody.indexOf("Services.ColorService.startupQuietReady()")
+        root.check("the queue unmutes the pulse and opens the palette gate last",
+                   unmuteAt >= 0 && paletteAt > unmuteAt
+                   && root.countOccurrences("Services.RipplePulseService.startupMuted = false") === 1
+                   && root.countOccurrences("Services.ColorService.startupQuietReady()") === 1,
+                   "finish: " + finishBody.slice(0, 200))
+
+        // The pulse is muted from the root's own completion, so it is armed before
+        // any chrome widget can move off its default, and the mute is never written
+        // anywhere else — in particular not inside the service's own trigger path.
+        const completedBody = root.normalized(
+            root.source.slice(root.indexOf("Component.onCompleted: {"),
+                              root.statementEnd(root.source,
+                                                root.indexOf("Component.onCompleted: {"))))
+        root.check("the pulse is muted from the root completion",
+                   completedBody.indexOf("Services.RipplePulseService.startupMuted = true") >= 0,
+                   "completion: " + completedBody.slice(0, 200))
+        root.check("the pulse is only muted at startup",
+                   root.countOccurrences("startupMuted") === 2
+                   && root.positionInChrome("startupMuted") < 0,
+                   "occurrences: " + root.countOccurrences("startupMuted"))
     }
 }

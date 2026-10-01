@@ -215,69 +215,44 @@ Item {
             compare(cold.next.rows.length, 0)
         }
 
-        // ---- how many columns get a slot ----------------------------------
-        function test_columnCount_isThreeWhenBothNeighboursHaveWindows() {
-            compare(Hint.columnCount(Hint.cappedColumns(makeHint())), 3)
+// ---- the shape of the panel ---------------------------------------
+        function test_cappedColumns_alwaysReportsAllThreeSlots() {
+            // A column with no windows still gets a slot. An earlier version
+            // dropped it and narrowed the panel, which moved the active workspace
+            // out of the middle and resized the panel under the pointer - so the
+            // same three workspaces read as a different panel each time.
+            var empty = Hint.cappedColumns(makeHint({ previousWindows: [], nextWindows: [] }))
+            compare(Object.keys(empty).sort().join(","), "current,next,previous")
+            compare(empty.previous.rows.length, 0, "previous is present and empty")
+            compare(empty.next.rows.length, 0, "next is present and empty")
+            compare(empty.current.rows.length, 3, "and the active one is untouched")
         }
 
-        function test_columnCount_dropsAColumnWithNothingInIt() {
-            // A column with no windows is not information, it is a hole in the
-            // panel - and a hole reads as a layout fault rather than as "there is
-            // nothing over there". So it takes no slot and no space.
-            compare(Hint.columnCount(Hint.cappedColumns(
-                makeHint({ previousWindows: [] }))), 2)
-            compare(Hint.columnCount(Hint.cappedColumns(
-                makeHint({ nextWindows: [] }))), 2)
-            compare(Hint.columnCount(Hint.cappedColumns(
-                makeHint({ previousWindows: [], nextWindows: [] }))), 1)
+        function test_thePanelIsAlwaysThreeColumnsWide() {
+            // One number, not a count of what happens to be on screen. It cannot be
+            // derived from the columns, which is the whole point: the frame is the
+            // same size whether the neighbours are busy or empty.
+            compare(Hint.COLUMN_COUNT, 3)
+            compare(Hint.COLUMN_COUNT, 1 + 2, "the active column and its two neighbours")
+            verify(Hint.columnCount === undefined,
+                "and there is no per-snapshot count left to disagree with it")
         }
 
-        function test_columnCount_keepsTheActiveColumnEvenWithNoWindows() {
-            // The active workspace always has a slot: the panel is about where you
-            // are, and an empty one says so in words. Dropping it would leave a
-            // panel about other workspaces with nothing marking the current one.
-            var empty = makeHint({
-                windows: [], previousWindows: [], nextWindows: []
-            })
-            compare(Hint.cappedColumns(empty).current.rows.length, 0)
-            compare(Hint.columnCount(Hint.cappedColumns(empty)), 1)
-            // And it keeps its slot while its neighbours still have windows, so
-            // the empty line renders inside a column rather than beside nothing.
-            compare(Hint.columnCount(Hint.cappedColumns(makeHint({ windows: [] }))), 3)
-        }
-
-        function test_columnCount_isOneForAColdSnapshot() {
-            // Nothing is resolved yet, so there is nothing to lay out - but the
-            // answer still has to be a number the panel can size itself from.
-            compare(Hint.columnCount(Hint.cappedColumns(null)), 1)
-            compare(Hint.columnCount(null), 1)
-            compare(Hint.columnCount({}), 1)
-        }
-
-        function test_columnCount_readsTheCappedRowsNotTheRawList() {
-            // The count follows what the cap left on screen, so a neighbour whose
-            // only windows were... well, the cap never empties a non-empty list,
-            // but the count must not be answerable from a shape the renderer
-            // never sees. A half-built object must not count as a column.
-            compare(Hint.columnCount({ previous: {}, current: { rows: [] }, next: {} }), 1)
-            compare(Hint.columnCount({
-                previous: { rows: [1] }, current: { rows: [1] }, next: { rows: [1, 2] }
-            }), 3)
+        function test_aNeighbourColumnSaysItIsEmptyRatherThanGoingBlank() {
+            // The word is one string, and it names no workspace: a column with no
+            // number on it cannot say which one it is, and the position in the
+            // panel already does that.
+            compare(Hint.NEIGHBOUR_EMPTY_LABEL, "No windows")
+            verify(Hint.NEIGHBOUR_EMPTY_LABEL.indexOf("workspace") < 0,
+                "and must not read as a statement about the active workspace")
         }
 
         function test_columnWidthIsAFixedColumnSize() {
-            // The panel's width is this times the column count, so the two cannot
-            // be derived from each other - and a dropped column has to narrow the
-            // panel rather than stretch the survivors to fill it.
+            // The panel's width is this times the column count, and neither varies,
+            // so the two are independent numbers rather than one derived from the
+            // other. That is what makes the panel a fixed frame.
             compare(Hint.COLUMN_WIDTH, 180)
-            // Three is the ceiling the panel can reach, and nothing above it may
-            // take a slot. It is also the count the slide distance used to be
-            // derived from, which was wrong: the distance has to be the panel's own
-            // current width for the two layers to meet exactly.
-            compare(Hint.MAX_COLUMNS, 3)
-            compare(Hint.MAX_COLUMNS, 1 + 2, "the active column and its two neighbours")
-            compare(Hint.columnCount(Hint.cappedColumns(makeHint())), Hint.MAX_COLUMNS,
-                "and a full panel reaches it")
+            compare(Hint.COLUMN_WIDTH * Hint.COLUMN_COUNT, 540, "a full panel")
         }
 
         function test_focusedIndexIn_readsARowList() {

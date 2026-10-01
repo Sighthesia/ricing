@@ -200,39 +200,56 @@ Item {
             verify(wash.x + wash.width <= next.x, "and stops before the next column")
         }
 
-        function test_aMissingNeighbourIsAnEmptyColumn() {
-            // At either end of the workspace list there is no workspace there, and
-            // a neighbour with no windows has nothing to say. Either way the
-            // column takes no slot and so no space: a blank third of the panel
-            // reads as a layout fault, not as "there is nothing over there".
+function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
+            // An empty neighbour workspace must not shrink the panel. It used to:
+            // the column took no slot, the panel narrowed, and the active workspace
+            // moved out of the middle - so the same three workspaces read as a
+            // different panel depending on what the neighbours were running. Now
+            // the slot stays and the column states the fact itself, because a blank
+            // column would read as a layout fault rather than as "nothing here".
             body.hint = root.makeHint({ previousWindows: [] })
             wait(20)
             verify(findByName(live(), "windowHintPreviousColumn"), "the column is still there")
             compare(findAllByName(live(), "windowHintPreviousRow").length, 0, "and holds no row")
+            var empty = findByName(live(), "windowHintPreviousEmpty")
+            verify(empty !== null, "the empty neighbour says something")
+            verify(empty.visible, "and is visible")
+            compare(empty.text, "No windows", "which is that it has no windows")
             compare(findAllByName(live(), "windowHintNextRow").length, 1, "the other side is unaffected")
-            // Two columns wide, not three, and the active one moved up into the
-            // slot the previous column vacated rather than staying put.
-            compare(body.shownColumnCount, 2)
-            compare(body.width, 2 * body.columnWidth, "the panel narrowed to fit")
-            // No settle needed: the columns' slots are derived, not animated, so
-            // they are in their new places the moment the content changes.
+            verify(!findByName(live(), "windowHintNextEmpty").visible,
+                "and does not claim to be empty when it is not")
+            // The frame is unchanged, and the active workspace is still the middle.
+            compare(body.shownColumnCount, 3)
+            compare(body.width, 3 * body.columnWidth, "the panel did not resize")
             var active = findByName(live(), "windowHintColumn")
             var next = findByName(live(), "windowHintNextColumn")
-            compare(active.x, 0, "active takes the freed slot")
-            compare(next.x, body.columnWidth, "next follows it")
+            compare(active.x, body.columnWidth, "active is still the middle column")
+            compare(next.x, body.columnWidth * 2, "and next is still the last")
             compare(findByName(live(), "windowHintFocusFrame").x, active.x,
-                "and the highlight follows the active column")
+                "and the highlight is still on the active column")
         }
 
-        function test_aSingleWorkspacePanelIsOneColumnWide() {
-            // Neither neighbour has windows, so the panel is one column. This is
-            // the width floor the popup has to live with, and it must not be
-            // padded out to three columns' worth of empty panel.
-            body.hint = root.makeHint({ previousWindows: [], nextWindows: [] })
+        function test_thePanelIsThreeColumnsWideWhateverTheNeighboursHold() {
+            // The one case that broke it: both neighbours empty. A panel that
+            // reports one column here is a panel that resizes under the pointer as
+            // the user moves between the edge workspace and an interior one.
+            body.hint = root.makeHint({ windows: [], previousWindows: [], nextWindows: [] })
             wait(20)
-            compare(body.shownColumnCount, 1)
-            compare(body.width, body.columnWidth)
-            compare(findByName(live(), "windowHintColumn").x, 0)
+            compare(body.shownColumnCount, 3, "three columns")
+            compare(body.width, 3 * body.columnWidth, "the same width as always")
+            // All three columns say they are empty, each in its own slot.
+            verify(findByName(live(), "windowHintPreviousEmpty").visible)
+            verify(findByName(live(), "windowHintNextEmpty").visible)
+            verify(findByName(live(), "windowHintNoWindows").visible,
+                "and the active one uses its own wording")
+            // The active column's line names the workspace; the neighbours' do not,
+            // because a column with no number on it cannot say which one it is.
+            compare(findByName(live(), "windowHintNoWindows").text, "No windows on this workspace")
+            compare(findByName(live(), "windowHintPreviousEmpty").text, "No windows")
+            // Three columns at three distinct offsets - the frame is intact.
+            compare(findByName(live(), "windowHintPreviousColumn").x, 0)
+            compare(findByName(live(), "windowHintColumn").x, body.columnWidth)
+            compare(findByName(live(), "windowHintNextColumn").x, body.columnWidth * 2)
         }
 
         function test_thePanelIsAsWideAsItsColumns() {
@@ -240,9 +257,33 @@ Item {
             // count times the column width and nothing else - a stray padding term
             // would leave a band of input region beside a narrower panel.
             compare(body.width, body.shownColumnCount * body.columnWidth)
-            // Three full columns while both neighbours have windows.
             compare(body.shownColumnCount, 3)
             compare(body.width, 3 * body.columnWidth)
+        }
+
+        function test_theActiveWorkspaceIsAlwaysTheMiddleColumn() {
+            // The claim this whole layout rests on: the workspace you are on is in
+            // the same place whatever is beside it. Asserted across every neighbour
+            // combination, because "always" is the part that has to be checked -
+            // one passing case would not tell a fixed slot from a derived one.
+            var combos = [
+                { previousWindows: [{ windowId: "p", title: "p", icon: "", isFocused: false }],
+                    nextWindows: [{ windowId: "n", title: "n", icon: "", isFocused: false }] },
+                { previousWindows: [], nextWindows: [{ windowId: "n", title: "n", icon: "", isFocused: false }] },
+                { previousWindows: [{ windowId: "p", title: "p", icon: "", isFocused: false }],
+                    nextWindows: [] },
+                { previousWindows: [], nextWindows: [] }
+            ]
+            for (var i = 0; i < combos.length; ++i) {
+                body.hint = root.makeHint(combos[i])
+                wait(20)
+                var active = findByName(live(), "windowHintColumn")
+                compare(active.x, body.columnWidth,
+                    "combination " + i + ": active is the middle column")
+                // And centred on the panel, not merely second of three.
+                compare(active.x + active.width / 2, body.width / 2,
+                    "combination " + i + ": and centred on the panel")
+            }
         }
 
         function test_columnsShareOneRowPitch() {

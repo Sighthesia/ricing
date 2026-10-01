@@ -302,25 +302,30 @@ Item {
                 "and the content column ends inside the surface")
         }
 
-        function test_theWindowHintNarrowsWithItsColumns() {
-            // The same accounting has to hold when a neighbour workspace is empty
-            // and the panel drops to two columns - otherwise the fix for the
-            // clipped case would just move the clipping.
+        function test_theWindowHintKeepsThreeColumnsWhenNeighboursAreEmpty() {
+            // The panel is a fixed three-column frame, so this surface width must
+            // not depend on what the neighbour workspaces are running. A width that
+            // shrank here would resize the layer-shell surface and its input region
+            // while the key is still held.
             var item = createTemporaryObject(actionsComp, root, {
                 actionKind: "window-hint",
                 payload: { hint: {
                     workspaceId: "42", activeWorkspacePosition: 1, previousActiveWorkspacePosition: 1,
-                    windows: [{ windowId: "10", title: "a", icon: "", isFocused: true }],
+                    windows: [],
                     previousWindows: [],
-                    nextWindows: [{ windowId: "30", title: "n", icon: "", isFocused: false }]
+                    nextWindows: []
                 } }
             })
             wait(20)
             var body = findByName(item, "windowHintBody")
-            compare(body.width, 2 * 180, "two columns now")
+            compare(body.width, 3 * 180, "still three columns")
             compare(item.implicitWidth, body.width + item.contentInset * 2)
+            var column = findByName(item, "actionsRoot")
+            var active = findByName(body, "windowHintColumn")
+            compare(active.x, 180, "and the active workspace is still the middle one")
+            // All three columns fit, so nothing is drawn past the surface.
             var next = findByName(body, "windowHintNextColumn")
-            verify(next.x + next.width <= findByName(item, "actionsRoot").width,
+            verify(next.x + next.width <= column.width,
                 "and the last column still ends inside the content column")
         }
 

@@ -66,6 +66,14 @@ QtObject {
     // for harnesses that mount the service without the shell.
     property int duration: 900
 
+    // Startup suppression. During startup staging the bar widgets go from their
+    // defaults to the services' real values, and an initial status sync must not
+    // add another screen-wide sweep on top of the wallpaper reveal and lock wave.
+    // The gate only rejects new triggers; it never cancels rings already in flight.
+    // The shell clears it after the deferred startup queue, so normal user input
+    // remains live immediately afterwards.
+    property bool startupMuted: false
+
     // The ring that started most recently, and its state. Diagnostics and the
     // subject of tests: hosts read `rings` and draw all of them.
     readonly property var newestRing: rings.length ? rings[rings.length - 1] : null
@@ -114,6 +122,11 @@ QtObject {
     // burst of notifications, puts out one ring per event rather than one ring
     // per sweep, and none of them waits for the one before it.
     function trigger(screen, originX, originY) {
+        // Suppression is checked before changing time, token, or the ring list.
+        // A startup sync therefore cannot perturb an existing sweep or make a
+        // later user event appear to be the second pulse.
+        if (root.startupMuted)
+            return
         const at = Date.now()
         root.now = at
         ++root.token

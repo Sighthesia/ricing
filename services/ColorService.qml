@@ -31,6 +31,15 @@ QtObject {
     // called by the wallpaper window). The hold timer flushes regardless, so a
     // missed signal can never leave the theme stale.
     readonly property string _lowPriority: "nice -n 19"
+    // The reveal gate above only covers the wallpaper window. The startup
+    // window is wider than that — the locked floor, the wallpaper reveal and
+    // chrome staging all overlap here — and Component.onCompleted asks for the
+    // current wallpaper on the very first turn, which is the locked floor. So
+    // extraction has a second, coarser gate in front of the reveal one: while it
+    // is closed a request is only recorded, never started. One-way: the shell
+    // opens it once the startup queue finishes, and it never closes again, so
+    // every later wallpaper switch takes the ordinary reveal-gated path.
+    property bool _startupQuiet: false
     property bool _revealInFlight: false
     property string _heldPath: ""
     // Path currently owned by the extraction process. When a reveal starts
@@ -79,6 +88,13 @@ QtObject {
             return
         }
         _pendingPath = wallpaperPath
+        // Startup gate: keep the newest request and start nothing. Checked before
+        // the reveal branch on purpose — a request parked in the held slot is
+        // flushed by revealCompleted(), and that flush must respect the same
+        // gate, so the pending slot is where a startup request belongs until the
+        // shell opens it.
+        if (!root._startupQuiet)
+            return
         if (_revealInFlight) {
             _heldPath = wallpaperPath
             _pendingPath = ""
@@ -87,6 +103,20 @@ QtObject {
         }
         _debounce.interval = delay ? Math.max(0, Number(delay)) : 500
         _debounce.restart()
+    }
+
+    // Open the startup gate. Idempotent by construction: the early return is what
+    // makes the gate one-way, so a duplicated startup report cannot arm a second
+    // extraction, and only a request that was actually recorded is flushed. A
+    // palette that is already cached leaves nothing pending and starts nothing.
+    function startupQuietReady() {
+        if (root._startupQuiet)
+            return
+        root._startupQuiet = true
+        if (!root._pendingPath)
+            return
+        root._debounce.interval = 120
+        root._debounce.restart()
     }
 
     // Move a request that has not started yet into the reveal-held slot. The
@@ -125,6 +155,10 @@ QtObject {
         if (_heldPath) {
             _pendingPath = _heldPath
             _heldPath = ""
+            // A reveal that ends inside the startup window hands the request back
+            // but must not start it; startupQuietReady() flushes it instead.
+            if (!root._startupQuiet)
+                return
             _debounce.interval = 120
             _debounce.restart()
         }
@@ -162,9 +196,10 @@ QtObject {
 
     // Refresh the cached palette once at startup so a fresh shell always
     // matches the current wallpaper without waiting for a wallpaper change.
-    // The reveal gate moves this past the startup reveal when it is still
-    // running; the delay only covers the case where the window has not started
-    // its reveal yet.
+    // This runs on the locked floor, so the startup gate is what defers it now;
+    // it records the path and the shell's startup queue opens the gate, which
+    // restarts the debounce itself. The delay only still covers a request that
+    // arrives after the gate and before the wallpaper window starts its reveal.
     Component.onCompleted: extractColors(Services.SettingsService.appearance.wallpaperPath, 900)
 
     // Regenerate palettes whenever the requested scheme or template changes.
@@ -268,7 +303,12 @@ QtObject {
         }
     }
 
+    // The single place a Process is started, so the startup gate is enforced here
+    // rather than at every caller: nothing can reach a shell before the gate, and
+    // a caller that forgot to check still cannot start work during startup.
     function _execute() {
+        if (!root._startupQuiet)
+            return
         if (_revealInFlight) {
             _holdCurrentRequest()
             return

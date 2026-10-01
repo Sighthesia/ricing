@@ -33,23 +33,28 @@ Item {
 
     signal windowActivated(string windowId)
 
-    // A column only takes a slot if it has something to show, so the packing is a
-    // function of the content rather than a layout pass over three fixed slots.
-    // A Column is not used to place the columns: it lays out from its children's
-    // widths, and an emptied column's width binding can resolve a beat after the
-    // model swap - so the positioner polishes against a stale width and, because
-    // nothing about the columns then changes again, never re-lays-out. Derived x
-    // cannot go stale.
-    readonly property int activeSlot: columns.previous.rows.length > 0 ? 1 : 0
+    // The columns are placed by derived x rather than by a `Row`. A positioner
+    // lays out from its children's widths, and a column's width is a binding that
+    // can resolve a beat after a model swap - so it polishes against a stale
+    // width and, because nothing about the columns then changes again, never
+    // re-lays-out. Derived x cannot go stale.
+    //
+    // The active workspace is always the middle column, and not derived from which
+    // neighbours happen to have content. A frame whose centre moves depending on
+    // what is beside it is not a frame: the workspace you are on would appear to
+    // jump sideways whenever a neighbour workspace ran empty, and the panel would
+    // change width under the pointer on the way.
+    readonly property int activeSlot: 1
     readonly property int activeColumnX: activeSlot * columnWidth
     readonly property int contentHeight: Math.max(
         previousColumn.implicitHeight,
         column.implicitHeight,
         nextColumn.implicitHeight)
 
-    // Neighbour column: plain labels, no card and no state. With no windows -
-    // because the workspace is empty, or because there is no workspace on that
-    // side of the list - it takes no slot and so no space.
+    // Neighbour column: plain labels, no card and no state. The slot exists
+    // whatever it contains, and a workspace with no windows says so rather than
+    // leaving the column blank - a blank column would read as a layout fault
+    // rather than as the fact it is reporting.
     Column {
         id: previousColumn
         objectName: "windowHintPreviousColumn"
@@ -72,6 +77,20 @@ Item {
                 enabled: root.interactive
                 onActivated: windowId => root.windowActivated(windowId)
             }
+        }
+
+        // What the neighbour column says when that workspace has no windows. Only
+        // for a neighbour: the active column has its own line further down, which
+        // names the workspace, and two of them saying the same thing in two
+        // different words would be two statements about one fact.
+        Text {
+            objectName: "windowHintPreviousEmpty"
+            width: parent.width
+            visible: root.columns.previous.rows.length === 0
+            text: HintLogic.NEIGHBOUR_EMPTY_LABEL
+            color: LazerTheme.textMuted
+            font.pixelSize: 10
+            horizontalAlignment: Text.AlignHCenter
         }
     }
 
@@ -226,6 +245,17 @@ Item {
                 enabled: root.interactive
                 onActivated: windowId => root.windowActivated(windowId)
             }
+        }
+
+        // The other side's empty line - see the previous column.
+        Text {
+            objectName: "windowHintNextEmpty"
+            width: parent.width
+            visible: root.columns.next.rows.length === 0
+            text: HintLogic.NEIGHBOUR_EMPTY_LABEL
+            color: LazerTheme.textMuted
+            font.pixelSize: 10
+            horizontalAlignment: Text.AlignHCenter
         }
     }
 }
