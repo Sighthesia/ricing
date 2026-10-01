@@ -34,4 +34,20 @@ TestCase {
         verify(!Logic.markerMatches(socket, ""))
         verify(!Logic.markerMatches(null, socket))
     }
+
+    // The startup lock is the regression this guards: it engages before any
+    // chrome exists, so a capture could only record a half-assembled desktop
+    // that the lock's own wallpaper reveal would then contradict.
+    function test_startupLockNeverCapturesTheDesktop() {
+        compare(Logic.backgroundModeFor("screenshot", true), "wallpaper")
+        compare(Logic.backgroundModeFor("wallpaper", true), "wallpaper")
+        compare(Logic.backgroundModeFor("", true), "wallpaper")
+        compare(Logic.backgroundModeFor(undefined, true), "wallpaper")
+    }
+
+    function test_manualLockKeepsTheConfiguredCapture() {
+        compare(Logic.backgroundModeFor("screenshot", false), "screenshot")
+        compare(Logic.backgroundModeFor("wallpaper", false), "wallpaper")
+        compare(Logic.backgroundModeFor("screenshot", undefined), "screenshot")
+    }
 }
