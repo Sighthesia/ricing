@@ -946,6 +946,18 @@ PanelWindow {
         ? Math.max(root.popupSlotWidth, root.trayInputWidth, root.targetWidth)
         : root.popupSlotWidth
 
+    // The width of the panel the user is looking at: the incoming intent's own
+    // painted face, not the wider of the two bodies. During a slide the panel
+    // is the incoming one, so a media(420) -> tray(260) hop has to bound the
+    // slot at 260; using the max left 160px of the incoming tray face painting
+    // to the right of its own panel. The outgoing body is wider in that case
+    // and is meant to be cut by the panel edge on its way out - that is what a
+    // carousel does.
+    readonly property real paintedPanelWidth: root.currentIntent
+            && String(root.currentIntent.kind || "") !== "context"
+            && String(root.currentIntent.actionKind || "") === "tray"
+        ? root.trayFaceWidth : root.popupWidthForIntent(root.currentIntent)
+
     // True exactly while a body is off its resting position. The content slot
     // narrows to the painted panel for exactly this window and is the full input
     // canvas again the moment the slide settles, which is also before a tray
@@ -1699,7 +1711,7 @@ PanelWindow {
                      // summonable. Displaced is exactly the slide, and the slide
                      // ends before a submenu can be summoned, so binding to it
                      // keeps both contracts without a second clip owner.
-                     width: root.contentBodiesDisplaced ? root.popupSlotWidth
+                     width: root.contentBodiesDisplaced ? root.paintedPanelWidth
                              : root.popupContentWidth
                      implicitWidth: root.popupContentWidth
                      implicitHeight: root.popupHeightForIntent(root.currentIntent)

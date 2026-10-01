@@ -519,6 +519,116 @@ Item {
             root.check("tray label refresh clears pending", host.pendingIntent, null)
             root.check("tray label refresh updates live", host.currentIntent.title, "App A (2)")
             root.check("tray label refresh keeps no outgoing layer", host._transitionOutgoingIntent, null)
+
+            // Regression: a second hover landing mid-slide resets
+            // _exchangeCommitted while both bodies are still offset. If the slot
+            // widens back to the input canvas on that flag alone, the
+            // still-displaced body paints outside the panel for the rest of the
+            // cascade - the menu flashing beside the popup.
+            host.updateIntent({
+                widgetId: "tray", instanceKey: "tray:0", kind: "hover",
+                title: "App C", actionKind: "tray", delegateKey: "sni-c",
+                anchorX: 720, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            host.transitionProgress = 0.5
+            host.contentSlideProgress = 0.5
+            var cascadeSlot = root.findByName(host.popupItem, "popupContentSlot")
+            var cascadeBody = root.findByName(host.popupItem, "popupActions")
+            root.check("mid-slide cascade keeps a body displaced",
+                Math.abs(cascadeBody.x) > 0.5, true)
+            root.check("mid-slide cascade keeps the slot bounded to the panel",
+                cascadeSlot.width, host.popupSlotWidth)
+            host.contentSlideProgress = 1
+            host.settleContentSlide()
+            // Regression: a hop between bodies of DIFFERENT widths. The slot was
+            // bounded to the wider of the two, so on media(420) -> tray(260) the
+            // incoming tray face started one 420px track out and painted 160px
+            // to the right of its own 260 panel - the occasional flash beside the
+            // menu, which only showed on mixed-width hops.
+            host.showIntent({
+                widgetId: "wide", instanceKey: "wide:0", kind: "hover",
+                title: "Media", actionKind: "media", anchorX: 700,
+                screenWidth: 1000, screenHeight: 800, effectiveBarHeight: 48,
+                barPosition: "top", payload: {}
+            })
+            host.popupItem.revealProgress = 1
+            host.transitionProgress = 1
+            host.updateIntent({
+                widgetId: "tray", instanceKey: "tray:1", kind: "hover",
+                title: "App D", actionKind: "tray", delegateKey: "sni-d",
+                anchorX: 700, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            host.transitionProgress = 0.5
+            host.contentSlideProgress = 0
+            var mixedSlot = root.findByName(host.popupItem, "popupContentSlot")
+            var mixedBody = root.findByName(host.popupItem, "popupActions")
+            root.check("mixed hop slot matches the incoming panel, not the wider body",
+                mixedSlot.width, host.trayFaceWidth)
+            // The body travels the full 420 track, so at progress 0 it is
+            // outside the 260 panel and the slot must clip it away entirely.
+            root.check("mixed hop slot is the incoming panel width",
+                mixedSlot.width, host.trayFaceWidth)
+            root.check("mixed hop starts the incoming face fully outside",
+                mixedBody.x >= mixedSlot.width - 0.5, true)
+            host.contentSlideProgress = 1
+            host.settleContentSlide()
+            root.check("settled mixed hop restores the tray input canvas",
+                mixedSlot.width, host.popupContentWidth)
+            // Hand the host back closed, as the tray block above does, so the
+            // sections after this one start from a known state.
+            host.dismissImmediately()
+
+            // The flip compensation translates the whole content layer with a
+            // Binding, so it can carry the slot past the panel without any clip
+            // seeing it. Drive the flip and check the painted surface stays
+            // inside the popup.
+            host.showIntent({
+                widgetId: "tray", instanceKey: "tray:8", kind: "hover",
+                title: "Edge A", actionKind: "tray", delegateKey: "sni-e1",
+                anchorX: 975, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            host.popupItem.revealProgress = 1
+            host.transitionProgress = 1
+            host.updateIntent({
+                widgetId: "tray", instanceKey: "tray:9", kind: "hover",
+                title: "Edge B", actionKind: "tray", delegateKey: "sni-e2",
+                anchorX: 940, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            host.transitionProgress = 0.5
+            host.contentSlideProgress = 0.5
+            var flipBody = root.findByName(host.popupItem, "popupActions")
+            if (flipBody && flipBody.trayMenuContent) {
+                flipBody.trayMenuContent.submenuProgress = 1
+                host.submenuFlipped = true
+                host.flipBaseX = host.displayX
+                host.displayX = host.displayX - 40
+                host.transitionProgress = 0.5
+                var shiftSlot = root.findByName(host.popupItem, "popupContentSlot")
+                var surface = root.findByName(host.popupItem, "popupContentSurface")
+                // The shift tracks the container's own leftward expansion, so
+                // read it rather than assume the sample's arithmetic.
+                root.check("flipped content layer tracks the flip delta",
+                    host.contentShiftX,
+                    Math.round((host.flipBaseX - host.displayX) * 10) / 10)
+                root.check("flipped slot stays bounded to the incoming panel",
+                    shiftSlot.width, host.paintedPanelWidth)
+                // The Binding moves the whole layer, so the panel surface and
+                // the slot travel together and the slot may never sit past the
+                // surface it is clipped against.
+                var flipSurface = root.findByName(host.popupItem, "popupContentSurface")
+                root.check("flipped slot never sits past the panel surface",
+                    shiftSlot.x + shiftSlot.width <= flipSurface.width + 0.5, true)
+                flipBody.trayMenuContent.submenuProgress = 0
+                host.submenuFlipped = false
+            }
+            host.contentSlideProgress = 1
+            host.settleContentSlide()
+            host.dismissImmediately()
+
             // Restore the closed state the close-race block below expects.
             host.dismissImmediately()
             root.check("tray phase dismiss closes host", host.open, false)
