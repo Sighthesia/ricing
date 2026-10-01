@@ -25,6 +25,19 @@ function startupBatch(widgetId) {
     return 2
 }
 
+// Total number of startup batches, derived from the classification above:
+// one more than the highest batch any shipped id lands in, so adding a
+// batch to startupBatch automatically extends the count BarContent binds.
+var startupBatchCount = (function() {
+    var highest = 0
+    for (var index = 0; index < ids.length; index++) {
+        var batch = startupBatch(ids[index])
+        if (batch > highest)
+            highest = batch
+    }
+    return highest + 1
+})()
+
 // Filter layout entries down to widgets that ship a frontend implementation.
 // This is the single authoritative render filter: BarContent delegates here
 // and tests exercise this seam directly, so a registry id without an

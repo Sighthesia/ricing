@@ -397,6 +397,16 @@ Variants {
             }
         }
 
+        // Prune finished keys the moment the screen set changes, so an
+        // unplugged screen's key never lingers past the hotplug. This lives
+        // on the Scope because Variants drops arbitrary root children.
+        Connections {
+            target: Quickshell
+            function onScreensChanged() {
+                root.refreshStartupReady()
+            }
+        }
+
         // The hint's anchor is the bar's own midpoint, so a bar width change is
         // the only thing that can invalidate it.
         Connections {

@@ -15,5 +15,15 @@ Item {
             compare(Widgets.startupBatch("network"), 2)
             compare(Widgets.startupBatch("unknown"), 2)
         }
+
+        function test_startupBatchCount_covers_every_shipped_id() {
+            compare(Widgets.startupBatchCount, 3)
+            for (var i = 0; i < Widgets.ids.length; i++) {
+                verify(Widgets.startupBatch(Widgets.ids[i]) < Widgets.startupBatchCount,
+                       "shipped id above the batch count: " + Widgets.ids[i])
+            }
+            verify(Widgets.startupBatch("unknown") < Widgets.startupBatchCount,
+                   "unknown ids must stay inside the staged batches")
+        }
     }
 }

@@ -38,13 +38,20 @@ Item {
     // Startup staging releases widget batches one frame apart so the first
     // frame paints the time-critical chrome before the heavier widgets load.
     // `startupBatchLimit` is the number of released batches; a delegate is
-    // active once its batch index falls below it. `startupBatchCount` is the
-    // total number of batches (see ShippedWidgets.startupBatch).
+    // active once its batch index falls below it. `startupBatchCount` binds
+    // the derived batch total (see ShippedWidgets.startupBatchCount).
     property bool startupStaging: false
     property int startupBatchLimit: 0
     property bool startupReady: false
-    readonly property int startupBatchCount: 3
+    readonly property int startupBatchCount: ShippedWidgets.startupBatchCount
     signal startupFinished()
+
+    // One-way latch: once staging has started (or finished), turning
+    // `startupStaging` back off never resets the limit, deactivates an
+    // already-loaded widget, or re-runs a batch. The plain non-staging
+    // one-tick path below only applies when staging was never entered.
+    property bool _stagingEntered: false
+    readonly property bool _stagingActive: root.startupStaging || root._stagingEntered
 
     // Test seams: the harness injects deterministic doubles for the two
     // services this component reads while staging, so the test never depends
@@ -60,7 +67,7 @@ Item {
     // limit reaches the batch count the timer stops, readiness flips, and the
     // finish signal fires on the next event-loop turn.
     function advanceStartupBatch() {
-        if (!root.startupStaging || !root.widgetsReady)
+        if (!root._stagingActive || !root.widgetsReady)
             return
         if (root.startupBatchLimit >= root.startupBatchCount)
             return
@@ -83,14 +90,23 @@ Item {
 
     onStartupStagingChanged: {
         if (root.startupStaging) {
-            root.startupBatchLimit = 0
-            root.startupReady = false
-            if (root.widgetsReady)
+            // First entry latches staging on and resets; re-entry after the
+            // latch never rewinds the limit or clears readiness.
+            if (!root._stagingEntered) {
+                root._stagingEntered = true
+                root.startupBatchLimit = 0
+                root.startupReady = false
+            }
+            if (root.widgetsReady && !root.startupReady)
                 startupBatchTimer.restart()
-        } else {
+        } else if (!root._stagingEntered) {
             startupBatchTimer.stop()
             if (root.widgetsReady)
                 root.startupReady = true
+        } else if (root.widgetsReady && !root.startupReady) {
+            // Staging was entered and then switched off mid-run: keep
+            // releasing on the latched path instead of stalling or resetting.
+            startupBatchTimer.restart()
         }
     }
 
@@ -437,10 +453,12 @@ Item {
         // before any widget binding evaluates.
         Qt.callLater(function () {
             widgetsReady = true
-            if (root.startupStaging)
-                startupBatchTimer.restart()
-            else
+            if (root._stagingActive) {
+                if (!root.startupReady)
+                    startupBatchTimer.restart()
+            } else {
                 root.startupReady = true
+            }
             schedulePublish()
         })
     }
@@ -482,7 +500,7 @@ Item {
                 required property var modelData
 
                 active: root.widgetsReady
-                        && (!root.startupStaging
+                        && (!root._stagingActive
                             || Number(modelData.startupBatch || 0) < root.startupBatchLimit)
                 source: modelData && modelData.source
                         ? root.widgetSourceUrl(modelData.source) : ""
