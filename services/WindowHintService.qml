@@ -137,6 +137,12 @@ Singleton {
             currentWindowIcon: "",
             currentIndex: -1,
             windows: [],
+            // The workspaces either side of the active one, so the view can lay
+            // out a previous / active / next column without reaching into
+            // NiriService itself. Empty at either end of the list, which is the
+            // honest answer: there is no workspace there.
+            previousWindows: [],
+            nextWindows: [],
             workspaces: [],
             previousWindow: root._emptyWindow(),
             nextWindow: root._emptyWindow()
@@ -288,6 +294,13 @@ Singleton {
         root._lastActiveWorkspacePosition = activePosition
         root._revision = nextRevision
 
+        // The neighbours of the active workspace, by position. Each is filtered
+        // from the same window list the active column uses, so all three columns
+        // describe the same instant. Out of range yields an empty list, which the
+        // view renders as a blank column rather than a neighbour.
+        const previousSummary = root._workspaceSummaryAt(activePosition - 1)
+        const nextSummary = root._workspaceSummaryAt(activePosition + 1)
+
         return {
             visible: !!visible,
             revision: nextRevision,
@@ -301,6 +314,10 @@ Singleton {
             currentWindowIcon: currentWindow.icon,
             currentIndex: currentIndex,
             windows: windows,
+            previousWindows: previousSummary.workspaceId
+                ? root._workspaceWindows(previousSummary.workspaceId) : [],
+            nextWindows: nextSummary.workspaceId
+                ? root._workspaceWindows(nextSummary.workspaceId) : [],
             workspaces: root._workspaceSummaries(),
             previousWindow: root._windowAt(windows, currentIndex - 1),
             nextWindow: root._windowAt(windows, currentIndex + 1)

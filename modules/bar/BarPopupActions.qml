@@ -21,8 +21,10 @@ Item {
     onPayloadChanged: if (root.actionKind === "network") root.refreshWifi()
     Component.onCompleted: if (root.actionKind === "network") root.refreshWifi()
 
+    // 540 is the window hint's three-column width; it has to agree with
+    // BarWindowHintContent and with the host's popupWidthForIntent.
     implicitWidth: root.actionKind === "media" ? 420
-        : (root.actionKind === "window-hint" ? 360 : 260)
+        : (root.actionKind === "window-hint" ? 540 : 260)
     implicitHeight: root.actionKind === "context" ? 0 : contentColumn.implicitHeight + 16
     width: implicitWidth
     height: implicitHeight

@@ -24,6 +24,14 @@ Item {
                 { windowId: "11", title: "afloat", appId: "kitty", icon: "/i/kitty.png", isFocused: true },
                 { windowId: "12", title: "firefox", appId: "firefox", icon: "/i/ff.png", isFocused: false }
             ],
+            // The neighbours the service resolves by position. One window each,
+            // so a test that forgets to override them still sees three columns.
+            previousWindows: [
+                { windowId: "20", title: "prev only", appId: "prev", icon: "/i/prev.png", isFocused: false }
+            ],
+            nextWindows: [
+                { windowId: "30", title: "next only", appId: "next", icon: "/i/next.png", isFocused: false }
+            ],
             workspaces: [
                 { workspaceId: "41", workspaceIndex: 1, isActive: false, icons: [] },
                 { workspaceId: "42", workspaceIndex: 2, isActive: true, icons: [{ windowId: "10" }, { windowId: "11" }, { windowId: "12" }] }
@@ -154,6 +162,94 @@ Item {
                 ]
             })
             compare(Hint.focusedRowIndex(two), 0)
+        }
+
+        // ---- the three columns -------------------------------------------
+        function test_cappedColumns_returnPreviousCurrentNext() {
+            // The panel is three columns: the workspaces either side of the
+            // active one, and the active one. Previous and next come from the
+            // service's own resolution, so the order is by workspace position
+            // and NOT by anything the view decides.
+            var columns = Hint.cappedColumns(makeHint())
+            compare(Object.keys(columns).sort().join(","), "current,next,previous")
+            compare(columns.previous.rows[0].windowId, "20")
+            compare(columns.current.rows[0].windowId, "10")
+            compare(columns.next.rows[0].windowId, "30")
+            // The neighbours are shaped exactly like the active column's rows, so
+            // one row component can render all three.
+            var prev = columns.previous.rows[0]
+            compare(Object.keys(prev).sort().join(","), "appId,icon,isFocused,title,windowId")
+        }
+
+        function test_cappedColumns_capEveryColumnAlike() {
+            // Same cap on all three, or the panel height would be driven by
+            // whichever neighbour happened to be busiest and the three columns
+            // would not read as peers.
+            var many = []
+            for (var i = 0; i < 8; i++)
+                many.push({ windowId: "n" + i, title: "n" + i, isFocused: false })
+            var columns = Hint.cappedColumns(makeHint({
+                previousWindows: many, windows: many, nextWindows: many
+            }))
+            compare(columns.previous.rows.length, Hint.MAX_WINDOW_ROWS)
+            compare(columns.current.rows.length, Hint.MAX_WINDOW_ROWS)
+            compare(columns.next.rows.length, Hint.MAX_WINDOW_ROWS)
+            compare(columns.previous.hidden, 3)
+            compare(columns.next.hidden, 3)
+        }
+
+        function test_cappedColumns_leaveAMissingNeighbourEmpty() {
+            // At either end of the workspace list there is no workspace there.
+            // The empty column is the honest answer; a wrapped-around neighbour
+            // would claim a workspace the user cannot see.
+            var atStart = Hint.cappedColumns(makeHint({ previousWindows: [] }))
+            compare(atStart.previous.rows.length, 0)
+            compare(atStart.previous.hidden, 0)
+            compare(atStart.next.rows.length, 1, "the other side is unaffected")
+            var atEnd = Hint.cappedColumns(makeHint({ nextWindows: [] }))
+            compare(atEnd.next.rows.length, 0)
+            // A snapshot from before the service knew about neighbours at all
+            // must not throw, and must not invent columns either.
+            var cold = Hint.cappedColumns(null)
+            compare(cold.previous.rows.length, 0)
+            compare(cold.current.rows.length, 0)
+            compare(cold.next.rows.length, 0)
+        }
+
+        function test_focusedIndexIn_readsARowList() {
+            // The view asks about the column it is actually painting, which is
+            // why the index is resolved from a row list rather than only from a
+            // whole snapshot.
+            var rows = [{ windowId: "a", isFocused: false }, { windowId: "b", isFocused: true }]
+            compare(Hint.focusedIndexIn(rows), 1)
+            compare(Hint.focusedIndexIn([{ isFocused: false }]), -1)
+            compare(Hint.focusedIndexIn(null), -1)
+        }
+
+        // ---- swap direction --------------------------------------------
+        function test_switchDirection_followsTheWorkspaceMove() {
+            compare(Hint.switchDirection({
+                activeWorkspacePosition: 3, previousActiveWorkspacePosition: 2
+            }), 1)
+            compare(Hint.switchDirection({
+                activeWorkspacePosition: 1, previousActiveWorkspacePosition: 3
+            }), -1)
+        }
+
+        function test_switchDirection_isZeroWhenThereWasNoMove() {
+            // A title edit on the same workspace republishes the snapshot without
+            // moving; an un-aimed animation there would be motion for its own
+            // sake, so the list commits straight away.
+            compare(Hint.switchDirection({
+                activeWorkspacePosition: 2, previousActiveWorkspacePosition: 2
+            }), 0)
+            // A first snapshot reports -1 for the previous position, which is
+            // indistinguishable from "unknown" - and 0 is the right answer.
+            compare(Hint.switchDirection({
+                activeWorkspacePosition: 2, previousActiveWorkspacePosition: -1
+            }), 0)
+            compare(Hint.switchDirection({}), 0)
+            compare(Hint.switchDirection(null), 0)
         }
 
         // ---- what the menu deliberately does not build -------------------

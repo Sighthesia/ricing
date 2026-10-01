@@ -636,6 +636,16 @@ PanelWindow {
                 && String(root.currentIntent.kind || "") === "context")
             return
 
+        // A tray delegate re-publishes its intent when the strip moves under it,
+        // and HoverHandler reports hovered for a frame after a fast crossing, so
+        // the icon the pointer just left could otherwise swap the popup back
+        // mid-slide. Tray owns that rule: republishHoveredAnchor only speaks for
+        // the delegate that currently holds the hover. Deliberately NOT
+        // re-guarded here - rejecting a differing delegateKey while an exchange
+        // is committed also rejected the pointer legitimately landing on the
+        // next icon, which is the normal fast switch, and made every hop feel
+        // late.
+
         // A new intent revives the live host before replacement is evaluated.
         // This prevents a pending close from racing the single popup instance.
         cancelClose()
@@ -950,13 +960,14 @@ PanelWindow {
     }
 
     // Popup width follows the intent: media carries a wide card (cover +
-    // identity + spectrum) and the window hint carries a workspace strip plus
-    // window titles, so both are wider than the classic 260 column.
+    // identity + spectrum) and the window hint carries three columns of window
+    // titles, so both are wider than the classic 260 column. The hint's 540 has
+    // to match BarWindowHintContent's own implicitWidth, or the body is clipped.
     function popupWidthForIntent(intentObj) {
         if (!intentObj || String(intentObj.kind || "") === "context")
             return 260
         var kind = String(intentObj.actionKind || "")
-        return kind === "media" ? 420 : (kind === "window-hint" ? 360 : 260)
+        return kind === "media" ? 420 : (kind === "window-hint" ? 540 : 260)
     }
 
     // Slot width fits both sliding layers during an exchange so the
