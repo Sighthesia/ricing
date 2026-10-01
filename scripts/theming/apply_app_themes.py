@@ -21,12 +21,16 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import json
 import subprocess
 import sys
 from pathlib import Path
 
 PROCESSOR = Path(__file__).resolve().parent / "template-processor.py"
 DEFAULT_CONFIG = Path(__file__).resolve().parent / "templates" / "app-themes.toml"
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lib.renderer import _atomic_write  # noqa: E402  (needs the path above)
 
 
 def parse_args() -> argparse.Namespace:
@@ -317,6 +321,44 @@ def run_hooks(mode: str) -> None:
             print(f"Warning: kitty reload failed: {e}", file=sys.stderr)
 
 
+def pin_opencode_theme_mode(home: Path, mode: str) -> bool:
+    """Mirror the active desktop mode into both variants of the opencode theme.
+
+    The generated theme carries a light and a dark variant, and opencode picks
+    between them at startup from the terminal's reported background. That query
+    does not survive a terminal multiplexer: run opencode under herdr and no
+    answer comes back, so opencode settles on one variant for the whole session
+    and a desktop light/dark switch never reaches it.
+
+    This pipeline already knows the desktop's mode — it is the `--mode` the
+    shell resolved — so write that mode into both slots. Whichever variant
+    opencode picks is then the one the desktop is actually showing, and the
+    next apply (the shell re-applies on every mode change) carries it across.
+
+    Returns True when the file changed. Only the legacy dual-variant layout is
+    touched; anything else is left alone.
+    """
+    path = home / ".config/opencode/themes/Afloat.json"
+    try:
+        theme = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return False
+    tokens = theme.get("theme")
+    if not isinstance(tokens, dict):
+        return False
+    other = "light" if mode == "dark" else "dark"
+    changed = False
+    for value in tokens.values():
+        if (isinstance(value, dict) and mode in value and other in value
+                and value[mode] != value[other]):
+            value[other] = value[mode]
+            changed = True
+    if not changed:
+        return False
+    _atomic_write(path, json.dumps(theme, indent=2) + "\n")
+    return True
+
+
 def main() -> int:
     args = parse_args()
 
@@ -383,6 +425,7 @@ def main() -> int:
     sync_kitty_clear_text(home, args.terminal_clear_text)
     sync_kde_theme(home)
     sync_niri_config(home)
+    pin_opencode_theme_mode(home, args.mode)
 
     if args.home_prefix is None:
         notify_kde_theme()

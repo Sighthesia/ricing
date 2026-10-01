@@ -376,6 +376,30 @@ def test_diff_lines_are_visibly_highlighted(sandbox):
             )
 
 
+def test_opencode_theme_follows_the_desktop_mode(sandbox):
+    """Both variants must carry the desktop's mode, not the palette's two.
+
+    opencode chooses between the light and dark variant at startup from the
+    terminal's reported background, and that query does not survive a terminal
+    multiplexer — so it can settle on the wrong one and never notice a desktop
+    switch. The pipeline knows the mode, so it writes it into both slots.
+    """
+    tmp, palette = sandbox
+    home = tmp / "home"
+
+    assert run_apply(palette, "light", home).returncode == 0
+    theme = json.loads((home / ".config/opencode/themes/Afloat.json").read_text())["theme"]
+    assert theme["background"]["light"] == theme["background"]["dark"]
+    assert theme["text"]["light"] == theme["text"]["dark"]
+    assert theme["text"]["light"] == "#4c4f69", theme["text"]["light"]
+
+    assert run_apply(palette, "dark", home).returncode == 0
+    theme = json.loads((home / ".config/opencode/themes/Afloat.json").read_text())["theme"]
+    assert theme["background"]["dark"] == theme["background"]["light"]
+    assert theme["text"]["dark"] == theme["text"]["light"]
+    assert theme["text"]["dark"] == "#cdd6f4", theme["text"]["dark"]
+
+
 def test_generated_files_are_replaced_atomically(sandbox):
     """A live reader must never catch a half-written theme file.
 
@@ -398,34 +422,27 @@ def test_generated_files_are_replaced_atomically(sandbox):
     assert [p.name for p in target.parent.iterdir() if p.name.endswith(".tmp")] == []
 
 
-def test_opencode_dual_variant(sandbox):
-    import json as _json
+def test_opencode_theme_tokens_are_real_colours(sandbox):
     tmp, palette = sandbox
     home = tmp / "home"
-    # Light apply must still carry the dark variant (opencode picks at runtime).
     assert run_apply(palette, "light", home).returncode == 0
-    rendered = (home / ".config/opencode/themes/Afloat.json").read_text()
-    theme = _json.loads(rendered)
-    text = theme["theme"]["text"]
-    assert text["light"] == "#4c4f69", text
-    assert text["dark"] == "#cdd6f4", text
+    theme = json.loads((home / ".config/opencode/themes/Afloat.json").read_text())["theme"]
+
     # Every token must be a real colour. opencode only understands a hex,
     # "transparent", or a reference to another token: anything else (the old
     # "none") makes it substitute a near-black plate of its own, which in
     # light mode is dark text on a dark plate and the UI goes unreadable.
-    for token, value in theme["theme"].items():
+    for token, value in theme.items():
         assert isinstance(value, dict), (token, value)
         for variant, colour in value.items():
             assert re.fullmatch(r"#[0-9a-fA-F]{6}", colour), (token, colour)
     # The window surface tracks the terminal background (kitty renders
     # colors.surface), so opencode still reads as one piece with the terminal.
-    assert theme["theme"]["background"]["light"] == _kitty_background(home)
-    # Dark apply keeps the light variant too: the dual-variant file is
-    # mode-independent, so the bytes must not move.
+    assert theme["background"]["light"] == _kitty_background(home)
+
     assert run_apply(palette, "dark", home).returncode == 0
-    assert (home / ".config/opencode/themes/Afloat.json").read_text() == rendered
-    theme = _json.loads(rendered)
-    assert theme["theme"]["background"]["dark"] == _kitty_background(home)
+    theme = json.loads((home / ".config/opencode/themes/Afloat.json").read_text())["theme"]
+    assert theme["background"]["dark"] == _kitty_background(home)
 
 
 def test_herdr_snippet(sandbox):
