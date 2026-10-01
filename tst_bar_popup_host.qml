@@ -12,6 +12,8 @@ Item {
     property int _failures: 0
     property int _checks: 0
     property var _contextCallbackArgs: []
+    property string _settleLabel: ""
+    property var _settleNext: null
 
     function check(label, actual, expected) {
         root._checks += 1
@@ -45,6 +47,30 @@ Item {
         var op = root.layerOpacity()
         root.check(label + " sidebar opaque", op.sidebar, 1)
         root.check(label + " content opaque", op.content, 1)
+    }
+
+    // The geometry glide can be re-armed by a deferred post-exchange rebase that
+    // flushes when the reveal finishes, so a single fixed wait no longer
+    // guarantees it has settled. Poll for the real resting state.
+    property int _settleWaits: 0
+    function settleGlideThen(label, next) {
+        root._settleWaits += 1
+        if (host.transitionProgress >= 0.999 || root._settleWaits > 40) {
+            root._settleWaits = 0
+            root.check(label, host.transitionProgress, 1)
+            if (next)
+                next()
+            return
+        }
+        settlePoll.restart()
+    }
+
+    Timer {
+        id: settlePoll
+        interval: 40
+        onTriggered: {
+            settleGlideThen(root._settleLabel, root._settleNext)
+        }
     }
 
     function findByName(item, name) {
@@ -93,8 +119,9 @@ Item {
             root.check("open hover-to-context replacement applies latest current", host.currentIntent.widgetId, "context-open")
             root.check("open hover-to-context replacement clears pending", host.pendingIntent, null)
             root.check("open hover-to-context replacement keeps host open", host.open, true)
-            root.check("glide settles at progress 1", host.transitionProgress, 1)
-            root.checkOpaque("hover-to-context settle")
+            root._settleLabel = "glide settles at progress 1"
+            root._settleNext = function() { root.checkOpaque("hover-to-context settle") }
+            settleGlideThen(root._settleLabel, root._settleNext)
             root.checkClose("hover-to-context display settles on target X", host.displayX, host.targetX)
             root.checkClose("hover-to-context display settles on target W", host.displayWidth, host.targetWidth)
             root._contextCallbackArgs = []
@@ -320,7 +347,9 @@ Item {
                 host.intent.widgetId, "clock-latest")
             root.check("context close clears pending immediately", host.pendingIntent, null)
             root.check("context close keeps surface through exit", host.surfaceActive, true)
-            root.check("context close settles progress", host.transitionProgress, 1)
+            root._settleLabel = "context close settles progress"
+            root._settleNext = null
+            settleGlideThen(root._settleLabel, null)
             root.checkOpaque("context close keeps layers opaque")
             root.check("context close stops close timer", host.closeTimerRunning, false)
             root.check("context close starts exit cleanup", host.debugSnapshot().host.clearTimer, true)
@@ -492,12 +521,16 @@ Item {
                 traySlot.clip, true)
             root.check("tray switch tracks one painted panel width",
                 host._contentSlideDistance, host.popupSlotWidth)
+            // Reaching 1 is not the end of the exchange: the outgoing layer is
+            // still mounted, so the bound must still hold.
             host.contentSlideProgress = 1
-            root.check("settled tray switch restores the input canvas",
-                traySlot.width, host.popupContentWidth)
-            root.check("settled tray switch rests both bodies at the origin",
+            root.check("finished slide keeps the bound while outgoing is mounted",
+                traySlot.width, host.paintedPanelWidth)
+            root.check("finished slide rests the incoming body at the origin",
                 trayInBody.x, 0)
             host.settleContentSlide()
+            root.check("torn-down exchange restores the input canvas",
+                traySlot.width, host.popupContentWidth)
             // Moving back left mirrors the track.
             host.updateIntent({
                 widgetId: "tray", instanceKey: "tray:0", kind: "hover",
@@ -541,6 +574,69 @@ Item {
                 cascadeSlot.width, host.popupSlotWidth)
             host.contentSlideProgress = 1
             host.settleContentSlide()
+            // Regression: the exact frame the slide reaches 1 but the outgoing
+            // layer has not been torn down yet. Releasing the bound on progress
+            // alone let the still-mounted outgoing body paint at full offset for
+            // one frame - a tray menu whose rows have not loaded yet, so empty
+            // cards floating to the right of the panel with nothing behind them.
+            host.updateIntent({
+                widgetId: "tray", instanceKey: "tray:2", kind: "hover",
+                title: "App E", actionKind: "tray", delegateKey: "sni-e",
+                anchorX: 500, screenWidth: 1000, screenHeight: 800,
+                effectiveBarHeight: 48, barPosition: "top", payload: {}
+            })
+            host.transitionProgress = 0.5
+            host.contentSlideProgress = 1
+            var gapSlot = root.findByName(host.popupItem, "popupContentSlot")
+            var gapOut = root.findByName(host.popupItem, "popupActionsOutgoing")
+            root.check("outgoing layer is still mounted at progress 1",
+                gapOut.visible, true)
+            root.check("tear-down gap keeps the slot bounded to the panel",
+                gapSlot.width, host.paintedPanelWidth)
+            // The outgoing body is at full offset, entirely outside the narrowed
+            // slot, so the slot's clip is what keeps it off the desktop.
+            root.check("tear-down gap keeps the slot clipped",
+                gapSlot.clip, true)
+            root.check("tear-down gap leaves the outgoing body fully clipped away",
+                gapOut.x >= gapSlot.width - 0.5, true)
+            host.settleContentSlide()
+            root.check("settling releases the bound",
+                gapSlot.width, host.popupContentWidth)
+
+            // Regression: a body that has not been measured yet must not
+            // collapse the slot to 1px while still painting at full height.
+            // A context menu's column only exists once it is on screen, and a
+            // tray menu awaits an async DBus fetch, so the window where the
+            // slot reads 0 is exactly the window where the menu renders outside
+            // its own clip - the whole menu appearing under the panel it was
+            // replacing.
+            var measureSlot = root.findByName(host.popupItem, "popupContentSlot")
+            var measuredNow = host.measuredContentHeight(host.currentIntent)
+            root.check("a measured body reports a real height", measuredNow > 1, true)
+            root.check("measured height reaches the slot", measureSlot.height > 1, true)
+            host._lastMeasuredHeight = measuredNow
+            // Simulate the unmeasured window: the body measures 0 but stays
+            // mounted, which is what a pending tray fetch looks like.
+            var ctxBody = root.findByName(host.popupItem, "contextPopupActions")
+            // The content fix makes height independent of `visible`, so a hidden
+            // context body still measures its real height - that independence is
+            // what broke the measurement/drawing cycle. Assert it directly.
+            var heightWhenHidden = ctxBody.implicitHeight
+            root.check("context body height does not depend on visible",
+                heightWhenHidden > 1, true)
+            ctxBody.visible = false
+            root.check("hidden context body keeps its measured height",
+                ctxBody.implicitHeight > 1, true)
+            ctxBody.visible = true
+            // And with no measurement available at all, the slot holds the last
+            // real height instead of collapsing to 1px.
+            var heldBefore = host.popupHeightForIntent(host.currentIntent)
+            host._lastMeasuredHeight = 260
+            root.check("empty measurement holds the last real height",
+                host.popupHeightForIntent(null), 260)
+            root.check("a real measurement wins over the held height",
+                heldBefore, measuredNow)
+
             // Regression: a hop between bodies of DIFFERENT widths. The slot was
             // bounded to the wider of the two, so on media(420) -> tray(260) the
             // incoming tray face started one 420px track out and painted 160px

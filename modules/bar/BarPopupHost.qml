@@ -188,6 +188,11 @@ PanelWindow {
     // pointer focus. _mapChurn only counts surface visibility, so it reported a
     // stable "1" while the region was in fact sweeping 260 -> 504.
     property int _regionCommits: 0
+    // Last content height that was actually measured. A body whose rows have not
+    // been measured yet reports 0, and collapsing the slot to 1px in that window
+    // let a still-painting menu render outside its own clip. Holding the last
+    // real height keeps the clip sized to the content until a new one arrives.
+    property real _lastMeasuredHeight: 0
     // The input region's rect in viewport coordinates, latched as one value per
     // commit. Assigning an object swaps all four geometry properties at once,
     // which is one region re-commit instead of four.
@@ -973,19 +978,44 @@ PanelWindow {
     // narrows to the painted panel for exactly this window and is the full input
     // canvas again the moment the slide settles, which is also before a tray
     // submenu can be summoned - so the catcher never loses its ancestors.
+    // Stays true for as long as EITHER body is off its resting position. Slide
+    // progress alone is one frame too early: reaching 1 releases the bound, but
+    // the outgoing body stays `visible` until settleContentSlide() clears its
+    // intent in the same turn's aftermath. That gap put the still-mounted
+    // outgoing body - a tray menu whose rows have not arrived yet, so empty
+    // cards - back on screen at full offset for a single frame, floating beside
+    // the panel with nothing behind it. Track the mounted outgoing layer too.
     readonly property bool contentBodiesDisplaced: root._exchangeCommitted
-            && root.contentSlideProgress < 1
+            && (root.contentSlideProgress < 1 || root._transitionOutgoingIntent !== null)
 
-    function popupHeightForIntent(intentObj) {        if (!intentObj)
-            return 1
-        // Track live height even while the two-layer reveal is in flight:
-        // holding a stale height here defers the correction until after
-        // full expansion, which reads as a second jump once already open.
-        // Late arrivals glide concurrently via rebaseGlide in
-        // retargetGeometry, so no post-reveal motion remains.
+    // Pure: read from the content slot's implicitHeight BINDING, so it must not
+    // write state. Writing from here re-enters the binding, which restarts the
+    // geometry glide and leaves transitionProgress short of 1.
+    function measuredContentHeight(intentObj) {
+        if (!intentObj)
+            return 0
         var height = String(intentObj.kind || "") === "context"
                 ? contextPopupActions.implicitHeight : popupActions.implicitHeight
-        return isFinite(Number(height)) && Number(height) > 0 ? Number(height) : 1
+        return Number(height) || 0
+    }
+
+    // A body whose rows have not arrived yet measures 0 - a tray menu awaits an
+    // async DBus fetch, a context menu's own column only exists once it is on
+    // screen. Collapsing the slot to 1px in that window let the body go on
+    // painting its full height OUTSIDE its own clip, which is the whole menu
+    // appearing under or beside the panel for a frame. Hold the last real height
+    // until a measured one arrives instead; only a genuinely empty host uses 1.
+    function popupHeightForIntent(intentObj) {
+        var height = root.measuredContentHeight(intentObj)
+        if (height > 0)
+            return height
+        return root._lastMeasuredHeight > 0 ? root._lastMeasuredHeight : 1
+    }
+
+    function noteMeasuredHeight() {
+        var height = root.measuredContentHeight(root.currentIntent)
+        if (height > 0)
+            root._lastMeasuredHeight = height
     }
 
     function targetGeometryFor(intentObj, width, height) {
@@ -1029,6 +1059,9 @@ PanelWindow {
     }
 
     function computeAndCommitTargets(intentObj) {
+        // A body can finish measuring without the slot's own height changing, so
+        // latch here as well; every geometry commit already runs off the binding.
+        root.noteMeasuredHeight()
         var trayContent = popupActions ? popupActions.trayMenuContent : null
         var trayExtraWidth = trayContent ? Number(trayContent.extraWidth) : 0
         var displayedIntent = root.currentIntent || intentObj
@@ -1755,7 +1788,13 @@ PanelWindow {
                     // otherwise the sliding layers paint past the slot edge.
                     clip: root._transitionOutgoingIntent !== null || !root.traySubmenuOverflowActive
                      enabled: root.contentInteractive
-                     onImplicitHeightChanged: root.updateTargetGeometry(root.currentIntent)
+                     onImplicitHeightChanged: {
+                         // Record first: this handler is outside the implicitHeight
+                         // binding, so it is the safe place to latch the value the
+                         // binding will fall back on while rows are still missing.
+                         root.noteMeasuredHeight()
+                         root.updateTargetGeometry(root.currentIntent)
+                     }
                      onImplicitWidthChanged: root.updateTargetGeometry(root.currentIntent)
 
                     // Settings section-block surface under the action rows; the

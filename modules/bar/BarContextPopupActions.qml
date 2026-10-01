@@ -17,7 +17,14 @@ Item {
     signal actionRequested(string action)
 
     implicitWidth: 260
-    implicitHeight: root.visible ? actionColumn.implicitHeight + 16 : 0
+    // Height is a property of the CONTENT, never of whether this item happens to
+    // be on screen. Deriving it from `visible` made measurement and drawing
+    // mutually dependent: the host installs a context intent and reads this
+    // height in the same turn, and `visible` (driven by `actionKind`) had not
+    // flipped yet, so the read returned 0. The host fell back to a 1px slot
+    // while this body went on painting in full - the whole context menu appeared
+    // outside its own clip, stacked under the menu it was replacing.
+    implicitHeight: actionColumn.implicitHeight + 16
     visible: root.actionKind === "context"
     // Empty-area menus carry no widget identity; widget rows need one.
     readonly property bool hasWidgetTarget: root.instanceKey !== ""
