@@ -302,6 +302,55 @@ def _kitty_background(home: Path) -> str:
     return match.group(1)
 
 
+def _relative_luminance(colour: str) -> float:
+    channels = [int(colour[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    linear = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def _contrast(a: str, b: str) -> float:
+    la, lb = _relative_luminance(a), _relative_luminance(b)
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+
+
+# Roles that paint surfaces, rules, borders or focus plates rather than text.
+# They are meant to sit back, so they are exempt from the text contrast floor.
+_DECORATIVE = {
+    "background", "backgroundPanel", "backgroundElement",
+    "border", "borderActive", "borderSubtle",
+    "diffAddedBg", "diffRemovedBg", "diffContextBg",
+    "diffAddedLineNumberBg", "diffRemovedLineNumberBg",
+    "markdownHorizontalRule",
+}
+
+
+def test_opencode_theme_text_is_readable_in_both_modes(sandbox):
+    """Every colour opencode paints as text must clear 4.5:1 on its panel.
+
+    Material's light tones assume a near-neutral surface. This palette's light
+    surface is a strongly tinted pink, so the stock light accents land at
+    2.5-3.8:1 on it — headings, bullets, links, code and the footer all wash
+    out. The template darkens the light accents to compensate; this locks the
+    result in so a palette change cannot quietly reintroduce it.
+    """
+    import json as _json
+    tmp, palette = sandbox
+    home = tmp / "home"
+    assert run_apply(palette, "light", home).returncode == 0
+    theme = _json.loads((home / ".config/opencode/themes/Afloat.json").read_text())["theme"]
+
+    for mode in ("light", "dark"):
+        for backdrop in ("background", "backgroundPanel", "backgroundElement"):
+            surface = theme[backdrop][mode]
+            for token, value in sorted(theme.items()):
+                if token in _DECORATIVE:
+                    continue
+                ratio = _contrast(value[mode], surface)
+                assert ratio >= 4.5, (
+                    f"{mode} {token} {value[mode]} on {backdrop} {surface} = {ratio:.2f}:1"
+                )
+
+
 def test_generated_files_are_replaced_atomically(sandbox):
     """A live reader must never catch a half-written theme file.
 
