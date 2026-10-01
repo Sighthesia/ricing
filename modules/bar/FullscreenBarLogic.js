@@ -22,16 +22,14 @@ var revealArmSlack = 2
 
 // Collapse again after this long without pointer movement.
 //
-// Zero: leaving the bar already collapses it immediately (a `leave` event sets
-// the state directly, without consulting this). A positive delay therefore only
-// ever governed one case — the pointer parked on the bar, not moving — where it
-// read as sluggishness rather than intent, because a still mouse is exactly when
-// a user is looking at the bar, not when they want it gone.
+// This is a SAFETY NET, not the normal path. Leaving the bar collapses it at
+// once via a `leave` event, which sets the state directly without consulting
+// this. So the delay only applies while the pointer is somewhere that never
+// produces a leave — a surface that kept its hover, or a pointer that arrived
+// before the bar was listening.
 //
-// Kept as a named value rather than inlined: TopBar needs a non-zero Timer
-// interval to stay event-driven, and it derives the smallest usable tick from
-// this so the two cannot drift apart.
-var idleHideDelay = 0
+// It stays deliberately small: the whole point of the delay is to not delay.
+var idleHideDelay = 200
 
 // Smallest non-zero interval to hand a Timer. A Timer with interval 0 is
 // not "immediate", it is a per-event-loop spin.
@@ -44,6 +42,7 @@ function initialState() {
         pinned: false,
         revealed: true,
         armed: true,
+        hovered: false,
     }
 }
 
@@ -54,6 +53,7 @@ function _copy(state) {
         pinned: !!state.pinned,
         revealed: !!state.revealed,
         armed: !!state.armed,
+        hovered: !!state.hovered,
     }
 }
 
@@ -72,7 +72,7 @@ function _settle(state) {
 }
 
 // events: { type: "fullscreen" | "enabled" | "pinned" | "enter" | "leave" |
-//           "move" | "idle" | "reset", value, distance, slack }
+//           "move" | "hover" | "idle" | "reset", value, distance, slack }
 function reduce(state, event) {
     var next = _copy(state || initialState())
     const type = event && event.type ? String(event.type) : ""
@@ -112,6 +112,7 @@ function reduce(state, event) {
     }
 
     if (type === "enter") {
+        next.hovered = true
         if (next.armed) {
             next.revealed = true
             next.armed = false
@@ -120,6 +121,7 @@ function reduce(state, event) {
     }
 
     if (type === "leave") {
+        next.hovered = false
         if (!forcedVisible(next))
             next.revealed = false
         next.armed = true
@@ -136,7 +138,21 @@ function reduce(state, event) {
         return _settle(next)
     }
 
+    // The pointer entered or left the bar without the caller distinguishing
+    // which, so hover can be tracked without the caller reasoning about it.
+    if (type === "hover") {
+        next.hovered = event.value === true
+        return _settle(next)
+    }
+
     if (type === "idle") {
+        // Ignore the idle collapse while the pointer is on the bar. Moving the
+        // mouse restarts the caller's timer, so with a short delay the bar would
+        // collapse a frame after every move and `leave` would reveal it again —
+        // the bar would strobe under a stationary cursor. Hovering the bar is the
+        // user looking at it, which is the one thing that must never hide it.
+        if (next.hovered)
+            return _settle(next)
         if (!forcedVisible(next)) {
             next.revealed = false
             next.armed = false

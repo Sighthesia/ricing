@@ -13,7 +13,8 @@ Item {
                 fullscreen: true,
                 pinned: false,
                 revealed: false,
-                armed: true
+                armed: true,
+                hovered: false
             }
             for (var key in overrides || {})
                 state[key] = overrides[key]
@@ -190,24 +191,79 @@ Item {
             compare(Logic.revealStripHeight, 3)
         }
 
-        function test_idleDelayIsImmediateButTimerIntervalIsUsable() {
-            // Leaving the bar already collapses it at once, so the idle fallback
-            // must not add a perceptible wait on top of that.
-            compare(Logic.idleHideDelay, 0)
+        function test_idleDelayIsShortButTimerIntervalIsUsable() {
+            // The idle path is a safety net for a missing `leave`, not the
+            // normal collapse, so it must stay small.
+            verify(Logic.idleHideDelay > 0 && Logic.idleHideDelay <= 500,
+                "idle delay is a safety net, not a hold")
             // A Timer with interval 0 spins once per event-loop turn instead of
             // firing once, so the tick handed to a Timer must stay positive.
             verify(Logic.minTimerInterval > 0)
         }
 
-        // The behaviour the zero delay is there to produce: pointer motion never
-        // leaves the bar waiting, whether it stays or leaves.
+        // The behaviour that makes leaving immediate: no idle event needed.
         function test_barCollapsesOnLeaveWithoutWaiting() {
-            var revealed = apply(Logic.initialState(), "fullscreen", false)
-            revealed = apply(hidden({ revealed: true, armed: false }), "enter")
+            var revealed = apply(hidden({ revealed: true, armed: false }), "enter")
             compare(revealed.revealed, true)
-            // No idle event in between: leaving is enough on its own.
-            var left = apply(revealed, "leave")
-            compare(left.revealed, false)
+            compare(apply(revealed, "leave").revealed, false)
+        }
+
+        // The regression: a timer firing underneath a resting cursor made the bar
+        // strobe. Moving the mouse over the bar must never hide it, because the
+        // cursor moving is the user reading the bar, not dismissing it.
+        function test_idleNeverHidesTheBarWhileHovered() {
+            var onBar = apply(hidden({ revealed: true, armed: false }), "enter")
+            compare(onBar.hovered, true)
+            // Move across the bar, as a user does before clicking anything.
+            var moved = apply(onBar, "move", undefined, 20)
+            var afterMoves = apply(moved, "idle")
+            compare(afterMoves.revealed, true,
+                "hovering and moving must not collapse the bar")
+            compare(afterMoves.revealed, apply(moved, "idle").revealed,
+                "repeated idle events under the cursor are stable")
+        }
+
+        function test_strobingUnderACursorCannotOccur() {
+            // The loop that produced the flapping: the bar is shown and the
+            // pointer is on it, and mouse movement keeps re-arming a collapse
+            // that then re-reveals. Armed starts false because a reveal already
+            // consumed it; that is the state the flapping actually happened in.
+            var state = hidden({ revealed: true, armed: false, hovered: true })
+            for (var i = 0; i < 5; i++) {
+                state = apply(state, "move", undefined, 10 + i)
+                state = apply(state, "idle")
+                compare(state.revealed, true,
+                    "no collapse without a leave, pass " + i)
+            }
+            // Leaving once still collapses it: the guard is hover, not a veto.
+            state = apply(state, "leave")
+            compare(state.revealed, false, "a real leave still collapses")
+        }
+
+        function test_idleStillHidesWhenNotHovered() {
+            // The safety net must still do its job when no hover is holding the
+            // bar: shown, fullscreen, and nobody touching it.
+            var shown = hidden({ revealed: true, armed: false })
+            compare(apply(shown, "idle").revealed, false,
+                "idle collapses a bar no hover is holding")
+        }
+
+        function test_hoverEventTracksTheFlagWithoutSideEffects() {
+            var state = apply(hidden({ revealed: true, armed: false }), "hover", true)
+            compare(state.hovered, true)
+            // Tracking hover must not itself reveal or collapse.
+            compare(state.revealed, true)
+            compare(apply(state, "hover", false).hovered, false)
+        }
+
+        function test_leaveClearsHoverSoTheNextIdleCanFire() {
+            var onBar = apply(hidden({ revealed: true, armed: false }), "enter")
+            compare(onBar.hovered, true)
+            // After leaving, hover is false and an idle event must be able to
+            // collapse again — otherwise the flag would strand the bar shown.
+            var off = apply(onBar, "leave")
+            compare(off.hovered, false)
+            compare(off.armed, true)
         }
 
         // The collapse path must be able to summon the bar back without a

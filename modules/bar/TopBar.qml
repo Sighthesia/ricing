@@ -4,7 +4,6 @@ import Quickshell.Wayland
 import "../lazerbar"
 import "../lazerbar/ScreenCornerMask.js" as CornerMask
 import "./FullscreenBarLogic.js" as RevealLogic
-import "./WindowHintMenuLogic.js" as HintMenu
 import "../../services" as Services
 
 // Mount the layout-driven bar plus the launcher wave owner per screen.
@@ -34,6 +33,14 @@ Variants {
         // Output identity, for effects that must only answer on their own
         // screen (the bar's glow pulse, for one).
         readonly property string screenName: screenScope.modelData ? String(screenScope.modelData.name || "") : ""
+        // Where this output sits in the virtual desktop, and where the bar
+        // window sits on it. The glow ring is shared in screen coordinates, and
+        // `mapToGlobal` is per-window, so both have to be stated here rather
+        // than measured inside a widget.
+        readonly property real screenX: screenScope.modelData ? Number(screenScope.modelData.x || 0) : 0
+        readonly property real screenY: screenScope.modelData ? Number(screenScope.modelData.y || 0) : 0
+        readonly property real barWindowX: screenX + screenScope.floatingMargin
+        readonly property real barWindowY: screenY + (screenScope.atTop ? screenScope.floatingMargin : 0)
         readonly property bool autoHideEnabled: Services.SettingsService.bar.autoHideFullscreen === true
         // Per-output: a fullscreen window on a background workspace of another
         // monitor must not collapse this screen's bar.
@@ -114,12 +121,11 @@ Variants {
                 instanceKey: "hint:" + (screenScope.modelData ? String(screenScope.modelData.name || "") : ""),
                 kind: "hover",
                 actionKind: "window-hint",
-                title: HintMenu.identityTitle(hint),
-                // The focused window's own icon carries the header, so the
-                // identity stays true to what the menu is listing.
-                iconSource: hint.currentWindowIcon || "",
-                tintIcon: false,
-                summary: HintMenu.identitySummary(hint),
+                // Body-only: the panel is just the window list, so the host
+                // collapses its identity rail to nothing. The bar already
+                // reports the active workspace and the rows are countable, so a
+                // header here would only restate the screen.
+                noIdentity: true,
                 anchorX: barContent.hintAnchorX(),
                 screenWidth: screenScope.modelData ? Number(screenScope.modelData.width) : 1920,
                 screenHeight: screenScope.modelData ? Number(screenScope.modelData.height) : 1080,
@@ -128,11 +134,8 @@ Variants {
                 floatingMargin: screenScope.floatingMargin,
                 payload: {
                     hint: hint,
-                    // niri owns workspace and window activation. The route
-                    // matches the workspace widget's own chips.
-                    onHintWorkspace: index => Quickshell.execDetached([
-                        "niri", "msg", "action", "focus-workspace", String(index)
-                    ]),
+                    // niri owns window activation; the route matches the
+                    // workspace widget's own window chips.
                     onHintWindow: windowId => Quickshell.execDetached([
                         "niri", "msg", "action", "focus-window", "--id", String(windowId)
                     ])
@@ -192,7 +195,11 @@ Variants {
                 if (type !== "leave")
                     _revealState = RevealLogic.rearmAfterCollapse(_revealState, _pointerDistance)
             } else if (next.revealed && !wasRevealed) {
-                _hideTimer.restart()
+                // Arm the safety net only when the pointer is not on the bar.
+                // While it is, `leave` owns the collapse, and a timer racing the
+                // cursor makes the bar strobe.
+                if (!next.hovered)
+                    _hideTimer.restart()
             }
         }
 
@@ -240,16 +247,17 @@ Variants {
             _pointerDistance = -1
         }
 
-        // Collapse again after a pause, but never out from under an open popup.
-        //
-        // `idleHideDelay` is 0 — leaving the bar already collapses it at once.
-        // A Timer cannot express that directly (interval 0 is a per-turn spin,
-        // not an immediate fire), so fall back to the smallest real tick.
+        // Safety net only. Leaving the bar collapses it at once via a `leave`
+        // event; this covers the case where no leave ever arrives (the pointer
+        // arrived before the surface was listening, or the hover was never
+        // established). It is deliberately not armed while the pointer is on the
+        // bar — a timer firing under a resting cursor made the bar strobe.
         Timer {
             id: _hideTimer
             interval: Math.max(RevealLogic.minTimerInterval, RevealLogic.idleHideDelay)
             onTriggered: {
-                if (!screenScope.revealed || !screenScope.fullscreenActive || screenScope._pinned)
+                if (!screenScope.revealed || !screenScope.fullscreenActive
+                        || screenScope._pinned || screenScope._revealState.hovered)
                     return
                 screenScope._sendReveal("idle")
             }
@@ -277,7 +285,8 @@ Variants {
         // while the pin held it open, so nothing else will collapse it.
         on_PinnedChanged: {
             _sendReveal("pinned", _pinned)
-            if (!_pinned && screenScope.revealed && screenScope.fullscreenActive)
+            if (!_pinned && screenScope.revealed && screenScope.fullscreenActive
+                    && !screenScope._revealState.hovered)
                 _hideTimer.restart()
         }
 
@@ -429,45 +438,24 @@ Variants {
                     Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
                 }
 
-                // The pre-lazer full-screen ripple, re-hosted: the ring, its
-                // luminous core and the afterglow band sweep across this bar
-                // strip instead of the whole display, clipped to the strip.
-                // Painted under the widgets so the sweep lights the bar's own
-                // surface and the glyphs stay legible on top of it.
+                // The shell's single glow pulse, hosted on the bar: the same
+                // heavy ring and its two soft bands the notification card
+                // plays, swept across this strip instead of the whole display
+                // and clipped to it. Painted under the widgets so the sweep
+                // lights the bar's own surface and the glyphs stay legible.
                 RippleGlow {
                     id: barGlow
 
                     anchors.fill: parent
+                    pulse: Services.RipplePulseService
+                    screenName: screenScope.screenName
+                    screenWidth: Number(screenScope.modelData ? screenScope.modelData.width : 0)
+                    screenHeight: Number(screenScope.modelData ? screenScope.modelData.height : 0)
+                    // The glow fills the bar window, so the window's own place
+                    // on the output is also this item's place on it.
+                    hostScreenX: screenScope.barWindowX
+                    hostScreenY: screenScope.barWindowY
                     glowEnabled: Services.SettingsService.appearance.ripplePulseEnabled !== false
-                    originXRatio: 0.5
-                    originYRatio: 0.5
-
-                    // A pulse published for another screen is not ours to
-                    // play; a screen-agnostic one (a notification) is.
-                    function playPulse() {
-                        if (!Services.RipplePulseService.matchesScreen(screenScope.screenName))
-                            return
-                        originXRatio = Services.RipplePulseService.pulseOriginXRatio
-                        play()
-                    }
-
-                    Connections {
-                        target: Services.RipplePulseService
-                        function onTokenChanged() { barGlow.playPulse() }
-                    }
-
-                    // A notification is not a bar event, so it is announced on
-                    // the notification service instead of the pulse bus. The
-                    // sweep starts on the side the card flies in from.
-                    Connections {
-                        target: Services.NotificationService
-                        function onPopupArrived() {
-                            if (!Services.SettingsService.appearance.ripplePulseEnabled)
-                                return
-                            barGlow.originXRatio = Services.NotificationService.notificationRight ? 0.82 : 0.18
-                            barGlow.play()
-                        }
-                    }
                 }
 
                 // The screen bezel corners this bar physically covers. The bezel's
@@ -493,7 +481,9 @@ Variants {
                 BarContent {
                     id: barContent
                     anchors.fill: parent
-                    screenName: screenScope.modelData ? String(screenScope.modelData.name || "") : ""
+                    screenName: screenScope.screenName
+                    screenX: screenScope.barWindowX
+                    screenY: screenScope.barWindowY
 
                     // While mod is held the hint owns the popup, so a widget's own hover traffic
                     // must not reach the host. Two reasons, both observable:
@@ -590,7 +580,10 @@ Variants {
                 onHoveredChanged: {
                     if (hovered) {
                         screenScope._sendReveal("enter")
-                        _hideTimer.restart()
+                        // Deliberately no timer restart here. The pointer is on
+                        // the bar, so `leave` is what must collapse it; letting a
+                        // timer fire underneath a resting cursor made the bar
+                        // strobe between every reveal and its own hide.
                     } else {
                         // The pointer is gone from the surface, so any distance
                         // it had is no longer evidence about the edge strip.
@@ -603,7 +596,9 @@ Variants {
                     screenScope._notePointerDistance(
                         RevealLogic.distanceFromEdge(
                             point.position.y, barSlide.height, screenScope.atTop))
-                    _hideTimer.restart()
+                    // Moving over the bar must not arm the collapse either.
+                    if (!screenScope._revealState.hovered)
+                        _hideTimer.restart()
                 }
             }
         }
