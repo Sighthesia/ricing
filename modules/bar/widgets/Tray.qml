@@ -80,6 +80,19 @@ Item {
         Qt.callLater(function() { root._primed = true })
     }
 
+    // Re-publish the hovered icon's intent after the strip moves. Only the
+    // delegate that currently owns the hover may do this: a delegate whose
+    // HoverHandler still reports hovered for the frame after the pointer has
+    // already crossed to its neighbour would otherwise swap the popup back to
+    // the icon the pointer just left, mid-sweep between two icons - which is
+    // what painted the previous menu beside the new one.
+    function republishHoveredAnchor() {
+        var delegate = root.hoveredTrayDelegate
+        if (!delegate)
+            return
+        root.popupAnchorUpdate(root.buildTrayIntent(root.hoveredTrayModel, delegate))
+    }
+
     // Build hover intent for a specific tray delegate.
     function resolveIconSource(source) {
         var normalized = String(source || "").trim()
@@ -274,8 +287,8 @@ Item {
         }
     }
 
-    onXChanged: if (hoveredTrayDelegate) popupAnchorUpdate(buildTrayIntent(hoveredTrayModel, hoveredTrayDelegate))
-    onWidthChanged: if (hoveredTrayDelegate) popupAnchorUpdate(buildTrayIntent(hoveredTrayModel, hoveredTrayDelegate))
+    onXChanged: republishHoveredAnchor()
+    onWidthChanged: republishHoveredAnchor()
 
     Row {
         id: trayRow
@@ -526,8 +539,13 @@ Item {
                     }
                 }
 
-                // Update anchor while the delegate or bar layout moves.
-                onXChanged: if (iconHover.hovered) root.popupAnchorUpdate(root.buildTrayIntent(trayIcon.liveItem, trayIcon))
+                // Update anchor while the delegate or bar layout moves. The
+                // ownership check is the point: `iconHover.hovered` alone is
+                // stale for a frame after the pointer crosses to the next icon.
+                onXChanged: {
+                    if (root.hoveredTrayDelegate === trayIcon)
+                        root.republishHoveredAnchor()
+                }
 
                 TapHandler {
                     objectName: "trayActivateTap"

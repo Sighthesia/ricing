@@ -1274,6 +1274,7 @@ Item {
                     Math.max(Number(host.popupItem.sidebarLayer.implicitHeight),
                         Number(host.popupItem.sidebarLayer.height), 48) + ctxSlotHeight + 1)
                 root.startContextHoldChecks()
+                root.startTrayHopChecks()
                 root.startBottomBarChecks()
                 // Last, because it mutates the shared host: a first open commits
                 // its target geometry before the content has laid out, so
@@ -1355,6 +1356,64 @@ Item {
         root.check("reopened hover is the tray intent, not the context one",
             String(host.currentIntent.actionKind || ""), "tray")
         root.check("hold released, no pending intent left", host.pendingIntent, null)
+    }
+
+    // A fast sweep between two tray icons: enter A, leave A, enter B, then the
+    // Row-shift anchor re-publish that onXChanged fires while the slide is
+    // still running. The bar has no gap between icons, so this is exactly what
+    // "between two tray icons" produces.
+    function startTrayHopChecks() {
+        function trayIntent(key, title, ax) {
+            return {
+                widgetId: "tray", instanceKey: "tray:0", delegateKey: key,
+                kind: "hover", actionKind: "tray", title: title,
+                anchorX: ax, screenWidth: 1920, screenHeight: 1080,
+                effectiveBarHeight: 48, barPosition: "top",
+                payload: { trayModel: null, hasMenu: true, menuHandle: null }
+            }
+        }
+        host.dismissImmediately()
+        host.widgetHovered = true
+        host.updateIntent(trayIntent("sni-a", "App A", 1500))
+        root.check("tray hop opens on A", host.currentIntent.delegateKey, "sni-a")
+
+        host.widgetHovered = false
+        host.requestClose()
+        // Enter B while the close is still pending: the pointer crossed the gap
+        // faster than the close grace, which is what makes this a sweep.
+        host.widgetHovered = true
+        host.updateIntent(trayIntent("sni-b", "App B", 1540))
+        host.transitionProgress = 0.5
+        host.commitExchange(host.transitionSerial)
+        root.check("tray hop moves to B", host.currentIntent.delegateKey, "sni-b")
+
+        var hopSlot = root.findByName(host.popupItem, "popupContentSlot")
+        var hopBody = root.findByName(host.popupItem, "popupActions")
+        var hopOut = root.findByName(host.popupItem, "popupActionsOutgoing")
+        root.check("tray hop bounds the slot to the panel",
+            hopSlot.width, host.paintedPanelWidth)
+        // The body is positioned outside the panel by construction (it enters
+        // from the right edge); what keeps it off the desktop is the slot's own
+        // clip, which is the ancestor whose rect is the panel. Assert that, not
+        // the body's geometry - a body parked outside a clipping ancestor paints
+        // nothing.
+        root.check("tray hop clips the slot, so an out-of-panel body cannot paint",
+            hopSlot.clip && hopBody.x >= hopSlot.width - 0.5, true)
+        root.check("tray hop keeps the outgoing body clipped",
+            hopOut.x + hopOut.width <= hopSlot.width + 0.5, true)
+
+        // A third icon arriving mid-slide is the normal fast switch and must be
+        // accepted: guarding it away made every hop feel late.
+        host.updateIntent(trayIntent("sni-c", "App C", 1580))
+        root.check("a new icon mid-slide is accepted, not dropped",
+            host.pendingIntent ? host.pendingIntent.delegateKey : null, "sni-c")
+        host.transitionProgress = 0.5
+        host.commitExchange(host.transitionSerial)
+        root.check("the third icon lands", host.currentIntent.delegateKey, "sni-c")
+        root.check("fast switch keeps the slot bounded",
+            hopSlot.width, host.paintedPanelWidth)
+        root.check("fast switch keeps the slot clipping during the exchange",
+            hopSlot.clip, true)
     }
 
     function startBottomBarChecks() {
