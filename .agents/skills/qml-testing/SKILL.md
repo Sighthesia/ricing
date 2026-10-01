@@ -100,21 +100,54 @@ inside `/tmp/opencode/xdg-data/`.
   every test that runs after it.
 - Read the animation's *contract* (a token or a formula) rather than a copied
   constant, so a deliberate retune does not silently desync the test.
-- **Reassigning a `Repeater` model needs a real settle before synthesized
-  pointer events.** `mouseClick(item, …)` maps the item's geometry through the
-  scene graph, so a `wait(0)` after replacing the model is not enough: the
-  delegates are rebuilt but the scene transform is not synced yet, and the click
-  lands on nothing. Measured on the window-hint body: `wait(0)` made a chip tap
-  fail intermittently (2 green / 1 red across identical runs, while ten
+- **Reassigning a `Repeater` model, or measuring a dynamically created object's
+  layout, needs a real settle before you assert on it.** `mouseClick(item, …)`
+  maps the item's geometry through the scene graph, and a positioner
+  (`Row`/`Column`/`Grid`) assigns its children's positions during layout — both
+  land *after* the frame that created the object. `wait(0)` is not enough for
+  either. Measured twice: `wait(0)` after replacing a hint body's model made a
+  chip tap fail intermittently (2 green / 1 red across identical runs, while ten
   back-to-back taps on the same chip with a settled scene missed 0), and
-  `wait(20)` gave 5/5 green. `init()` that swaps a model must wait long enough
-  for the rebuild.
+  `wait(0)` after `createTemporaryObject(BarPopupIdentity, …)` read both text
+  columns at x=0 instead of 0 and 24. `wait(30)` fixed both. An `init()` that
+  swaps a model, and any assertion on a positioner's child `x`, must wait.
 - For a click-flash, assert the **recipe**, not a sampled opacity: expose the
   animation the way `OsuTopBarButton` does (`flashAnimationItem`,
   `flashOverlayItem`) and compare `property` / `from` / `to` / `duration` /
   `easing.type` against `MotionTokens`. `animation.restart()` sets `from`
   synchronously, so `running` and a non-zero `opacity` are readable on the click
   frame — no `wait` needed, and no dependence on where in the decay a poll lands.
+- A change handler on a property that other properties are **derived from** is
+  not a safe place to read those derived properties. QML notifies a property's
+  own change handlers as soon as it is written; the bindings depending on it
+  have not necessarily been re-evaluated yet, so a handler that reads one back
+  gets the **previous** value. Measured on the window-hint focus indicator: the
+  tracker snapped to the row the user had just left, so the bar trailed one
+  switch behind and never landed on the focused row — and the symptom was
+  invisible in a still screenshot, because the bar looked correctly *shaped* at
+  the wrong place. Fix: compute the value in the handler from the property that
+  actually changed (a `_targetYFor(index)` helper taking the notified value as an
+  argument) and pass that into the animation, instead of reading
+  `_indicatorTargetY` / `focusedRowTop` back. This is the discipline
+  `Workspaces.qml` already uses, where `updateIndicator` computes `centerX`
+  itself and hands it to `retargetEdges`. Corollary: hook the **semantic**
+  property (`focusedRowIndex`, `hasTarget`) rather than a derived edge
+  (`focusedRowTop`), and never rely on the relative order of two change handlers.
+- `QQuickItem.childrenRect()` counts an **invisible** child at its full
+  geometry — it is not "visible children". Anything that sizes itself from
+  `childrenRect` therefore does **not** collapse when you only set
+  `visible: false`; the child's `height`/`width` has to actually reach 0.
+  Measured, modelling the same three shapes in `TwoLayerPopup`: an invisible
+  48-tall `sidebarData` child left `sidebarLayer.implicitHeight` at **48**; the
+  same child with `height: 0` measured **0** and dropped `contentLayer.y` to 0.
+  (An inactive `Loader` with an explicitly set height also stayed at 48, since
+  `QQuickLoader` only mirrors the item's size when the height is not set
+  explicitly — so a `Loader` is not a shortcut here.) This is what lets
+  `BarPopupHost` collapse its 48px identity rail for a body-only intent: the
+  rail wrapper's own height is driven to 0, and `computeAndCommitTargets` reads
+  that animated value instead of a hardcoded 48 floor — a floor left in place
+  would size the layer-shell surface 48px taller than the painted panel and
+  clip it.
 - `qmllint` on this machine reports **zero diagnostics even for a file with
   unknown properties and unknown types**. It is not a usable signal here; do not
   report "lint clean" on its strength. `qmlformat <file> >/dev/null` *is* usable
