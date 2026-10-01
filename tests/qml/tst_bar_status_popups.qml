@@ -205,6 +205,30 @@ Item {
             compare(findByName(item, "batteryTimeValueText").text, "3 h 28 min")
         }
 
+        // The metric rows used to hang off the state label's measured bottom,
+        // which resolved to y=0 and stacked them on the centred percentage.
+        // Assert the composed geometry, not just the text: this is the seam
+        // where measurement, target and rendered position can all disagree.
+        function test_batteryMetricRowsDoNotOverlapReadout() {
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "battery", payload: { batteryService: makeBatteryService() }
+            })
+            var pct = findByName(item, "batteryPctText")
+            var state = findByName(item, "batteryStateText")
+            var rate = findByName(item, "batteryRateRow")
+            var time = findByName(item, "batteryTimeRow")
+            var card = findByName(item, "batteryCard")
+
+            verify(rate.y >= pct.y + pct.height,
+                "rate row clears the percentage: " + rate.y + " >= " + (pct.y + pct.height))
+            verify(rate.y >= state.y + state.height,
+                "rate row clears the state label: " + rate.y + " >= " + (state.y + state.height))
+            verify(time.y >= rate.y + rate.height,
+                "time row follows the rate row: " + time.y + " >= " + (rate.y + rate.height))
+            verify(time.y + time.height <= card.height,
+                "time row stays inside the card: " + (time.y + time.height) + " <= " + card.height)
+        }
+
         function test_batteryMetricFormattingFallsBackWhenUnknown() {
             compare(BatteryMetrics.formatRate(0), "—")
             compare(BatteryMetrics.formatRate("invalid"), "—")

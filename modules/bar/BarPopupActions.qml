@@ -1238,7 +1238,11 @@ Item {
                 font.pixelSize: 10
             }
 
-            // Charge or discharge rate row follows the state label.
+            // Charge or discharge rate row. Positioned from the card's own top
+            // rather than from the state label's measured bottom: the card is a
+            // fixed-height surface with known typography, and a sibling-bottom
+            // anchor chain resolved to y=0 here, stacking these rows on top of
+            // the centred percentage.
             Item {
                 id: batteryRateRow
                 objectName: "batteryRateRow"
@@ -1246,8 +1250,8 @@ Item {
                 anchors.leftMargin: 16
                 anchors.right: parent.right
                 anchors.rightMargin: 16
-                anchors.top: batteryStateText.bottom
-                anchors.topMargin: 6
+                anchors.top: parent.top
+                anchors.topMargin: 52
                 height: 16
 
                 Text {
@@ -1277,7 +1281,8 @@ Item {
                 anchors.leftMargin: 16
                 anchors.right: parent.right
                 anchors.rightMargin: 16
-                anchors.top: batteryRateRow.bottom
+                anchors.top: parent.top
+                anchors.topMargin: 68
                 height: 16
 
                 Text {
