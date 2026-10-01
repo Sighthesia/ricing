@@ -42,6 +42,30 @@ Separate the **input canvas** from the **visual columns**:
 - Let the overflow catcher begin at `primaryMenuWidth` and include the gap plus the submenu width. It may be wider than the painted surface.
 - Keep the layer-shell region at least as wide as the complete input canvas, but do not use region expansion as a substitute for widening QML ancestors.
 
+### The canvas is not a paint region
+
+Widening the input tree creates a second, invisible failure mode: anything that
+derives a **clip** or a **slide distance** from that width now paints over pixels
+the panel never owns. Symptom: a menu that is correct at rest but smears a face
+across the desktop while it animates.
+
+Two rules, both verified on the tray popup:
+
+- A displaced child needs its own paint width, not the canvas width. `Item.clip`
+  clips to the item's own bounds, so a child only gets bounded by a clip if it is
+  as narrow as its own paint. Give each sliding body its own
+  `width` + `clip` while displaced; a single shared canvas-sized clip either lets
+  the incoming face escape or cuts a strip off a wider outgoing body.
+- Derive the slide distance from a **committed design width** (the painted slot
+  width), never from a live measured property such as
+  `contentLayer.width = childrenRect.width`. A live value also folds in the
+  displaced child's own offset, so the track inflates on every later hop and the
+  outgoing body never clears the panel edge.
+
+Keep the widened canvas resting-state only: restore it the moment the slide
+settles, before a submenu can be summoned, or the catcher loses its ancestors
+again.
+
 ```qml
 readonly property real primaryMenuWidth: implicitWidth
 
@@ -67,6 +91,7 @@ The outer content owners must be wide enough for the catcher. Preserve the visua
 - Widening only `PanelWindow.mask` or `popupInputRegion`: the compositor routes the pointer to the surface, but Qt still rejects the overflowing child during ancestor hit testing.
 - Widening only the painted background: the menu looks wider while the event owner remains narrow.
 - Widening the entire action body without separating visual widths: fixes part of hit testing but visibly expands the primary menu.
+- Using the widened input canvas as a clip rect or slide track: the panel paints over the desktop for the whole animation. See "The canvas is not a paint region".
 - Removing the visual gap to make the old input catcher easier to cross: changes the design and hides the ownership problem; use a catcher that owns the gap instead.
 - Treating `contentEnabled=true` and `submenuInteractable=true` as proof of delivery: these only describe state, not whether Qt delivered a pointer event.
 
