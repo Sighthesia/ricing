@@ -110,9 +110,20 @@ PanelWindow {
     signal closeRequested()
 
     // Identity travels its own height; content starts further away, matching
-    // the settings panel's shorter-rail / longer-content stagger.
+    // the settings panel's shorter-rail / longer-content stagger. A body-only
+    // intent has no rail to stagger, so its travel collapses to the same
+    // one-pixel seam the two-layer layout leaves between the layers.
+    readonly property bool identityHidden: !!(currentIntent && currentIntent.noIdentity)
+    // Rail height for the identity layer: the shared 48, or 0 for a body-only
+    // intent. Snapped, not animated: the shell's own geometry glide
+    // (`transitionProgress`, already running on every replacement) carries the
+    // height change from the outside, and a second clock on the rail would put
+    // the content's own offset on a different curve than the surface resizing
+    // around it.
+    readonly property real identityHeight: root.identityHidden ? 0 : 48
     readonly property real travelSign: root.direction === "up" ? 1 : -1
-    readonly property real identityTravel: Math.max(Number(popup.sidebarLayer.height),
+    readonly property real identityTravel: root.identityHidden ? 1
+            : Math.max(Number(popup.sidebarLayer.height),
             Number(popup.sidebarLayer.implicitHeight), 48) + 1
     readonly property real contentTravel: root.revealDistance + 1
     readonly property real identityOffset: root.travelSign * root.identityTravel
@@ -964,6 +975,7 @@ PanelWindow {
     // submenu can be summoned - so the catcher never loses its ancestors.
     readonly property bool contentBodiesDisplaced: root._exchangeCommitted
             && root.contentSlideProgress < 1
+
     function popupHeightForIntent(intentObj) {        if (!intentObj)
             return 1
         // Track live height even while the two-layer reveal is in flight:
@@ -1027,8 +1039,10 @@ PanelWindow {
         var width = baseWidth
         if (isFinite(trayExtraWidth) && trayExtraWidth > 0)
             width = baseWidth + trayExtraWidth
-        var sidebarHeight = Math.max(Number(popup.sidebarLayer.implicitHeight),
-                Number(popup.sidebarLayer.height), 48)
+        // Reads the animated rail height, not a 48 floor: a body-only intent has to
+        // measure 0 here or the layer-shell surface would keep a 48px band the
+        // content no longer paints into, clipping the panel's top.
+        var sidebarHeight = root.identityHeight
         var height = sidebarHeight + popupHeightForIntent(displayedIntent) + 1
         if (!isFinite(width) || width < 0)
             width = 240
@@ -1644,6 +1658,9 @@ PanelWindow {
                 // 200ms contentDelay held the content layer behind the bar for
                 // the first ~1/3 of travel, so it popped in around 3/4.
                 contentDelay: 0
+                // Lets the layer know the rail is optional, so it reads the
+                // rail's live height instead of latching the previous one.
+                railCollapsible: root.identityHidden
                 animateLayerOpacity: false
                 sidebarOffset: root.identityOffset
                 contentOffset: root.slideOffset
@@ -1654,12 +1671,20 @@ PanelWindow {
                 // Identity layer bound to the current intent; updates in place when
                 // the hovered tray delegate changes so no overlapping windows appear.
                 // Persistent context menus expose the header close affordance.
+                //
+                // A body-only intent (the mod-key window hint) collapses this to
+                // zero. Hidden, not merely short: `TwoLayerPopup` derives its
+                // slot size from `childrenRect`, which ignores invisible
+                // children - a zero-height wrapper with a 48px identity still
+                // inside would keep the slot 48 tall and leave the body offset
+                // by a band nothing paints.
                 sidebarData: Item {
                     objectName: "popupIdentityTransition"
                     width: root.popupSlotWidth
                     implicitWidth: root.popupSlotWidth
-                    height: 48
-                    implicitHeight: 48
+                    height: root.identityHeight
+                    implicitHeight: height
+                    visible: root.identityHeight > 0.5
                     clip: true
 
                     // Incoming identity enters from the right and settles in

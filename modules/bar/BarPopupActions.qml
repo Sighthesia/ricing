@@ -21,7 +21,8 @@ Item {
     onPayloadChanged: if (root.actionKind === "network") root.refreshWifi()
     Component.onCompleted: if (root.actionKind === "network") root.refreshWifi()
 
-    implicitWidth: root.actionKind === "media" ? 420 : 260
+    implicitWidth: root.actionKind === "media" ? 420
+        : (root.actionKind === "window-hint" ? 360 : 260)
     implicitHeight: root.actionKind === "context" ? 0 : contentColumn.implicitHeight + 16
     width: implicitWidth
     height: implicitHeight
@@ -759,6 +760,20 @@ Item {
         if (payload && typeof payload.onDismiss === "function")
             payload.onDismiss()
         root.dismissRequested()
+    }
+
+    // A window hint activation is forwarded to the intent's callback rather
+    // than run here: this body stays free of Quickshell so the component suite
+    // can still instantiate it, and the bar keeps ownership of the niri
+    // round-trip. The hint is a hold-to-see surface, so an activation
+    // deliberately leaves the menu open - mod is still held and the refreshed
+    // snapshot is the confirmation.
+    function handleHintWindow(windowId) {
+        var target = String(windowId || "").trim()
+        if (target === "")
+            return
+        if (payload && typeof payload.onHintWindow === "function")
+            payload.onHintWindow(target)
     }
 
     // Root content container; always visible when actionKind is known.
@@ -1875,6 +1890,25 @@ Item {
             }
         }
 
+        // Mod-key window hint: the active workspace's windows, clickable to
+        // focus. The snapshot travels on the intent payload so a refresh while
+        // mod is held updates the rows in place.
+        Item {
+            id: windowHintContent
+            objectName: "windowHintContent"
+            width: parent.width
+            height: windowHintBody.implicitHeight
+            visible: root.actionKind === "window-hint"
+
+            BarWindowHintContent {
+                id: windowHintBody
+                objectName: "windowHintBody"
+                width: parent.width
+                hint: root.payload ? root.payload.hint : null
+                onWindowActivated: windowId => root.handleHintWindow(windowId)
+            }
+        }
+
         // Fallback for unknown kinds keeps a visible placeholder.
         Rectangle {
             id: fallbackContent
@@ -1883,7 +1917,7 @@ Item {
             height: 32
             radius: 6
             color: LazerTheme.settingsCard
-            visible: root.actionKind !== "volume" && root.actionKind !== "brightness" && root.actionKind !== "media" && root.actionKind !== "notifications" && root.actionKind !== "tray" && root.actionKind !== "battery" && root.actionKind !== "bluetooth" && root.actionKind !== "network" && root.actionKind !== "clock" && root.actionKind !== ""
+            visible: root.actionKind !== "volume" && root.actionKind !== "brightness" && root.actionKind !== "media" && root.actionKind !== "notifications" && root.actionKind !== "tray" && root.actionKind !== "battery" && root.actionKind !== "bluetooth" && root.actionKind !== "network" && root.actionKind !== "clock" && root.actionKind !== "window-hint" && root.actionKind !== ""
 
             Text {
                 anchors.centerIn: parent

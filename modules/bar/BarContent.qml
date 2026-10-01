@@ -17,6 +17,10 @@ Item {
     signal popupAnchorUpdate(var intent)
     signal contextPopupRequested(var intent)
     signal contextPopupCloseRequested()
+    // The mod hint's anchor is the bar's own midpoint, so only a width change
+    // moves it - but its intent is not a widget intent and would otherwise keep
+    // the anchor it was built with.
+    signal anchorInvalidated()
 
     // Track active hover intent for anchor re-emission when layout moves.
     property var _activeHoverIntent: null
@@ -82,6 +86,28 @@ Item {
             }
         }
         return null
+    }
+
+    // Screen-space x the mod hint popup anchors to: the bar's own midpoint, so
+    // the menu stays centred under the bar no matter where the widgets sit.
+    //
+    // Deliberately not the active-window readout's position. The hint is driven
+    // by a key, not by a pointer, so it has no widget to belong to, and a
+    // widget-relative anchor would slide the menu across the bar whenever the
+    // layout moved. The host subtracts half the popup width from this value and
+    // clamps the result to the screen, so the bar midpoint centres the panel.
+    function hintAnchorX() {
+        return root.width / 2
+    }
+
+    // Re-publish the widget hover intent that the mod hint displaced. A widget
+    // that is still under the pointer emits no new hover event when the hint
+    // closes, so without this the widget's popup would stay gone until the
+    // pointer left and came back.
+    function reemitHoverIntent() {
+        if (!root._activeHoverIntent) return false
+        root.popupRequested(root._activeHoverIntent)
+        return true
     }
 
     // Recompute anchor when geometry shifts while a widget is hovered.
@@ -347,10 +373,14 @@ Item {
         function onLayoutModelChanged() {
             root.schedulePublish()
             Qt.callLater(root.refreshActiveAnchor)
+            Qt.callLater(root.anchorInvalidated)
         }
     }
 
-    onWidthChanged: Qt.callLater(root.refreshActiveAnchor)
+    onWidthChanged: {
+        Qt.callLater(root.refreshActiveAnchor)
+        Qt.callLater(root.anchorInvalidated)
+    }
 
     component SectionRow: Row {
         id: sectionRow

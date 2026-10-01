@@ -59,6 +59,80 @@ Item {
         }
     }
 
+    // A body-only popup: the rail is collapsed, which is what the mod-key window
+    // hint asks the host for. `BarPopupHost` relies on the sidebar slot
+    // measuring 0 so its geometry drops the rail band instead of keeping an
+    // unpainted 48px strip the body would be offset by.
+    Lazer.TwoLayerPopup {
+        id: bodyOnlyPopup
+        width: 360
+        height: 200
+        orientation: 1
+        direction: 1
+        revealProgress: 1
+
+        // Height 0 on the rail wrapper is what collapses the slot. Measured,
+        // not assumed: `sidebarSlot` sizes itself from `childrenRect`, and
+        // childrenRect counts an INVISIBLE child at its full height (so
+        // `visible: false` alone leaves the slot at 48), while a child that is
+        // simply 0 tall measures 0.
+        sidebarData: Item {
+            objectName: "collapsedRail"
+            width: 360
+            height: 0
+            visible: false
+        }
+
+        contentData: Rectangle {
+            objectName: "bodyOnlyContent"
+            width: 360
+            height: 120
+        }
+    }
+
+    // The rail at full height, for contrast: same structure, non-zero height.
+    Lazer.TwoLayerPopup {
+        id: railedPopup
+        width: 360
+        height: 200
+        orientation: 1
+        direction: 1
+        revealProgress: 1
+
+        sidebarData: Item {
+            objectName: "fullRail"
+            width: 360
+            height: 48
+        }
+
+        contentData: Rectangle {
+            width: 360
+            height: 120
+        }
+    }
+
+    // Same shape as railedPopup, but never told its rail is collapsible - the
+    // trap the flag exists to close.
+    Lazer.TwoLayerPopup {
+        id: symptomPopup
+        width: 360
+        height: 200
+        orientation: 1
+        direction: 1
+        revealProgress: 1
+
+        sidebarData: Item {
+            objectName: "symptomRail"
+            width: 360
+            height: 48
+        }
+
+        contentData: Rectangle {
+            width: 360
+            height: 120
+        }
+    }
+
     TestCase {
         name: "TwoLayerPopup"
         when: windowShown
@@ -89,6 +163,104 @@ Item {
             compare(popup.contentLayer.implicitHeight, 96)
             compare(popup.sidebarLayer.implicitWidth, 320)
             compare(popup.contentLayer.implicitWidth, 320)
+        }
+
+        function test_hiddenRailMeasuresZero() {
+            // The slot sizes itself from `childrenRect`, so the rail wrapper's
+            // own height is the only thing that collapses it. If this ever
+            // reports 48, the host would keep an unpainted band and the body
+            // would sit 48px below where the panel starts.
+            compare(bodyOnlyPopup.sidebarLayer.implicitHeight, 0)
+            compare(bodyOnlyPopup.sidebarLayer.height, 0)
+            // The body is not offset by a rail that is not there.
+            compare(bodyOnlyPopup.contentLayer.y, 0)
+        }
+
+        function test_collapsedRailDoesNotShrinkTheBody() {
+            // Collapsing the rail must not shrink the content: the window list
+            // is the whole panel.
+            compare(bodyOnlyPopup.contentLayer.implicitHeight, 120)
+            compare(bodyOnlyPopup.contentLayer.height, 120)
+        }
+
+        function test_aZeroHeightChildCollapsesTheSlotEvenWithTallGrandchildren() {
+            // Why the host collapses the wrapper rather than only hiding it:
+            // childrenRect counts an invisible direct child at its full height,
+            // so `visible: false` alone would leave the slot at 48 - and the
+            // wrapper's own visible grandchildren do not expand it.
+            compare(railedPopup.sidebarLayer.implicitHeight, 48)
+            compare(bodyOnlyPopup.sidebarLayer.implicitHeight, 0)
+        }
+
+        function test_aRailThatLatchesUpwardParksTheContentAfterwards() {
+            // The regression, measured on the sequence rather than the end state:
+            // the host reuses ONE popup instance across intents, so a titled
+            // popup settles first (latching 48) and a later body-only one lands
+            // on the same instance. Without `railCollapsible` the latch refuses
+            // to forget, and the content is parked 47px below a rail that is
+            // gone - the blank band that was reported.
+            symptomPopup.revealProgress = 0
+            wait(0)
+            symptomPopup.revealProgress = 1
+            wait(0)
+            compare(symptomPopup.stableSidebarHeight, 48, "titled popup latches its rail")
+
+            symptomPopup.sidebarLayer.children[0].height = 0
+            symptomPopup.revealProgress = 0
+            wait(0)
+            compare(symptomPopup.sidebarLayer.implicitHeight, 0, "rail is gone")
+            compare(symptomPopup.stableSidebarHeight, 48, "latch still holds the old rail")
+
+            // The parking only happens while the reveal is in flight: that is
+            // when the content prefers the cached height over the live one, and
+            // it is exactly the window during which the blank band is visible.
+            // At rest the content reads the live rail and looks correct, which
+            // is why this reads as a flash rather than a mislayout.
+            symptomPopup.revealProgress = 0.5
+            wait(0)
+            compare(symptomPopup.contentLayer.y, 47, "content parked below a rail that is gone")
+
+            symptomPopup.revealProgress = 1
+            compare(symptomPopup.contentLayer.y, 0, "at rest it settles correctly, hiding the cause")
+
+            symptomPopup.sidebarLayer.children[0].height = 48
+            symptomPopup.revealProgress = 0
+            symptomPopup.revealProgress = 1
+            wait(0)
+        }
+
+        function test_railCollapsibleLetsTheLatchForget() {
+            // Same sequence, with the host telling the layer its rail is
+            // optional. The latch is then allowed to record 0, and the content
+            // reads the rail live rather than a stale height.
+            railedPopup.revealProgress = 0
+            wait(0)
+            railedPopup.revealProgress = 1
+            wait(0)
+            compare(railedPopup.stableSidebarHeight, 48)
+
+            railedPopup.railCollapsible = true
+            railedPopup.sidebarLayer.children[0].height = 0
+            wait(0)
+            compare(railedPopup.sidebarLayer.implicitHeight, 0)
+            compare(railedPopup.stableSidebarHeight, 0, "latch follows the rail down to 0")
+
+            // Mid-flight is where the blank band appeared; the content has to
+            // sit at the top the whole way through.
+            railedPopup.revealProgress = 0
+            wait(0)
+            railedPopup.revealProgress = 0.5
+            wait(0)
+            compare(railedPopup.contentLayer.y, 0, "content is not parked mid-reveal")
+            railedPopup.revealProgress = 1
+            wait(0)
+            compare(railedPopup.contentLayer.y, 0)
+
+            railedPopup.railCollapsible = false
+            railedPopup.sidebarLayer.children[0].height = 48
+            railedPopup.revealProgress = 0
+            railedPopup.revealProgress = 1
+            wait(0)
         }
 
     function test_upDirectionStacksContentBeforeSidebar() {

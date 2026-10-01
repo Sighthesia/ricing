@@ -107,6 +107,39 @@ Item {
             compare(icon2.height, 16)
         }
 
+        function test_emptyIconAndSummaryCollapseTheHeader() {
+            // The mod-key window hint runs its header with neither field set: it
+            // supplies a title only, because the chips and the rows already show
+            // both counts and the focused row already shows the app icon. That
+            // only reads as "less redundant" if the two slots actually collapse.
+            var bare = createTemporaryObject(identityComp, root, {
+                title: "Workspace 2", iconSource: "", summary: "", hostWidth: 260
+            })
+            var full = createTemporaryObject(identityComp, root, {
+                title: "Workspace 2",
+                iconSource: Qt.resolvedUrl("../../modules/lazerbar/icons/music.svg"),
+                summary: "2 windows", hostWidth: 260
+            })
+            verify(!findByName(bare, "identityIcon").visible, "icon must collapse")
+            verify(!findByName(bare, "identitySummary").visible, "summary must collapse")
+            verify(findByName(full, "identityIcon").visible, "icon shows when supplied")
+            verify(findByName(full, "identitySummary").visible, "summary shows when supplied")
+
+            // The collapsed icon slot must not leave a hole. A Row skips its
+            // invisible children, so the text column has to move left by the
+            // slot width plus the row spacing - otherwise a title-only header
+            // sits 24px further right than every other header and reads as a
+            // misalignment against the body below it.
+            var bareText = findByName(bare, "identityTitle").parent
+            var fullText = findByName(full, "identityTitle").parent
+            var slot = findByName(full, "identityIcon").parent
+            // Row children are positioned during layout, which lands a couple of turns
+            // after a dynamically created object, not on the same frame.
+            wait(30)
+            compare(bareText.x, 0, "bare text column offset")
+            compare(fullText.x, slot.width + 8, "full text column offset")
+        }
+
         function test_identityFixedHeaderHeight() {
             var a = createTemporaryObject(identityComp, root, { title: "A", summary: "", hostWidth: 200 })
             var b = createTemporaryObject(identityComp, root, { title: "B", summary: "long summary", hostWidth: 300 })

@@ -34,10 +34,19 @@ Item {
     // previous heights are held so the second layer does not teleport.
     property real stableSidebarHeight: 0
     property real stableContentHeight: 0
+    // Set by a host whose rail is optional (the mod-key window hint shows a
+    // body only). The cache above assumes the rail always has height, so it can
+    // only latch upwards: without this, once any titled popup has settled, a
+    // later body-only popup's reveal parks its content at the old rail height
+    // and leaves a blank band where the header used to be.
+    property bool railCollapsible: false
 
     function syncStableHeights() {
         if (root.revealProgress < 0.01 || root.revealProgress > 0.99) {
-            if (sidebarSlot.height > 0)
+            // A collapsible rail must be allowed to record 0 - that is the whole
+            // measurement. A fixed rail keeps the guard, so a pre-layout 0 at
+            // completion does not latch.
+            if (sidebarSlot.height > 0 || root.railCollapsible)
                 stableSidebarHeight = sidebarSlot.height
             if (contentSlot.height > 0)
                 stableContentHeight = contentSlot.height
@@ -116,8 +125,13 @@ Item {
             if (root.orientation !== root.vertical)
                 return 0
             if (root.direction === root.down) {
-                var sh = (root.revealProgress > 0.01 && root.revealProgress < 0.99 && root.stableSidebarHeight > 0)
-                    ? stableSidebarHeight : sidebarSlot.height
+                // A collapsible rail is read live rather than from the cache: it
+                // can change height between two settled reveals, and a cached
+                // value would park the content at the rail's previous height.
+                var sh = root.railCollapsible ? sidebarSlot.height
+                        : ((root.revealProgress > 0.01 && root.revealProgress < 0.99
+                                && root.stableSidebarHeight > 0)
+                            ? stableSidebarHeight : sidebarSlot.height)
                 // Tuck 1px under the opaque header instead of leaving a 1px
                 // gap that reads as a dark seam between the layers.
                 return Math.max(0, sh - 1)
