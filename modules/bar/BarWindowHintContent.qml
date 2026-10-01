@@ -35,7 +35,10 @@ Item {
     // popup does.
     property var columns: HintLogic.cappedColumns(null)
     property bool shownReady: false
-    // +1 when the workspace moved later in the list, -1 earlier, 0 unknown.
+    // +1 when the workspace moved later in the list, -1 earlier, 0 unknown. This
+    // is the RECORD of the move, not a steering input: the three columns sit side
+    // by side, so a switch is a horizontal slide and every column already knows
+    // which slot it is heading for.
     property int swapDirection: 0
     property bool swapping: false
     // True only between a swap committing and its staggered arrival finishing.
@@ -60,16 +63,16 @@ Item {
         columns.previous.rows.length,
         columns.current.rows.length,
         columns.next.rows.length) * MotionTokens.dropdownItem
-    // The three columns are peers, so they share one width and the middle one -
-    // the active workspace - sits at the second slot. Its left edge is the
-    // origin for the focus highlight and the indicator, stated once here rather
-    // than repeated as a literal offset in each marker.
-    readonly property int columnCount: 3
-    readonly property int columnWidth: Math.floor(width / columnCount)
-    readonly property int activeColumnX: columnWidth
-    // How far the list travels while swapping. `overlayFromY` is the existing
-    // offset token for an overlay arriving from off its resting place.
-    readonly property int swapTravel: MotionTokens.overlayFromY
+    // The three columns are peers of one fixed width, and a column only gets a
+    // slot if it has something to show - so the panel is exactly as wide as the
+    // columns on screen and a workspace with no windows takes no space instead
+    // of leaving a hole. A dropped column therefore moves the active one out of
+    // the middle, which is a fact about the layout rather than a special case.
+    readonly property int columnWidth: HintLogic.COLUMN_WIDTH
+    readonly property int shownColumnCount: HintLogic.columnCount(columns)
+    // The active column's slot. 0 when there is no previous column to push it
+    // along, otherwise the second slot.
+    readonly property int activeSlot: columns.previous.rows.length > 0 ? 1 : 0
     readonly property int rowHeight: 28
     // The one row the focus indicator belongs to, or -1. Read from the SHOWN
     // column, not from `hint`, so it cannot point past what is on screen while
@@ -130,10 +133,12 @@ Item {
     }
 
     // --- list swap choreography ---------------------------------------
-    // A workspace switch replaces every row, so without this the list is simply
-    // gone and remade between two frames. The swap travels the way the workspace
-    // moved - the same direction the focus indicator travels - so the panel reads
-    // as one surface turning rather than as its contents blinking.
+    // A workspace switch replaces every row, and it also moves the strip: the
+    // workspace you were on slides to where the neighbour now sits, and the
+    // workspace you are on slides in from the side. That is what makes a switch
+    // read as one continuous move instead of one list blinking into another -
+    // the columns are side by side, so the travel is horizontal and each column
+    // glides to the slot it now belongs in (see the Behaviors on their x).
     //
     // Reduced motion, a first snapshot, and a change with no knowable direction
     // (a window title edit on the same workspace) all commit straight away: an
@@ -305,9 +310,10 @@ Item {
         onFinished: root._commitHint(true)
     }
 
-    // Wide enough for three columns of window titles. The popup measures its
-    // geometry from this, so the host's `window-hint` width has to agree.
-    implicitWidth: 540
+    // As wide as the columns that are actually on screen: one, two or three of
+    // them. The popup measures its geometry from this, so the host's `window-hint`
+    // width reads the body rather than keeping its own number.
+    implicitWidth: shownColumnCount * columnWidth
     // The tallest of the three columns, and the empty-workspace line when the
     // active one has nothing in it - that line lives outside the columns, so it
     // has to be added in by hand.
@@ -328,9 +334,16 @@ Item {
     // against a stale width and, because nothing about the columns then changes
     // again, never re-lays-out. The result is an active column sitting at x 0
     // under the previous workspace's labels with the next one drawn over it.
-    // Derived x cannot go stale: the slot a column occupies is a function of
-    // the panel width, so every column is in its place from the first frame and
-    // after every model change.
+    // Derived x cannot go stale: a column's slot is a function of which other
+    // columns have content, so every column is in its place from the first frame
+    // and after every model change.
+    //
+    // The x Behaviors are the coherence. A workspace switch slides the whole
+    // strip one column sideways - the column you were on moves to where your new
+    // previous workspace sits, and your new workspace arrives into the slot your
+    // old one left - so the panel reads as one surface turning rather than as
+    // its contents blinking. The outgoing rows fade across the same travel, and
+    // the incoming ones stagger in behind them.
     //
     // `spacing` on the active column is bound to `listSpacing` because the focus
     // indicator computes its own y from that same pitch, and the neighbour
@@ -341,10 +354,34 @@ Item {
         width: parent.width
         visible: root.ready
         opacity: root.listFade
+        // The page turn. Three columns side by side means a switch is one
+        // column of horizontal travel, not a crossfade in place: the whole strip
+        // leaves by one column and glides home while the new rows arrive, so the
+        // workspace you are moving to slides in from the side it was already on.
+        // Without it the outgoing rows would fade out of one position and the
+        // incoming ones fade into the same one, with nothing carrying anything
+        // across - the two lists would read as unrelated rather than as one
+        // workspace becoming the next.
+        //
+        // The offset is negated: moving to a LATER workspace takes the strip
+        // leftwards, because the new workspace was sitting to the right of the
+        // old one and has to travel across to reach the middle. So `swapDirection`
+        // says which way the workspace moved, and the content moves the other
+        // way - the same way a page does when you turn forward.
+        //
+        // Exactly one column, so the motion stays on the grid the columns are laid
+        // out on. The columns' own x Behaviors below cover the other case, where
+        // a neighbour appeared or vanished and the packing itself changed.
+        x: root.swapping ? -root.swapDirection * root.columnWidth : 0
 
-        // Neighbour column: plain labels, no card and no state. At either end of
-        // the workspace list this column is simply empty, which is the honest
-        // answer rather than a wrapped-around neighbour.
+        Behavior on x {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuint }
+        }
+
+        // Neighbour column: plain labels, no card and no state. With no windows
+        // - because the workspace is empty, or because there is no workspace on
+        // that side of the list - it takes no slot and so no space.
         Column {
             id: previousColumn
             objectName: "windowHintPreviousColumn"
@@ -365,8 +402,6 @@ Item {
                     glyphInset: root.glyphInset
                     glyphWidth: root.glyphWidth
                     staggerStep: index * MotionTokens.dropdownItem
-                    travelling: root.swapping
-                    travelOffset: root.swapDirection * root.swapTravel
                     arrivalPending: root.entrancePending
                     onActivated: windowId => root.windowActivated(windowId)
                 }
@@ -374,14 +409,21 @@ Item {
         }
 
         // The active column: the only one carrying a fill, a highlight and the
-        // focus indicator. The middle slot, and the one the markers are measured
-        // against - so its x is stated, not left to a layout pass.
+        // focus indicator. Its slot depends on whether the previous column has
+        // anything to show, and the markers below are positioned from ITS x
+        // rather than from a restatement of the slot - so the highlight cannot
+        // end up over a column that is not the active one.
         Column {
             id: column
             objectName: "windowHintColumn"
-            x: root.activeColumnX
+            x: root.activeSlot * root.columnWidth
             width: root.columnWidth
             spacing: root.listSpacing
+
+            Behavior on x {
+                enabled: !MotionTokens.reducedMotion
+                NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuint }
+            }
 
             Repeater {
                 model: root.windowPage.rows
@@ -411,18 +453,9 @@ Item {
                 // hidden value is bound to `entrancePending` so it can only ever
                 // apply while an animation will actually raise it again.
                 opacity: root.entrancePending ? 0 : 1
-                // Offsets the row WITHOUT touching the Column's layout, so the
-                // stagger cannot shift the rows that have already landed.
-                transform: Translate {
-                    y: root.swapping ? root.swapDirection * root.swapTravel : 0
-                    Behavior on y {
-                        enabled: !MotionTokens.reducedMotion
-                        NumberAnimation {
-                            duration: MotionTokens.medium
-                            easing.type: Easing.OutQuint
-                        }
-                    }
-                }
+                // No per-row travel: the column itself glides sideways to its new
+                // slot, so offsetting the rows as well would make the same move
+                // happen twice in two directions at once.
                 // A row mid-flight is not a tap target: the list underneath it
                 // is about to be replaced.
                 enabled: !root.swapping
@@ -551,11 +584,13 @@ Item {
         }
 
         // Neighbour column: the workspace after the active one, mirroring the
-        // previous column on the other side.
+        // previous column on the other side. It sits immediately after the active
+        // column and inherits its animated x, so the pair slides as one strip
+        // rather than two columns arriving at their slots at different moments.
         Column {
             id: nextColumn
             objectName: "windowHintNextColumn"
-            x: root.columnWidth * 2
+            x: column.x + root.columnWidth
             width: root.columnWidth
             spacing: root.listSpacing
 
@@ -570,8 +605,6 @@ Item {
                     glyphInset: root.glyphInset
                     glyphWidth: root.glyphWidth
                     staggerStep: index * MotionTokens.dropdownItem
-                    travelling: root.swapping
-                    travelOffset: root.swapDirection * root.swapTravel
                     arrivalPending: root.entrancePending
                     onActivated: windowId => root.windowActivated(windowId)
                 }
@@ -603,7 +636,13 @@ Item {
         // column is the MIDDLE slot, so both edges are an offset away - a
         // highlight at x 0 would be drawn under the previous workspace's labels
         // and none of it would be visible.
-        x: root.activeColumnX
+        // Positioned from the active column's own x plus the strip's travel, not
+        // from a restatement of its slot: both of those are animated, and a marker
+        // bound to the slot would jump to the new position a frame before the
+        // column got there. Reading the column also means the highlight cannot be
+        // drawn over a column that is not the active one, whatever the layout
+        // decided.
+        x: body.x + column.x
         y: root.focusedRowTop
         width: root.columnWidth
         height: root.rowHeight
@@ -640,7 +679,10 @@ Item {
         color: LazerTheme.osuGreen
         // The active column is the middle slot, so the bar's inset is measured
         // from that column's left edge, not from the panel's.
-        x: root.activeColumnX + root.indicatorInset
+        // Measured from the active column's own left edge, carried by the same
+        // animated travel as the highlight, so the bar and the fill it marks
+        // always move together.
+        x: body.x + column.x + root.indicatorInset
         y: root._barTop
         visible: root.hasTarget
         opacity: root.hasTarget ? 1 : 0
@@ -733,7 +775,9 @@ Item {
     Text {
         id: noWindows
         objectName: "windowHintNoWindows"
-        x: root.activeColumnX
+        // Travels with the strip, so the line about the active workspace does not
+        // sit still while the column it is about slides out from under it.
+        x: body.x + column.x
         width: root.columnWidth
         visible: root.ready && !root.hasWindows
         text: "No windows on this workspace"

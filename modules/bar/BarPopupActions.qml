@@ -21,10 +21,14 @@ Item {
     onPayloadChanged: if (root.actionKind === "network") root.refreshWifi()
     Component.onCompleted: if (root.actionKind === "network") root.refreshWifi()
 
-    // 540 is the window hint's three-column width; it has to agree with
-    // BarWindowHintContent and with the host's popupWidthForIntent.
+    // The window hint's width is the body's own, because the body is what knows
+    // how many columns there are: a workspace with no windows takes no slot, so
+    // the panel is one, two or three columns wide. A number kept here as well
+    // would be a second answer to the same question, and the two would disagree
+    // the moment a neighbour workspace ran empty.
     implicitWidth: root.actionKind === "media" ? 420
-        : (root.actionKind === "window-hint" ? 540 : 260)
+        : (root.actionKind === "window-hint"
+            ? (windowHintBody.implicitWidth || 260) : 260)
     implicitHeight: root.actionKind === "context" ? 0 : contentColumn.implicitHeight + 16
     width: implicitWidth
     height: implicitHeight

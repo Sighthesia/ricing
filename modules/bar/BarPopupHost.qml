@@ -93,6 +93,25 @@ PanelWindow {
             && popupActionsOutgoing.trayMenuContent
             && Number(popupActionsOutgoing.trayMenuContent.submenuProgress) > 0)
 
+    // Only a submenu the user is actually pointing at may widen the slot. A
+    // retracting one must not: closing takes MotionTokens.settingsSidebarFade
+    // (500ms), so a fast sweep between two tray icons lands the next icon's menu
+    // while the previous icon's second level is still at full extension. The
+    // outgoing body counts as attached while it is closing or retracting, which
+    // is exactly when its panel is being replaced - and its surface reaches to
+    // 504px inside a 443px panel, which is the "menu beside the menu" frame.
+    readonly property bool traySubmenuPanelAttached: (popupActions
+            && popupActions.trayMenuContent
+            && String(popupActions.trayMenuContent.submenuPhase || "") !== "closing"
+            && String(popupActions.trayMenuContent.submenuPhase || "") !== "closed"
+            && Number(popupActions.trayMenuContent.submenuProgress) > 0)
+        || (root._transitionOutgoingIntent !== null
+            && popupActionsOutgoing
+            && popupActionsOutgoing.trayMenuContent
+            && String(popupActionsOutgoing.trayMenuContent.submenuPhase || "") !== "closing"
+            && String(popupActionsOutgoing.trayMenuContent.submenuPhase || "") !== "closed"
+            && Number(popupActionsOutgoing.trayMenuContent.submenuProgress) > 0)
+
     readonly property real activeScreenWidth: intentScreenWidth > 0 ? intentScreenWidth : screenWidth
     readonly property real activeScreenHeight: intentScreenHeight > 0 ? intentScreenHeight : screenHeight
     readonly property real activeBarHeight: intentBarHeight > 0 ? intentBarHeight : effectiveBarHeight
@@ -960,20 +979,33 @@ PanelWindow {
     }
 
     // Popup width follows the intent: media carries a wide card (cover +
-    // identity + spectrum) and the window hint carries three columns of window
-    // titles, so both are wider than the classic 260 column. The hint's 540 has
-    // to match BarWindowHintContent's own implicitWidth, or the body is clipped.
-    function popupWidthForIntent(intentObj) {
+    // identity + spectrum), and the window hint's own width is the body's, since
+    // the number of columns depends on how many workspaces have windows.
+    //
+    // The hint therefore takes the matching actions' width rather than a number
+    // from this table. The input slot is sized from the same figure the panel is
+    // painted at, and a second copy of the width here could not follow the panel
+    // narrowing when a neighbour workspace ran empty - leaving a band of
+    // transparent input region beside a narrower panel.
+    function popupWidthForIntent(intentObj, actions) {
         if (!intentObj || String(intentObj.kind || "") === "context")
             return 260
         var kind = String(intentObj.actionKind || "")
-        return kind === "media" ? 420 : (kind === "window-hint" ? 540 : 260)
+        if (kind === "media")
+            return 420
+        if (kind === "window-hint")
+            return Number(actions ? actions.implicitWidth : 0) || 260
+        return 260
     }
 
     // Slot width fits both sliding layers during an exchange so the
-    // outgoing body is never squeezed before it leaves.
-    readonly property real incomingPopupWidth: popupWidthForIntent(root.currentIntent)
-    readonly property real outgoingPopupWidth: popupWidthForIntent(root._transitionOutgoingIntent)
+    // outgoing body is never squeezed before it leaves. Each layer is asked for
+    // its OWN width, because a window hint's two layers can differ: the incoming
+    // body has already committed to a new set of columns while the outgoing one
+    // is still painting the old.
+    readonly property real incomingPopupWidth: popupWidthForIntent(root.currentIntent, popupActions)
+    readonly property real outgoingPopupWidth: popupWidthForIntent(
+        root._transitionOutgoingIntent, popupActionsOutgoing)
     readonly property real popupSlotWidth: Math.max(root.incomingPopupWidth, root.outgoingPopupWidth)
     // Reserve the complete tray input canvas from the first tray frame. The
     // action body and its menu root become wide enough for the second-level
@@ -1000,7 +1032,7 @@ PanelWindow {
     readonly property real paintedPanelWidth: root.currentIntent
             && String(root.currentIntent.kind || "") !== "context"
             && String(root.currentIntent.actionKind || "") === "tray"
-        ? root.trayFaceWidth : root.popupWidthForIntent(root.currentIntent)
+        ? root.trayFaceWidth : root.popupWidthForIntent(root.currentIntent, popupActions)
 
     // True exactly while a body is off its resting position. The content slot
     // narrows to the painted panel for exactly this window and is the full input
@@ -1814,7 +1846,7 @@ PanelWindow {
                     // While an exchange is mounted both bodies slide
                     // horizontally, so force the clip even with a submenu open:
                     // otherwise the sliding layers paint past the slot edge.
-                    clip: root._transitionOutgoingIntent !== null || !root.traySubmenuOverflowActive
+                    clip: root._transitionOutgoingIntent !== null || !root.traySubmenuPanelAttached
                      enabled: root.contentInteractive
                      onImplicitHeightChanged: {
                          // Record first: this handler is outside the implicitHeight

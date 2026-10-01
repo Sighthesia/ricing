@@ -90,9 +90,9 @@ function cappedWindowRows(hint) {
 
 // The three columns the menu lays out: the workspaces either side of the active
 // one, and the active one itself. Each is capped by the same limit so the three
-// read as peers and the panel height is predictable; at either end of the
-// workspace list the missing neighbour is an empty column, which is the honest
-// answer - there is no workspace there to show.
+// read as peers and the panel height is predictable. At either end of the
+// workspace list the missing neighbour resolves to an empty list, which
+// `columnCount` then refuses to give a slot to.
 function cappedColumns(hint) {
     return {
         previous: cappedRows(hint ? hint.previousWindows : null),
@@ -100,6 +100,27 @@ function cappedColumns(hint) {
         next: cappedRows(hint ? hint.nextWindows : null)
     }
 }
+
+// How many of the three columns get a slot, from a `cappedColumns` result.
+//
+// The active workspace always takes one - with no windows it says so rather
+// than disappearing, because the panel is about where you are. A neighbour takes
+// one only if it has windows: a column with nothing in it is not information,
+// it is a hole in the panel, and a hole reads as a layout fault rather than as
+// "there is nothing there". So the two ends of the workspace list - and any
+// empty neighbour workspace in between - take no space at all.
+function columnCount(columnsValue) {
+    var value = columnsValue || {}
+    return (value.previous && value.previous.rows && value.previous.rows.length > 0 ? 1 : 0)
+        + 1
+        + (value.next && value.next.rows && value.next.rows.length > 0 ? 1 : 0)
+}
+
+// One column's width. A constant rather than a share of the panel: the panel's
+// width is this times the column count, so deriving one from the other would be
+// circular, and a dropped column must narrow the panel instead of stretching
+// the survivors to fill it.
+var COLUMN_WIDTH = 180
 
 // Index of the focused row within a list of rows, or -1. niri reports at most one
 // focused window, so this is the single row the focus marker belongs to. An index
@@ -125,11 +146,12 @@ function focusedRowIndex(hint) {
 // earlier, or 0 when the move is unknown. The snapshot already carries both the
 // active and the previous active position, so this only compares them.
 //
-// The list replacement uses it so the swap travels the way the workspace did: a
-// switch downwards reads as the next page arriving from below, which is the
-// same direction the focus indicator travels in. A first snapshot reports -1
-// for the previous position, which is indistinguishable from "unknown", and 0 is
-// the right answer there - there is nothing to have come from.
+// The list replacement uses it to decide whether a switch is worth animating at
+// all. A first snapshot reports -1 for the previous position, which is
+// indistinguishable from "unknown", and 0 is the right answer there - there is
+// nothing to have come from. The direction itself no longer steers a transform:
+// the three columns sit side by side, so a switch is a horizontal slide and each
+// column knows which slot it is moving to.
 function switchDirection(hint) {
     if (!hint)
         return 0

@@ -200,20 +200,76 @@ Item {
 
         function test_cappedColumns_leaveAMissingNeighbourEmpty() {
             // At either end of the workspace list there is no workspace there.
-            // The empty column is the honest answer; a wrapped-around neighbour
-            // would claim a workspace the user cannot see.
+            // `cappedColumns` still reports all three, so the view can tell an
+            // absent neighbour from one it has not resolved yet; `columnCount` is
+            // what decides that neither gets a slot.
             var atStart = Hint.cappedColumns(makeHint({ previousWindows: [] }))
             compare(atStart.previous.rows.length, 0)
             compare(atStart.previous.hidden, 0)
             compare(atStart.next.rows.length, 1, "the other side is unaffected")
-            var atEnd = Hint.cappedColumns(makeHint({ nextWindows: [] }))
-            compare(atEnd.next.rows.length, 0)
             // A snapshot from before the service knew about neighbours at all
             // must not throw, and must not invent columns either.
             var cold = Hint.cappedColumns(null)
             compare(cold.previous.rows.length, 0)
             compare(cold.current.rows.length, 0)
             compare(cold.next.rows.length, 0)
+        }
+
+        // ---- how many columns get a slot ----------------------------------
+        function test_columnCount_isThreeWhenBothNeighboursHaveWindows() {
+            compare(Hint.columnCount(Hint.cappedColumns(makeHint())), 3)
+        }
+
+        function test_columnCount_dropsAColumnWithNothingInIt() {
+            // A column with no windows is not information, it is a hole in the
+            // panel - and a hole reads as a layout fault rather than as "there is
+            // nothing over there". So it takes no slot and no space.
+            compare(Hint.columnCount(Hint.cappedColumns(
+                makeHint({ previousWindows: [] }))), 2)
+            compare(Hint.columnCount(Hint.cappedColumns(
+                makeHint({ nextWindows: [] }))), 2)
+            compare(Hint.columnCount(Hint.cappedColumns(
+                makeHint({ previousWindows: [], nextWindows: [] }))), 1)
+        }
+
+        function test_columnCount_keepsTheActiveColumnEvenWithNoWindows() {
+            // The active workspace always has a slot: the panel is about where you
+            // are, and an empty one says so in words. Dropping it would leave a
+            // panel about other workspaces with nothing marking the current one.
+            var empty = makeHint({
+                windows: [], previousWindows: [], nextWindows: []
+            })
+            compare(Hint.cappedColumns(empty).current.rows.length, 0)
+            compare(Hint.columnCount(Hint.cappedColumns(empty)), 1)
+            // And it keeps its slot while its neighbours still have windows, so
+            // the empty line renders inside a column rather than beside nothing.
+            compare(Hint.columnCount(Hint.cappedColumns(makeHint({ windows: [] }))), 3)
+        }
+
+        function test_columnCount_isOneForAColdSnapshot() {
+            // Nothing is resolved yet, so there is nothing to lay out - but the
+            // answer still has to be a number the panel can size itself from.
+            compare(Hint.columnCount(Hint.cappedColumns(null)), 1)
+            compare(Hint.columnCount(null), 1)
+            compare(Hint.columnCount({}), 1)
+        }
+
+        function test_columnCount_readsTheCappedRowsNotTheRawList() {
+            // The count follows what the cap left on screen, so a neighbour whose
+            // only windows were... well, the cap never empties a non-empty list,
+            // but the count must not be answerable from a shape the renderer
+            // never sees. A half-built object must not count as a column.
+            compare(Hint.columnCount({ previous: {}, current: { rows: [] }, next: {} }), 1)
+            compare(Hint.columnCount({
+                previous: { rows: [1] }, current: { rows: [1] }, next: { rows: [1, 2] }
+            }), 3)
+        }
+
+        function test_columnWidthIsAFixedColumnSize() {
+            // The panel's width is this times the column count, so the two cannot
+            // be derived from each other - and a dropped column has to narrow the
+            // panel rather than stretch the survivors to fill it.
+            compare(Hint.COLUMN_WIDTH, 180)
         }
 
         function test_focusedIndexIn_readsARowList() {

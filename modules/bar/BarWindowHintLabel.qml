@@ -22,9 +22,6 @@ Item {
     property real glyphInset: 8
     property real glyphWidth: 16
     property int staggerStep: 0
-    // Set while the owning list is mid-swap, so the whole block travels with it.
-    property bool travelling: false
-    property real travelOffset: 0
     property bool arrivalPending: false
 
     signal activated(string windowId)
@@ -40,15 +37,10 @@ Item {
     height: rowHeight
 
     // Staggered arrival, identical in shape to the active column's so the swap
-    // reads as one page turn across all three columns.
+    // reads as one page turn across the panel. No travel of its own: the column
+    // this label sits in glides sideways to its new slot, and offsetting the
+    // label too would apply the same move twice.
     opacity: arrivalPending ? 0 : 1
-    transform: Translate {
-        y: travelling ? travelOffset : 0
-        Behavior on y {
-            enabled: !MotionTokens.reducedMotion
-            NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuint }
-        }
-    }
 
     NumberAnimation {
         id: rowFade

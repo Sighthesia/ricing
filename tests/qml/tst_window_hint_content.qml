@@ -76,7 +76,6 @@ Item {
     Bar.BarWindowHintContent {
         id: body
         objectName: "hintBody"
-        width: 540
         x: 20
         y: 20
         hint: root.makeHint()
@@ -184,24 +183,48 @@ Item {
         }
 
         function test_aMissingNeighbourIsAnEmptyColumn() {
-            // At either end of the workspace list there is no workspace there.
-            // The honest answer is a blank column; wrapping around to a real
-            // neighbour would label it with a workspace the user cannot see.
+            // At either end of the workspace list there is no workspace there, and
+            // a neighbour with no windows has nothing to say. Either way the
+            // column takes no slot and so no space: a blank third of the panel
+            // reads as a layout fault, not as "there is nothing over there".
             body.hint = root.makeHint({ previousWindows: [] })
             wait(20)
             verify(findByName(body, "windowHintPreviousColumn"), "the column is still there")
             compare(findAllByName(body, "windowHintPreviousRow").length, 0, "and holds no row")
             compare(findAllByName(body, "windowHintNextRow").length, 1, "the other side is unaffected")
-            // The active column's markers must not drift into the empty space,
-            // and the columns must not re-settle around the hole. An empty column
-            // still occupies its slot: taking it out would make the panel jump
-            // sideways on every switch to the first or last workspace.
+            // Two columns wide, not three, and the active one moved up into the
+            // slot the previous column vacated rather than staying put.
+            compare(body.shownColumnCount, 2)
+            compare(body.width, 2 * body.columnWidth, "the panel narrowed to fit")
+            settleColumn()
             var active = findByName(body, "windowHintColumn")
+            var next = findByName(body, "windowHintNextColumn")
+            compare(active.x, 0, "active takes the freed slot")
+            compare(next.x, body.columnWidth, "next follows it")
             compare(findByName(body, "windowHintFocusFrame").x, active.x,
-                "the highlight follows the active column")
-            compare(findByName(body, "windowHintPreviousColumn").x, 0, "previous keeps the first slot")
-            compare(active.x, body.columnWidth, "active keeps the second")
-            compare(findByName(body, "windowHintNextColumn").x, body.columnWidth * 2, "and next the third")
+                "and the highlight follows the active column")
+        }
+
+        function test_aSingleWorkspacePanelIsOneColumnWide() {
+            // Neither neighbour has windows, so the panel is one column. This is
+            // the width floor the popup has to live with, and it must not be
+            // padded out to three columns' worth of empty panel.
+            body.hint = root.makeHint({ previousWindows: [], nextWindows: [] })
+            wait(20)
+            compare(body.shownColumnCount, 1)
+            compare(body.width, body.columnWidth)
+            settleColumn()
+            compare(findByName(body, "windowHintColumn").x, 0)
+        }
+
+        function test_thePanelIsAsWideAsItsColumns() {
+            // The host sizes the input slot from this number, so it has to be the
+            // count times the column width and nothing else - a stray padding term
+            // would leave a band of input region beside a narrower panel.
+            compare(body.width, body.shownColumnCount * body.columnWidth)
+            // Three full columns while both neighbours have windows.
+            compare(body.shownColumnCount, 3)
+            compare(body.width, 3 * body.columnWidth)
         }
 
         function test_columnsShareOneRowPitch() {
@@ -257,27 +280,6 @@ Item {
             compare(body.entrancePending, false)
             verify(findAllByName(body, "windowHintPreviousRow")[2].opacity > 0.9)
             verify(findAllByName(body, "windowHintNextRow")[2].opacity > 0.9)
-        }
-
-        function test_neighbourColumnsTravelWithTheSwap() {
-            // The list replacement is one motion across the panel: if only the
-            // active column travelled, the neighbours would jump while the middle
-            // slid and the swap would read as two unrelated changes.
-            body.hint = root.makeHint({
-                activeWorkspacePosition: 3,
-                previousActiveWorkspacePosition: 2,
-                previousWindows: [{ windowId: "p1", title: "p1", icon: "", isFocused: false }],
-                nextWindows: [{ windowId: "n1", title: "n1", icon: "", isFocused: false }],
-                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
-            })
-            wait(Math.round(Lazer.MotionTokens.fast / 2))
-            var previous = findAllByName(body, "windowHintPreviousRow")[0]
-            var active = findAllByName(body, "windowHintWindowRow")[0]
-            var next = findAllByName(body, "windowHintNextRow")[0]
-            verify(previous.transform[0].y > 0, "previous leaves downwards, was " + previous.transform[0].y)
-            verify(active.transform[0].y > 0, "active too, was " + active.transform[0].y)
-            verify(next.transform[0].y > 0, "and next, was " + next.transform[0].y)
-            settleSwap(1)
         }
 
         function test_bodyShowsNothingButTheList() {
@@ -462,6 +464,14 @@ Item {
             wait((rows - 1) * Lazer.MotionTokens.dropdownItem + Lazer.MotionTokens.medium + 60)
         }
 
+        // The strip's slide and the columns' own re-slotting both run on `medium`,
+        // and a column whose neighbour appeared or vanished does not arrive at its
+        // new slot until then. Geometry assertions have to wait for it; the panel
+        // width does not move, so it can be read immediately.
+        function settleColumn() {
+            wait(Lazer.MotionTokens.medium + 40)
+        }
+
         function test_indicatorFollowsAFocusSwitch() {
             // Switch focus to the first row; the single instance has to travel
             // rather than leave a second one behind.
@@ -579,11 +589,10 @@ Item {
 
         // ---- swapping the list between workspaces ------------------------
         function test_workspaceSwitchAnimatesTheListOutThenIn() {
-            // A workspace switch replaces every row, so the list has to be seen
-            // leaving before the new one arrives - otherwise it is simply gone
-            // and remade between two frames. The fade is on the body, the row
-            // that holds all three columns: fading the active column alone would
-            // leave the neighbours opaque through the exit.
+            // A workspace switch replaces every row, so the rows have to be seen
+            // leaving before the new ones arrive - otherwise the list is simply
+            // gone and remade between two frames. The slide is on the body, the
+            // one container that holds all three columns.
             var list = findByName(body, "windowHintBody")
             compare(body.swapping, false, "settled to begin with")
             compare(list.opacity, 1)
@@ -604,7 +613,7 @@ Item {
             var during = findAllByName(body, "windowHintWindowRow")
             compare(during.length, 2, "the outgoing rows are still mounted")
             verify(list.opacity < 1, "and fading, was " + list.opacity)
-            verify(during[0].transform[0].y !== 0, "and travelling")
+            verify(list.x !== 0, "and travelling")
 
             // Rows mid-flight must not be tappable: what is under the pointer is
             // about to be discarded.
@@ -616,36 +625,111 @@ Item {
             compare(after[0].modelData.windowId, "20")
             compare(body.swapping, false)
             compare(list.opacity, 1, "and the list is opaque again")
+            compare(list.x, 0, "and the strip is home")
             verify(after[0].enabled, "rows are tappable once landed")
         }
 
         function test_swapTravelsTheWayTheWorkspaceMoved() {
-            // The list replacement and the focus indicator both travel with the
-            // switch, so the panel reads as one surface turning.
+            // Three columns side by side, so a switch is a horizontal slide: the
+            // whole strip leaves by one column and glides home while the new rows
+            // arrive. That continuity is the whole point - the alternative is one
+            // list blinking into another, with nothing carrying the eye across.
+            var strip = findByName(body, "windowHintBody")
+            compare(strip.x, 0, "the strip rests at home")
+
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            compare(body.swapDirection, 1, "downwards")
+            compare(body.swapDirection, 1, "moved later in the list")
+            // Sampled mid-flight, not after it out: waiting the whole thing out
+            // first is what makes a slide unverifiable. An animation reads its
+            // start value on the frame it starts, so the sample comes after the
+            // event loop has turned.
             wait(Math.round(Lazer.MotionTokens.fast / 2))
-            var rows = findAllByName(body, "windowHintWindowRow")
-            verify(rows[0].transform[0].y > 0,
-                "the outgoing list leaves downwards, was " + rows[0].transform[0].y)
-            settleSwap(1)
+            // Moving to a LATER workspace takes the strip LEFT, because the new
+            // workspace was sitting to the right of the old one and has to travel
+            // across to reach the middle. Getting this backwards would have the
+            // panel turn away from the direction the workspace went.
+            verify(strip.x < 0 && strip.x > -body.columnWidth,
+                "the strip has set off to one side, was " + strip.x)
+            verify(strip.x >= -body.columnWidth, "and by no more than one column")
 
+            settleSwap(1)
+            compare(findByName(body, "windowHintBody").x, 0, "and has come home")
+
+            // The other way has to mirror it: the direction is a record of which
+            // way the workspace moved, and the strip leaves against it so the
+            // previous workspace arrives from the far side.
             body.hint = root.makeHint({
                 activeWorkspacePosition: 1,
                 previousActiveWorkspacePosition: 3,
                 windows: [{ windowId: "21", title: "term2", appId: "kitty", icon: "", isFocused: true }]
             })
-            compare(body.swapDirection, -1, "upwards")
+            compare(body.swapDirection, -1, "moved earlier in the list")
             wait(Math.round(Lazer.MotionTokens.fast / 2))
-            var back = findAllByName(body, "windowHintWindowRow")
-            verify(back[0].transform[0].y < 0,
-                "and upwards, was " + back[0].transform[0].y)
+            verify(strip.x > 0 && strip.x < body.columnWidth,
+                "and to the other side, was " + strip.x)
             settleSwap(1)
+            compare(findByName(body, "windowHintBody").x, 0)
         }
+
+        function test_theStripSlidesAsOneWithItsMarkers() {
+            // The strip carries the columns, the shared highlight and the
+            // indicator together. A highlight parked at its own resting x while
+            // the column slid out from under it would read as the focus staying
+            // put while the window list moved - two different claims about where
+            // the current window is.
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 3,
+                previousActiveWorkspacePosition: 2,
+                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
+            })
+            wait(Math.round(Lazer.MotionTokens.fast / 2))
+            var strip = findByName(body, "windowHintBody")
+            var active = findByName(body, "windowHintColumn")
+            var wash = findByName(body, "windowHintFocusFrame")
+            var bar = findByName(body, "windowHintFocusIndicator")
+            verify(strip.x !== 0, "the strip is travelling, was " + strip.x)
+            compare(wash.x, strip.x + active.x, "the highlight rides with its column")
+            compare(bar.x - wash.x, 4, "and the indicator keeps its inset")
+            settleSwap(1)
+            // Landed: the markers are back exactly on the column, not near it.
+            var settled = findByName(body, "windowHintColumn")
+            compare(findByName(body, "windowHintFocusFrame").x, settled.x)
+        }
+
+        function test_neighbourColumnsTravelWithTheSwap() {
+            // Every column moves together, so the swap reads as one motion across
+            // the panel. If only the active column travelled, the neighbours would
+            // sit still while the middle slid and the switch would read as two
+            // unrelated changes.
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 3,
+                previousActiveWorkspacePosition: 2,
+                previousWindows: [{ windowId: "p1", title: "p1", icon: "", isFocused: false }],
+                nextWindows: [{ windowId: "n1", title: "n1", icon: "", isFocused: false }],
+                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
+            })
+            wait(Math.round(Lazer.MotionTokens.fast / 2))
+            // The previous column is already in its slot and does not move; what
+            // has to hold is that the strip is mid-slide and still in order.
+            var strip = findByName(body, "windowHintBody")
+            var active = findByName(body, "windowHintColumn")
+            var next = findByName(body, "windowHintNextColumn")
+            verify(strip.x !== 0, "mid-slide, was " + strip.x)
+            compare(findByName(body, "windowHintPreviousColumn").x, 0, "previous holds the first slot")
+            compare(next.x - active.x, body.columnWidth, "and next is still one column along")
+            settleSwap(1)
+            // Landed: the new workspace is in the middle, and each neighbour slot
+            // shows what the new snapshot says for it rather than a stale list.
+            compare(findByName(body, "windowHintBody").x, 0)
+            compare(active.x, body.columnWidth)
+            compare(findByName(body, "windowHintPreviousRow").modelData.windowId, "p1")
+            compare(findByName(body, "windowHintNextRow").modelData.windowId, "n1")
+        }
+
 
         function test_rowsArriveOnAStaggerNotAllAtOnce() {
             body.hint = root.makeHint({
