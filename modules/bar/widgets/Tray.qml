@@ -188,17 +188,24 @@ Item {
                 slotModel.setProperty(index, "label", root.labelFor(items[liveKey]))
                 continue
             }
-            root.writeSnapshot(index, liveKey)
+            root.writeSnapshot(liveKey)
         }
     }
 
-    // Refresh one live row's snapshot. An app swapping its own icon (a badge,
-    // a play/pause glyph) reuses the slot instead of replacing it.
-    function writeSnapshot(index, key) {
+    // Refresh one live row's snapshot, addressed by key rather than by index.
+//
+// `ListModel.get()` does not reject a bad index — handed `undefined` it
+// returns the *first* row. A delegate cannot supply a trustworthy row index
+// anyway (`index` is injected into its scope, not a property of the item), so
+// an app changing its icon wrote itself over slot 0 and QQ wore the input
+// method's glyph. Looking the row up by key removes the whole hazard.
+    function writeSnapshot(key) {
         var item = root.liveItemFor(key)
         if (!item) return
+        var index = root.slotIndexFor(key)
+        if (index < 0) return
         var row = slotModel.get(index)
-        if (!row) return
+        if (!row || row.slotKey !== key) return
         // An app that briefly reports no icon (mid-reload) must not blank the
         // slot: an empty source makes the icon vanish, and it only comes back if
         // the app signs another icon change.
@@ -495,9 +502,9 @@ Item {
                 // An app that swaps its own icon mid-life reuses the slot.
                 Connections {
                     target: trayIcon.liveItem
-                    function onIconChanged() { root.writeSnapshot(trayIcon.slotIndex, trayIcon.slotKey) }
-                    function onTitleChanged() { root.writeSnapshot(trayIcon.slotIndex, trayIcon.slotKey) }
-                    function onTooltipTitleChanged() { root.writeSnapshot(trayIcon.slotIndex, trayIcon.slotKey) }
+                    function onIconChanged() { root.writeSnapshot(trayIcon.slotKey) }
+                    function onTitleChanged() { root.writeSnapshot(trayIcon.slotKey) }
+                    function onTooltipTitleChanged() { root.writeSnapshot(trayIcon.slotKey) }
                 }
 
                 HoverHandler {

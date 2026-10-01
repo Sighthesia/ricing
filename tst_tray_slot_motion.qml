@@ -28,6 +28,7 @@ Item {
     property int clock: 0
     property int polls: 0
     property var sessionItems: []
+    property var _churnSources: []
     // Sampler bookkeeping for the arrival window.
     property bool sawClosedBox: false
     property int inkBeforeBox: 0
@@ -101,6 +102,17 @@ Item {
         property var menu: null
     }
 
+    // The app whose glyph churns most: an input method swaps icons for its
+    // mode, and it is what ended up painted over the leftmost slot.
+    QtObject {
+        id: itemI
+        property string title: "输入法"
+        property string icon: ""
+        property string tooltipTitle: "shared-b"
+        property bool hasMenu: false
+        property var menu: null
+    }
+
     Widgets.Tray {
         id: tray
 
@@ -108,9 +120,44 @@ Item {
         height: Lazer.LazerTheme.barWidgetHeight
     }
 
+    function slotCount() {
+        return slots().length
+    }
+
+    // Whether the strip has actually consumed `list` yet. A freshly assigned list
+    // leaves the *previous* state settled for a turn, so "settled" alone returns
+    // before syncSlots has run and every assertion after it reads stale data.
+    // Object identity, not titles: two fakes deliberately share a title.
+    function consumed(list) {
+        if (!probe.settled())
+            return false
+        var keys = tray._registry.keys
+        var items = tray._registry.items
+        if (keys.length !== list.length)
+            return false
+        for (var i = 0; i < keys.length; i++) {
+            if (items[i] !== list[i])
+                return false
+        }
+        return true
+    }
+
+    // A slot on its way out is not part of what the strip is showing, and its
+    // transient presence would otherwise show up as churn in the comparisons
+    // below (a departing slot and its arriving replacement can share a label).
+    function shown() {
+        var out = []
+        var s = slots()
+        for (var i = 0; i < s.length; i++) {
+            if (!s[i].retiring)
+                out.push(s[i])
+        }
+        return out
+    }
+
     // The labels the strip is actually showing, left to right.
     function stripLabels() {
-        var s = slots()
+        var s = shown()
         var names = []
         for (var i = 0; i < s.length; i++)
             names.push(s[i].label)
@@ -120,10 +167,33 @@ Item {
     // Which app each slot is showing, by slot identity rather than by name —
     // the only way to see two icons trade places.
     function slotPairs() {
-        var s = slots()
+        var s = shown()
         var pairs = []
         for (var i = 0; i < s.length; i++)
             pairs.push(s[i].slotKey + "=" + s[i].label)
+        return pairs
+    }
+
+    // The icon each slot is currently asked to draw, so a churn that repaints
+    // the wrong slot is visible even when both labels happen to match.
+    function slotSources() {
+        var row = tray.children[0]
+        var pairs = []
+        var s = shown()
+        for (var i = 0; i < s.length; i++) {
+            var found = ""
+            var kids = row.children
+            for (var j = 0; j < kids.length; j++) {
+                if (kids[j] === s[i]) {
+                    for (var k = 0; k < kids[j].children.length; k++) {
+                        var child = kids[j].children[k]
+                        if (child.source !== undefined && child.source !== null)
+                            found = String(child.source)
+                    }
+                }
+            }
+            pairs.push(s[i].slotKey + "=" + found)
+        }
         return pairs
     }
 
@@ -438,10 +508,9 @@ Item {
     function phaseCollidingIds() {
         var t = probe.tokens
         var settle = t.fast + t.trayIconEnter + t.trayIconStagger + 120
-        var before = tray.liveCount
         probe.after(20, function() { tray.liveValuesOverride = [itemQ, itemF] })
         probe.pump(settle, 16, function() {
-            return probe.slots().length === 2 && probe.settled()
+            return probe.consumed([itemQ, itemF])
         }, function() {
             probe.check("collidingIdsKeepTwoSlots", probe.slots().length === 2, probe.slots().length)
             probe.check("collidingIdsKeepTheReportedOrder",
@@ -452,18 +521,14 @@ Item {
                 keys.push(s[i].slotKey)
             probe.check("collidingSlotsAreToldApart", keys[0] !== keys[1], keys.join())
 
-            // Which slot holds which app, so the reorder can be checked against
+            // Which slot holds which app, so the reorder is checked against
             // identity rather than against the service's ordering.
             var pairsBefore = probe.slotPairs()
 
             // The service list reorders: the same two objects, swapped places.
             probe.after(20, function() { tray.liveValuesOverride = [itemF, itemQ] })
-            // A service reorder is not a display event: the strip keeps the
-            // order it established, so the icons do not jump around while they
-            // are being used. Waiting on the reindex rather than on "settled",
-            // which is already true before it lands.
             probe.pump(settle, 16, function() {
-                return tray.liveCount === 2 && probe.slots().length === 2 && probe.settled()
+                return probe.consumed([itemF, itemQ])
             }, function() {
                 probe.check("reorderDoesNotChurnSlots",
                         probe.slots().length === 2, probe.slots().length)
@@ -472,8 +537,66 @@ Item {
                         probe.slotPairs().join() + " vs " + pairsBefore.join())
                 probe.check("reorderKeepsTheStripStable",
                         probe.stripLabels().join() === "QQ,输入法", probe.stripLabels().join())
-                probe.after(20, phaseReducedMotion)
+                probe.after(20, phaseIconChurn)
             })
         })
+    }
+
+    // An app that changes its own icon must repaint its own slot and nothing
+    // else. This is the reported "the leftmost app turns into the input
+    // method": the delegate asked for a row index it could not have, and
+    // `ListModel.get(undefined)` handed back the *first* row, so the input
+    // method's icon landed on QQ's slot.
+    function phaseIconChurn() {
+        var t = probe.tokens
+        var settle = t.fast + t.trayIconEnter + 120
+        probe.after(20, function() { tray.liveValuesOverride = [itemQ, itemI] })
+        probe.pump(settle + t.trayIconStagger, 16, function() {
+            return probe.consumed([itemQ, itemI])
+        }, function() {
+            probe.check("churnStartsWithBothIconsCorrect",
+                    probe.stripLabels().join() === "QQ,输入法", probe.stripLabels().join())
+            var pairsBefore = probe.slotPairs()
+            var sourcesBefore = probe.slotSources()
+            probe._churnSources = sourcesBefore
+
+            // The input method swaps its icon mid-life, on its own. The window
+            // is held open across the whole transition: the crossing lasted a
+            // few frames and then healed on the next sync, so a single sample
+            // at either end would miss it.
+            probe.after(20, function() { itemI.icon = "input-method-zh" })
+            probe.pump(t.fast + t.trayIconEnter + 120, 16, function() { return false }, function() {
+                probe.check("iconChurnNeverMovesAnotherSlot",
+                        probe.slotPairs().join() === pairsBefore.join(),
+                        probe.slotPairs().join() + " vs " + pairsBefore.join())
+                probe.check("iconChurnRepaintsOnlyItsOwnSlot",
+                        probe.churnDamagedSlot() === -1, probe.churnDamagedSlot())
+                probe.check("iconChurnLeavesTheStripStable",
+                        probe.stripLabels().join() === "QQ,输入法", probe.stripLabels().join())
+
+                // ...and an empty icon must not blank the slot either.
+                probe.after(20, function() { itemI.icon = "" })
+                probe.pump(t.fast + 160, 16, function() { return false }, function() {
+                    probe.check("emptyIconDoesNotBlankASlot",
+                            probe.slotSources().join() === sourcesBefore.join(),
+                            probe.slotSources().join() + " vs " + sourcesBefore.join())
+                    probe.after(20, phaseReducedMotion)
+                })
+            })
+        })
+    }
+
+    // Which slot's drawn icon changed during the churn. Only the app that
+    // changed may repaint; a neighbour moving is the crossing.
+    function churnDamagedSlot() {
+        var pairs = slotSources()
+        for (var i = 0; i < pairs.length; i++) {
+            if (pairs[i] !== probe._churnSources[i]) {
+                probe._churnSources = pairs
+                return i
+            }
+        }
+        probe._churnSources = pairs
+        return -1
     }
 }

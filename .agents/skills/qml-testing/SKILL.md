@@ -159,6 +159,25 @@ inside `/tmp/opencode/xdg-data/`.
   catches it is the one reading the count. Reassign a QML-owned property (a
   `ListModel`, or a `property var` you replace wholesale) for anything a
   binding must follow.
+- **`ListModel.get()` does not validate its index — `get(undefined)` returns the
+  FIRST row.** Combined with the next trap this silently corrupts whatever it
+  is asked to read. Together they turn one wrong argument into a wrong
+  *neighbour*, which reads as a random other item's content appearing in place.
+- **A `Repeater` delegate has no `index` *property*.** `index` is injected into
+  the delegate's *scope*, so `someDelegate.index` evaluates to `undefined` (only
+  unqualified `index` resolves). Never capture it onto the object — address the
+  row by a stable key from inside the model instead. The pair above was the
+  whole of a real bug: an app changing its icon repainted the leftmost slot.
+- **A freshly assigned model leaves the *previous* state settled for a turn.**
+  A harness that waits on "settled" after swapping a model returns before the
+  swap has been consumed, and every assertion after it reads stale data while
+  looking like a real failure. Wait on the new state itself — the identity of
+  the list's entries, not merely that nothing is moving.
+- **A `property var` assignment copies a plain JS array's elements.** Test
+  doubles must be `QtObject`s (or real QObjects), not `{...}` literals: a plain
+  record comes back as a different object every time, so identity-based code
+  under test sees a fresh set of registrations and every assertion about
+  persistence fails for a reason that is not the bug.
 
 ## Do not let tests touch the real environment
 
