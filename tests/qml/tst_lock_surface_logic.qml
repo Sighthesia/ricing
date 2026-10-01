@@ -35,23 +35,55 @@ Item {
         property bool reducedMotion: false
         property bool exitStarted: false
         property bool releaseSent: false
+        // Startup gate mirror: a session-start surface prepares immediately but
+        // holds its entry wave until the wallpaper and chrome gates both open.
+        property bool startupRequest: false
+        property bool startupRevealAllowed: true
+        property bool startupWaveStarted: false
         signal releaseRequested()
+        signal startupWaveStartedSignal()
 
         function allAnimations() {
             return [enterAnimation, exitAnimation, contentFallAnimation]
         }
 
-        function startReveal() {
+        function prepareReveal() {
             exitStarted = false
             releaseSent = false
             contentFallProgress = 0
+            startupWaveStarted = false
             if (reducedMotion) {
                 SurfaceLogic.applyRevealImmediately(lockSurface, allAnimations())
                 return
             }
             SurfaceLogic.stopAll(allAnimations())
+        }
+
+        function beginEntryWave() {
+            if (exitStarted || reducedMotion || startupWaveStarted)
+                return
+            startupWaveStarted = true
             enterAnimation.from = waveProgress
             enterAnimation.start()
+            startupWaveStartedSignal()
+        }
+
+        // Manual entry: prepare and wave at once, never consulting the gates.
+        function startReveal() {
+            prepareReveal()
+            beginEntryWave()
+        }
+
+        // Startup entry: prepare now, wave only once the gates allow it.
+        function tryStartReveal() {
+            prepareReveal()
+            if (!startupRequest || startupRevealAllowed)
+                beginEntryWave()
+        }
+
+        onStartupRevealAllowedChanged: {
+            if (startupRequest && startupRevealAllowed)
+                beginEntryWave()
         }
 
         function stopAnimation() {
@@ -120,7 +152,12 @@ Item {
             onFinished: lockSurface.startWaveExit()
         }
 
-        Component.onCompleted: startReveal()
+        Component.onCompleted: {
+            if (startupRequest)
+                tryStartReveal()
+            else
+                startReveal()
+        }
     }
 
     Connections {
@@ -140,6 +177,9 @@ Item {
             lockSurface.contentFallProgress = 0
             lockSurface.exitStarted = false
             lockSurface.releaseSent = false
+            lockSurface.startupRequest = false
+            lockSurface.startupRevealAllowed = true
+            lockSurface.startupWaveStarted = false
         }
 
         function test_surfaceIsFullSizeAndRevealCompletes() {
@@ -204,6 +244,29 @@ Item {
             lockSurface.startExit()
             compare(lockSurface.waveProgress, 0)
             verify(harness.released)
+        }
+
+        // A session-start surface holds its wave while either gate is closed,
+        // then plays the normal 800ms enter once both open.
+        function test_startupWaveWaitsForBothReadinessGates() {
+            lockSurface.startupRequest = true
+            lockSurface.startupRevealAllowed = false
+            lockSurface.tryStartReveal()
+            compare(lockSurface.waveProgress, 0)
+            wait(300)
+            compare(lockSurface.waveProgress, 0, "gated startup must not wave")
+            verify(!lockSurface.startupWaveStarted)
+            lockSurface.startupRevealAllowed = true
+            tryCompare(lockSurface, "waveProgress", 1, 1200)
+            verify(lockSurface.startupWaveStarted)
+        }
+
+        // A manual surface waves at once even when the startup gates are shut.
+        function test_manualRevealStartsImmediatelyWhenGateIsClosed() {
+            lockSurface.startupRequest = false
+            lockSurface.startupRevealAllowed = false
+            lockSurface.tryStartReveal()
+            tryCompare(lockSurface, "waveProgress", 1, 1200)
         }
     }
 

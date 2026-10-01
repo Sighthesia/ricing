@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import "../../modules/lock/StartupLockLogic.js" as Logic
+import "../../modules/lazerbar/StartupRevealLogic.js" as Reveal
 
 TestCase {
     name: "StartupLockLogic"
@@ -46,6 +47,27 @@ TestCase {
     }
 
     function test_manualLockKeepsTheConfiguredCapture() {
+        compare(Logic.backgroundModeFor("screenshot", false), "screenshot")
+        compare(Logic.backgroundModeFor("wallpaper", false), "wallpaper")
+        compare(Logic.backgroundModeFor("screenshot", undefined), "screenshot")
+    }
+
+    // The startup wave waits for both gates; a manual request never consults
+    // them, so a configured reveal cannot be delayed by a settling boot.
+    function test_startupWaveNeedsWallpaperAndChromeReady() {
+        verify(!Reveal.waveAllowed(true, false, false))
+        verify(!Reveal.waveAllowed(true, true, false))
+        verify(!Reveal.waveAllowed(true, false, true))
+        verify(Reveal.waveAllowed(true, true, true))
+        verify(Reveal.waveAllowed(false, false, false))
+    }
+
+    // Readiness gates the wave only: the startup request always reveals the
+    // wallpaper (there is no desktop to capture) and a manual request always
+    // keeps the configured background mode.
+    function test_readinessDoesNotChangeBackgroundMode() {
+        compare(Logic.backgroundModeFor("screenshot", true), "wallpaper")
+        compare(Logic.backgroundModeFor("wallpaper", true), "wallpaper")
         compare(Logic.backgroundModeFor("screenshot", false), "screenshot")
         compare(Logic.backgroundModeFor("wallpaper", false), "wallpaper")
         compare(Logic.backgroundModeFor("screenshot", undefined), "screenshot")

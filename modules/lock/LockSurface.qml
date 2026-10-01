@@ -87,12 +87,25 @@ WlSessionLockSurface {
     property bool inputMode: false
 
     signal releaseRequested()
+    // Startup gating: a session-start surface prepares immediately but holds
+    // its entry wave until the wallpaper reveal has settled and the bar chrome
+    // has finished staging. Manual surfaces wave at once. The boolean records
+    // that the wave began; the signal notifies the lock owner. The names stay
+    // distinct because a property and a signal may not share one.
+    property bool startupRequest: false
+    property bool startupRevealAllowed: true
+    property bool startupWaveStarted: false
+    signal startupWaveStartedSignal()
 
     // The surface starts with the selected theme surface until the bands sweep
     // and unveil the wallpaper.
     color: "transparent"
 
-    function startReveal(): void {
+    // Prepare the surface for its entry: snapshot the theme, reset the
+    // animation state, and settle instantly when motion is reduced. Starting
+    // the wave itself is separate (see beginEntryWave) so a session-start
+    // surface can wait for the startup gates first.
+    function prepareReveal(): void {
         lightScheme = Services.SettingsService.effectiveColorScheme === "light"
         lockThemeSnapshot = SurfaceLogic.lockThemeSnapshot(lightScheme, {
             accent: Lazer.LazerTheme.adapt ? Lazer.LazerTheme.accentColor : null,
@@ -111,6 +124,7 @@ WlSessionLockSurface {
         themeSnapshotReady = true
         exitStarted = false
         releaseSent = false
+        startupWaveStarted = false
         inputMode = false
         contentFallProgress = 0
         authControlState = SurfaceLogic.AuthControlStates.idle
@@ -122,7 +136,32 @@ WlSessionLockSurface {
         }
         SurfaceLogic.stopAll(allAnimations())
         revealWaitTicks = 0
+    }
+
+    // Manual entry: prepare and wave at once, never consulting the gates.
+    function startReveal(): void {
+        prepareReveal()
+        beginEntryWave()
+    }
+
+    // Startup entry: prepare now, wave only once the gates allow it. Called
+    // from Component.onCompleted; the onStartupRevealAllowedChanged handler
+    // below covers the closed-to-open transition afterwards.
+    function tryStartReveal(): void {
+        prepareReveal()
+        if (!root.startupRequest || root.startupRevealAllowed)
+            root.beginEntryWave()
+    }
+
+    // Start the 800ms enter animation via the bounded image wait. Runs once:
+    // a repeat call after the wave began (gate flapping, second prepare) is a
+    // no-op, and reduced motion has no wave to start.
+    function beginEntryWave(): void {
+        if (root.exitStarted || root.reducedMotion || root.startupWaveStarted)
+            return
+        root.startupWaveStarted = true
         revealStartTimer.restart()
+        root.startupWaveStartedSignal()
     }
 
     // The unlock choreography runs in two beats: every content block drops away
@@ -229,8 +268,20 @@ WlSessionLockSurface {
         contextConnections.target = lockContext
     }
 
+    // The gate binding flips true once both startup readiness flags land;
+    // only a session-start surface waits on it. tryStartReveal covers the case
+    // where the gate was already open at creation, so this handler only fires
+    // on the closed-to-open transition.
+    onStartupRevealAllowedChanged: {
+        if (root.startupRequest && root.startupRevealAllowed)
+            root.beginEntryWave()
+    }
+
     Component.onCompleted: {
-        startReveal()
+        if (root.startupRequest)
+            root.tryStartReveal()
+        else
+            root.startReveal()
         keyboardOwner.forceActiveFocus()
     }
 

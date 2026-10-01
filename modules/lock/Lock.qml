@@ -10,6 +10,7 @@ import "./LockLogic.js" as LockLogic
 import "./LockController.js" as Controller
 import "./LockSurfaceLogic.js" as SurfaceLogic
 import "./StartupLockLogic.js" as StartupLockLogic
+import "../lazerbar/StartupRevealLogic.js" as StartupRevealLogic
 
 // Own the single compositor session lock: trigger, snapshot commit, release.
 Scope {
@@ -27,6 +28,16 @@ Scope {
     readonly property string _startupSessionKey: StartupLockLogic.sessionKey(
         Quickshell.env("NIRI_SOCKET"), Quickshell.env("XDG_SESSION_ID"))
     property bool _startupGateResolved: false
+    // Startup wave gate (Task 5 supplies the readiness flags): a session-start
+    // surface holds its entry wave until the wallpaper reveal has settled and
+    // the bar chrome has finished staging. Manual requests never consult them.
+    property bool startupRequest: false
+    property bool startupWallpaperReady: false
+    property bool startupChromeReady: false
+    property bool _startupWaveEmitted: false
+    // Emitted once per accepted startup request, when the first surface's
+    // entry wave actually begins.
+    signal startupWaveStarted()
 
     // Opt-in startup self-test: arm the lock on boot and force-release it on a
     // timer so the wave surface can be verified (and torn down) unattended.
@@ -85,6 +96,10 @@ Scope {
             return false
         backgroundMode = StartupLockLogic.backgroundModeFor(
             configuredBackgroundMode, startup === true)
+        // Explicit bool: only a literal startup request arms the wave gate;
+        // every other call (including an omitted argument) is manual.
+        startupRequest = startup === true
+        _startupWaveEmitted = false
         lockContext.reset()
         for (const image of root._snapshotImages)
             image.destroy()
@@ -293,7 +308,21 @@ Scope {
             snapshot: snapshot
             wallpaperPath: root.wallpaperPath
             captureExpected: root.backgroundMode === SurfaceLogic.backgroundModes.screenshot
+            startupRequest: root.startupRequest
+            startupRevealAllowed: !root.startupRequest
+                    || StartupRevealLogic.waveAllowed(true,
+                                                      root.startupWallpaperReady,
+                                                      root.startupChromeReady)
             onReleaseRequested: root._finishRelease()
+            // One surface exists per screen and each waves in turn; only the
+            // first startup wave notifies the root coordinator (Task 5), and
+            // manual waves never do.
+            onStartupWaveStartedSignal: {
+                if (!root.startupRequest || root._startupWaveEmitted)
+                    return
+                root._startupWaveEmitted = true
+                root.startupWaveStarted()
+            }
         }
     }
 
