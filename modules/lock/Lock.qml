@@ -44,8 +44,14 @@ Scope {
     // as the base, then the wave mask sweeps the wallpaper over it. Setting
     // AFLOAT_LOCK_BACKGROUND=wallpaper skips the capture and reveals the
     // wallpaper over the opaque floor instead.
-    readonly property string backgroundMode: SurfaceLogic.normalizeBackgroundMode(
+    //
+    // `configuredBackgroundMode` is that environment default. `backgroundMode` is
+    // what the request being prepared actually uses: the session-start lock
+    // overrides it, because at that point there is no finished desktop to
+    // capture (see StartupLockLogic.backgroundModeFor).
+    readonly property string configuredBackgroundMode: SurfaceLogic.normalizeBackgroundMode(
         (Quickshell.env("AFLOAT_LOCK_BACKGROUND") || "").trim())
+    property string backgroundMode: root.configuredBackgroundMode
     readonly property int _screenshotTimeoutMs: 2000
     property Component _grimCapture: LockGrimCapture {}
     property var _snapshotImages: []
@@ -71,9 +77,14 @@ Scope {
         report(index, image.status === Image.Ready ? url : "")
     }
 
-    function lock(): bool {
+    // Begin a lock. `startup` marks the session-start auto-lock, which reveals
+    // the wallpaper instead of capturing a desktop that has not finished
+    // assembling; every other request keeps the configured capture.
+    function lock(startup: bool): bool {
         if (!Controller.canLock(_state))
             return false
+        backgroundMode = StartupLockLogic.backgroundModeFor(
+            configuredBackgroundMode, startup === true)
         lockContext.reset()
         for (const image of root._snapshotImages)
             image.destroy()
@@ -90,6 +101,11 @@ Scope {
     // Request the compositor lock once per niri session, after the shell has
     // discovered a screen. The marker gate resolves first so a shell reload
     // inside an already-used session never locks again.
+    //
+    // This is the session's first screen: the shell runs it from the bootstrap
+    // layer, before the wallpaper reveal has settled and before any chrome
+    // exists, so there is no finished desktop to capture. The lock surface
+    // unveils the wallpaper itself instead.
     function startupLock(): bool {
         if (_startupSessionKey.length > 0 && !_startupGateResolved) {
             startupLockTimer.restart()
@@ -103,7 +119,7 @@ Scope {
                 _startupLockArmed = false
             return false
         }
-        const accepted = root.lock()
+        const accepted = root.lock(true)
         const result = StartupLockLogic.nextAttempt(
             _startupLockArmed, Quickshell.screens.length > 0, _state, accepted)
         _startupLockArmed = result.armed
@@ -276,6 +292,7 @@ Scope {
             lockContext: lockContext
             snapshot: snapshot
             wallpaperPath: root.wallpaperPath
+            captureExpected: root.backgroundMode === SurfaceLogic.backgroundModes.screenshot
             onReleaseRequested: root._finishRelease()
         }
     }

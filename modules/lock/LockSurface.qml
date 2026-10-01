@@ -22,6 +22,9 @@ WlSessionLockSurface {
     readonly property string snapshotUrl: snapshot && screenIndex >= 0
             ? snapshot.snapshotUrlFor(screenIndex) : ""
     property string wallpaperPath: ""
+    // Whether this request expects a pre-lock capture. The session-start lock
+    // passes false, so its reveal is not gated on an image that will never exist.
+    property bool captureExpected: true
     // Single reveal driver; the backdrop derives the trailing mask from it
     // so bands and wallpaper edge always move as one curtain.
     property real waveProgress: 0
@@ -249,6 +252,7 @@ WlSessionLockSurface {
         anchors.fill: parent
         snapshotSource: root.snapshotUrl
         wallpaperSource: root.wallpaperPath
+        captureExpected: root.captureExpected
         progress: root.waveProgress
         lightScheme: root.lightScheme
         surfaceColorOverride: root.themeSnapshotReady

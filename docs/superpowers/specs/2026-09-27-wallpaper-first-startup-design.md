@@ -59,18 +59,21 @@ owned by a `Loader`:
 - `OverviewBackgroundWindow`;
 - `Bar.TopBar`;
 - `NotificationHost`;
-- `ScreenRoundedCorners`;
-- `LockModule.Lock`.
+- `ScreenRoundedCorners`.
 
 The chrome loader becomes active only after the wallpaper bootstrap reports
 that the first reveal has completed on every current screen. The existing
 service injection into `LazerTheme` remains at root completion so the wallpaper
 floor can resolve its color without waiting for chrome.
 
-The explicit startup calls for `AppThemeService`, `LauncherService`,
-`ClipboardService`, and the automatic lock move into the chrome component's
-completion path. They therefore cannot occupy the wallpaper-first scene-build
-window.
+The explicit startup calls for `AppThemeService`, `LauncherService`, and
+`ClipboardService` move into the chrome component's completion path. They
+therefore cannot occupy the wallpaper-first scene-build window.
+
+> **Superseded in part** by `2026-10-01-lock-first-startup-design.md`:
+> `LockModule.Lock` is *not* moved into the chrome. It stays eagerly mounted at
+> the root and owns the automatic lock request from the first turn, so a fresh
+> session never assembles a desktop that the lock immediately covers.
 
 ### 2. Make the first wallpaper start from image readiness, not clean frames
 
@@ -111,7 +114,8 @@ cannot change `bootReady` or retrigger chrome construction.
 After the chrome loader is active:
 
 - bar widgets and overlays retain their current ownership and bindings;
-- the lock service is created once and receives the existing startup-lock call;
+- the lock service is created once at the root and keeps its startup-lock marker
+  semantics, unchanged by when the chrome mounts;
 - overview and corner surfaces keep their current layer and visibility rules;
 - wallpaper changes continue through `beginWallpaper()` with the existing
   click-origin snapshot, synchronous decode, reveal animation, and palette gate.

@@ -344,7 +344,7 @@ git commit -m "perf(wallpaper): start boot reveal at image readiness"
 
 **Interfaces:**
 - `WallpaperBackground.bootReady` controls the chrome Loader's `active` property.
-- `chromeComponent` creates `OverviewBackgroundWindow`, `Bar.TopBar`, `NotificationHost`, `ScreenRoundedCorners`, and `LockModule.Lock` exactly once.
+- `chromeComponent` creates `OverviewBackgroundWindow`, `Bar.TopBar`, `NotificationHost`, and `ScreenRoundedCorners` exactly once. (`LockModule.Lock` is no longer part of it — see `2026-10-01-lock-first-startup-design.md`.)
 - Explicit startup calls for `AppThemeService`, `LauncherService`, `ClipboardService`, and `lockModule.startupLock()` run from chrome completion, not root completion.
 
 - [ ] **Step 1: Move chrome into a component without changing its child bindings.**
@@ -360,7 +360,7 @@ Loader {
 }
 ```
 
-Define `chromeComponent` as an `Item` containing the existing five chrome surfaces in their current order. Preserve the `LockModule.Lock` id inside that component.
+Define `chromeComponent` as an `Item` containing the four chrome surfaces in their current order. (`LockModule.Lock` moved back to the shell root; see `2026-10-01-lock-first-startup-design.md`.)
 
 - [ ] **Step 2: Move explicit startup calls into the chrome component.**
 

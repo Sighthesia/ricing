@@ -58,13 +58,27 @@ QtObject {
 
         if (result !== null && result !== undefined) {
             // A synchronous result carries no screen index, so it can only
-            // ever describe screen 0; every other screen falls back.
-            var url = typeof result === "string" ? result : (result.url || "")
-            root.storeUrl(requestGeneration, 0, url)
+            // ever describe screen 0; every other screen falls back. It also
+            // never overwrites a screen the provider already reported through
+            // `report` while it was running — that report is the real capture,
+            // and an absent url is a fallback, not an instruction to erase it.
+            if (preparedScreens.indexOf(0) < 0) {
+                var url = typeof result === "string" ? result : (result.url || "")
+                root.storeUrl(requestGeneration, 0, url)
+            }
             if (result.ready !== false)
                 finish(requestGeneration)
             else
                 fallbackTimer.restart()
+            return
+        }
+
+        // A request with no provider has nothing to wait for. The lock surface
+        // keeps its themed floor instead of a capture, so committing in the same
+        // turn is what lets the session lock take the screen immediately instead
+        // of after a fallback window in which the desktop is still on top.
+        if (!snapshotProvider) {
+            finish(requestGeneration)
             return
         }
 

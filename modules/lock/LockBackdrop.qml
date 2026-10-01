@@ -12,6 +12,13 @@ Item {
     id: root
     property url snapshotSource: ""
     property url wallpaperSource: ""
+    // Whether this request expects a capture at all. The session-start lock
+    // deliberately has none: there is no settled desktop to photograph, so it
+    // unveils the wallpaper over the opaque floor. Waiting on that empty slot as
+    // if it were a pending image would burn the whole bounded grace window before
+    // the lock screen ever appeared. A capture that *was* expected and failed
+    // still gets the same bounded wait.
+    property bool captureExpected: true
     property real progress: 0
     property bool lightScheme: Lazer.LazerTheme.lightScheme
     property color surfaceColorOverride: "transparent"
@@ -19,7 +26,8 @@ Item {
     // enough that the wallpaper arrives while the bands still sweep.
     readonly property real maskDelay: 0.3
     readonly property real maskProgress: Math.max(0, Math.min(1, (root.progress - root.maskDelay) / (1 - root.maskDelay)))
-    readonly property bool snapshotReady: screenshot.status === Image.Ready
+    readonly property bool snapshotReady: !root.captureExpected
+            || screenshot.status === Image.Ready
     readonly property bool imagesReady: snapshotReady && wallpaperBody.status === Image.Ready
     readonly property bool revealContentInteractive: wallpaperReveal.height > 0.5
     readonly property Item revealContentHost: foregroundBody

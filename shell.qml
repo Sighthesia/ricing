@@ -6,28 +6,38 @@ import "modules/bar" as Bar
 import "modules/lock" as LockModule
 import "services" as Services
 
-// Mount the desktop wallpaper behind the layout-driven top bar and notifications.
-// The wallpaper is the only eager surface: everything else lives in the chrome
-// component, which is built after the wallpaper reports its first reveal so the
-// opening frames of a session cost one full-screen surface instead of all of it.
+// Mount the session lock and the desktop wallpaper behind the layout-driven top
+// bar and notifications. Both are eager surfaces; everything else lives in the
+// chrome component, which is built after the wallpaper reports its first reveal
+// so the opening frames of a session cost two full-screen surfaces instead of
+// all of them.
+//
+// Order matters here. The lock is the session's first screen: it engages from
+// the bootstrap layer, so a fresh login never assembles a desktop that the lock
+// would immediately cover. The wallpaper reveal still runs underneath it, which
+// means the desktop is already settled when the user authenticates.
 ShellRoot {
     id: root
-
-    // The chrome's LockModule.Lock, published once the chrome mounts, and a
-    // lock request that arrived before that. Both live on the root rather than
-    // on the IpcHandler because Quickshell rejects non-void handler functions
-    // and warns about every signal a handler exposes over IPC.
-    property var lockOwner: null
-    property bool queuedLockRequest: false
 
     // Inject the wallpaper palette into the shared LazerTheme singleton.
     // Keeps LazerTheme loadable without Quickshell in qmltestrunner while
     // restoring the live theme-color path in the compositor. Stays on the root
     // because the wallpaper floor resolves its color through these bindings
     // during bootstrap, before any chrome exists.
+    //
+    // The glow pulse's clock is injected the same way: the service owns the one
+    // timeline so the notification card and the bar cannot drift apart, but the
+    // sweep length belongs to the motion tokens.
     Component.onCompleted: {
         LazerBar.LazerTheme.settingsService = Services.SettingsService
         LazerBar.LazerTheme.colorService = Services.Color
+        Services.RipplePulseService.duration = LazerBar.MotionTokens.glowSweep
+        // Ask for the session-start lock now rather than from the chrome. It
+        // waits for a screen and for the persisted session marker on its own, so
+        // calling it early is safe and a reload inside an already-locked session
+        // still resolves to "do nothing".
+        if (!lockModule.selfTestEnabled)
+            Qt.callLater(() => lockModule.startupLock())
     }
 
     // Bootstrap layer: one full-screen wallpaper surface per screen, reporting
@@ -43,12 +53,16 @@ ShellRoot {
         onBootReadyChanged: {
             if (!bootReady || chromeLoader.active)
                 return
-            // The lock moves into the chrome, so the bridge has to hand the
-            // `lock` target back first: Quickshell keeps one handler per target
-            // and displaces the earlier registration with a warning.
-            bootstrapLockBridge.enabled = false
             chromeLoader.active = true
         }
+    }
+
+    // The compositor-enforced session lock, one surface per screen. Mounted here
+    // rather than in the chrome so the lock owns the `lock` IPC target from the
+    // first turn: a keybind or `afloat-ipc lock` during bootstrap reaches the real
+    // owner instead of a stand-in that has to queue and replay the request.
+    LockModule.Lock {
+        id: lockModule
     }
 
     // Builds the chrome exactly once, behind the wallpaper reveal.
@@ -126,80 +140,25 @@ ShellRoot {
         }
     }
 
-    // Stands in for the lock IPC surface that the chrome's LockModule.Lock owns
-    // once it exists. Compositor keybinds and `afloat-ipc lock` reach the session
-    // lock through the `lock` target, and moving that handler behind the
-    // wallpaper reveal would otherwise drop every request made during bootstrap.
-    // This bridge owns the target only until the chrome mounts, then disables
-    // itself so the real handler is the only one answering.
-    IpcHandler {
-        id: bootstrapLockBridge
-        target: "lock"
-
-        // A lock asked for before the chrome existed, retained instead of
-        // dropped. Coalesced to one request: repeated locks are no-ops anyway.
-        function lock() {
-            if (root.lockOwner !== null) {
-                root.lockOwner.lock()
-                return
-            }
-            // Say so once, so a request that is waiting is never invisible.
-            if (!root.queuedLockRequest)
-                console.log("[afloat:lock] holding a lock request until the wallpaper bootstrap finishes")
-            root.queuedLockRequest = true
-        }
-
-        // Nothing can be locked before the chrome exists, so releasing is a
-        // no-op and the state is known to be unlocked, exactly as on a freshly
-        // started lock.
-        function unlock() {}
-
-        function isLocked(): bool {
-            return root.lockOwner !== null && root.lockOwner.isLocked()
-        }
-
-        // The self-test entry point spawns a second shell process and only makes
-        // sense against an already-revealed desktop, so it stays with the real
-        // handler. Quickshell reports an unknown function as an error rather than
-        // swallowing the call, which is the honest answer during bootstrap.
-        function test() {
-            console.warn("[afloat:lock] the lock self-test is unavailable during wallpaper bootstrap")
-        }
-    }
-
-    // Adopt the chrome's lock as the bridge's forward target, replaying a
-    // request that arrived while the bridge was the only `lock` handler.
-    function adoptLockOwner(owner) {
-        root.lockOwner = owner
-        if (!root.queuedLockRequest)
-            return
-        root.queuedLockRequest = false
-        console.log("[afloat:lock] replaying a lock request taken during wallpaper bootstrap")
-        owner.lock()
-    }
-
-    // Every surface that is not the wallpaper, in the order they must stack:
-    // overview backdrop, bar, notifications, corner bezel, then the lock.
+    // Every surface that is not the wallpaper or the lock, in the order they
+    // must stack: overview backdrop, bar, notifications, corner bezel.
     Component {
         id: chromeComponent
 
         Item {
             // Service warmup lives here rather than at root completion: these
             // entry points (and the lazily instantiated singletons they force
-            // alive) must not occupy the wallpaper-first scene build.
+            // alive) must not occupy the wallpaper-first scene build. They run
+            // behind the lock screen, so a session that starts locked has its
+            // desktop already warm by the time the user authenticates.
             Component.onCompleted: {
-                // Hand the bootstrap bridge this lock so a request taken while
-                // the chrome did not exist can be replayed into the real owner.
-                root.adoptLockOwner(lockModule)
                 Services.LauncherService.primeApps()
                 Services.ClipboardService.warmup()
                 // Start the hold-key listener now, so the evdev bridge is
                 // already reading the keyboard by the time the user reaches for
                 // the hint key. QML singletons are lazy, so naming the property
                 // is what spawns the bridge; the value itself is unused here.
-                var hintWarm = Services.WindowHintService.hintHeld
-                if (!lockModule.selfTestEnabled)
-                    Qt.callLater(() => lockModule.startupLock())
+                Services.WindowHintService.hintHeld
             }
 
             // Defer external app-theme work until the chrome has yielded a few
@@ -228,11 +187,6 @@ ShellRoot {
             // cannot be ordered against each other by the client, so the bar
             // paints its own corners from its own window. See TopBar.qml.
             LazerBar.ScreenRoundedCorners {}
-
-            // Compositor-enforced session lock; creates one surface per screen.
-            LockModule.Lock {
-                id: lockModule
-            }
         }
     }
 }

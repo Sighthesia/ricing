@@ -55,6 +55,17 @@ Item {
         }
     }
 
+    // The session-start lock: no capture at all, only the wallpaper to unveil.
+    Component {
+        id: capturelessBackdrop
+        LockBackdrop {
+            width: 320
+            height: 240
+            captureExpected: false
+            wallpaperSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="blue"/></svg>')
+        }
+    }
+
     TestCase {
         name: "LockBackdropPixels"
         when: windowShown
@@ -198,6 +209,39 @@ Item {
             var lightClosed = grabImage(light)
             verify(isThemeLight(lightClosed.pixel(160, 10)), "light floor without a capture")
             verify(isThemeLight(lightClosed.pixel(160, 230)), "light floor without a capture")
+        }
+
+        // A request that expects no capture must not be gated on an image that
+        // will never arrive: the surface waits for `imagesReady` and falls back
+        // to its bounded wait, so an always-false gate would hold the reveal.
+        function test_capturelessRequestIsNotGatedOnAScreenshot() {
+            var item = createTemporaryObject(capturelessBackdrop, backdrop.parent)
+            verify(item !== null)
+            tryCompare(item, "imagesReady", true)
+
+            // Before the sweep the themed floor is all there is to show.
+            item.progress = 0
+            wait(80)
+            var closed = grabImage(item)
+            verify(isThemeDark(closed.pixel(160, 10)), "floor ahead of the sweep")
+            verify(isThemeDark(closed.pixel(160, 230)), "floor ahead of the sweep")
+
+            item.progress = 1
+            wait(120)
+            var settled = grabImage(item)
+            compare(bandArea(settled), 0, "no bands left at rest")
+            compare(settled.pixel(160, 10), "#0000ff", "wallpaper unveiled")
+            compare(settled.pixel(160, 230), "#0000ff", "wallpaper unveiled")
+        }
+
+        // A capture that was expected and never arrived keeps its bounded wait,
+        // which is what keeps a failed grim capture from exposing the wallpaper
+        // the instant the surface appears.
+        function test_expectedButMissingCaptureStillWaits() {
+            var item = createTemporaryObject(coldBackdrop, backdrop.parent)
+            verify(item !== null)
+            verify(item.captureExpected === true)
+            verify(item.imagesReady === false, "a pending capture still gates the reveal")
         }
     }
 }
