@@ -36,7 +36,11 @@ Scope {
     property bool startupChromeReady: false
     property bool _startupWaveEmitted: false
     // Emitted once per accepted startup request, when the first surface's
-    // entry wave actually begins.
+    // entry wave is scheduled: the surface has committed to wave (its bounded
+    // image wait is armed and the 800ms enter follows), or, under reduced
+    // motion, has committed the settled state. Task 5 releases post-wave work
+    // on this, in parallel with the reveal — not on animation completion.
+    // Manual waves never emit.
     signal startupWaveStarted()
 
     // Opt-in startup self-test: arm the lock on boot and force-release it on a

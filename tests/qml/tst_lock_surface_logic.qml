@@ -9,6 +9,7 @@ Item {
     height: 600
 
     property bool released: false
+    property int waveSignals: 0
 
     // Stands in for the animated theme singleton: Color.qml animates every
     // palette token with `Behavior on color`, and a color read out of such a
@@ -60,11 +61,13 @@ Item {
         }
 
         function beginEntryWave() {
-            if (exitStarted || reducedMotion || startupWaveStarted)
+            if (exitStarted || startupWaveStarted)
                 return
             startupWaveStarted = true
-            enterAnimation.from = waveProgress
-            enterAnimation.start()
+            if (!reducedMotion) {
+                enterAnimation.from = waveProgress
+                enterAnimation.start()
+            }
             startupWaveStartedSignal()
         }
 
@@ -163,6 +166,7 @@ Item {
     Connections {
         target: lockSurface
         function onReleaseRequested() { harness.released = true }
+        function onStartupWaveStartedSignal() { harness.waveSignals += 1 }
     }
 
     TestCase {
@@ -171,6 +175,7 @@ Item {
 
         function init() {
             harness.released = false
+            harness.waveSignals = 0
             lockSurface.stopAnimation()
             lockSurface.reducedMotion = false
             lockSurface.waveProgress = 0
@@ -256,9 +261,52 @@ Item {
             wait(300)
             compare(lockSurface.waveProgress, 0, "gated startup must not wave")
             verify(!lockSurface.startupWaveStarted)
+            compare(harness.waveSignals, 0, "no scheduling signal while gated")
             lockSurface.startupRevealAllowed = true
+            // Scheduling semantics: the signal fires synchronously with the
+            // gate opening, while the 800ms enter is still running.
+            compare(harness.waveSignals, 1, "signal fires at scheduling time")
+            verify(lockSurface.waveProgress < 1, "wave still running when signal fires")
             tryCompare(lockSurface, "waveProgress", 1, 1200)
             verify(lockSurface.startupWaveStarted)
+        }
+
+        // Gate flapping after the wave was scheduled must not re-emit: the
+        // once-only contract holds for Task 5's coordinator.
+        function test_startupWaveSignalFiresExactlyOnceAcrossGateToggles() {
+            lockSurface.startupRequest = true
+            lockSurface.startupRevealAllowed = false
+            lockSurface.tryStartReveal()
+            lockSurface.startupRevealAllowed = true
+            compare(harness.waveSignals, 1)
+            tryCompare(lockSurface, "waveProgress", 1, 1200)
+            lockSurface.startupRevealAllowed = false
+            lockSurface.startupRevealAllowed = true
+            wait(200)
+            compare(harness.waveSignals, 1, "gate flapping must not re-emit")
+            compare(lockSurface.waveProgress, 1, "no second animation run")
+        }
+
+        // Reduced motion settles the surface immediately but still waits for
+        // the gate before reporting: no signal while closed, exactly one when
+        // the gate opens, and the progress stays settled throughout.
+        function test_reducedMotionStartupEmitsOnceWhenGateOpens() {
+            lockSurface.reducedMotion = true
+            lockSurface.startupRequest = true
+            lockSurface.startupRevealAllowed = false
+            lockSurface.tryStartReveal()
+            compare(lockSurface.waveProgress, 1, "reduced motion settles immediately")
+            verify(!lockSurface.startupWaveStarted)
+            compare(harness.waveSignals, 0, "no signal while gate closed")
+            wait(200)
+            compare(harness.waveSignals, 0, "settled wait must stay silent")
+            lockSurface.startupRevealAllowed = true
+            verify(lockSurface.startupWaveStarted)
+            compare(harness.waveSignals, 1, "gate opening commits the wave once")
+            compare(lockSurface.waveProgress, 1, "stays settled, no animation")
+            wait(200)
+            compare(harness.waveSignals, 1)
+            compare(lockSurface.waveProgress, 1)
         }
 
         // A manual surface waves at once even when the startup gates are shut.

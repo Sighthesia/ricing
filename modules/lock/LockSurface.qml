@@ -92,6 +92,12 @@ WlSessionLockSurface {
     // has finished staging. Manual surfaces wave at once. The boolean records
     // that the wave began; the signal notifies the lock owner. The names stay
     // distinct because a property and a signal may not share one.
+    //
+    // The signal is the entry-wave scheduling event, not the animation-start
+    // event: it fires when the wave is committed to run (the bounded image
+    // wait timer is armed; the 800ms enter still runs afterwards), or, under
+    // reduced motion, when the settled state is committed. Task 5 releases
+    // post-wave work on it, in parallel with the reveal.
     property bool startupRequest: false
     property bool startupRevealAllowed: true
     property bool startupWaveStarted: false
@@ -153,14 +159,19 @@ WlSessionLockSurface {
             root.beginEntryWave()
     }
 
-    // Start the 800ms enter animation via the bounded image wait. Runs once:
-    // a repeat call after the wave began (gate flapping, second prepare) is a
-    // no-op, and reduced motion has no wave to start.
+    // Commit the entry wave and report it exactly once. With motion, this arms
+    // the bounded image wait that starts the 800ms enter; under reduced motion
+    // there is no animation, so the timer stays stopped and only the flag and
+    // the scheduling signal are recorded. A repeat call after the wave began
+    // (gate flapping, second prepare) is a no-op. Never called from
+    // prepareReveal, so a startup surface whose gate is still closed settles
+    // without emitting; the emission lands when the gate actually opens.
     function beginEntryWave(): void {
-        if (root.exitStarted || root.reducedMotion || root.startupWaveStarted)
+        if (root.exitStarted || root.startupWaveStarted)
             return
         root.startupWaveStarted = true
-        revealStartTimer.restart()
+        if (!root.reducedMotion)
+            revealStartTimer.restart()
         root.startupWaveStartedSignal()
     }
 
