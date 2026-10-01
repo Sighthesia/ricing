@@ -13,6 +13,18 @@ function ships(widgetId) {
     return ids.indexOf(widgetId) !== -1
 }
 
+// Startup activation batch for a widget id. Batch 0 is the time-critical
+// chrome (clock, active window), batch 1 the interactive core (workspaces,
+// media, tray), and batch 2 everything else. Unknown ids land in the last
+// batch so an unregistered entry can never stall an earlier one.
+function startupBatch(widgetId) {
+    if (widgetId === "clock" || widgetId === "active-window")
+        return 0
+    if (widgetId === "workspaces" || widgetId === "media" || widgetId === "tray")
+        return 1
+    return 2
+}
+
 // Filter layout entries down to widgets that ship a frontend implementation.
 // This is the single authoritative render filter: BarContent delegates here
 // and tests exercise this seam directly, so a registry id without an

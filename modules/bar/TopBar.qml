@@ -3,13 +3,52 @@ import Quickshell
 import Quickshell.Wayland
 import "../lazerbar"
 import "../lazerbar/ScreenCornerMask.js" as CornerMask
+import "../lazerbar/WallpaperBootLogic.js" as BootLogic
 import "./FullscreenBarLogic.js" as RevealLogic
 import "../../services" as Services
 
 // Mount the layout-driven bar plus the launcher wave owner per screen.
 // BarPopupHost is mounted per screen and bound to BarContent hover intents.
 Variants {
+    id: root
     model: Quickshell.screens
+
+    // Startup staging passes into each screen's BarContent; readiness flips
+    // only after every current screen reports its widget batches complete.
+    // Keys follow the WallpaperBootLogic "<name>@<x>,<y>,<w>x<h>" convention,
+    // so a geometry change invalidates the old record and reporting stays
+    // idempotent: duplicate reports collapse and never rebuild a bar.
+    property bool startupStaging: false
+    property var finishedStartupScreens: []
+    readonly property bool startupReady: BootLogic.isReady(
+        root.finishedStartupScreens, root.currentStartupKeys())
+
+    // Screen keys as they exist right now, so a resolution change drops the
+    // completion recorded for the old geometry out of the readiness check.
+    function currentStartupKeys() {
+        return BootLogic.currentKeys(Quickshell.screens)
+    }
+
+    // Drop completions for screens that are gone, so unplugging a screen does
+    // not leave its key behind to satisfy a later screen of the same name.
+    function refreshStartupReady() {
+        var current = root.currentStartupKeys()
+        var retained = []
+        for (var index = 0; index < root.finishedStartupScreens.length; index++) {
+            if (current.indexOf(root.finishedStartupScreens[index]) >= 0)
+                retained.push(root.finishedStartupScreens[index])
+        }
+        if (retained.length === root.finishedStartupScreens.length)
+            return
+        root.finishedStartupScreens = retained
+    }
+
+    // Record one screen's bar completion. Duplicate keys are ignored, so a
+    // screen that reports twice cannot stand in for another screen.
+    function reportBarReady(screenKey) {
+        root.finishedStartupScreens = BootLogic.markFinished(root.finishedStartupScreens, screenKey)
+        root.refreshStartupReady()
+    }
 
     Scope {
         id: screenScope
@@ -337,6 +376,27 @@ Variants {
             }
         }
 
+        // Report this screen's staged widgets without touching the bar:
+        // the registry dedupes repeats, so a second report changes nothing.
+        // The key follows the boot convention, so a geometry change re-keys
+        // this screen; if its batches already finished, the new key reports
+        // at once instead of stranding readiness on the old geometry.
+        readonly property string startupScreenKey: BootLogic.screenKey(
+            screenScope.modelData.name, screenScope.modelData.x,
+            screenScope.modelData.y, screenScope.modelData.width,
+            screenScope.modelData.height)
+        onStartupScreenKeyChanged: {
+            if (barContent && barContent.startupReady)
+                root.reportBarReady(screenScope.startupScreenKey)
+        }
+        Connections {
+            target: barContent
+            function onStartupReadyChanged() {
+                if (barContent.startupReady)
+                    root.reportBarReady(screenScope.startupScreenKey)
+            }
+        }
+
         // The hint's anchor is the bar's own midpoint, so a bar width change is
         // the only thing that can invalidate it.
         Connections {
@@ -484,6 +544,7 @@ Variants {
                     screenName: screenScope.screenName
                     screenX: screenScope.barWindowX
                     screenY: screenScope.barWindowY
+                    startupStaging: root.startupStaging
 
                     // While mod is held the hint owns the popup, so a widget's own hover traffic
                     // must not reach the host. Two reasons, both observable:

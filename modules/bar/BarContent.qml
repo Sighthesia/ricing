@@ -35,9 +35,68 @@ Item {
     // fully registered before widget bindings evaluate.
     property bool widgetsReady: false
 
+    // Startup staging releases widget batches one frame apart so the first
+    // frame paints the time-critical chrome before the heavier widgets load.
+    // `startupBatchLimit` is the number of released batches; a delegate is
+    // active once its batch index falls below it. `startupBatchCount` is the
+    // total number of batches (see ShippedWidgets.startupBatch).
+    property bool startupStaging: false
+    property int startupBatchLimit: 0
+    property bool startupReady: false
+    readonly property int startupBatchCount: 3
+    signal startupFinished()
+
+    // Test seams: the harness injects deterministic doubles for the two
+    // services this component reads while staging, so the test never depends
+    // on the session's persisted layout. Production leaves both null and the
+    // real singletons answer. Only the staging seam reads them; hover, popup,
+    // drag, and geometry paths keep their direct service bindings untouched.
+    property var settingsServiceOverride: null
+    property var layoutServiceOverride: null
+    readonly property var _effectiveSettingsService: settingsServiceOverride || Services.SettingsService
+    readonly property var _effectiveLayoutService: layoutServiceOverride || Services.BarLayoutService
+
+    // Release the next startup batch. Idempotent past the last batch: once the
+    // limit reaches the batch count the timer stops, readiness flips, and the
+    // finish signal fires on the next event-loop turn.
+    function advanceStartupBatch() {
+        if (!root.startupStaging || !root.widgetsReady)
+            return
+        if (root.startupBatchLimit >= root.startupBatchCount)
+            return
+        root.startupBatchLimit++
+        if (root.startupBatchLimit >= root.startupBatchCount) {
+            startupBatchTimer.stop()
+            root.startupReady = true
+            Qt.callLater(function() { root.startupFinished() })
+        }
+    }
+
+    // One batch per timer tick while staging; without staging the existing
+    // one-tick activation stands and readiness follows it immediately.
+    Timer {
+        id: startupBatchTimer
+        interval: 16
+        repeat: true
+        onTriggered: root.advanceStartupBatch()
+    }
+
+    onStartupStagingChanged: {
+        if (root.startupStaging) {
+            root.startupBatchLimit = 0
+            root.startupReady = false
+            if (root.widgetsReady)
+                startupBatchTimer.restart()
+        } else {
+            startupBatchTimer.stop()
+            if (root.widgetsReady)
+                root.startupReady = true
+        }
+    }
+
     // Attach popup signals from a widget item to the BarContent forwarders.
     function debugLog(event, payload) {
-        if (!Services.SettingsService.hoverDebugEnabled)
+        if (!root._effectiveSettingsService.hoverDebugEnabled)
             return
         console.log("[afloat:PopupDebug]", JSON.stringify(Object.assign({ "event": event }, payload || ({}))))
     }
@@ -259,9 +318,18 @@ Item {
 
     // Filter a section's entries down to implemented widgets; the shipped
     // set lives in the shared ShippedWidgets source so it cannot drift
-    // between production and tests.
+    // between production and tests. Each surviving entry is cloned and
+    // annotated with its startup batch without changing the order.
     function loadableWidgets(sectionName) {
-        return ShippedWidgets.loadable(Services.BarLayoutService.sectionWidgets(sectionName))
+        var entries = root._effectiveLayoutService.sectionWidgets(sectionName)
+        var filtered = ShippedWidgets.loadable(entries)
+        var annotated = []
+        for (var index = 0; index < filtered.length; index++) {
+            var clone = Object.assign({}, filtered[index])
+            clone.startupBatch = ShippedWidgets.startupBatch(filtered[index].id)
+            annotated.push(clone)
+        }
+        return annotated
     }
 
     // Registry source paths are already relative to this file's directory.
@@ -369,6 +437,10 @@ Item {
         // before any widget binding evaluates.
         Qt.callLater(function () {
             widgetsReady = true
+            if (root.startupStaging)
+                startupBatchTimer.restart()
+            else
+                root.startupReady = true
             schedulePublish()
         })
     }
@@ -410,6 +482,8 @@ Item {
                 required property var modelData
 
                 active: root.widgetsReady
+                        && (!root.startupStaging
+                            || Number(modelData.startupBatch || 0) < root.startupBatchLimit)
                 source: modelData && modelData.source
                         ? root.widgetSourceUrl(modelData.source) : ""
 
