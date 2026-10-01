@@ -47,6 +47,10 @@ QtObject {
 
     // Bumped on every trigger, for hosts that want an edge rather than a binding.
     property int token: 0
+    // How many times the clock has advanced. Diagnostics: the sweep is only as
+    // smooth as the rate this is driven at, and a clock that falls behind the
+    // display is indistinguishable from a dropped frame to the eye.
+    property int clockTicks: 0
     // Wall-clock milliseconds, advanced once a frame while any ring lives. The
     // rings themselves carry their own start time, so a second ring added mid
     // sweep gets its own full length instead of inheriting the first one's
@@ -130,12 +134,29 @@ QtObject {
     // flight there is no single progress to drive, and each ring's own start
     // time already fixes its length. Held as a property rather than declared as a
     // child, because a QtObject has no default property to put one in.
+    //
+    // 8ms, and the number matters. A ring's position is a function of wall-clock
+    // time rather than of tick count, so this does not change how fast a ring
+    // travels — it changes how often the display gets a fresh position for it.
+    // At 16ms this clock measured 62Hz with a worst gap of 25ms, against a
+    // frame-synced reference running at 90Hz with a 14ms gap: a 25ms gap is
+    // longer than a 60Hz frame period, so whole frames were rendered with no new
+    // sample and the ring stood still for a frame and then jumped the next
+    // frame's distance along. That reads as a low frame rate however correct the
+    // geometry is.
+    //
+    // A sampling period shorter than the display's frame period closes that gap
+    // by construction: any interval one frame long then contains at least one
+    // tick, so every frame is drawn from a fresh position. 8ms covers displays
+    // up to 125Hz, and the clock is idle otherwise — one property write per tick,
+    // only while a sweep is actually running.
     property Timer pulseClock: Timer {
-        interval: 16
+        interval: 8
         repeat: true
         onTriggered: {
             const at = Date.now()
             root.now = at
+            ++root.clockTicks
             const kept = root.pruneFinished(at)
             if (kept.length !== root.rings.length) {
                 root.rings = kept
