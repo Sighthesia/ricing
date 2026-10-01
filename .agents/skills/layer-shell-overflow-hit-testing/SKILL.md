@@ -51,16 +51,27 @@ across the desktop while it animates.
 
 Two rules, both verified on the tray popup:
 
-- A displaced child needs its own paint width, not the canvas width. `Item.clip`
-  clips to the item's own bounds, so a child only gets bounded by a clip if it is
-  as narrow as its own paint. Give each sliding body its own
-  `width` + `clip` while displaced; a single shared canvas-sized clip either lets
-  the incoming face escape or cuts a strip off a wider outgoing body.
+- **`Item.clip` clips a child to the CLIPPING item's own rect.** It is not a way
+  to bound where a child sits. Putting `clip: true` on a sliding body and
+  narrowing the body trims that body's own children and still lets the body
+  paint at `x = panelWidth` against a `panelWidth` panel. The bound has to live
+  on an **ancestor whose rect is the panel** — that ancestor clips the displaced
+  child as a side effect. Check an already-correct sibling for the pattern: a
+  fixed-width identity wrapper bounds its sliding identity child exactly this
+  way.
+- That ancestor is usually the same item that carries the wide input canvas, so
+  bind its width to "is anything displaced" rather than adding a second clip
+  owner. Narrowing it is safe only while the slide runs; the slide ends before a
+  submenu can be summoned, which is what keeps the catcher reachable.
 - Derive the slide distance from a **committed design width** (the painted slot
   width), never from a live measured property such as
   `contentLayer.width = childrenRect.width`. A live value also folds in the
   displaced child's own offset, so the track inflates on every later hop and the
   outgoing body never clears the panel edge.
+
+Measured failure, to recognize it: content offset to `x = 260` with a 260 panel
+while the slot stays 504 wide, reported as content overrunning the panel by
+exactly 260px on the first frame of the slide.
 
 Keep the widened canvas resting-state only: restore it the moment the slide
 settles, before a submenu can be summoned, or the catcher loses its ancestors
