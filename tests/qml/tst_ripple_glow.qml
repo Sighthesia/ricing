@@ -225,30 +225,40 @@ Item {
             verify(progress < 0.75)
         }
 
-        // The bands lag the leading edge, the halo further back, so the three
-        // layers read as one edge with motion blur behind it.
-        function test_bandsLagTheLeadingEdge() {
-            var travel = 1000
-            verify(Glow.haloDiameter(0.6, travel, 12) < Glow.trailDiameter(0.6, travel, 12))
-            verify(Glow.trailDiameter(0.6, travel, 12) < Glow.ringDiameter(0.6, travel, 12))
-            compare(Glow.haloDiameter(0.6, travel, 12), Glow.ringDiameter(0.55, travel, 12))
-            compare(Glow.haloDiameter(0.01, travel, 12), 12)
+        // The bleed is one gradient annulus around the leading edge, so it has to sit on
+        // the edge and fade out on both sides of it — that is what replaced two
+        // hard-edged bands, whose crisp boundaries were the banding.
+        function test_theBleedSitsOnTheEdgeAndFadesEitherSideOfIt() {
+            var bleed = Glow.BLEED
+            verify(bleed > 0 && bleed < 0.5)
+            // Peak on the edge, and the zero crossings one bleed's distance out
+            // either side of it.
+            compare(Glow.bleedPeak(), 1 / (1 + bleed))
+            compare(Glow.bleedInner(), (1 - bleed) / (1 + bleed))
+            verify(Glow.bleedInner() < Glow.bleedPeak())
+            verify(Glow.bleedPeak() < 1.0)
+            // The gradient's item is the ring's diameter plus the bleed on both
+            // sides, or the outer falloff would have nowhere to go.
+            compare(Glow.bleedDiameter(1000), 1000 * (1 + 2 * bleed))
+            compare(Glow.bleedDiameter(0), 0)
+            // And it thickens with the ring, so the glow stays attached to the
+            // edge instead of detaching from it as the sweep grows.
+            verify(Glow.bleedDiameter(2000) > Glow.bleedDiameter(1000))
         }
 
-        function test_bandWidthsStayBands() {
-            verify(Glow.trailWidth(14, 4000, 3000) < Glow.trailWidth(26, 4000, 3000))
-            compare(Glow.trailWidth(26, 640, 48), 48 * 0.6)
-            verify(Glow.trailWidth(14, 4, 2) >= 16)
-            verify(Glow.haloWidth(26) < Glow.trailWidth(26, 4000, 3000))
-            verify(Glow.haloWidth(14) >= 12)
+        // The bleed must stay faint enough that a card reads as swept rather than
+        // lit: it is an annulus, so its centre stays dark, but a surface smaller
+        // than the bleed is inside it entirely.
+        function test_theBleedStaysFaint() {
+            verify(Glow.BLEED_ALPHA < 0.25,
+                   "bleed alpha " + Glow.BLEED_ALPHA)
+            verify(Glow.BLEED_ALPHA > 0)
         }
 
-        // Nothing in the effect fades: brightness is constant, so the ring has
-        // to leave by growing past the screen or it would cut off on screen.
+        // Nothing in the effect fades: the ring's own brightness is constant, so
+        // it has to leave by growing past the screen or it would cut off there.
         function test_brightnessIsConstant() {
             compare(Glow.RING_OPACITY, 1)
-            compare(Glow.TRAIL_OPACITY, 0.5)
-            compare(Glow.HALO_OPACITY, 0.25)
         }
 
         // --- the renderer as a mask ---

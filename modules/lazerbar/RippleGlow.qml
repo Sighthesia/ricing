@@ -1,4 +1,8 @@
 import QtQuick
+// For RadialGradient only — the bleed is a plain Rectangle paint, and no Shape
+// is instantiated, so the 1px opaque white ring this module leaves on
+// antialiased edges does not come into it.
+import QtQuick.Shapes
 import "RippleGlowLogic.js" as Glow
 
 // Show the shell's glow pulse, clipped to one host surface.
@@ -137,35 +141,46 @@ Item {
             readonly property real originX: ringRoot.modelData.originX - root.hostScreenX
             readonly property real originY: ringRoot.modelData.originY - root.hostScreenY
             readonly property real travelRadius: root.travelRadiusFor(ringRoot.modelData)
+            // Diameter of the leading edge, which every band is measured against
+            // so the bleed thickens with the edge instead of detaching from it.
+            readonly property real diameter: Glow.ringDiameter(ringRoot.ringProgress,
+                                                               ringRoot.travelRadius,
+                                                               root.minDiameter)
+            readonly property real stroke: Glow.ringWidth(ringRoot.diameter)
 
-            // Outermost glow, furthest behind the edge.
+            // Soft bleed around the edge: one radial gradient whose peak sits on
+            // the leading edge, faded out well inside it and past it. Declared
+            // before the ring so the crisp edge paints on top of its own glow.
             Rectangle {
-                id: glowHalo
+                id: glowBleed
 
-                width: Glow.haloDiameter(ringRoot.ringProgress, ringRoot.travelRadius, root.minDiameter)
+                width: Glow.bleedDiameter(ringRoot.diameter)
                 height: width
                 x: ringRoot.originX - width / 2
                 y: ringRoot.originY - height / 2
                 radius: width / 2
-                color: "transparent"
-                border.width: Glow.haloWidth(glowRing.border.width)
-                border.color: LazerTheme.shade(LazerTheme.glowPulseRing, Glow.HALO_OPACITY)
-            }
 
-            // Wider soft band right behind the edge. Declared before the ring so
-            // the crisp edge paints on top of its own blur; it reads the ring's
-            // stroke, hence the forward reference.
-            Rectangle {
-                id: glowTrail
-
-                width: Glow.trailDiameter(ringRoot.ringProgress, ringRoot.travelRadius, root.minDiameter)
-                height: width
-                x: ringRoot.originX - width / 2
-                y: ringRoot.originY - height / 2
-                radius: width / 2
-                color: "transparent"
-                border.width: Glow.trailWidth(glowRing.border.width, root.width, root.height)
-                border.color: LazerTheme.shade(LazerTheme.glowPulseRing, Glow.TRAIL_OPACITY)
+                gradient: RadialGradient {
+                    // Stops run 0..1 across centerRadius, so setting it to the
+                    // ring's radius plus one bleed puts the stop at 1.0 exactly
+                    // one bleed outside the edge — where the falloff has to reach
+                    // for the glow to have an outside at all.
+                    centerX: width / 2
+                    centerY: height / 2
+                    centerRadius: width / 2
+                    GradientStop {
+                        position: Glow.bleedInner()
+                        color: LazerTheme.shade(LazerTheme.glowPulseRing, 0)
+                    }
+                    GradientStop {
+                        position: Glow.bleedPeak()
+                        color: LazerTheme.shade(LazerTheme.glowPulseRing, Glow.BLEED_ALPHA)
+                    }
+                    GradientStop {
+                        position: 1.0
+                        color: LazerTheme.shade(LazerTheme.glowPulseRing, 0)
+                    }
+                }
             }
 
             // Leading ring: the heavy, fully opaque edge that carries the
@@ -174,13 +189,13 @@ Item {
             Rectangle {
                 id: glowRing
 
-                width: Glow.ringDiameter(ringRoot.ringProgress, ringRoot.travelRadius, root.minDiameter)
+                width: ringRoot.diameter
                 height: width
                 x: ringRoot.originX - width / 2
                 y: ringRoot.originY - height / 2
                 radius: width / 2
                 color: "transparent"
-                border.width: Glow.ringWidth(width)
+                border.width: ringRoot.stroke
                 border.color: LazerTheme.glowPulseRing
                 opacity: Glow.RING_OPACITY
             }

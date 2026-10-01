@@ -3,18 +3,16 @@
 // Geometry for the shell's glow pulse.
 //
 // One ring, defined once, in *screen* coordinates: it is the pre-lazer
-// `main`-branch ripple (a heavy leading edge with two soft bands bleeding off
-// it) with nothing re-fitted per surface. Hosts do not scale it, do not give it
-// their own travel and do not give it their own stroke — they hand it the
-// screen extent, project its origin into their own coordinates, and clip
-// whatever part of the ring happens to cross them. That is the whole trick: a
-// card shows a 360px slice of the same ring the bar shows, at the same instant,
-// and the swept region is the mask.
+// `main`-branch ripple (a heavy leading edge with light bleeding off it) with
+// nothing re-fitted per surface. Hosts do not scale it, do not give it their own
+// travel and do not give it their own stroke — they hand it the screen extent,
+// project its origin into their own coordinates, and clip whatever part of the
+// ring happens to cross them. That is the whole trick: a card shows a 360px slice
+// of the same ring the bar shows, at the same instant, and the swept region is
+// the mask.
 //
 // Pure functions so the curves stay testable without QML.
 
-var HALO_OPACITY = 0.25
-var TRAIL_OPACITY = 0.5
 var RING_OPACITY = 1
 
 function clamp(value, low, high) {
@@ -79,25 +77,46 @@ function ringWidth(diameter) {
     return clamp(14 + (Number(diameter) || 0) * 0.004, 14, MAX_RING_STROKE)
 }
 
-// The two soft bands behind the leading edge. The old build made its single
-// afterglow 16x the ring stroke, which on a display-sized ring would be a
-// wall of light; these still follow the stroke but stay bounded, so they read
-// as a glow bleeding off a moving edge.
-function trailWidth(ringStroke, hostWidth, hostHeight) {
-    var shortEdge = Math.min(Math.abs(Number(hostWidth) || 0), Math.abs(Number(hostHeight) || 0))
-    return clamp(Math.min((Number(ringStroke) || 0) * 6, shortEdge * 0.6), 16, 120)
+// The bleed around the leading edge.
+//
+// This used to be two wide bands at half and quarter strength, drawn as rounded
+// rectangle borders. Rendered, that is a bright edge with two crisp-edged bands
+// behind it — the banding that made the sweep look like it was drawn in pieces,
+// and worse with several rings in flight, where the bands multiply into stripes.
+// Nothing here can blur them away: inline GLSL in ShaderEffect and MultiEffect's
+// blur passes are both broken on this Qt, and a filled disc is what the first
+// version used and what made a card look lit rather than swept.
+//
+// So the bleed is a radial gradient instead, which is a plain paint — evaluated
+// per pixel by the GPU, so it costs the same at any size and needs no texture
+// uploaded per frame — and whose edges are soft by construction. The old
+// full-screen ripple got the same look from a filled disc whose rim was always
+// off-screen; an annulus gets it without the flat tint, because the middle stays
+// dark.
+//
+// `BLEED` is how far the soft edge reaches, as a fraction of the ring's radius:
+// the gradient's peak sits on the leading edge and reaches BLEED either side of
+// it, so the glow thickens with the ring rather than staying a fixed number of
+// pixels wide.
+var BLEED = 0.22
+var BLEED_ALPHA = 0.13
+
+// Diameter of the gradient item: the ring's diameter plus the bleed on both
+// sides, so the gradient's rim falls outside the edge and the outer falloff is
+// actually visible.
+function bleedDiameter(ringDiameter) {
+    var d = Math.max(0, Number(ringDiameter) || 0)
+    return d * (1 + 2 * BLEED)
 }
 
-function haloWidth(ringStroke) {
-    return clamp((Number(ringStroke) || 0) * 3, 12, 72)
+// Where the gradient's peak sits, as a fraction of the gradient's radius. The
+// peak is the leading edge, and the gradient's radius covers the ring's radius
+// plus one bleed's worth.
+function bleedPeak() {
+    return 1 / (1 + BLEED)
 }
 
-// Both bands lag the ring along the timeline, the halo further back, so the
-// three layers read as one edge with motion blur behind it.
-function trailDiameter(progress, travelRadiusValue, seedDiameter) {
-    return ringDiameter(Math.max(0, (Number(progress) || 0) - 0.02), travelRadiusValue, seedDiameter)
-}
-
-function haloDiameter(progress, travelRadiusValue, seedDiameter) {
-    return ringDiameter(Math.max(0, (Number(progress) || 0) - 0.05), travelRadiusValue, seedDiameter)
+// Where it starts from nothing: the same distance inside the edge.
+function bleedInner() {
+    return (1 - BLEED) / (1 + BLEED)
 }
