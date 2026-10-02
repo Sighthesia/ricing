@@ -1083,34 +1083,42 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // Under the pointer means nothing - it is decoration.
             verify(!highlight.enabled, "and inert to input")
 
-            // At rest it sits exactly on the active column.
-            compare(highlight.width, body.columnWidth, "as wide as one column")
-            compare(highlight.x, host.activeColumnX,
-                "and on the active one, was " + highlight.x + " against "
-                    + host.activeColumnX)
+            // Inset from the column's own edges. At the full column width the band
+            // butts against its neighbours and reads as the panel's background rather
+            // than as a band under one workspace.
+            verify(host.highlightInset > 0, "inset from the column's edges, was "
+                + host.highlightInset)
+            compare(highlight.width, body.columnWidth - host.highlightInset * 2,
+                "as wide as one column less the inset, was " + highlight.width)
+            compare(highlight.x, host.activeColumnX + host.highlightInset,
+                "and inset on the left too, was " + highlight.x)
 
-            // It slides rather than popping, on the widget's recipe - which is the
-            // same recipe the crossing runs, so the list and the band behind it
-            // arrive together instead of reading as two things happening at once.
-            var motion = host.highlightSlideAnimation
-            verify(motion !== undefined && motion !== null,
-                "and it has a slide of its own")
-            if (!motion)
-                return
-            compare(motion.duration, Lazer.MotionTokens.medium,
-                "on the workspace highlight's clock, was " + motion.duration)
-            compare(motion.easing.type, Easing.OutQuad,
-                "and the workspace highlight's curve")
-            compare(motion.duration, body.slideDuration,
-                "the same clock the crossing runs, so they arrive together")
-
-            // First placement snaps. A Behavior would otherwise slide the band in
-            // from the strip's left edge every time the panel opened - the guard the
-            // widget keeps for the same reason.
-            body.hint = root.framedHint(4, 4)
+            // CARRIED, NOT DRIVEN. The band must be exactly on the active slot at
+            // every observable instant, including immediately after the plan changes
+            // - no wait, because that is where a second clock shows itself.
+            //
+            // It had a `Behavior on x` on the crossing's own curve, to "match" it,
+            // and two animations on one curve are not on one clock. The body snaps the
+            // strip's offset instantly when a crossing ends (it has to, or the panel
+            // is left uncovered while the strip narrows), so the band was a whole
+            // column right of where it belonged for one frame and then slid back over
+            // the crossing's duration. That is the right-to-left jump on every
+            // switch. A lag here is that bug; nothing else about the band can produce
+            // it.
+            body.hint = root.framedHint(5, 5)
             wait(60)
-            compare(highlight.x, host.activeColumnX,
-                "and a fresh frame places it without sliding, was " + highlight.x)
+            compare(highlight.x, host.activeColumnX + host.highlightInset,
+                "a fresh frame places it without sliding, was " + highlight.x)
+
+            body.hint = root.framedHint(6, 5)
+            compare(highlight.x, host.activeColumnX + host.highlightInset,
+                "and the instant a crossing starts it is already there, was "
+                    + highlight.x + " against " + (host.activeColumnX + host.highlightInset))
+            settleSlide()
+            compare(highlight.x, host.activeColumnX + host.highlightInset,
+                "and the instant it lands, still there, was " + highlight.x)
+            compare(highlight.width, body.columnWidth - host.highlightInset * 2,
+                "at the resting width, was " + highlight.width)
         }
 
         function test_theCrossingRunsOnTheWorkspacesHighlightCurve() {

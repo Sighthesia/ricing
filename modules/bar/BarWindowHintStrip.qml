@@ -67,76 +67,69 @@ Item {
     }
 
     // --- active-workspace background, the workspace widget's surface ---------
-    // The bar's `Workspaces.qml` draws the active workspace as one rectangle that
-    // SLIDES between the squares rather than each square popping its own fill, and
-    // this strip is that widget's run of columns at three times the size. So the
-    // active column gets the same sliding surface, from the same token and the same
-    // curve - and deliberately NOT a fill on the column's own delegate, which would
-    // cross-fade between two columns instead of travelling.
+    // The bar's `Workspaces.qml` draws the active workspace as one rectangle behind
+    // the squares rather than each square popping its own fill, and this strip is
+    // that widget's run of columns at three times the size. So the active column gets
+    // the same surface, in the same token, sharp-cornered - and deliberately NOT a
+    // fill on the column's own delegate, which would cross-fade between two columns
+    // instead of travelling.
     //
-    // Neighbour columns get no fill, matching the widget: there, a square that is
-    // not active has no fill either and shows only instant hover. Here the neighbour
-    // columns carry their own muted labels, so a tint behind them would say they are
-    // selected too.
+    // Neighbour columns get no fill, matching the widget: there, a square that is not
+    // active has none either and shows only instant hover. Here the neighbour columns
+    // carry their own muted labels, so a tint behind them would say they are selected
+    // too.
     //
-    // Settable x/width rather than a binding on `activeColumnX`, because the first
-    // placement has to snap: a Behavior would otherwise slide the surface in from the
-    // strip's left edge every time the panel opened. Same `_highlightPlaced` guard
-    // the widget uses, for the same reason.
-    // The band's own recipe, so a suite can assert it against the crossing's rather
-    // than against the tokens both were written from. A test that reads
-    // `MotionTokens.medium` proves a number exists, not that the band runs on it.
-    readonly property alias highlightSlideAnimation: activeHighlightSlide
+    // THE BAND HAS NO CLOCK OF ITS OWN, and that is the whole design. It looks like
+    // the widget's sliding highlight but is placed, not animated: its x is the active
+    // slot times the column width, written the instant the slot changes, exactly like
+    // every column's own x. All of its motion is the strip travelling.
+    //
+    // It had a `Behavior on x` on the widget's recipe, to "match" the crossing's
+    // curve, and that was a second clock running alongside the first. The body snaps
+    // the strip's offset instantly when a crossing ends - the strip has to narrow to
+    // three columns and return to offset 0 in the same step, or the panel is left
+    // uncovered - so for one frame the band was a column right of where it belonged,
+    // and then it slid back over the crossing's own duration. That is the right-to-
+    // left jump on every switch. Two animations on the same curve are not on the same
+    // clock, and only one of them can be right.
+    //
+    // Carried rather than driven, the band cannot drift from the crossing at all: the
+    // widget's squares are fixed and the highlight moves between them, whereas here
+    // the columns move and the highlight rides along, which reads the same and has
+    // nothing to keep in step.
+    readonly property real highlightInset: 8
 
-    property bool _highlightPlaced: false
-    property real _highlightX: 0
     property bool _highlightOn: false
 
-    // Track the active slot. Called on the slot itself rather than on the columns'
-    // geometry: `activeSlot` is an integer, so it changes exactly when the active
-    // workspace does, and reading a column's laid-out x back here would resolve a
-    // beat after the model swap and leave the surface a column behind.
+    // Place the band on the active slot. A binding on `activeColumnX` would do, and
+    // did not: it is set from the plan on the body, and the plan changes in the same
+    // step that snaps the strip's offset, so a bound band and an animated band
+    // disagree about when the switch happened.
     function _syncHighlight() {
-        if (root.columns.length === 0) {
-            root._highlightOn = false
-            return
-        }
-        const target = root.activeSlot * root.columnWidth
-        if (!root._highlightPlaced) {
-            // First placement snaps - there is nothing on screen to travel from.
-            root._highlightX = target
-            root._highlightPlaced = true
-        } else {
-            root._highlightX = target
-        }
-        root._highlightOn = true
+        root._highlightOn = root.columns.length > 0
     }
 
     onActiveSlotChanged: _syncHighlight()
+    onColumnsChanged: _syncHighlight()
     Component.onCompleted: _syncHighlight()
 
-    // The sliding surface. Below the columns (`z: -1`, as in the widget) so it is a
-    // background and never an overlay on a title, and sharp-cornered: this is a
-    // column band, and the design language keeps rounding for component details.
+    // The band. Below the columns (`z: -1`, as in the widget) so it is a background
+    // and never an overlay on a title, and sharp-cornered: this is a column band, and
+    // the design language keeps rounding for component details.
+    //
+    // Inset from the column's own edges. At the full column width it butts straight
+    // against the neighbouring columns and reads as the panel's own background rather
+    // than as a band under one workspace - which is what it was reported as.
     Rectangle {
         id: activeHighlight
         objectName: "windowHintColumnHighlight"
         z: -1
-        x: root._highlightX
-        width: root.columnWidth
+        x: root.activeColumnX + root.highlightInset
+        width: Math.max(0, root.columnWidth - root.highlightInset * 2)
         height: root.height
         visible: root._highlightOn
         color: LazerTheme.activeFill
         enabled: false
-
-        Behavior on x {
-            enabled: root._highlightPlaced && !MotionTokens.reducedMotion
-            NumberAnimation {
-                id: activeHighlightSlide
-                duration: MotionTokens.medium
-                easing.type: Easing.OutQuad
-            }
-        }
     }
 
     // One delegate per workspace position. `x` is DERIVED from the index rather
