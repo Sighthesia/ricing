@@ -97,6 +97,30 @@ Item {
     // read as a cell with something in it rather than as a frame drawn tight around
     // the cards.
     readonly property int cellPadding: 8
+    // The band's radius, matching the cards it wraps. The design language keeps
+    // rounding for component details and a cell background around 6px cards is one;
+    // a sharp band read as a block of panel colour rather than as a slot.
+    readonly property int bandRadius: 6
+    // How far the band swells at the middle of a crossing, as a share of its size.
+    // 2% is about 3.6px across a 180px column, which reads as a pulse rather than as
+    // a zoom, and stays inside the 6px gutter at either side so it never touches a
+    // neighbour's cards.
+    readonly property real bandPulse: 0.02
+    // Where the band sits: the panel's middle column, always.
+    //
+    // The active workspace's column is ALWAYS the panel's middle one - the strip
+    // travels precisely so that the arriving active column lands there. So the band
+    // has no reason to move, and moving it is what broke it twice: glued to the
+    // strip's active SLOT it teleported a whole column at the start of a crossing and
+    // had to slide back (measured: 161px in one frame), and given a clock of its own
+    // it jumped at the end instead, because the body snaps the strip's offset there.
+    //
+    // Anchored to the panel, both jumps are impossible - there is nothing to be out of
+    // step with. The crossing is expressed by the band swelling on the crossing's own
+    // progress, which is a pure function of the one clock.
+    readonly property real bandX: columnPitch
+    readonly property real bandScale: 1
+        + Math.sin(Math.PI * slideProgress) * bandPulse
     readonly property int shownColumnCount: HintLogic.COLUMN_COUNT
     // Where the strip's travel starts and ends, in pixels, and the offset as a
     // function of the one clock. Computed rather than animated per layer because
@@ -514,6 +538,38 @@ Item {
     // width is the whole run of workspaces; the panel is the three-column window
     // onto it, and `clip` on the body is what keeps the rest of the run off the
     // surface.
+    // The active workspace's cell. The bar's `Workspaces.qml` draws that as one
+    // rectangle behind the squares - `activeHighlight`, covering the square exactly -
+    // and this is the same surface one size up, in the same token, with the same
+    // geometry: the cell, whose edges are the panel's edges, with the cards sitting
+    // `cellPadding` inside it.
+    //
+    // A child of the BODY, not of the strip. The strip travels and its active slot
+    // moves; the band does not, because the column you are looking at does not - so
+    // making it a strip child is what put a 161px teleport at the start of every
+    // crossing.
+    Rectangle {
+        id: activeBand
+        objectName: "windowHintColumnHighlight"
+        x: root.bandX
+        width: root.columnWidth
+        // The cell, not the card block: the band's top and bottom edges are the
+        // PANEL's, and the cards sit `cellPadding` inside them. The strip already sits
+        // a padding down and is as tall as the card block, so the band spans the strip
+        // plus a padding above and below.
+        height: Math.max(0, strip.contentHeight + cellPadding * 2)
+        radius: root.bandRadius
+        color: LazerTheme.activeFill
+        // The crossing's own progress, so the pulse cannot drift from the slide: one
+        // clock, no second animation to fall behind.
+        scale: root.bandScale
+        visible: root.ready && strip.contentHeight > 0
+        // Inert to input: under the pointer this is decoration, and a surface that
+        // swallows taps meant for the cards would be a fault the user only finds by
+        // missing a click.
+        enabled: false
+    }
+
     BarWindowHintStrip {
         id: strip
         objectName: "windowHintStrip"

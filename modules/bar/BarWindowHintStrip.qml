@@ -31,14 +31,10 @@ Item {
     property int columnWidth: HintLogic.COLUMN_WIDTH
     // Gap between columns, and the pitch it produces.
     //
-    // The columns were flush: one column's right edge was the next one's left edge,
-    // so a band covering a whole column necessarily touched its neighbours on both
-    // sides and read as the panel's own background rather than as a band under one
-    // workspace. The bar's workspace widget does not have that problem because its
-    // squares are separated by `inlineGap` and the highlight covers exactly one
-    // square - the separation IS the margin. Same token, same idea, one size up: the
-    // band is as wide as the column it marks and the breathing room is around it,
-    // rather than the band being shrunk to make room inside it.
+    // The columns were flush: one column's right edge was the next one's left edge, so
+    // the cards in adjacent columns touched and the three columns read as one block
+    // rather than as three workspaces. The bar's workspace widget separates its squares
+    // by `inlineGap`, and this is the same token at three times the size.
     property int columnGutter: 0
     readonly property int columnPitch: columnWidth + columnGutter
     // Padding between the band's edge and the cards inside it, on every side.
@@ -88,78 +84,6 @@ Item {
                 tallest = column.height
         }
         return tallest
-    }
-
-    // --- active-workspace background, the workspace widget's surface ---------
-    // The bar's `Workspaces.qml` draws the active workspace as one rectangle behind
-    // the squares rather than each square popping its own fill, and this strip is
-    // that widget's run of columns at three times the size. So the active column gets
-    // the same surface, in the same token, sharp-cornered - and deliberately NOT a
-    // fill on the column's own delegate, which would cross-fade between two columns
-    // instead of travelling.
-    //
-    // Neighbour columns get no fill, matching the widget: there, a square that is not
-    // active has none either and shows only instant hover. Here the neighbour columns
-    // carry their own muted labels, so a tint behind them would say they are selected
-    // too.
-    //
-    // THE BAND HAS NO CLOCK OF ITS OWN, and that is the whole design. It looks like
-    // the widget's sliding highlight but is placed, not animated: its x is the active
-    // slot times the column width, written the instant the slot changes, exactly like
-    // every column's own x. All of its motion is the strip travelling.
-    //
-    // It had a `Behavior on x` on the widget's recipe, to "match" the crossing's
-    // curve, and that was a second clock running alongside the first. The body snaps
-    // the strip's offset instantly when a crossing ends - the strip has to narrow to
-    // three columns and return to offset 0 in the same step, or the panel is left
-    // uncovered - so for one frame the band was a column right of where it belonged,
-    // and then it slid back over the crossing's own duration. That is the right-to-
-    // left jump on every switch. Two animations on the same curve are not on the same
-    // clock, and only one of them can be right.
-    //
-    // Carried rather than driven, the band cannot drift from the crossing at all: the
-    // widget's squares are fixed and the highlight moves between them, whereas here
-    // the columns move and the highlight rides along, which reads the same and has
-    // nothing to keep in step.
-    property bool _highlightOn: false
-
-    // Place the band on the active slot. A binding on `activeColumnX` would do, and
-    // did not: it is set from the plan on the body, and the plan changes in the same
-    // step that snaps the strip's offset, so a bound band and an animated band
-    // disagree about when the switch happened.
-    function _syncHighlight() {
-        root._highlightOn = root.columns.length > 0
-    }
-
-    onActiveSlotChanged: _syncHighlight()
-    onColumnsChanged: _syncHighlight()
-    Component.onCompleted: _syncHighlight()
-
-    // The band. Below the columns (`z: -1`, as in the widget) so it is a background
-    // and never an overlay on a title, and sharp-cornered: this is a column band, and
-    // the design language keeps rounding for component details.
-    //
-    // Inset from the column's own edges. At the full column width it butts straight
-    // against the neighbouring columns and reads as the panel's own background rather
-    // than as a band under one workspace - which is what it was reported as.
-    Rectangle {
-        id: activeHighlight
-        objectName: "windowHintColumnHighlight"
-        z: -1
-        x: root.activeColumnX
-        width: root.columnWidth
-        // The CELL, not the card block: the band's edges are the panel's edges.
-        //
-        // The strip is the card block, sitting `cellPadding` down inside the panel, so
-        // the band reaches one padding above it and one padding below - hence `y` of
-        // minus a padding against a height one padding taller than the block. Both
-        // terms are needed: with the height left at the block's own, the band's bottom
-        // sat a padding short and the bottom margin came out at zero.
-        y: -root.cellPadding
-        height: root.height + root.cellPadding
-        visible: root._highlightOn
-        color: LazerTheme.activeFill
-        enabled: false
     }
 
     // One delegate per workspace position. `x` is DERIVED from the index rather
