@@ -83,18 +83,31 @@ Item {
     // through the other. Shallow on purpose: enough to register, far too little to
     // read as a fade.
     readonly property real slideDip: Math.sin(Math.PI * slideProgress) * 0.12
-    // Where the head hands over to the tail, as a share of the traverse. Past this
-    // point the remaining distance is covered on the indicator's long OutSine, so
-    // putting it too high leaves a short settle and too low leaves a long crawl
-    // before the content even starts moving.
-    readonly property real slideHeadShare: 0.82
-    // Both phases, for anything that has to wait the crossing out.
-    readonly property int slideDuration: MotionTokens.fast + MotionTokens.slow
-    // The crossing's own recipe, so a suite can assert the two phases rather than
-    // the tokens they were written from. A test that reads `MotionTokens.slow`
-    // instead checks that a token exists, not that the animation uses it - which
-    // is exactly the mistake a retune of this file would reintroduce.
+    // Where the head hands over to the tail, as a share of the traverse.
+    //
+    // Chosen so the tail has real distance left to close rather than a crawl: the
+    // indicator's own tail is still a third of its way along when the head lands,
+    // and that is what keeps the settle readable instead of looking like the motion
+    // stopped and then restarted.
+    readonly property real slideHeadShare: 0.7
+    // The two clocks, which are the indicator's two clocks and nothing else. The
+    // same tokens, in the same roles, that drive the head and tail Behaviors below
+    // - see the note on `slideRun` for why the crossing cannot be a single ease.
+    readonly property int slideHeadDuration: MotionTokens.medium
+    readonly property int slideTailDuration: MotionTokens.slow * 2
+    // Both phases, for anything that has to wait the crossing out. This is longer
+    // than the indicator's 480ms settle, because there the two speeds run in
+    // parallel and here they run one after the other - the same two speeds in the
+    // same order, not the same total.
+    readonly property int slideDuration: slideHeadDuration + slideTailDuration
+    // The crossing's own recipe, and the indicator's, so a suite can compare the
+    // two against each other. A test that reads `MotionTokens.slow > MotionTokens.fast`
+    // instead checks that two numbers exist somewhere in the file, not that the
+    // crossing runs on them - which is exactly the mistake a retune would
+    // reintroduce, and which one already had.
     readonly property alias slideAnimation: slideRun
+    readonly property alias indicatorHeadMotion: indicatorHeadAnimation
+    readonly property alias indicatorTailMotion: indicatorTailAnimation
     readonly property int rowHeight: 28
     // The one row the focus indicator belongs to, or -1. Read from the INCOMING
     // column, which is the content the user is looking at.
@@ -212,35 +225,45 @@ Item {
 
     SequentialAnimation {
         id: slideRun
-        // The crossing runs on the INDICATOR's curve, not one symmetric ease.
+        // The crossing runs on the INDICATOR's motion: same two speeds, same two
+        // curves, same order.
         //
-        // The focus indicator beside the rows moves on two speeds: a head that
-        // commits fast on OutQuad and a tail that lingers on a much longer
-        // OutSine. That two-speed shape is what makes it read as carrying weight
-        // rather than being dragged, and a single ease cannot produce it - the
-        // symmetric `InOutSine` this replaced left and arrived at the same gentle
-        // rate, which read as a shove rather than a crossing.
+        // The indicator beside the rows moves a head that commits fast on OutQuad
+        // and a tail that lingers on a much longer OutSine. That two-speed shape
+        // is what makes it read as carrying weight rather than being dragged, and
+        // a single ease cannot produce it - the symmetric `InOutSine` this replaced
+        // left and arrived at the same gentle rate, which read as a shove.
         //
-        // So the traverse is the same two phases, in sequence, on one progress
-        // value: most of the distance committed quickly, then a settle. The curves
-        // are the indicator's own. The head is `fast` and the tail `slow`, where
-        // the indicator uses `medium` and `slow * 2` - the same shape at a shorter
-        // travel, because a whole panel's width is not the indicator's 16px bar.
+        // So the traverse is the same two phases in sequence on one progress
+        // value, on the indicator's own clocks: `medium` to commit the head, then
+        // `slow * 2` to settle the tail. The durations are the indicator's, not a
+        // rescaled approximation of them - a faster version of the same curve is
+        // a different motion, and it is the speed as much as the shape that makes
+        // the indicator what it is.
+        //
+        // What cannot be identical is the total: the indicator's head and tail run
+        // in PARALLEL on two positions with a drawn bar between them, so it settles
+        // in `slow * 2`. Here there is one position - the seam - and it has to
+        // cover both phases, so the crossing is `medium + slow * 2`. Giving the two
+        // layers the two speeds separately would have been the literal version and
+        // it cannot work: coverage only holds when the arriving layer runs ahead,
+        // which means it lands early and hides the content that is supposed to be
+        // seen sliding out past it.
         animations: [
-            // The indicator's head.
+            // The indicator's head, on the indicator's head clock.
             NumberAnimation {
                 target: root
                 property: "slideProgress"
                 to: root.slideHeadShare
-                duration: MotionTokens.fast
+                duration: root.slideHeadDuration
                 easing.type: Easing.OutQuad
             },
-            // The indicator's tail.
+            // The indicator's tail, on the indicator's tail clock.
             NumberAnimation {
                 target: root
                 property: "slideProgress"
                 to: 1
-                duration: MotionTokens.slow
+                duration: root.slideTailDuration
                 easing.type: Easing.OutSine
             }
         ]
@@ -261,13 +284,21 @@ Item {
 
     Behavior on _headY {
         enabled: root._placed && !MotionTokens.reducedMotion && !root._snapping
-        NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad }
+        NumberAnimation {
+            id: indicatorHeadAnimation
+            duration: root.slideHeadDuration
+            easing.type: Easing.OutQuad
+        }
     }
     Behavior on _tailY {
         enabled: root._placed && !MotionTokens.reducedMotion && !root._snapping
         // 3x the head's flight: the tail lingers long after the head lands, which
         // is what keeps the stretch readable.
-        NumberAnimation { duration: MotionTokens.slow * 2; easing.type: Easing.OutSine }
+        NumberAnimation {
+            id: indicatorTailAnimation
+            duration: root.slideTailDuration
+            easing.type: Easing.OutSine
+        }
     }
 
     // Commit head and tail together with the Behaviors suppressed. Both writes use

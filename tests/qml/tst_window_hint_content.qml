@@ -790,19 +790,30 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // one leaves and arrives at the same rate, which is the shove.
             var phases = body.slideAnimation.animations
             compare(phases.length, 2, "the crossing is two phases, not one ease")
-            // The head, which commits most of the way quickly.
             compare(phases[0].to, body.slideHeadShare, "the head hands over at the share")
             verify(body.slideHeadShare > 0.5 && body.slideHeadShare < 1,
                 "and that share is most of the way, not all of it")
-            compare(phases[0].easing.type, Easing.OutQuad,
-                "on the indicator's head curve")
-            // The tail, which lingers. This is the assertion that matters: the tail
-            // must outlast the head or there is no two-speed shape left, and that
-            // is the whole difference between the indicator's motion and a plain
-            // ease. Read off the ANIMATION, not off the token - checking the token
-            // only proves a number exists somewhere in the file.
-            compare(phases[1].easing.type, Easing.OutSine,
-                "on the indicator's tail curve")
+
+            // "Same curve AND same speed as the indicator" means the same curves
+            // on the same clocks, so both sides are read off the live objects: the
+            // crossing's own phases against the indicator's own two Behaviors. A
+            // comparison against `MotionTokens` would only prove the two numbers
+            // exist in the file - and it already did, green, on a crossing whose
+            // tail was no slower than its head.
+            compare(phases[0].easing.type, body.indicatorHeadMotion.easing.type,
+                "the head runs on the indicator's head curve")
+            compare(phases[0].duration, body.indicatorHeadMotion.duration,
+                "and the indicator's head clock, was "
+                    + body.indicatorHeadMotion.duration + " against " + phases[0].duration)
+            compare(phases[1].easing.type, body.indicatorTailMotion.easing.type,
+                "the tail runs on the indicator's tail curve")
+            compare(phases[1].duration, body.indicatorTailMotion.duration,
+                "and the indicator's tail clock, was "
+                    + body.indicatorTailMotion.duration + " against " + phases[1].duration)
+
+            // The tail must outlast the head, or there is no two-speed shape left
+            // - that is the whole difference between the indicator's motion and a
+            // plain ease.
             verify(phases[1].duration > phases[0].duration,
                 "and the tail outlasts the head, was "
                     + phases[0].duration + " then " + phases[1].duration)
