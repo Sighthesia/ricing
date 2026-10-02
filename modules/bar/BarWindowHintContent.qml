@@ -83,22 +83,18 @@ Item {
     // `BarWindowHintStrip.columnGutter` for why the panel needs one.
     readonly property int columnGutter: LazerTheme.inlineGap
     readonly property int columnPitch: columnWidth + columnGutter
-    // Padding between the band and the cards it marks. DELIBERATELY ZERO.
+    // Padding between the band and the cards it marks: present, and as small as it
+    // can be while still being there.
     //
-    // The band's reference for this is the widget's HOVER highlight rather than its
-    // active one: `Workspaces.qml` draws hover as `anchors.fill: parent` with
-    // `radius: 0` - flush to the square's edges, sharp-cornered, no inset at all.
-    // That is the arrangement here: the band IS the cell and the cards fill it.
+    // Zero read as one solid mass - the band stopped being a slot the cards sit in and
+    // became the cards' own background, which is what the surface behind them already
+    // is. Eight, which is `Workspaces.cellPadding`, read as a margin: the band looked
+    // like a separate floating surface rather than the column the cards are in. At a
+    // column three times the widget's size, the widget's own padding does not transfer.
     //
-    // This went round three times. The band was inset 8px, which left the cards
-    // overhanging it; then the columns were given a gap with the band still flush,
-    // which left the band butting its neighbours; then the cards were inset 8px
-    // inside their cell, which made the band float around them and read as a separate
-    // surface rather than as the slot the cards are in. Flush is what all three were
-    // reaching for.
-    //
-    // Left as a property so the geometry stays in one place, but zero on purpose.
-    readonly property int cellPadding: 0
+    // Two pixels is a hairline: enough that the band's edge is legible as an edge, and
+    // not enough to read as space.
+    readonly property int cellPadding: 2
     // The band's radius: square, like the widget's hover highlight and its active
     // highlight - both are `radius: 0`. A rounded band was tried and read as a slot
     // floating over the panel rather than as the column itself; the design language

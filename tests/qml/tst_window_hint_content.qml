@@ -1144,9 +1144,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(body.columnPitch, body.columnWidth + body.columnGutter,
                 "the pitch is the column plus the gap")
 
-            // FLUSH on every side. The band's reference is the widget's hover
-            // highlight - `anchors.fill: parent`, `radius: 0` - so the band IS the cell
-            // and the cards fill it, with no margin between them.
+            // A SMALL, STATED margin on every side - not flush, and not the widget's 8.
             //
             // Measured from real cards, not from the focus highlight: that sits on
             // whichever row is current, so its top edge says nothing about the band's
@@ -1154,11 +1152,13 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // neighbours get plain labels - so every row found here belongs to the
             // column the band is on.
             //
-            // The expected value is a literal 0 and the claim is FLUSHNESS, not a
-            // number: an earlier version compared the measured gap against
-            // `body.cellPadding`, the same constant the component used, so with the
-            // padding at 0 it compared 0 against 0 and passed - with or without a
-            // padding. Asserting the gap must be zero cannot be argued with.
+            // The expected number lives HERE, not read back from `body.cellPadding`: a
+            // test whose expected value is the component's own constant cannot tell
+            // "the padding is there" from "the padding is gone" - with the padding at 0
+            // it compared 0 against 0 and passed either way. Stated here it has to be
+            // argued with, and 2 is the value the design settled on: zero read as one
+            // solid mass, eight read as a floating margin.
+            var expectedMargin = 2
             var cards = findAllByName(body, "windowHintWindowRow")
             verify(cards.length > 0, "the active column has cards to measure against")
             if (cards.length > 0) {
@@ -1170,10 +1170,9 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                     if (cards[ci].y + cards[ci].height > bottom)
                         bottom = cards[ci].y + cards[ci].height
                 }
-                // Both edges measured in the body's space: the cards are in the
-                // strip's, and the band is in the body's, so comparing a card's own y
-                // against the band's would put a strip-relative number next to a
-                // body-relative one.
+                // Both edges measured in the body's space: the cards are in the strip's
+                // and the band is in the body's, so comparing a card's own y against the
+                // band's would put a strip-relative number next to a body-relative one.
                 var box = body
                 var topCard = cards[0].mapToItem(box, 0, 0)
                 var blockTop = topCard.y + top
@@ -1181,16 +1180,16 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 var blockLeft = topCard.x
                 var blockRight = blockLeft + cards[0].width
                 var bandBox = band.mapToItem(box, 0, 0)
-                compare(blockTop - bandBox.y, 0,
-                    "padding above the first card, was " + (blockTop - bandBox.y))
+                compare(blockTop - bandBox.y, expectedMargin,
+                    "margin above the first card, was " + (blockTop - bandBox.y))
                 // The band's own height, not a mapped one: `mapToItem` returns a point.
-                // Measured at rest, where the scale is 1, so the untransformed height
-                // is the visual one.
-                compare(band.height - (blockBottom - bandBox.y), 0,
+                // Measured at rest, where the scale is 1, so the untransformed height is
+                // the visual one.
+                compare(band.height - (blockBottom - bandBox.y), expectedMargin,
                     "and below the last, was " + (band.height - (blockBottom - bandBox.y)))
-                compare(blockLeft - bandBox.x, 0,
+                compare(blockLeft - bandBox.x, expectedMargin,
                     "and to the left of the cards, was " + (blockLeft - bandBox.x))
-                compare(bandBox.x + band.width - blockRight, 0,
+                compare(bandBox.x + band.width - blockRight, expectedMargin,
                     "and to the right, was " + (bandBox.x + band.width - blockRight))
             }
         }

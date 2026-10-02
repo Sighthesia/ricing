@@ -341,10 +341,9 @@ Item {
             verify(wash !== null, "the focus highlight should exist")
             // One column plus the gap before it: the middle column starts a pitch in,
             // and the pitch is the column plus the gap.
-            // One column plus the gap before it. The band is flush with its cards, so
-            // there is no cell padding in this number - the middle column starts a
-            // pitch in and the highlight sits at the column's own left edge.
-            compare(wash.x, 180 + 6,
+            // One column, plus the gap between columns, plus the hairline the cards
+            // sit inside their cell with.
+            compare(wash.x, 180 + 6 + 2,
                 "and the active workspace is still the middle one, was " + wash.x)
             // All three columns fit, so nothing is drawn past the surface.
             var strip = findByName(body, "windowHintStrip")
