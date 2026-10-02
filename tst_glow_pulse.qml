@@ -214,6 +214,7 @@ Item {
                    && root.lateCard.glowOriginX <= root.lateCard.width)
         root.checkStacking()
         root.checkContinuousEmission()
+        root.checkStartupMute()
         root.phase = 6
     }
 
