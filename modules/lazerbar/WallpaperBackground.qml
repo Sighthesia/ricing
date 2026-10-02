@@ -33,6 +33,13 @@ Variants {
     // delegate, the per-screen Scope is never instantiated, and every wallpaper
     // surface silently disappears from the compositor while the rest of the
     // shell keeps working. See tests/qml/tst_variants_delegate.qml.
+    //
+    // "Ahead of the Scope" includes children contributed from outside this file:
+    // this component's root object is the Variants, so anything declared inline
+    // at an instantiation site joins the same data list. `Connections { ... }`
+    // written inside `LazerBar.WallpaperBackground { ... }` in shell.qml lost the
+    // wallpaper this way, and removing an in-file offender does not help while
+    // one remains at the call site. Put wiring beside the component instead.
     readonly property bool bootReady: BootLogic.isReady(
         root.finishedBootScreens, root.currentBootKeys())
         && Services.SettingsService.settingsReady

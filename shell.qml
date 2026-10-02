@@ -375,13 +375,23 @@ ShellRoot {
             if (bootStarted)
                 root.mountChromeForWallpaperBootstrap()
         }
+    }
 
-        Connections {
-            target: Services.SettingsService
-            function onSettingsReadyChanged() {
-                if (Services.SettingsService.settingsReady)
-                    root.mountChromeForWallpaperBootstrap()
-            }
+    // Deliberately a sibling of `WallpaperBackground`, never a child of it.
+    // `WallpaperBackground`'s root object is a `Variants`, and Quickshell picks
+    // its `delegate` from whatever ends up first in that object's `data` list —
+    // which includes inline children written here at the instantiation site, not
+    // only the ones in the component file. A `Connections` sitting here used to
+    // become the delegate, so Quickshell handed it a `modelData` it has no
+    // property for, deleted it, and no screen ever got a wallpaper window. The
+    // desktop then fell through to niri's own background colour with no error
+    // beyond one `qs:`-category line naming `shell.qml` and `Connections`, and
+    // every other surface kept working. Keep the wiring here.
+    Connections {
+        target: Services.SettingsService
+        function onSettingsReadyChanged() {
+            if (Services.SettingsService.settingsReady)
+                root.mountChromeForWallpaperBootstrap()
         }
     }
 
