@@ -341,7 +341,9 @@ Item {
             verify(wash !== null, "the focus highlight should exist")
             // One column plus the gap before it: the middle column starts a pitch in,
             // and the pitch is the column plus the gap.
-            compare(wash.x, 180 + 6,
+            // One column plus the gap before it, plus the cell padding the cards sit
+            // inside: the highlight is placed against the card, not the cell.
+            compare(wash.x, 180 + 6 + 8,
                 "and the active workspace is still the middle one, was " + wash.x)
             // All three columns fit, so nothing is drawn past the surface.
             var strip = findByName(body, "windowHintStrip")

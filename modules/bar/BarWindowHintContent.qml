@@ -83,6 +83,20 @@ Item {
     // `BarWindowHintStrip.columnGutter` for why the panel needs one.
     readonly property int columnGutter: LazerTheme.inlineGap
     readonly property int columnPitch: columnWidth + columnGutter
+    // Padding between the band and the cards it marks, on every side.
+    //
+    // `Workspaces.qml`'s square is `contentRow.implicitWidth + cellPadding * 2` wide
+    // and a fixed height taller than its content, and `activeHighlight` covers that
+    // square exactly. So the margin in the widget is INSIDE the marked cell, not
+    // between the highlight and the thing it marks - which is why insetting the band
+    // was wrong here too: it shrank the marked cell while the cards stayed put, and
+    // they overhung it.
+    //
+    // So the column is the square, the cards sit `cellPadding` inside it, and the band
+    // is taller than the card block by the same amount - which is what makes the band
+    // read as a cell with something in it rather than as a frame drawn tight around
+    // the cards.
+    readonly property int cellPadding: 8
     readonly property int shownColumnCount: HintLogic.COLUMN_COUNT
     // Where the strip's travel starts and ends, in pixels, and the offset as a
     // function of the one clock. Computed rather than animated per layer because
@@ -161,6 +175,10 @@ Item {
     // Top edge of the focused row, 0 when there is none. One source of truth for
     // both markers below, so the frame and the indicator can never disagree about
     // which row is current.
+    // Top edge of the focused row, in the strip's space. The cards start at the
+    // strip's own top - the band is what sits a padding above them, not the cards -
+    // so this carries no padding term. It did, briefly, and put the row highlight a
+    // whole padding below the card it is drawn over.
     readonly property real focusedRowTop: focusedRowIndex < 0 ? 0
         : focusedRowIndex * rowPitch
     // The leaving frame's own height, from the row counts of the frame being held
@@ -487,7 +505,7 @@ Item {
     // own height once it has landed. The empty-workspace placeholder lives inside
     // the columns, so the columns' own height already accounts for it.
     implicitHeight: ready
-        ? Math.max(root._outgoingHeight, strip.contentHeight)
+        ? Math.max(root._outgoingHeight, strip.contentHeight) + cellPadding * 2
         : emptyText.implicitHeight
     width: implicitWidth
     height: implicitHeight
@@ -504,9 +522,13 @@ Item {
         // active column in the panel's middle - and during a crossing it is
         // somewhere between the plan's start and end.
         x: root.slideOffset
-        y: 0
+        // A padding down from the panel's top edge, and correspondingly shorter than
+        // the panel: the strip is the card block, and the padding belongs to the panel
+        // around it. Sized from the panel it overran the bottom by a whole padding,
+        // which put the band's bottom margin out of step with its top.
+        y: root.cellPadding
+        height: Math.max(0, root.height - root.cellPadding * 2)
         width: root.stripWidth
-        height: root.height
         // One object moving, so one dim. With two copies crossing this had to be
         // applied to both in lockstep or the seam would show one through the other;
         // with one strip there is no seam, and the value is a pure function of the
@@ -519,6 +541,7 @@ Item {
         activeSlot: root.plan ? root.plan.activeSlot : 1
         columnWidth: root.columnWidth
         columnGutter: root.columnGutter
+        cellPadding: root.cellPadding
         listSpacing: root.listSpacing
         rowHeight: root.rowHeight
         glyphInset: root.glyphInset
@@ -555,9 +578,9 @@ Item {
         // it marks, and the row spans its column's full width. Measured from the
         // active column's own x, so it cannot be drawn over a column that is not
         // the active one whatever the layout decided.
-        x: strip.activeColumnX
+        x: strip.activeColumnX + root.cellPadding
         y: root.focusedRowTop
-        width: root.columnWidth
+        width: strip.cardWidth
         height: root.rowHeight
         opacity: root.hasTarget ? 1 : 0
 
@@ -593,7 +616,7 @@ Item {
         color: LazerTheme.osuGreen
         // Measured from the active column's own left edge, which is the same origin
         // the highlight uses, so the bar and the fill it marks always move together.
-        x: strip.activeColumnX + root.indicatorInset
+        x: strip.activeColumnX + root.cellPadding + root.indicatorInset
         y: root._barTop
         visible: root.hasTarget
         opacity: root.hasTarget ? 1 : 0
