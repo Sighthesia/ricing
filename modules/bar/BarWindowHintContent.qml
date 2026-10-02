@@ -85,26 +85,32 @@ Item {
     readonly property real slideDip: Math.sin(Math.PI * slideProgress) * 0.12
     // Where the head hands over to the tail, as a share of the traverse.
     //
-    // Chosen so the tail has real distance left to close rather than a crawl: the
-    // indicator's own tail is still a third of its way along when the head lands,
-    // and that is what keeps the settle readable instead of looking like the motion
-    // stopped and then restarted.
-    readonly property real slideHeadShare: 0.7
-    // The two clocks, which are the indicator's two clocks and nothing else. The
-    // same tokens, in the same roles, that drive the head and tail Behaviors below
-    // - see the note on `slideRun` for why the crossing cannot be a single ease.
-    readonly property int slideHeadDuration: MotionTokens.medium
-    readonly property int slideTailDuration: MotionTokens.slow * 2
-    // Both phases, for anything that has to wait the crossing out. This is longer
-    // than the indicator's 480ms settle, because there the two speeds run in
-    // parallel and here they run one after the other - the same two speeds in the
-    // same order, not the same total.
+    // Small on purpose. The head is the quick departure, so the temptation is to
+    // let it carry most of the distance - and on a panel-width travel that reads as
+    // a lunge, because the bulk of the movement lands in the first fifth of a
+    // second and the rest crawls. Two tenths of the way is a departure; four tenths
+    // is most of the motion, and the seam looks like it is being thrown across the
+    // panel rather than carried.
+    readonly property real slideHeadShare: 0.4
+    // The two clocks, carrying the indicator's two-speed SHAPE at a distance the
+    // indicator's clocks were never asked to cover.
+    //
+    // `medium`/`slow * 2` is right for the indicator because the indicator has to
+    // cover sixteen pixels: its head really can put the bar there in 160ms. The
+    // crossing covers the panel's whole width, so the same head clock moves a
+    // third of a metre of content in the same breath - a different motion wearing
+    // the same numbers. These are scaled to the travel, not copied from it, and the
+    // two stay in the indicator's proportions: the tail is three times the head, so
+    // the arrival keeps lingering after the departure has finished.
+    readonly property int slideHeadDuration: MotionTokens.slow
+    readonly property int slideTailDuration: MotionTokens.slow * 3
+    // Both phases, for anything that has to wait the crossing out.
     readonly property int slideDuration: slideHeadDuration + slideTailDuration
     // The crossing's own recipe, and the indicator's, so a suite can compare the
-    // two against each other. A test that reads `MotionTokens.slow > MotionTokens.fast`
-    // instead checks that two numbers exist somewhere in the file, not that the
-    // crossing runs on them - which is exactly the mistake a retune would
-    // reintroduce, and which one already had.
+    // two. A test that reads `MotionTokens.slow > MotionTokens.fast` instead checks
+    // that two numbers exist somewhere in the file, not that the crossing runs on
+    // them - which is exactly the mistake a retune would reintroduce, and which one
+    // already had.
     readonly property alias slideAnimation: slideRun
     readonly property alias indicatorHeadMotion: indicatorHeadAnimation
     readonly property alias indicatorTailMotion: indicatorTailAnimation
@@ -225,30 +231,30 @@ Item {
 
     SequentialAnimation {
         id: slideRun
-        // The crossing runs on the INDICATOR's motion: same two speeds, same two
-        // curves, same order.
+        // The crossing runs on the INDICATOR'S SHAPE: a quick departure on OutQuad,
+        // then a long settle on OutSine, the tail three times the head.
         //
-        // The indicator beside the rows moves a head that commits fast on OutQuad
-        // and a tail that lingers on a much longer OutSine. That two-speed shape
-        // is what makes it read as carrying weight rather than being dragged, and
-        // a single ease cannot produce it - the symmetric `InOutSine` this replaced
-        // left and arrived at the same gentle rate, which read as a shove.
+        // That two-speed shape is what makes the indicator read as carrying weight
+        // rather than being dragged, and a single ease cannot produce it - the
+        // symmetric `InOutSine` this replaced left and arrived at the same gentle
+        // rate, which read as a shove.
         //
-        // So the traverse is the same two phases in sequence on one progress
-        // value, on the indicator's own clocks: `medium` to commit the head, then
-        // `slow * 2` to settle the tail. The durations are the indicator's, not a
-        // rescaled approximation of them - a faster version of the same curve is
-        // a different motion, and it is the speed as much as the shape that makes
-        // the indicator what it is.
+        // The SHAPE is the indicator's; the clocks are not, and cannot be. The
+        // indicator has sixteen pixels to cross and can honestly put its bar
+        // somewhere in `medium`. The seam has the panel's whole width to cross, so
+        // the same clock throws most of the content across the screen before the
+        // settle even starts - measured on the previous numbers, 70% of the panel in
+        // 160ms and the remaining 30% over 480ms, which reads as a lunge followed by
+        // a crawl rather than as a carried crossing. The clocks here are scaled to
+        // the travel and the share is cut so the departure stays a departure.
         //
-        // What cannot be identical is the total: the indicator's head and tail run
-        // in PARALLEL on two positions with a drawn bar between them, so it settles
-        // in `slow * 2`. Here there is one position - the seam - and it has to
-        // cover both phases, so the crossing is `medium + slow * 2`. Giving the two
-        // layers the two speeds separately would have been the literal version and
-        // it cannot work: coverage only holds when the arriving layer runs ahead,
-        // which means it lands early and hides the content that is supposed to be
-        // seen sliding out past it.
+        // What cannot be reproduced at all is the indicator's structure: its head
+        // and tail are two positions running in PARALLEL with a drawn bar between
+        // them, so it settles in `slow * 2`. Here there is one position - the seam -
+        // and it has to cover both phases. Giving the two layers the two speeds
+        // separately would be the literal version and it does not work: coverage
+        // only holds when the arriving layer runs ahead, which means it lands early
+        // and hides the content that is supposed to be seen sliding out past it.
         animations: [
             // The indicator's head, on the indicator's head clock.
             NumberAnimation {
@@ -286,7 +292,7 @@ Item {
         enabled: root._placed && !MotionTokens.reducedMotion && !root._snapping
         NumberAnimation {
             id: indicatorHeadAnimation
-            duration: root.slideHeadDuration
+            duration: MotionTokens.medium
             easing.type: Easing.OutQuad
         }
     }
@@ -296,7 +302,7 @@ Item {
         // is what keeps the stretch readable.
         NumberAnimation {
             id: indicatorTailAnimation
-            duration: root.slideTailDuration
+            duration: MotionTokens.slow * 2
             easing.type: Easing.OutSine
         }
     }

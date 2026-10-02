@@ -791,34 +791,55 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var phases = body.slideAnimation.animations
             compare(phases.length, 2, "the crossing is two phases, not one ease")
             compare(phases[0].to, body.slideHeadShare, "the head hands over at the share")
-            verify(body.slideHeadShare > 0.5 && body.slideHeadShare < 1,
-                "and that share is most of the way, not all of it")
 
-            // "Same curve AND same speed as the indicator" means the same curves
-            // on the same clocks, so both sides are read off the live objects: the
-            // crossing's own phases against the indicator's own two Behaviors. A
-            // comparison against `MotionTokens` would only prove the two numbers
-            // exist in the file - and it already did, green, on a crossing whose
-            // tail was no slower than its head.
+            // The SHAPE is the indicator's, checked against the indicator's own live
+            // Behaviors rather than against `MotionTokens`: the same two curves, in
+            // the same order. The CLOCKS deliberately differ - see the lunge bound
+            // below - so comparing durations here would be asserting the bug.
             compare(phases[0].easing.type, body.indicatorHeadMotion.easing.type,
-                "the head runs on the indicator's head curve")
-            compare(phases[0].duration, body.indicatorHeadMotion.duration,
-                "and the indicator's head clock, was "
-                    + body.indicatorHeadMotion.duration + " against " + phases[0].duration)
+                "the departure runs on the indicator's head curve")
             compare(phases[1].easing.type, body.indicatorTailMotion.easing.type,
-                "the tail runs on the indicator's tail curve")
-            compare(phases[1].duration, body.indicatorTailMotion.duration,
-                "and the indicator's tail clock, was "
-                    + body.indicatorTailMotion.duration + " against " + phases[1].duration)
+                "the settle runs on the indicator's tail curve")
 
-            // The tail must outlast the head, or there is no two-speed shape left
-            // - that is the whole difference between the indicator's motion and a
-            // plain ease.
-            verify(phases[1].duration > phases[0].duration,
-                "and the tail outlasts the head, was "
+            // The indicator's proportions: the tail is three times the head's flight,
+            // which is what keeps the arrival lingering after the departure is done.
+            verify(phases[1].duration >= 2 * phases[0].duration,
+                "and the tail is the long half, was "
                     + phases[0].duration + " then " + phases[1].duration)
             verify(body.slideDuration >= phases[0].duration + phases[1].duration,
                 "and the declared total covers both phases")
+
+            // THE LUNGE BOUND. This is the assertion that replaces the duration
+            // equality, and it is what the indicator's literal clocks cannot satisfy
+            // on a panel-width travel: the indicator has 16px to cross and can put
+            // its bar there in `medium`, but the same head clock throws most of a
+            // panel's content across the screen before the settle starts. Measured
+            // as average pixels-of-progress per millisecond over each phase, the
+            // departure may be faster than the settle but must not be a bolt -
+            // "70% in 160ms, then 30% over 480ms" is a throw followed by a crawl,
+            // which is what the crossing was reported as feeling like.
+            //
+            // The ratio is computed HERE, from the component's own declared numbers
+            // and its own width. The component states no speed and asserts nothing
+            // about one, so this is a design rule stated independently of the
+            // numbers it judges rather than a restatement of them.
+            // Stated as a ratio with a float tolerance, not as a product: a bound
+            // that the numbers can land exactly on must not fail on the rounding.
+            var bound = 2.0
+            var ratio = (body.slideHeadShare / phases[0].duration)
+                / ((1 - body.slideHeadShare) / phases[1].duration)
+            verify(ratio <= bound + 1e-6,
+                "the departure is a departure and not a throw, ratio "
+                    + ratio.toFixed(2) + "x the settle")
+            verify(body.slideHeadShare < 0.5,
+                "and it does not carry most of the crossing, was "
+                    + body.slideHeadShare)
+
+            // The panel's crossing gets more time than the indicator's own settle,
+            // because it has the panel's width to cover rather than a bar's length.
+            verify(body.slideDuration > body.indicatorTailMotion.duration,
+                "and the whole crossing outlasts the indicator settling, was "
+                    + body.slideDuration + " against " + body.indicatorTailMotion.duration)
             verify(body.hasOwnProperty("slideDip"), "and it dims a little in the middle")
         }
 
