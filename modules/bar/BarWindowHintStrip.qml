@@ -2,262 +2,263 @@ import QtQuick
 import "../lazerbar"
 import "./WindowHintMenuLogic.js" as HintLogic
 
-// One snapshot's three columns and nothing else: the workspace before, the active
-// workspace, and the workspace after.
+// One strip of workspace columns and nothing else: a run of consecutive
+// workspaces, left to right, the active one among them.
 //
-// Instantiated twice by the body - once for the content on screen, once for the
-// content on its way off - so a workspace switch is two of these translating in
-// the same direction rather than one being replaced. The outgoing copy is inert.
+// Instantiated once by the body. A workspace switch is not two copies of this
+// sliding past each other - it is ONE strip, `span + 3` columns wide, travelling
+// by `span` columns so that it begins on the frame being left and ends on the
+// frame arriving. Every workspace position is in the strip exactly once, which is
+// why no window title can be painted twice during the crossing: there is only one
+// place it could be painted from. See `WindowHintMenuLogic.stripPlan`.
 //
 // The focus highlight and the indicator are NOT here. Focus belongs to the
-// content that is arriving; a marker on the outgoing copy would blink a second
-// time for a workspace the user has already left, and the two copies would
-// disagree about which row is current while both are on screen.
+// content that is arriving, and the body owns those markers so they can be placed
+// against `activeColumnX` - which moves during a crossing, unlike the columns'
+// slots, which do not.
 //
-// Geometry and vocabulary are passed in rather than measured, so the two copies
-// are laid out identically and cannot drift apart by a pixel.
+// Geometry and vocabulary are passed in rather than measured, so the strip cannot
+// drift from the panel by a pixel, and `columns` is the ordered list the body built
+// rather than a view model assembled here: the ordering IS the rule that stops the
+// duplication, and there is one place it is decided.
 Item {
     id: root
 
-    // The capped columns to paint: previous / current / next, each
-    // `{ rows, hidden }` as WindowHintMenuLogic builds them.
-    property var columns: HintLogic.cappedColumns(null)
+    // The strip, one entry per workspace position, in order. Each is
+    // `{ position, rows, hidden }` as `WindowHintMenuLogic.stripColumns` builds
+    // them.
+    property var columns: []
     property int columnWidth: HintLogic.COLUMN_WIDTH
     property int listSpacing: 6
     property int rowHeight: 28
     property int glyphInset: 20
     property int glyphWidth: 16
-    // False for the outgoing copy and while a slide is in flight: what is under
-    // the pointer is either leaving or has not arrived.
+    // False while a crossing is in flight: what is under the pointer is either
+    // leaving or has not arrived.
     property bool interactive: true
 
     signal windowActivated(string windowId)
 
-    // The columns are placed by derived x rather than by a `Row`. A positioner
-    // lays out from its children's widths, and a column's width is a binding that
-    // can resolve a beat after a model swap - so it polishes against a stale
-    // width and, because nothing about the columns then changes again, never
-    // re-lays-out. Derived x cannot go stale.
-    //
-    // The active workspace is always the middle column, and not derived from which
-    // neighbours happen to have content. A frame whose centre moves depending on
-    // what is beside it is not a frame: the workspace you are on would appear to
-    // jump sideways whenever a neighbour workspace ran empty, and the panel would
-    // change width under the pointer on the way.
-    readonly property int activeSlot: 1
+    // Which slot holds the workspace the user is on. Dynamic, and it MOVES during
+    // a crossing: the arriving frame's active column starts off-panel and lands in
+    // the middle. The body reads the same number off the plan it built the strip
+    // from, so the two cannot disagree about which column carries the card fill
+    // and which the focus markers.
+    property int activeSlot: 1
     readonly property int activeColumnX: activeSlot * columnWidth
-    readonly property int contentHeight: Math.max(
-        previousColumn.implicitHeight,
-        column.implicitHeight,
-        nextColumn.implicitHeight)
-
-    // Neighbour column: plain labels, no card and no state. The slot exists
-    // whatever it contains, and a workspace with no windows says so rather than
-    // leaving the column blank - a blank column would read as a layout fault
-    // rather than as the fact it is reporting.
-    Column {
-        id: previousColumn
-        objectName: "windowHintPreviousColumn"
-        x: 0
-        width: root.columnWidth
-        spacing: root.listSpacing
-
-        Repeater {
-            model: root.columns.previous.rows
-
-            BarWindowHintLabel {
-                objectName: "windowHintPreviousRow"
-                width: parent.width
-                // `modelData` / `index` are declared as required properties on the
-                // label, so the delegate model fills them. Binding them here would
-                // point each one at ITSELF.
-                rowHeight: root.rowHeight
-                glyphInset: root.glyphInset
-                glyphWidth: root.glyphWidth
-                enabled: root.interactive
-                onActivated: windowId => root.windowActivated(windowId)
-            }
+    // The tallest column on the strip, read off the live delegates. The panel is
+    // sized from this, so it has to be the real laid-out height rather than a
+    // prediction from the row counts - a column's height includes its overflow line
+    // and its placeholder, and predicting that here would be a second copy of the
+    // layout's rules to drift.
+    //
+    // The loop reads `root.columns`, so re-assigning the list re-evaluates it; that is
+    // the only moment the column heights can change, since the rows themselves do not
+    // animate.
+    readonly property int contentHeight: {
+        var columns = root.columns
+        var tallest = 0
+        for (var i = 0; i < columnRepeater.count; ++i) {
+            var column = columnRepeater.itemAt(i)
+            if (column && column.height > tallest)
+                tallest = column.height
         }
-
-        // The slot this column shows when its workspace has no windows.
-        BarWindowHintEmpty {
-            objectName: "windowHintPreviousEmpty"
-            width: parent.width
-            rowHeight: root.rowHeight
-            visible: root.columns.previous.rows.length === 0
-        }
+        return tallest
     }
 
-    // The active column: the only one carrying a card fill, and the one the focus
-    // markers outside this component are positioned against.
-    Column {
-        id: column
-        objectName: "windowHintColumn"
-        x: root.activeColumnX
-        width: root.columnWidth
-        spacing: root.listSpacing
+    // One delegate per workspace position. `x` is DERIVED from the index rather
+    // than accumulated by a `Row`: a positioner's layout lands after the frame that
+    // created the delegate, and a column's width is a binding that can resolve a
+    // beat after the list is replaced, so a positioner would polish against a
+    // stale width and - because nothing about the columns then changes again -
+    // never re-lay-out. Derived x cannot go stale, and a strip that is translated
+    // as one object needs every column to know its own offset from the strip.
+    Repeater {
+        id: columnRepeater
+        model: root.columns
 
-        Repeater {
-            model: root.columns.current.rows
+        // A workspace column. The active slot carries the card fill and the
+        // overflow line; its neighbours are plain labels. Which is which is the
+        // index, not a flag on the model, so a column cannot claim to be the
+        // active one and disagree with the body about it.
+        Column {
+            id: stripColumn
+            required property int index
+            required property var modelData
 
-            // Window row: app icon and title. The row does not tint itself when it
-            // holds focus - the shared highlight is that highlight, and painting it
-            // per row as well would put two fills on screen and read as two
-            // different states. A row's own surface is only ever the hover response.
-            Rectangle {
-                id: windowRow
-                required property var modelData
-                required property int index
+            x: stripColumn.index * root.columnWidth
+            width: root.columnWidth
+            spacing: root.listSpacing
+            readonly property bool isActiveSlot: stripColumn.index === root.activeSlot
 
-                objectName: "windowHintWindowRow"
-                width: parent.width
-                height: root.rowHeight
-                radius: 6
-                transformOrigin: Item.Center
-                color: rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
-                // A Rectangle borders itself by default; the shared highlight is
-                // the only focus signal here, so that default is off.
-                border.width: 0
-                scale: rowPress.pressed ? MotionTokens.pressScale : 1
-                enabled: root.interactive
+            // Window rows: cards in the active column, plain labels either side.
+            // Two Repeaters over mutually exclusive models rather than one
+            // delegate that switches, so a neighbour column instantiates no card
+            // at all - and builds no icon to decode for one.
+            Repeater {
+                model: stripColumn.modelData && stripColumn.isActiveSlot
+                    ? stripColumn.modelData.rows : null
 
-                // Test seam for the shared click-flash recipe.
-                readonly property alias rowFlashAnimation: rowFlash
-                readonly property alias rowFlashOverlay: rowFlashOverlay
+                // Window row: app icon and title. The row does not tint itself when
+                // it holds focus - the shared highlight is that highlight, and
+                // painting it per row as well would put two fills on screen and read
+                // as two different states. A row's own surface is only ever the
+                // hover response.
+                Rectangle {
+                    id: windowRow
+                    required property var modelData
+                    required property int index
 
-                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-                Behavior on scale {
-                    enabled: !MotionTokens.reducedMotion
-                    NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
-                }
+                    objectName: "windowHintWindowRow"
+                    width: parent.width
+                    height: root.rowHeight
+                    radius: 6
+                    transformOrigin: Item.Center
+                    color: rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+                    // A Rectangle borders itself by default; the shared highlight is
+                    // the only focus signal here, so that default is off.
+                    border.width: 0
+                    scale: rowPress.pressed ? MotionTokens.pressScale : 1
+                    enabled: root.interactive
 
-                // App icon; the service resolves a themed path per window.
-                Image {
-                    id: rowIcon
-                    objectName: "windowHintWindowIcon"
-                    x: root.glyphInset
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: root.glyphWidth
-                    height: root.glyphWidth
-                    source: windowRow.modelData.icon
-                    visible: windowRow.modelData.icon !== ""
-                    // Synchronous decode: the popup lives for the length of one
-                    // key hold, so an async icon would land too late to read.
-                    asynchronous: false
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                }
-
-                Text {
-                    objectName: "windowHintWindowTitle"
-                    anchors.left: rowIcon.visible ? rowIcon.right : parent.left
-                    anchors.leftMargin: 8
-                    anchors.right: parent.right
-                    anchors.rightMargin: 8
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: windowRow.modelData.title
-                    color: windowRow.modelData.isFocused ? LazerTheme.textPrimary : LazerTheme.barSubtitle
-                    font.pixelSize: 12
-                    font.bold: windowRow.modelData.isFocused
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
+                    // Test seam for the shared click-flash recipe.
+                    readonly property alias rowFlashAnimation: rowFlash
+                    readonly property alias rowFlashOverlay: rowFlashOverlay
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-                }
+                    Behavior on scale {
+                        enabled: !MotionTokens.reducedMotion
+                        NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+                    }
 
-                // Click flash, inert to input so it cannot swallow the tap.
-                Rectangle {
-                    id: rowFlashOverlay
-                    objectName: "windowHintRowFlash"
-                    anchors.fill: parent
-                    radius: 6
-                    color: LazerTheme.textPrimary
-                    opacity: 0
-                    enabled: false
-                }
+                    // App icon; the service resolves a themed path per window.
+                    Image {
+                        id: rowIcon
+                        objectName: "windowHintWindowIcon"
+                        x: root.glyphInset
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: root.glyphWidth
+                        height: root.glyphWidth
+                        source: windowRow.modelData.icon
+                        visible: windowRow.modelData.icon !== ""
+                        // Synchronous decode: the popup lives for the length of one
+                        // key hold, so an async icon would land too late to read.
+                        asynchronous: false
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                    }
 
-                NumberAnimation {
-                    id: rowFlash
-                    target: rowFlashOverlay
-                    property: "opacity"
-                    from: MotionTokens.clickFlashOpacity
-                    to: 0
-                    duration: MotionTokens.clickFlashDuration
-                    easing.type: MotionTokens.clickFlashEasing
-                }
+                    Text {
+                        objectName: "windowHintWindowTitle"
+                        anchors.left: rowIcon.visible ? rowIcon.right : parent.left
+                        anchors.leftMargin: 8
+                        anchors.right: parent.right
+                        anchors.rightMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: windowRow.modelData.title
+                        color: windowRow.modelData.isFocused ? LazerTheme.textPrimary : LazerTheme.barSubtitle
+                        font.pixelSize: 12
+                        font.bold: windowRow.modelData.isFocused
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
 
-                HoverHandler { id: rowHover; blocking: false }
-                TapHandler {
-                    id: rowPress
-                    gesturePolicy: TapHandler.ReleaseWithinBounds
-                    onTapped: {
-                        if (MotionTokens.reducedMotion)
-                            rowFlashOverlay.opacity = 0
-                        else
-                            rowFlash.restart()
-                        root.windowActivated(windowRow.modelData.windowId)
+                        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                    }
+
+                    // Click flash, inert to input so it cannot swallow the tap.
+                    Rectangle {
+                        id: rowFlashOverlay
+                        objectName: "windowHintRowFlash"
+                        anchors.fill: parent
+                        radius: 6
+                        color: LazerTheme.textPrimary
+                        opacity: 0
+                        enabled: false
+                    }
+
+                    NumberAnimation {
+                        id: rowFlash
+                        target: rowFlashOverlay
+                        property: "opacity"
+                        from: MotionTokens.clickFlashOpacity
+                        to: 0
+                        duration: MotionTokens.clickFlashDuration
+                        easing.type: MotionTokens.clickFlashEasing
+                    }
+
+                    HoverHandler { id: rowHover; blocking: false }
+                    TapHandler {
+                        id: rowPress
+                        gesturePolicy: TapHandler.ReleaseWithinBounds
+                        onTapped: {
+                            if (MotionTokens.reducedMotion)
+                                rowFlashOverlay.opacity = 0
+                            else
+                                rowFlash.restart()
+                            root.windowActivated(windowRow.modelData.windowId)
+                        }
                     }
                 }
             }
-        }
 
-        // The same slot the neighbour columns use. The active column is not
-        // special here: an empty workspace is the same fact wherever it is, and a
-        // different shape for the middle one would make the panel look like it had
-        // a special case in it rather than three equal columns.
-        BarWindowHintEmpty {
-            objectName: "windowHintActiveEmpty"
-            width: parent.width
-            rowHeight: root.rowHeight
-            visible: root.columns.current.rows.length === 0
-        }
+            // Neighbour rows: the same windows, stated plainly. The active column
+            // gets no label delegates at all, so the two renderings of a workspace
+            // can never be on screen together.
+            Repeater {
+                model: stripColumn.modelData && !stripColumn.isActiveSlot
+                    ? stripColumn.modelData.rows : null
 
-        // Overflow line for the windows the cap left out. Empty when the list fit,
-        // so visibility binds straight to the text - and a Column skips an
-        // invisible child when it sizes itself, so the line needs no height binding
-        // of its own to collapse.
-        Text {
-            objectName: "windowHintOverflow"
-            width: parent.width
-            visible: HintLogic.overflowLabel(root.columns.current.hidden) !== ""
-            text: HintLogic.overflowLabel(root.columns.current.hidden)
-            color: LazerTheme.textMuted
-            font.pixelSize: 10
-            horizontalAlignment: Text.AlignHCenter
-        }
-    }
-
-    // Neighbour column: the workspace after the active one, mirroring the previous
-    // column on the other side. Bound to the active column's x so the pair is one
-    // strip by construction.
-    Column {
-        id: nextColumn
-        objectName: "windowHintNextColumn"
-        x: column.x + root.columnWidth
-        width: root.columnWidth
-        spacing: root.listSpacing
-
-        Repeater {
-            model: root.columns.next.rows
-
-            BarWindowHintLabel {
-                objectName: "windowHintNextRow"
-                width: parent.width
-                // Filled by the delegate model - see the previous column.
-                rowHeight: root.rowHeight
-                glyphInset: root.glyphInset
-                glyphWidth: root.glyphWidth
-                enabled: root.interactive
-                onActivated: windowId => root.windowActivated(windowId)
+                // One window label in a NEIGHBOUR column - the workspace either side
+                // of the active one.
+                //
+                // Deliberately plainer than the active column's row: no card fill,
+                // no focus highlight, no indicator, a muted title. The active
+                // column is the only one that carries state, so the other two read
+                // as context for it rather than as three equal lists. Tapping a
+                // label still focuses that window, which is what makes the
+                // neighbours worth showing at all - niri moves the view to that
+                // window's workspace.
+                BarWindowHintLabel {
+                    objectName: "windowHintNeighbourRow"
+                    width: parent.width
+                    // `modelData` / `index` are declared as required properties on
+                    // the label, so the delegate model fills them. Binding them here
+                    // would point each one at ITSELF.
+                    rowHeight: root.rowHeight
+                    glyphInset: root.glyphInset
+                    glyphWidth: root.glyphWidth
+                    enabled: root.interactive
+                    onActivated: windowId => root.windowActivated(windowId)
+                }
             }
-        }
 
-        // The other side's slot - see the previous column.
-        BarWindowHintEmpty {
-            objectName: "windowHintNextEmpty"
-            width: parent.width
-            rowHeight: root.rowHeight
-            visible: root.columns.next.rows.length === 0
+            // The slot this column shows when its workspace has no windows. The
+            // same for the active column as for a neighbour: an empty workspace is
+            // the same fact wherever it is, and a different shape for the middle
+            // one would make the panel look as if it had a special case in it.
+            BarWindowHintEmpty {
+                objectName: "windowHintColumnEmpty"
+                width: parent.width
+                rowHeight: root.rowHeight
+                visible: !stripColumn.modelData
+                    || stripColumn.modelData.rows.length === 0
+            }
+
+            // Overflow line for the windows the cap left out. Only the active
+            // column has one: a neighbour column states what it has and stops.
+            // Empty when the list fit, so visibility binds straight to the text.
+            Text {
+                objectName: "windowHintOverflow"
+                width: parent.width
+                visible: stripColumn.isActiveSlot && stripColumn.modelData
+                    ? HintLogic.overflowLabel(stripColumn.modelData.hidden) !== ""
+                    : false
+                text: stripColumn.modelData
+                    ? HintLogic.overflowLabel(stripColumn.modelData.hidden) : ""
+                color: LazerTheme.textMuted
+                font.pixelSize: 10
+                horizontalAlignment: Text.AlignHCenter
+            }
         }
     }
 }

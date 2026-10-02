@@ -12,6 +12,31 @@ Item {
     width: 480
     height: 400
 
+    // A snapshot whose every workspace's single window is titled `ws<position>`, so
+    // a title in the panel names the workspace it came from and a repeated title is
+    // unambiguous. The neighbours are filled in as the switch approaches them, which
+    // is what the service reports: the three workspaces around the active one.
+    function framedHint(active, previous) {
+        function ws(position) {
+            return [{ windowId: "w" + position, title: "ws" + position,
+                appId: "kitty", icon: "", isFocused: true }]
+        }
+        return {
+            workspaceId: "ws" + active,
+            workspaceIndex: active,
+            activeWorkspacePosition: active,
+            previousActiveWorkspacePosition: previous,
+            currentWindowTitle: "ws" + active,
+            currentWindowAppId: "kitty",
+            currentWindowIcon: "",
+            currentIndex: 0,
+            windows: ws(active),
+            previousWindows: ws(active - 1),
+            nextWindows: ws(active + 1),
+            workspaces: []
+        }
+    }
+
     // Snapshot shaped exactly like WindowHintService's.
     function makeHint(overrides) {
         var hint = {
@@ -66,57 +91,101 @@ Item {
         return all.length > 0 ? all[0] : null
     }
 
-    // The body paints two copies of the strip mid-slide - the one leaving and the
-    // one arriving - and both use the same objectNames, because they are the same
-    // component. So a search rooted at the body would find every row twice, and a
-    // count or a position assertion would be about neither copy. Most tests want
-    // the content the user is looking at, which is the incoming layer; the slide
-    // tests ask for the outgoing one by name.
-    //
-    // Both helpers root their own search at `body` and must never be rewritten to
-    // call each other: `live()` walking itself is the infinite recursion that
-    // blows the stack.
+    // The content the user is looking at. Mid-crossing that is the arriving frame's
+    // active column plus whichever neighbours the panel is currently revealing, all
+    // of it inside one strip - so there is no "which copy" question left to ask.
+    // The alias is kept because the rest of this file reads it constantly.
     function live() {
-        return findByName(body, "windowHintIncomingLayer") || body
+        return body
     }
 
-    function outgoing() {
-        return findByName(body, "windowHintOutgoingLayer")
+    // The strip: the one object the panel is a window onto. Named here because
+    // every geometry assertion reads its real offset and width rather than
+    // re-deriving them from the plan.
+    function strip() {
+        return findByName(body, "windowHintStrip")
     }
 
-    // Where the two gates meet. The gates are adjacent halves of the panel, so
-    // this is the left gate's far edge whichever way round they are.
-    function seamBetween(left, right) {
-        return left.x <= right.x ? left.x + left.width : right.x + right.width
-    }
-
-    // Every window row a gate is currently showing, as a list of window ids.
+    // Every window title the PANEL is currently showing, in order, read off the
+    // live objects.
     //
-    // Read off the real objects: the gate's own rect is the window onto the
-    // panel, and each row's own width says how much of it there is to see. A
-    // row is "shown" when the panel reveals more than a hair of it, so a row that
-    // is entirely behind the seam is not counted and a row the seam is halfway
-    // across is.
-    function shownWindowIds(gate) {
-        var ids = []
-        if (!gate || gate.width <= 0)
-            return ids
-        var rows = findAllByName(gate, "windowHintWindowRow")
-            .concat(findAllByName(gate, "windowHintPreviousRow"))
-            .concat(findAllByName(gate, "windowHintNextRow"))
+    // The search is rooted at the BODY, not at the strip. That is the point: the
+    // claim is about what the user can see, so it must not assume the panel is made
+    // of one object. Rooting it at the strip would make the test pass on any layout
+    // that happens to have one strip, and would not notice a second one painting the
+    // same titles beside it - which is the fault being guarded against.
+    //
+    // Each row is asked for its real span in panel coordinates, and the rows the
+    // panel reveals more than a hair of are kept: a row entirely off-panel is not
+    // counted, a row the panel edge is halfway across is.
+    //
+    // Titles rather than window ids, because the user-visible claim is about
+    // titles: two ids sharing one title are still one thing appearing twice.
+    function shownTitles() {
+        var titles = []
+        if (!body.ready || body.width <= 0)
+            return titles
+        var rows = findAllByName(body, "windowHintWindowRow")
+            .concat(findAllByName(body, "windowHintNeighbourRow"))
         for (var i = 0; i < rows.length; ++i) {
             var row = rows[i]
             // The Repeater leaves one role-less placeholder among the delegates,
             // and every model role on it reads undefined.
-            if (!row.modelData || row.modelData.windowId === undefined)
+            if (!row.modelData || row.modelData.title === undefined)
+                continue
+            if (row.visible === false)
                 continue
             var from = row.mapToItem(body, 0, 0).x
-            var lo = Math.max(from, gate.x, 0)
-            var hi = Math.min(from + row.width, gate.x + gate.width, body.width)
+            var lo = Math.max(from, 0)
+            var hi = Math.min(from + row.width, body.width)
             if (hi - lo > 1)
-                ids.push(String(row.modelData.windowId))
+                titles.push(String(row.modelData.title))
         }
-        return ids
+        return titles
+    }
+
+    // The distinct titles on screen, and any title that appears more than once.
+    function repeatedTitles() {
+        var counts = {}
+        var titles = shownTitles()
+        for (var i = 0; i < titles.length; ++i) {
+            var t = titles[i]
+            counts[t] = (counts[t] || 0) + 1
+        }
+        var repeated = []
+        for (var key in counts) {
+            if (counts[key] > 1)
+                repeated.push(key + " x" + counts[key])
+        }
+        return repeated
+    }
+
+    // The panel's left and right edges in body coordinates, and whether painted
+    // content reaches both. Read off the real rows rather than off the strip's
+    // rect, so a strip that is the right width but the wrong place fails this.
+    function panelEdgesReached() {
+        // Rooted at the body for the same reason `shownTitles` is: the claim is about
+        // the panel's contents, and a layout that covered the panel with two objects
+        // would be as correct as one that covered it with a single strip.
+        var rows = findAllByName(body, "windowHintWindowRow")
+            .concat(findAllByName(body, "windowHintNeighbourRow"))
+        var leftmost = body.width
+        var rightmost = 0
+        for (var i = 0; i < rows.length; ++i) {
+            var row = rows[i]
+            if (!row.modelData || row.modelData.title === undefined)
+                continue
+            var from = row.mapToItem(body, 0, 0).x
+            var lo = Math.max(from, 0)
+            var hi = Math.min(from + row.width, body.width)
+            if (hi - lo <= 1)
+                continue
+            if (lo < leftmost)
+                leftmost = lo
+            if (hi > rightmost)
+                rightmost = hi
+        }
+        return leftmost <= 1 && rightmost >= body.width - 1
     }
 
     // The last activation the body reported. The body owns no niri call, so
@@ -161,36 +230,61 @@ Item {
 
         // ---- the list ---------------------------------------------------
         function test_bodyListsOneRowPerWindow() {
-            compare(findAllByName(live(), "windowHintWindowRow").length, 2)
+            // At rest the panel is the arriving frame's own three columns, so the
+            // only rows that are CARDS are the active workspace's - which is what
+            // "one row per window" means now that the strip can carry more.
+            var cards = findAllByName(live(), "windowHintWindowRow")
+            compare(cards.length, 2, "one card row per window on the active workspace")
+            for (var i = 0; i < cards.length; ++i) {
+                compare(String(cards[i].modelData.windowId), i === 0 ? "10" : "11",
+                    "in the order the snapshot gave them")
+            }
         }
 
         // ---- the three columns -------------------------------------------
         function test_bodyRendersThreeColumnsPreviousActiveNext() {
-            // Left / middle / right are the workspace before, the active one and
-            // the workspace after - in that order, so the workspace you are on
-            // is always in the same place. The order is asserted by position, not
-            // by existence: three sets of rows that exist is not the same claim
-            // as three columns that are in the right places.
-            var previous = findByName(live(), "windowHintPreviousColumn")
-            var active = findByName(live(), "windowHintColumn")
-            var next = findByName(live(), "windowHintNextColumn")
-            verify(previous && active && next, "all three columns exist")
-            verify(previous.x + previous.width <= active.x, "previous is leftmost")
-            verify(active.x + active.width <= next.x, "next is rightmost")
-            compare(findAllByName(live(), "windowHintPreviousRow").length, 1)
-            compare(findAllByName(live(), "windowHintNextRow").length, 1)
+            // At rest the panel is three columns and the strip is exactly those
+            // three: the workspace before, the active one, and the workspace after,
+            // in that order, so the workspace you are on is always in the same
+            // place. The order is asserted by position, not by existence: three sets
+            // of rows that exist is not the same claim as three columns that are in
+            // the right places.
+            compare(body.plan.slots, 3, "the resting strip is three columns")
+            compare(strip().width, 3 * body.columnWidth, "and no wider than the panel")
+            var active = findAllByName(live(), "windowHintWindowRow")
+            compare(active.length, 2, "the active column's rows are cards")
+            var neighbours = findAllByName(live(), "windowHintNeighbourRow")
+            compare(neighbours.length, 2, "one label per neighbour column")
+            // Ordered by where their COLUMNS are, mapped into the strip's space. A
+            // label's own x is measured from its column, so reading it directly would
+            // report 0 for every neighbour and make this assertion vacuous - which is
+            // exactly what it did before: it passed on a strip that had every column
+            // at x 0. Placed by position rather than by class, because a column
+            // rendering itself on the wrong side would still be "a neighbour" by
+            // class, and that is the layout fault worth catching.
+            var placed = neighbours.map(function(row) {
+                return { column: row.parent.mapToItem(strip(), 0, 0).x, id: row.modelData.windowId }
+            }).sort(function(a, b) { return a.column - b.column })
+            // Stated against the active column's own slot rather than as literals, so
+            // the frame is checked as "one column's width either side" instead of as
+            // three numbers that could drift apart while still passing.
+            var activeSlotX = strip().activeColumnX
+            compare(placed[0].column, activeSlotX - body.columnWidth,
+                "a neighbour column one width to the left of the active one")
+            compare(placed[1].column, activeSlotX + body.columnWidth,
+                "and one the same width to the right")
             // Each column shows its OWN workspace's window, not a copy of the
             // active one - a neighbour that listed the active workspace's
             // windows would be decoration pretending to be information.
-            compare(findByName(live(), "windowHintPreviousRow").modelData.windowId, "20")
-            compare(findByName(live(), "windowHintNextRow").modelData.windowId, "30")
+            compare(placed[0].id, "20", "the left neighbour is the previous workspace")
+            compare(placed[1].id, "30", "and the right one is the next workspace")
         }
 
         function test_neighbourColumnsCarryNoState() {
             // Only the active column holds focus, so a card, a highlight or an
             // indicator on a neighbour would claim a second selection. The
             // neighbour labels are plain text over the panel's own surface.
-            var previous = findAllByName(live(), "windowHintPreviousRow")[0]
+            var previous = findAllByName(live(), "windowHintNeighbourRow")[0]
             var active = findAllByName(live(), "windowHintWindowRow")[0]
             // The active row is a card; a neighbour is not.
             verify(active.color !== undefined, "the active row is a filled card")
@@ -206,62 +300,71 @@ Item {
         }
 
         function test_tappingANeighbourRowReportsItsId() {
-            var row = findAllByName(live(), "windowHintNextRow")[0]
+            var row = findAllByName(live(), "windowHintNeighbourRow")[1]
             mouseClick(row, row.width / 2, row.height / 2, Qt.LeftButton)
             compare(reported.window, "30")
         }
 
         function test_stateMarkersSitOnTheActiveColumn() {
-            // The active column is the MIDDLE slot, so a highlight left at x 0
-            // would be drawn under the previous workspace's labels and none of it
-            // would be visible over the row it is supposed to mark. The rows are
-            // positioned inside their column, so root-space is column.x + row.x.
+            // The active column is the MIDDLE slot, so a highlight left at x 0 would
+            // be drawn under the previous workspace's labels and none of it would be
+            // visible over the row it is supposed to mark.
+            //
+            // Every position below is read in the STRIP's space, which is the space
+            // the markers and `activeColumnX` are stated in. A row's own x is
+            // measured from its column, so comparing one against a marker without
+            // mapping it would put a column-relative number next to a strip-relative
+            // one - and they agree at rest only because the strip happens to be at 0.
             var rows = findAllByName(live(), "windowHintWindowRow")
-            var active = findByName(live(), "windowHintColumn")
             var wash = findByName(live(), "windowHintFocusFrame")
             var bar = findByName(live(), "windowHintFocusIndicator")
-            var previous = findByName(live(), "windowHintPreviousColumn")
-            compare(wash.x, active.x + rows[0].x, "the highlight starts where the row starts")
-            compare(wash.width, active.width, "and spans the column")
-            // The previous column ends exactly where the active one begins, so
-            // the check is that the highlight does not reach back over it.
-            compare(wash.x, previous.x + previous.width,
-                "and starts where the previous column ends")
+            var neighbours = findAllByName(live(), "windowHintNeighbourRow")
+            var rowInStrip = rows[0].mapToItem(strip(), 0, 0)
+            var leftColumn = neighbours[0].parent.mapToItem(strip(), 0, 0)
+            var rightColumn = neighbours[1].parent.mapToItem(strip(), 0, 0)
+            compare(wash.x, rowInStrip.x, "the highlight starts where the row starts")
+            compare(wash.x, strip().activeColumnX, "and on the active column")
+            compare(wash.width, body.columnWidth, "spanning it")
+            // The left neighbour's column ends exactly where the active one begins,
+            // so the check is that the highlight does not reach back over it.
+            compare(wash.x, leftColumn.x + body.columnWidth,
+                "and starts where the left neighbour's column ends")
             verify(bar.x >= wash.x && bar.x < wash.x + wash.width,
                 "the indicator is on the highlight")
-            // ...and the same on the far side, or the highlight would cover the
-            // next workspace's labels.
-            var next = findByName(live(), "windowHintNextColumn")
-            verify(wash.x + wash.width <= next.x, "and stops before the next column")
+            // ...and the same on the far side, or the highlight would cover the next
+            // workspace's labels.
+            verify(wash.x + wash.width <= rightColumn.x,
+                "and stops before the right neighbour's column")
         }
 
 function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // An empty neighbour workspace must not shrink the panel. It used to:
             // the column took no slot, the panel narrowed, and the active workspace
             // moved out of the middle - so the same three workspaces read as a
-            // different panel depending on what the neighbours were running. Now
-            // the slot stays and the column states the fact itself, because a blank
+            // different panel depending on what the neighbours were running. Now the
+            // slot stays and the column states the fact itself, because a blank
             // column would read as a layout fault rather than as "nothing here".
             body.hint = root.makeHint({ previousWindows: [] })
             wait(20)
-            verify(findByName(live(), "windowHintPreviousColumn"), "the column is still there")
-            compare(findAllByName(live(), "windowHintPreviousRow").length, 0, "and holds no row")
-            var empty = findByName(live(), "windowHintPreviousEmpty")
-            verify(empty !== null, "the empty neighbour shows something")
-            verify(empty.visible, "and it is visible")
-            compare(findByName(empty, "windowHintEmptySlotLabel").text, "No windows",
+            compare(body.plan.slots, 3, "the strip is still three columns")
+            var emptySlots = findAllByName(live(), "windowHintColumnEmpty")
+            // One placeholder, in the left column, and it is the visible one: the
+            // other two columns have windows so their placeholders are hidden.
+            var visible = emptySlots.filter(function(s) { return s.visible })
+            compare(visible.length, 1, "exactly one placeholder is showing")
+            var slot = visible[0]
+            verify(slot.mapToItem(body, 0, 0).x < 1,
+                "and it is in the left column")
+            compare(findByName(slot, "windowHintEmptySlotLabel").text, "No windows",
                 "which is that it has no windows")
-            compare(findAllByName(live(), "windowHintNextRow").length, 1, "the other side is unaffected")
-            verify(!findByName(live(), "windowHintNextEmpty").visible,
-                "and does not claim to be empty when it is not")
+            // The other side is unaffected, and says so by having a row rather than
+            // a placeholder.
+            compare(findAllByName(live(), "windowHintNeighbourRow").length, 1,
+                "the other side still has its one row")
             // The frame is unchanged, and the active workspace is still the middle.
             compare(body.shownColumnCount, 3)
             compare(body.width, 3 * body.columnWidth, "the panel did not resize")
-            var active = findByName(live(), "windowHintColumn")
-            var next = findByName(live(), "windowHintNextColumn")
-            compare(active.x, body.columnWidth, "active is still the middle column")
-            compare(next.x, body.columnWidth * 2, "and next is still the last")
-            compare(findByName(live(), "windowHintFocusFrame").x, active.x,
+            compare(findByName(live(), "windowHintFocusFrame").x, body.columnWidth,
                 "and the highlight is still on the active column")
         }
 
@@ -273,19 +376,23 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             wait(20)
             compare(body.shownColumnCount, 3, "three columns")
             compare(body.width, 3 * body.columnWidth, "the same width as always")
-            // All three columns say they are empty, each in its own slot.
-            // All three, each in its own slot - the middle one is not a special
+            compare(strip().width, 3 * body.columnWidth, "and the strip is no wider")
+            // All three columns say they are empty - the middle one is not a special
             // case, because an empty workspace is the same fact wherever it is.
-            verify(findByName(live(), "windowHintPreviousEmpty").visible)
-            verify(findByName(live(), "windowHintActiveEmpty").visible,
-                "and the active column uses the same placeholder")
-            verify(findByName(live(), "windowHintNextEmpty").visible)
-            compare(findByName(live(), "windowHintActiveEmpty").height, body.rowHeight,
-                "each standing where a row would")
-            // Three columns at three distinct offsets - the frame is intact.
-            compare(findByName(live(), "windowHintPreviousColumn").x, 0)
-            compare(findByName(live(), "windowHintColumn").x, body.columnWidth)
-            compare(findByName(live(), "windowHintNextColumn").x, body.columnWidth * 2)
+            var visible = findAllByName(live(), "windowHintColumnEmpty")
+                .filter(function(s) { return s.visible })
+            compare(visible.length, 3, "all three columns show a placeholder")
+            for (var i = 0; i < 3; ++i) {
+                compare(visible[i].height, body.rowHeight,
+                    "placeholder " + i + " stands where a row would")
+            }
+            // Three placeholders at three distinct offsets - the frame is intact, and
+            // the offsets are what says which is the active column.
+            var xs = visible.map(function(s) { return s.mapToItem(body, 0, 0).x })
+                .sort(function(a, b) { return a - b })
+            compare(xs[0], 0, "the first column takes the first slot")
+            compare(xs[1], body.columnWidth, "the second the second")
+            compare(xs[2], body.columnWidth * 2, "and the third the third")
         }
 
         function test_thePanelIsAsWideAsItsColumns() {
@@ -313,40 +420,66 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             for (var i = 0; i < combos.length; ++i) {
                 body.hint = root.makeHint(combos[i])
                 wait(20)
-                var active = findByName(live(), "windowHintColumn")
-                compare(active.x, body.columnWidth,
-                    "combination " + i + ": active is the middle column")
+                var wash = findByName(live(), "windowHintFocusFrame")
+                compare(wash.x, body.columnWidth,
+                    "combination " + i + ": the active column is the middle one")
                 // And centred on the panel, not merely second of three.
-                compare(active.x + active.width / 2, body.width / 2,
+                compare(wash.x + wash.width / 2, body.width / 2,
                     "combination " + i + ": and centred on the panel")
             }
         }
 
         function test_columnsShareOneRowPitch() {
             // The focus indicator computes its y from the active column's pitch
-            // alone. If a neighbour column used a different spacing, the three
-            // lists would not line up across the panel and the panel would read
-            // as three unrelated stacks.
-            var previous = findByName(live(), "windowHintPreviousColumn")
-            var active = findByName(live(), "windowHintColumn")
-            var next = findByName(live(), "windowHintNextColumn")
-            compare(previous.spacing, active.spacing, "previous matches the active pitch")
-            compare(next.spacing, active.spacing, "next matches it too")
-            compare(previous.width, active.width, "and the columns are peers in width")
-            compare(next.width, active.width)
-            // The slots are derived from the panel width, not accumulated by a
+            // alone. If a neighbour column used a different spacing, the three lists
+            // would not line up across the panel and the panel would read as three
+            // unrelated stacks. Every column is one delegate of the same component,
+            // so this is asserted across the real delegates rather than across a
+            // named previous/active/next triple.
+            var columns = columnDelegates()
+            compare(columns.length, 3, "three column delegates")
+            for (var i = 1; i < columns.length; ++i) {
+                compare(columns[i].spacing, columns[0].spacing,
+                    "column " + i + " matches the first column's pitch")
+                compare(columns[i].width, columns[0].width,
+                    "and the columns are peers in width")
+            }
+            // The slots are derived from the index rather than accumulated by a
             // layout pass, so each column knows where it belongs.
-            compare(previous.x, 0, "previous takes the first slot")
-            compare(active.x, body.columnWidth, "active the second")
-            compare(next.x, body.columnWidth * 2, "next the third")
+            for (var k = 0; k < columns.length; ++k) {
+                compare(columns[k].x, k * body.columnWidth,
+                    "column " + k + " holds slot " + k)
+            }
+        }
+
+        // The strip's column delegates, left to right. Reached by geometry rather
+        // than by name: the columns share one component and one objectName, so
+        // their order is what distinguishes them.
+        function columnDelegates() {
+            var s = strip()
+            if (!s)
+                return []
+            var out = []
+            var rows = findAllByName(s, "windowHintNeighbourRow")
+                .concat(findAllByName(s, "windowHintWindowRow"))
+            // A column is the parent of a row or of a placeholder, whichever it has.
+            var seen = {}
+            for (var i = 0; i < rows.length; ++i) {
+                var parent = rows[i].parent
+                if (parent && !seen[parent]) {
+                    seen[parent] = true
+                    out.push(parent)
+                }
+            }
+            return out.sort(function(a, b) { return a.x - b.x })
         }
 
         function test_theWholePanelArrivesInOnePiece() {
             // No row is left behind and none arrives on its own. A switch used to
             // stagger the three columns in row by row, which meant the panel was
-            // briefly three different heights' worth of half-drawn content; now it
-            // is displaced as one object, so every row of every column crosses at
-            // the same time and none of them is ever partially faded in.
+            // briefly three different heights' worth of half-drawn content; now the
+            // strip is displaced as one object, so every row of every column crosses
+            // at the same time and none of them is ever partially faded in.
             var many = []
             for (var i = 0; i < 3; i++)
                 many.push({ windowId: "p" + i, title: "p" + i, icon: "", isFocused: false })
@@ -357,43 +490,36 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 windows: many,
                 nextWindows: many
             })
-            // Sampled DURING the slide, which is the only time the two layers are
-            // both on screen.
+            // Sampled DURING the crossing, which is when the strip carries both
+            // frames at once.
             wait(Math.round(body.slideDuration / 2))
             verify(body.swapping, "still crossing")
-            var previous = findAllByName(live(), "windowHintPreviousRow")
-            var active = findAllByName(live(), "windowHintWindowRow")
-            var next = findAllByName(live(), "windowHintNextRow")
-            compare(previous.length, 3, "every neighbour row is there")
-            compare(active.length, 3, "and every active one")
-            compare(next.length, 3, "and the far side too")
+            // The strip holds one column per workspace in the union of the two
+            // frames, so a two-step move is five columns and every one of them has
+            // its rows - none held back, none missing.
+            compare(body.plan.slots, 5, "a two-step crossing carries five columns")
+            var all = findAllByName(strip(), "windowHintWindowRow")
+                .concat(findAllByName(strip(), "windowHintNeighbourRow"))
+            // 3 rows in each of the four columns that have them, plus the arriving
+            // frame's active column.
+            compare(all.length, 12, "every row of every column is on the strip")
             // All opaque: a row that faded in on its own would be a hole in the
-            // displacement, and the point of the two layers is that there is none.
-            for (var r = 0; r < 3; ++r) {
-                verify(active[r].opacity > 0.9, "active row " + r + " is solid")
-                verify(previous[r].opacity > 0.9, "previous row " + r + " is solid")
-                verify(next[r].opacity > 0.9, "next row " + r + " is solid")
-            }
-            // And the outgoing copy is solid too, since it is a rigid body sliding
-            // off rather than a list dissolving.
-            // The copy that is leaving is the PREVIOUS content - the two windows
-            // the init snapshot installed. It has to be whole and opaque, because
-            // it is a rigid body sliding off rather than a list dissolving, and it
-            // must not already have become the new list.
-            var leaving = findAllByName(outgoing(), "windowHintWindowRow")
-            compare(leaving.length, 2, "the copy that is leaving is whole")
-            compare(leaving[0].modelData.windowId, "10", "and is the OLD content")
-            verify(leaving[0].opacity > 0.9, "and opaque")
+            // displacement, and one strip is precisely what rules a hole out.
+            for (var r = 0; r < all.length; ++r)
+                verify(all[r].opacity > 0.9, "row " + r + " is solid, was " + all[r].opacity)
             settleSlide()
+            // Landed: the strip has narrowed to the arriving frame's own three
+            // columns, so the four that were travelling through the panel are gone.
+            compare(body.plan.slots, 3, "and the strip is three columns again")
+            compare(findAllByName(strip(), "windowHintWindowRow").length, 3)
         }
 
         function test_bodyShowsNothingButTheList() {
-            // The panel is body-only: no workspace strip, no header, no
-            // divider. Anything here is a copy of what the bar already shows or
-            // of what the rows themselves say.
+            // The panel is body-only: no header, no divider, no workspace row. Anything
+            // here is a copy of what the bar already shows or of what the rows
+            // themselves say.
             verify(findByName(live(), "windowHintWorkspaceChip") === null)
             verify(findByName(live(), "windowHintDivider") === null)
-            verify(findByName(live(), "windowHintStrip") === null)
         }
 
         function test_bodyCarriesNoWorkspaceActivation() {
@@ -443,8 +569,15 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var bar = findByName(live(), "windowHintFocusIndicator")
             var icon = findByName(live(), "windowHintWindowIcon")
             compare(icon.x, rows[0].children[0].x, "glyphs share one inset")
-            var gap = icon.x - (bar.x - wash.x + bar.width)
+            // The gap is measured in the STRIP's space: the icon is a child of its
+            // row and the marker a child of the strip, and a gutter between them is
+            // only meaningful once both are in one space. The strip is at rest here,
+            // so the two spaces coincide - but the comparison does not depend on
+            // that, which is the point of measuring in the space the marker lives in.
+            var iconInStrip = icon.mapToItem(strip(), 0, 0)
+            var gap = iconInStrip.x - (bar.x + bar.width)
             compare(gap, 12, "and keep a 12px gutter clear of the marker")
+            compare(wash.x, strip().activeColumnX, "and the marker is on the active column")
             verify(gap >= 8, "a gutter, not a hairline")
             // The title follows the glyph, so the whole row shifts with it.
             var title = findByName(live(), "windowHintWindowTitle")
@@ -473,9 +606,10 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // Bounded by the row, not inset: the highlight has to cover exactly
             // the row it marks, and the row spans its column's full width. The
             // rows sit inside their column, so the comparison is made there too.
-            var active = findByName(live(), "windowHintColumn")
+            var rowInStrip = rows[1].mapToItem(strip(), 0, 0)
             compare(frame.height, rows[1].height)
-            compare(frame.x, active.x + rows[1].x, "starts where the row starts")
+            compare(frame.x, rowInStrip.x, "starts where the row starts")
+            compare(frame.x, strip().activeColumnX, "and on the active column")
             compare(frame.width, rows[1].width, "and is exactly as wide")
             compare(frame.radius, rows[1].radius, "corners match the row's")
             compare(frame.border.width, 0, "a fill, not an outline")
@@ -546,10 +680,11 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var rowCentre = rows[1].y + rows[1].height / 2
             compare(bar.y + bar.height / 2, rowCentre, "centred on the row")
             compare(bar.x - wash.x, 4, "sits inside the active column's left edge")
-            // Root space: the bar is a child of the panel, the row of its column.
-            var active = findByName(live(), "windowHintColumn")
-            verify(bar.x + bar.width < active.x + rows[1].x + rows[1].width,
-                "and within the row")
+            // The bar is a child of the strip and the row is a child of a column of
+            // the strip, so the row has to be mapped into the strip's space before the
+            // two can be compared - the row's own x is measured from its column.
+            var rowInStrip = rows[1].mapToItem(strip(), 0, 0)
+            verify(bar.x + bar.width < rowInStrip.x + rows[1].width, "and within the row")
         }
 
         // Wait out the indicator's dual-speed tracker. The head lands in `medium`, but
@@ -561,9 +696,10 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             wait(Lazer.MotionTokens.slow * 2 + 150)
         }
 
-        // Wait out one full crossing. The slide is two phases on one clock with
-        // no stagger behind them, so the declared total is the whole of it - plus
-        // room for the animation's `onFinished` to have released the held copy.
+        // Wait out one full crossing. The crossing is two phases on one clock with no
+        // stagger behind them, so the declared total is the whole of it - plus room
+        // for the animation's `onFinished` to have narrowed the strip to the arriving
+        // frame and released the held one.
         function settleSlide() {
             wait(body.slideDuration + 40)
         }
@@ -664,7 +800,31 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             body.hint = root.makeHint({ windows: many })
             wait(20)
             compare(findAllByName(live(), "windowHintWindowRow").length, 8 - 3)
-            compare(findByName(live(), "windowHintOverflow").text, "+3 more windows")
+            // Every column carries an overflow line instance; only the active
+            // column's has anything to say, so the one with text is read rather
+            // than the first one found.
+            var line = findAllByName(live(), "windowHintOverflow")
+                .filter(function(t) { return t.text !== "" })[0]
+            verify(line !== undefined, "a column has an overflow line")
+            compare(line.text, "+3 more windows")
+        }
+
+        function test_onlyTheActiveColumnCarriesAnOverflowLine() {
+            // The cap applies to the active column, and it is the only one with a
+            // "+N more" line. A neighbour column reporting a cap it does not have
+            // would claim windows that are not being shown, and the strip carries
+            // neighbour columns that are still travelling through the panel.
+            var many = []
+            for (var i = 0; i < 8; i++)
+                many.push({ windowId: String(i), title: "w" + i, icon: "", isFocused: false })
+            body.hint = root.makeHint({ windows: many, previousWindows: many })
+            wait(20)
+            var lines = findAllByName(live(), "windowHintOverflow")
+            var showing = lines.filter(function(l) { return l.visible })
+            compare(showing.length, 1, "one overflow line, on the active column")
+            compare(showing[0].text, "+3 more windows")
+            verify(showing[0].mapToItem(body, 0, 0).x > body.columnWidth * 0.5,
+                "and it is in the middle column, was " + showing[0].mapToItem(body, 0, 0).x)
         }
 
         function test_anEmptyWorkspaceShowsAPlaceholderNotAHole() {
@@ -676,8 +836,12 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             body.hint = root.makeHint({ windows: [] })
             wait(20)
             compare(findAllByName(live(), "windowHintWindowRow").length, 0)
-            var slot = findByName(live(), "windowHintActiveEmpty")
-            verify(slot.visible, "the active column shows its placeholder")
+            var visible = findAllByName(live(), "windowHintColumnEmpty")
+                .filter(function(s) { return s.visible })
+            compare(visible.length, 1, "one placeholder, in the active column")
+            var slot = visible[0]
+            verify(Math.abs(slot.mapToItem(body, 0, 0).x - body.columnWidth) < 1,
+                "and it is the middle column, was " + slot.mapToItem(body, 0, 0).x)
             var frame = findByName(slot, "windowHintEmptySlot")
             // QML hands a transparent colour back as #00000000, so that is what
             // "no fill" reads as here.
@@ -688,18 +852,19 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(frame.enabled, false, "inert, so it cannot swallow a tap")
             // Same footprint as a row, so the three columns stay on one pitch.
             compare(slot.height, body.rowHeight)
-            var rows = findAllByName(live(), "windowHintWindowRow")
-            verify(rows.length > 0 || slot.height > 0, "a row-height placeholder")
         }
 
         function test_aPlaceholderIsHiddenWhenTheColumnHasWindows() {
             // The other half of the same contract: a column with windows must not
-            // also show an empty slot, or every row would be doubled by a ghost.
+            // also show an empty slot, or every row would be doubled by a ghost. All
+            // three columns have a placeholder instance; none may be visible.
             body.hint = root.makeHint()
             wait(20)
-            verify(!findByName(live(), "windowHintPreviousEmpty").visible)
-            verify(!findByName(live(), "windowHintActiveEmpty").visible)
-            verify(!findByName(live(), "windowHintNextEmpty").visible)
+            compare(findAllByName(live(), "windowHintColumnEmpty").length, 3,
+                "each column has a placeholder instance")
+            var showing = findAllByName(live(), "windowHintColumnEmpty")
+                .filter(function(s) { return s.visible })
+            compare(showing.length, 0, "and none of them is showing")
         }
 
         function test_coldSnapshotStatesItself() {
@@ -710,136 +875,161 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         }
 
         // ---- switching between workspaces --------------------------------
-        function test_workspaceSwitchHoldsTheOutgoingRowsWhileTheyLeave() {
-            // A workspace switch replaces every row, so the outgoing ones have to
-            // still be mounted while they travel off - otherwise the panel's
-            // contents are simply gone and remade between two frames. This is the
-            // part a depth-1 hold buys.
+        function test_theStripCarriesBothFramesWhileItTravels() {
+            // A workspace switch replaces every row, so the rows of the frame being
+            // left have to still be mounted while the strip carries them off -
+            // otherwise the panel's contents are simply gone and remade between two
+            // frames. One strip, not two objects, so the claim is that its columns
+            // cover the union of both frames rather than that a held copy exists.
             compare(body.swapping, false, "settled to begin with")
-            compare(outgoing().visible, false, "and nothing is held")
+            compare(body.plan.slots, 3, "and the strip is three columns")
 
-            body.hint = root.makeHint({
-                workspaceId: "43",
-                workspaceIndex: 3,
-                activeWorkspacePosition: 2,
-                previousActiveWorkspacePosition: 1,
-                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
-            })
-            verify(body.swapping, "sliding")
-            verify(outgoing().visible, "the outgoing layer is mounted")
+            // Settle on the frame being left, so the crossing below really is
+            // position 1 -> 2 and the union is the one under test.
+            body.hint = root.framedHint(1, 1)
+            wait(20)
+            body.hint = root.framedHint(2, 1)
+            verify(body.swapping, "crossing")
+            // The union of position 0..1 and position 1..2 is 0..2: FOUR slots in the
+            // strip (span + 3), of which the panel shows three at a time. The active
+            // column is the one the workspace moved to.
+            compare(body.plan.slots, 4, "a one-step crossing carries four slots")
+            compare(body.plan.activeSlot, 2, "and the arriving one is the last slot")
             // An animation reads its start value on the frame it starts, so the
             // travel has to be sampled after the event loop has turned.
             wait(Math.round(body.slideDuration / 2))
-            var leaving = findAllByName(outgoing(), "windowHintWindowRow")
-            compare(leaving.length, 2, "the outgoing rows are still mounted")
-            compare(leaving[0].modelData.windowId, "10", "and are the OLD ones")
-            var arriving = findAllByName(live(), "windowHintWindowRow")
-            compare(arriving.length, 1, "while the new one is already in place")
-            compare(arriving[0].modelData.windowId, "20")
-
-            // Rows mid-slide are not tap targets on either side: what is under the
-            // pointer is leaving, or has not arrived.
-            verify(!leaving[0].enabled, "a row on the way out is not a tap target")
-            verify(!arriving[0].enabled, "nor is the one on its way in")
+            // Every workspace in the union is on the strip, once, with its own
+            // windows: the frame being left (positions 0 and 1) and the one arriving
+            // (position 2). Each is titled after its own position, so a title that
+            // appears twice would be a workspace shown twice.
+            var titles = shownTitles()
+            for (var t = 0; t < titles.length; ++t) {
+                var pos = titles[t]
+                verify(titles.indexOf(pos) === t,
+                    "workspace " + pos + " is on the strip once, not twice")
+            }
+            // The frame being left is still there, as content rather than as a
+            // separate object: position 0 is the only column that could be carrying
+            // it now.
+            verify(titles.indexOf("ws0") >= 0,
+                "the frame being left is still on the strip, saw " + titles.join(", "))
+            verify(titles.indexOf("ws2") >= 0, "and the arriving frame is in place")
+            // Rows travelling are not tap targets: what is under the pointer is
+            // leaving, or has not arrived.
+            var rows = findAllByName(strip(), "windowHintNeighbourRow")
+            verify(rows.length > 0, "the strip has neighbour rows mid-crossing")
+            verify(!rows[0].enabled, "a travelling row is not a tap target")
 
             settleSlide()
             compare(body.swapping, false)
-            compare(outgoing().visible, false, "the held copy is released")
-            compare(findAllByName(outgoing(), "windowHintWindowRow").length, 0,
-                "and its rows are gone with it")
-            var after = findAllByName(live(), "windowHintWindowRow")
+            compare(body.plan.slots, 3, "and the strip is three columns again")
+            var after = findAllByName(strip(), "windowHintWindowRow")
             compare(after.length, 1, "the new list has taken over")
-            compare(after[0].modelData.windowId, "20")
+            compare(after[0].modelData.title, "ws2")
             verify(after[0].enabled, "rows are tappable once landed")
         }
 
         function test_thePanelIsNeverLeftUncovered() {
-            // The reason there are two gates. A single copy replaced in place
-            // leaves a band of empty panel for the length of the crossing, and a
-            // hole in a panel reads as a layout fault rather than as motion. So
-            // the two windows onto the panel have to cover each other's vacated
-            // ground at every point of the crossing - which is a claim about the
-            // whole travel, not about either end of it, and about both directions.
+            // The reason the strip carries more columns than the panel shows. A
+            // strip exactly as wide as the panel would uncover a band at one end for
+            // the length of the crossing, and a hole in a panel reads as a layout
+            // fault rather than as motion. The strip is `span + 3` columns and
+            // travels `span`, so there is always a full panel's worth of it under
+            // the window.
             //
-            // The claim is stated as the geometry: the two gates are the same cut
-            // read twice, so they are adjacent, they never overlap, and together
-            // they are the panel. Anything else - a gap, an overlap, one gate
-            // wider than the panel - is the fault.
-            for (var pass = 0; pass < 2; ++pass) {
-                body.hint = root.makeHint({
-                    // Later in the list on one pass, earlier on the other: the two
-                    // ends anchor the cut to opposite edges of the panel.
-                    activeWorkspacePosition: pass === 0 ? 3 : 1,
-                    previousActiveWorkspacePosition: pass === 0 ? 2 : 3,
-                    windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
-                })
-                var panelWidth = body.width
-                for (var step = 0; step < 4; ++step) {
-                    wait(Math.round(body.slideDuration / 4))
-                    var out = outgoing()
-                    var inn = live()
-                    var left = out.x <= inn.x ? out : inn
-                    var right = out.x <= inn.x ? inn : out
-                    compare(left.x, 0, "pass " + pass + " step " + step
-                        + ": the pair starts at the panel's edge")
-                    compare(right.x + right.width, panelWidth, "pass " + pass + " step " + step
-                        + ": and ends at the other one")
-                    compare(left.x + left.width, right.x, "pass " + pass + " step " + step
-                        + ": the two gates meet at one seam")
-                    compare(left.width + right.width, panelWidth, "pass " + pass + " step " + step
-                        + ": and together they are the whole panel")
-                    verify(seamBetween(left, right) >= 0
-                        && seamBetween(left, right) <= panelWidth,
-                        "pass " + pass + " step " + step
-                            + ": the seam is inside the panel, was " + seamBetween(left, right))
+            // The claim is stated as the geometry the user would see: painted rows
+            // have to reach the panel's left edge AND its right edge at every
+            // sampled progress, in both directions, for every span. Read off the
+            // real row rects mapped into the body, so a strip that is the right
+            // width in the wrong place fails this rather than passing it.
+            for (var span = 1; span <= 3; ++span) {
+                for (var direction = 0; direction < 2; ++direction) {
+                    var from = direction === 0 ? 1 : 4
+                    var to = direction === 0 ? 1 + span : 4 - span
+                    // Settle on the frame being LEFT first, so the crossing that
+                    // follows really is the span under test. The hint the previous
+                    // test left behind has its own active position, and a crossing
+                    // measures from whatever was on screen.
+                    body.hint = root.framedHint(from, from)
+                    wait(20)
+                    body.hint = root.framedHint(to, from)
+                    compare(body.plan.span, span, "span " + span + " dir " + direction
+                        + ": the plan agrees on the span")
+                    compare(body.plan.slots, span + 3, "and on the column count")
+                    for (var step = 0; step < 4; ++step) {
+                        wait(Math.round(body.slideDuration / 4))
+                        verify(panelEdgesReached(),
+                            "span " + span + " dir " + direction + " step " + step
+                                + ": the panel is covered, offset " + body.slideOffset)
+                    }
+                    settleSlide()
+                    verify(panelEdgesReached(),
+                        "span " + span + " dir " + direction + ": and once landed")
                 }
-                settleSlide()
             }
-            // And the two ends, which are what make it a crossing rather than a
-            // permanently half-open panel: the leaving copy holds all of it before
-            // the crossing and none of it after.
-            body.hint = root.makeHint({
-                activeWorkspacePosition: 2, previousActiveWorkspacePosition: 1
-            })
-            compare(outgoing().width, body.width, "before the crossing it is all the leaving copy")
-            compare(live().width, 0, "and none of it is the arriving one")
-            settleSlide()
-            compare(outgoing().width, 0, "and after it, none of it is")
-            compare(live().width, body.width, "and all of it is the arriving copy")
         }
 
-        function test_bothLayersMoveTheSameWayAndTheSameDistance() {
-            // One crossing, not a round trip: the seam crosses the panel once, in
-            // the direction the workspace moved, and the two copies trade the
-            // panel over between them without either of them ever covering ground
-            // the other is also covering.
-            compare(live().x, 0, "the arriving gate rests open across the panel")
-            compare(outgoing().width, 0, "and the leaving one shut")
-            body.hint = root.makeHint({
-                activeWorkspacePosition: 3,
-                previousActiveWorkspacePosition: 2,
-                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
-            })
-            compare(outgoing().width, body.width, "the leaving copy starts with the whole panel")
-            var previousSeam = body.width
-            for (var step = 0; step < 5; ++step) {
-                wait(Math.round(body.slideDuration / 5))
-                var out = outgoing()
-                var inn = live()
-                var seam = seamBetween(out, inn)
-                // Towards a LATER workspace the arriving frame comes in from the
-                // right, so the leaving copy keeps the left and the seam walks
-                // leftwards. Getting that backwards would have the panel turn away
-                // from the direction the workspace went.
-                verify(seam < previousSeam, "step " + step + ": the seam has moved, was "
-                    + seam + " from " + previousSeam)
-                previousSeam = seam
+        function test_theStripTravelsOnePassByExactlyTheSpan() {
+            // The distance is the number of columns the workspace moved, in each
+            // direction, once, without turning back. Read off the strip's real offset
+            // rather than off the plan, so a plan that says one thing and a strip
+            // that does another is caught here.
+            for (var span = 1; span <= 3; ++span) {
+                for (var direction = 0; direction < 2; ++direction) {
+                    var from = direction === 0 ? 1 : 6
+                    var to = direction === 0 ? 1 + span : 6 - span
+                    // Settle on the frame being left, so the crossing is the span
+                    // under test rather than whatever the previous test left.
+                    body.hint = root.framedHint(from, from)
+                    wait(20)
+                    compare(strip().x, 0, "span " + span + " dir " + direction
+                        + ": the strip rests at home")
+                    compare(strip().width, 3 * body.columnWidth, "as three columns")
+
+                    body.hint = root.framedHint(to, from)
+                    compare(strip().width, (span + 3) * body.columnWidth,
+                        "span " + span + " dir " + direction
+                            + ": and widens to the union while crossing")
+                    // Towards a LATER workspace the strip travels left; earlier, it
+                    // travels right. Getting this backwards would have the panel turn
+                    // away from the direction the workspace went. The last sample is
+                    // the landed one, which is at rest by definition - so the
+                    // "one way only" claim is over the samples that are still moving.
+                    // The distance travelled, in pixels, read off the two offsets the
+                    // crossing interpolates between. The strip does not start at zero
+                    // in both directions - a backward move starts it left of home, so
+                    // that the frame being LEFT is the one under the panel at the
+                    // start - so the claim is about the DISTANCE, not the endpoints.
+                    compare(Math.abs(body.slideTo - body.slideFrom), span * body.columnWidth,
+                        "span " + span + " dir " + direction
+                            + ": the crossing travels exactly the span, was "
+                            + Math.abs(body.slideTo - body.slideFrom))
+                    // One way only, sampled while it is still moving. The last sample
+                    // is the landed one, which is at rest by definition.
+                    var furthest = strip().x
+                    for (var step = 0; step < 4; ++step) {
+                        wait(Math.round(body.slideDuration / 5))
+                        var here = strip().x
+                        verify(direction === 0 ? here < furthest : here > furthest,
+                            "span " + span + " dir " + direction + " step " + step
+                                + ": one way only, was " + here + " from " + furthest)
+                        furthest = here
+                    }
+                    // Landed: back at home, three columns, and the arriving frame's
+                    // active column in the middle. The strip's own offset returns to
+                    // 0 here because the resting plan says the active column is slot
+                    // 1 - the panel's middle - so the travel is a property of the
+                    // crossing, not a resting position.
+                    settleSlide()
+                    compare(strip().x, 0,
+                        "span " + span + " dir " + direction + ": and it rests at home, was "
+                            + strip().x)
+                    compare(strip().width, 3 * body.columnWidth,
+                        "as the arriving frame's three columns again")
+                    compare(body.plan.slots, 3, "and the plan says three slots")
+                    compare(body.plan.activeSlot, 1, "with the active column in the middle")
+                }
             }
-            settleSlide()
-            compare(live().x, 0, "the arriving gate ends open across the panel")
-            compare(live().width, body.width)
-            compare(outgoing().width, 0, "and the leaving one shut again")
-            compare(outgoing().visible, false, "and the other one is gone")
         }
 
         function test_theCrossingUsesTheIndicatorsCurve() {
@@ -903,33 +1093,31 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             verify(body.hasOwnProperty("slideDip"), "and it dims a little in the middle")
         }
 
-        function test_bothLayersDipTogetherSoTheSeamNeverShows() {
-            // The softening dim is only safe because both layers take the SAME
-            // value at the same moment. If they dipped independently the seam would
-            // show one through the other, which is worse than no dim at all.
+        function test_theStripDipsOnceInTheMiddleAndNoFurther() {
+            // The softening dim, on the one object that moves. It is shallow on
+            // purpose: enough to register as weight, far too little to read as a
+            // fade. And it is a property of the progress alone, so the same progress
+            // always gives the same value - a dip that varied along the travel would
+            // make some parts of the panel dimmer than others for no visible reason.
+            compare(strip().opacity, 1, "undimmed at rest")
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            var out = outgoing()
-            var inn = live()
-            compare(out.opacity, inn.opacity, "the same value")
-            compare(out.opacity, 1, "and undimmed at rest")
-            // Sampled at the middle, where the dip is deepest. `page / 2` is only
-            // approximate, so this reads the peak rather than assuming it landed
-            // exactly there.
+            // Sampled at the middle, where the dip is deepest. `duration / 2` is
+            // only approximate, so this reads the value rather than assuming the
+            // sample landed exactly on the peak.
             wait(Math.round(body.slideDuration / 2))
-            out = outgoing()
-            inn = live()
-            compare(out.opacity, inn.opacity, "still the same value in flight")
-            verify(out.opacity < 1, "and both have dipped, was " + out.opacity)
-            // Shallow: enough to register as weight, not enough to read as a fade
-            // - a fade at the seam is what the two layers exist to prevent.
-            verify(out.opacity > 0.8, "but only slightly, was " + out.opacity)
-            verify(out.opacity > 0, "and never to nothing")
+            verify(strip().opacity < 1, "it has dipped, was " + strip().opacity)
+            verify(strip().opacity > 0.8, "but only slightly, was " + strip().opacity)
+            verify(strip().opacity > 0, "and never to nothing")
+            // The same progress must give the same value, so the dim is a function of
+            // the clock and not a per-frame decision.
+            compare(strip().opacity, 1 - body.slideDip,
+                "and it is the clock's own value, not a sampled one")
             settleSlide()
-            compare(live().opacity, 1, "and full again once landed")
+            compare(strip().opacity, 1, "and full again once landed")
         }
 
         function test_aRefreshWithNoMovementDoesNotCancelTheCrossing() {
@@ -973,6 +1161,41 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(body.slideProgress, 1, "and lands on its own clock")
         }
 
+        function test_aMoveTooWideToDescribeCommitsRatherThanInventingAColumn() {
+            // The strip is the ordered union of the two frames' workspaces, and two
+            // three-column frames only tile a contiguous run while the move is no
+            // wider than the two frames together. Four steps apart they do not: the
+            // middle columns belong to neither snapshot.
+            //
+            // A strip cannot have a column whose contents nothing knows, and filling
+            // it with an empty placeholder would report "no windows" about workspaces
+            // nobody looked at. So a move that wide is a replacement, not a crossing -
+            // and it must commit cleanly, showing the destination's own frame.
+            body.hint = root.framedHint(1, 1)
+            wait(20)
+            body.hint = root.framedHint(5, 1)
+            compare(body.swapping, false, "no crossing: the move is too wide to describe")
+            compare(body.plan.span, 0, "and the plan is the resting one, was "
+                + body.plan.span)
+            compare(body.plan.slots, 3, "three columns")
+            compare(strip().x, 0, "and the strip is at home")
+            // The destination is shown, whole: its own workspace in the middle.
+            var landed = shownTitles()
+            compare(landed.indexOf("ws5") >= 0, true, "the destination is on screen")
+            compare(landed.indexOf("ws4") >= 0, true, "with its previous workspace beside it")
+            compare(landed.indexOf("ws6") >= 0, true, "and its next workspace")
+            compare(repeatedTitles().length, 0, "and nothing is on screen twice")
+            // And the threshold is not arbitrary: the widest move that DOES cross is
+            // one column narrower, and it does animate.
+            body.hint = root.framedHint(1, 1)
+            wait(20)
+            body.hint = root.framedHint(4, 1)
+            compare(body.swapping, true, "three steps still crosses")
+            compare(body.plan.span, 3, "and carries the full union")
+            compare(body.plan.slots, 6, "of six slots")
+            settleSlide()
+        }
+
         function test_aRefreshWithNoMovementAndNoCrossingStillCommits() {
             // The other half of the same decision, so the guard above cannot be
             // satisfied by never committing anything: a title edit on the workspace
@@ -984,17 +1207,16 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             })
             verify(!body.swapping, "nothing is crossing")
             compare(body.slideProgress, 1, "and it commits straight away")
-            compare(outgoing().visible, false, "with nothing held on the way out")
-            compare(findAllByName(outgoing(), "windowHintWindowRow").length, 0,
-                "and the held copy released")
+            compare(body.plan.slots, 3, "with the strip back to three columns")
+            compare(body.leavingHint, null, "and nothing held on the way out")
             wait(Math.round(body.slideDuration / 2))
             compare(body.slideProgress, 1, "and never starts one afterwards")
         }
 
         function test_theSlideIsOnePassAndDoesNotTurnBack() {
             // Progress runs 0 to 1 once. A value that overshot and came back would
-            // be a bounce, and the whole point of the two layers is that the motion
-            // is a single displacement.
+            // be a bounce, and the whole point of one strip is that the motion is a
+            // single displacement.
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
                 previousActiveWorkspacePosition: 2,
@@ -1013,43 +1235,51 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         }
 
         function test_swapTravelsTheWayTheWorkspaceMoved() {
-            // Which edge the arriving frame comes in from follows the workspace
-            // move. A later workspace was sitting to the RIGHT of the one being
-            // left, so its frame arrives from the right and the leaving copy keeps
-            // the left - the seam walks leftwards. Earlier, the mirror. Getting
-            // this backwards would have the panel turn away from the direction the
-            // workspace went.
+            // The direction is the workspace move, and the plan's slots follow it: a
+            // later workspace's frame sits to the RIGHT of the one being left, so its
+            // active column is the LAST slot and the strip travels leftwards to bring
+            // it to the middle. Earlier, the mirror - first slot, travel rightwards.
+            // Getting this backwards would have the panel turn away from the
+            // direction the workspace went.
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
+            // Settle on the frame being left first, or the crossing measures from
+            // whatever the previous test left on screen rather than from this move.
+            body.hint = root.framedHint(2, 2)
+            wait(20)
+            body.hint = root.framedHint(3, 2)
             compare(body.swapDirection, 1, "moved later in the list")
-            compare(outgoing().x, 0, "so the leaving copy holds the left")
-            compare(live().x, body.width, "and the arriving one enters from the right")
+            compare(body.plan.activeSlot, 2, "so the arriving frame is the last slot")
+            verify(body.plan.endColumn < 0, "and the strip travels leftwards")
             settleSlide()
 
-            body.hint = root.makeHint({
-                activeWorkspacePosition: 1,
-                previousActiveWorkspacePosition: 3,
-                windows: [{ windowId: "21", title: "term2", appId: "kitty", icon: "", isFocused: true }]
-            })
+            body.hint = root.framedHint(3, 3)
+            wait(20)
+            // A ONE-step move backwards. The two cases are not mirror images in the
+            // strip's own slot numbering, and the difference is worth stating rather
+            // than glossed: forwards the arriving active column is the strip's LAST
+            // slot (span + 1), backwards it is the MIDDLE one. Both end with it in the
+            // panel's middle column - the forward case by travelling left to it, the
+            // backward one by travelling right - which is the claim that matters.
+            body.hint = root.framedHint(2, 3)
             compare(body.swapDirection, -1, "moved earlier in the list")
-            compare(live().x, 0, "so the arriving one holds the left")
-            // The leaving copy is given up from its left, so it is the panel minus
-            // what the seam has taken. Read after the event loop has turned: the
-            // seam is at the far edge on the frame the crossing starts.
-            wait(Math.round(body.slideDuration / 4))
-            verify(outgoing().width > 0 && outgoing().width < body.width,
-                "which is the panel minus what the seam has taken, was " + outgoing().width)
-            verify(outgoing().x > 0, "and it has started at the seam, was " + outgoing().x)
+            compare(body.plan.slots, 4, "a one-step crossing carries four slots")
+            compare(body.plan.activeSlot, 1, "the arriving active column is already the middle slot")
+            verify(body.plan.startColumn < 0, "and the strip starts left of home")
+            verify(body.plan.endColumn > body.plan.startColumn,
+                "travelling rightwards to bring it to the middle, was "
+                    + body.plan.startColumn + " to " + body.plan.endColumn)
             settleSlide()
             // And the resting panel is whole again whichever way it was left.
-            compare(live().width, body.width, "the arriving copy ends with the whole panel")
+            compare(strip().x, 0, "the strip rests at home")
+            compare(strip().width, body.width, "and fills the panel")
         }
 
         // ---- the duplication this crossing used to have --------------------
-        function test_noWindowIsPaintedTwiceWhileTheSeamCrosses() {
+        function test_noWindowIsPaintedTwiceWhileTheStripTravels() {
             // The regression. A workspace switch used to translate the two copies
             // a whole panel width past each other, which is the right motion for a
             // panel whose pages are disjoint - and this one's are not. The panel is
@@ -1067,94 +1297,113 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             //   forward  1->2   22 of 24 samples had a title painted twice (41)
             //   backward 2->0   22 of 24 samples had a title painted twice (44)
             //
-            // The rule is stated about the panel's contents, not about the
-            // arithmetic that produces them: no window may be inside the panel
-            // twice at any point of the crossing. The snapshots below are chosen so
-            // the two frames share a workspace - the resting frame's active
-            // workspace is the arriving frame's previous one, which is exactly the
-            // pair the old page turn put side by side.
-            body.hint = root.makeHint({ previousWindows: [], nextWindows: [] })
-            wait(20)
-            body.hint = root.makeHint({
-                activeWorkspacePosition: 2,
-                previousActiveWorkspacePosition: 1,
-                previousWindows: [
-                    { windowId: "10", title: "kitty", appId: "kitty", icon: "", isFocused: false },
-                    { windowId: "11", title: "afloat", appId: "kitty", icon: "", isFocused: true }
-                ],
-                windows: [{ windowId: "40", title: "foot", appId: "foot", icon: "", isFocused: true }],
-                nextWindows: []
-            })
-            // Eight samples across 960ms: the duplication the old page turn
-            // produced was on screen for the first two thirds of the crossing, so
-            // several of these land inside it.
-            for (var step = 0; step < 8; ++step) {
-                wait(Math.round(body.slideDuration / 8))
-                var leaving = shownWindowIds(outgoing())
-                var arriving = shownWindowIds(live())
-                for (var i = 0; i < leaving.length; ++i) {
-                    verify(arriving.indexOf(leaving[i]) < 0,
-                        "step " + step + " (progress " + body.slideProgress.toFixed(2)
-                            + "): window " + leaving[i]
-                            + " is on screen in both the frame being left and the one arriving")
+            // The rule is stated about the panel's contents, not about the arithmetic
+            // that produces them: no window title may be inside the panel twice at
+            // any point of a crossing. The snapshots below are chosen so the two
+            // frames SHARE two workspaces - the resting frame's active workspace is
+            // the arriving frame's previous one, which is exactly the pair the old
+            // page turn put side by side.
+            //
+            // Swept over every span and both directions, and with a second switch
+            // injected mid-crossing, because the one-off case is not the hard one:
+            // a strip that is correct for a single crossing can still duplicate the
+            // moment a second one re-aims it, since the held frame is then relative
+            // to a different active workspace than the one being left.
+            for (var span = 1; span <= 3; ++span) {
+                for (var direction = 0; direction < 2; ++direction) {
+                    // Every workspace's windows titled after its own position, so a
+                    // repeated title names the workspace that repeated.
+                    for (var mid = 0; mid < 2; ++mid) {
+                        test.crossingIsDuplicateFree(span, direction, mid)
+                    }
                 }
             }
-            settleSlide()
-            // ...and the resting panel is one frame, not a composite: the two
-            // windows the shared workspace had are on screen once each, in the
-            // arriving frame's previous column, and the leaving gate holds nothing.
-            var landed = shownWindowIds(live())
-            compare(landed.filter(function(id) { return id === "10" }).length, 1,
-                "the first of the shared workspace's windows is shown once")
-            compare(landed.filter(function(id) { return id === "11" }).length, 1,
-                "and so is the second")
-            compare(shownWindowIds(outgoing()).length, 0, "the leaving gate holds nothing")
         }
 
-        function test_onlyTheArrivingLayerCarriesTheFocusMarkers() {
-            // Focus belongs to the workspace you are moving to. A marker on the
-            // outgoing copy would blink a second time for a workspace you have
-            // already left, and the two copies would disagree about which row is
-            // current while both are on screen.
+        // One crossing of the given span and direction, with a second switch injected
+        // partway through when `reAim` is set. Asserts the no-duplication rule at
+        // eight points across the travel and again once landed.
+        function crossingIsDuplicateFree(span, direction, reAim) {
+            var from = direction === 0 ? 1 : 6
+            var to = direction === 0 ? 1 + span : 6 - span
+            var label = "span " + span + " dir " + direction + (reAim ? " re-aim" : "")
+            // Settle on the starting frame, with every workspace around it named.
+            body.hint = root.framedHint(from, from)
+            wait(20)
+            compare(shownTitles().length > 0, true, label + ": the starting frame is on screen")
+
+            body.hint = root.framedHint(to, from)
+            var destination = to
+            if (reAim) {
+                // A second switch, a third of the way in, in the SAME direction as
+                // the first: the common case, holding mod and arrowing twice.
+                wait(Math.round(body.slideDuration / 3))
+                destination = to + (direction === 0 ? 1 : -1)
+                body.hint = root.framedHint(destination, to)
+            }
+            var steps = 8
+            for (var step = 0; step < steps; ++step) {
+                wait(Math.round(body.slideDuration / steps))
+                var repeated = repeatedTitles()
+                compare(repeated.length, 0, label + " step " + step + " (progress "
+                    + body.slideProgress.toFixed(2) + ", offset " + body.slideOffset
+                    + "): " + repeated.join(", ") + " on screen more than once")
+            }
+            settleSlide()
+            compare(repeatedTitles().length, 0, label + ": and once landed")
+            // And it landed ON the frame the crossing was aimed at - which is what
+            // makes "no duplicate" the right answer rather than "no content at all".
+            compare(body.plan.activeSlot, 1, label + ": the resting panel's active slot")
+            var landed = shownTitles()
+            compare(landed.indexOf("ws" + destination) >= 0, true,
+                label + ": the destination workspace's own window is on screen")
+        }
+
+        function test_onlyTheActiveColumnCarriesTheFocusMarkers() {
+            // Focus belongs to the workspace you are moving to, and the markers
+            // belong to the ARRIVING frame's active column. There is one strip and
+            // one pair of markers, so the claim is that they sit on the column the
+            // plan calls active - not on the panel's middle, which is where that
+            // column is only at the end of the crossing.
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
             wait(Math.round(body.slideDuration / 2))
-            compare(findAllByName(outgoing(), "windowHintFocusFrame").length, 0,
-                "no highlight on the copy that is leaving")
-            compare(findAllByName(outgoing(), "windowHintFocusIndicator").length, 0,
-                "and no indicator")
             compare(findAllByName(live(), "windowHintFocusFrame").length, 1,
-                "the arriving one carries the highlight")
+                "one highlight, mid-crossing")
             compare(findAllByName(live(), "windowHintFocusIndicator").length, 1,
-                "and the indicator")
+                "and one indicator")
+            // Mid-crossing the arriving active column is still off to the side, and
+            // the markers are on it rather than pinned to the panel.
+            compare(body.plan.activeSlot, 2, "the arriving column is the last slot")
+            compare(strip().activeColumnX, 2 * body.columnWidth,
+                "and the markers are placed against it")
             settleSlide()
+            // Landed: it is the middle column, which is the same claim the resting
+            // panel makes everywhere else.
+            compare(body.plan.activeSlot, 1, "at rest the active column is the middle")
+            compare(findByName(live(), "windowHintFocusFrame").x, body.columnWidth)
         }
 
-        function test_theMarkersCrossWithTheContentTheyMark() {
-            // The highlight is a child of the arriving layer, so it travels with
-            // the column it is on. A highlight pinned to the panel while the column
-            // slid out from under it would read as the focus staying put while the
-            // window list moved - two different claims about where the current
-            // window is.
+        function test_theMarkersTravelWithTheContentTheyMark() {
+            // The markers are children of the strip, so they cross with the column
+            // they are on. Read in STRIP space, where the marker and the row share a
+            // parent chain, so the assertion is about the pairing rather than about
+            // an absolute position a translation would have to be added to.
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
             wait(Math.round(body.slideDuration / 2))
-            var inn = live()
-            var wash = findByName(inn, "windowHintFocusFrame")
-            var bar = findByName(inn, "windowHintFocusIndicator")
-            var active = findByName(inn, "windowHintColumn")
-            verify(inn.x > 0, "the layer is mid-flight, was " + inn.x)
-            // Layer-local: the markers are children of the layer, so their own x is
-            // the same number whether or not the layer is moving. What has to hold
-            // is that they sit on the column, not that they are at some absolute
-            // position that a slide would have to be added to.
-            compare(wash.x, active.x, "the highlight sits on its column mid-slide")
+            var wash = findByName(strip(), "windowHintFocusFrame")
+            var bar = findByName(strip(), "windowHintFocusIndicator")
+            // The row they mark, in the same space.
+            var row = findAllByName(strip(), "windowHintWindowRow")[0]
+            var rowInStrip = row.mapToItem(strip(), 0, 0)
+            compare(wash.x, rowInStrip.x, "the highlight sits on its row mid-crossing")
             compare(bar.x - wash.x, 4, "and the indicator keeps its inset")
             settleSlide()
         }
@@ -1163,7 +1412,8 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // Every column moves together, so the switch reads as one motion across
             // the panel. If only the active column travelled, the neighbours would
             // sit still while the middle slid and the switch would read as two
-            // unrelated changes.
+            // unrelated changes. There is one strip, so the claim is that its columns
+            // keep their slots relative to each other while it is displaced.
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
                 previousActiveWorkspacePosition: 2,
@@ -1172,54 +1422,155 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
             wait(Math.round(body.slideDuration / 2))
-            var inn = live()
-            var active = findByName(inn, "windowHintColumn")
-            var next = findByName(inn, "windowHintNextColumn")
-            var previous = findByName(inn, "windowHintPreviousColumn")
-            // The columns keep their slots relative to each other; the LAYER is
-            // what is displaced, so all three move as one object.
-            compare(active.x, body.columnWidth, "active holds its slot")
-            compare(previous.x, 0, "previous holds the first slot")
-            compare(next.x - active.x, body.columnWidth, "and next is one column along")
+            var columns = columnDelegates()
+            compare(columns.length, 4, "a two-step crossing carries four columns")
+            for (var i = 0; i < columns.length; ++i) {
+                compare(columns[i].x, i * body.columnWidth,
+                    "column " + i + " holds its slot mid-crossing")
+            }
             settleSlide()
             // Landed: each neighbour slot shows what the new snapshot says for it
             // rather than a stale list.
-            compare(findByName(live(), "windowHintPreviousRow").modelData.windowId, "p1")
-            compare(findByName(live(), "windowHintNextRow").modelData.windowId, "n1")
+            var neighbours = findAllByName(live(), "windowHintNeighbourRow")
+            compare(neighbours.length, 2)
+            compare(neighbours[0].modelData.windowId, "p1")
+            compare(neighbours[1].modelData.windowId, "n1")
         }
 
-        function test_aSwitchMidSlideDoesNotRestartIt() {
-            // Holding mod and arrowing twice quickly lands a second switch while
-            // the first is still crossing. Re-holding the outgoing copy there would
-            // snap the arriving layer back to its starting offset - a visible jump
-            // backwards - which is worse than the outgoing copy briefly naming a
-            // workspace one step behind.
-            body.hint = root.makeHint({
-                activeWorkspacePosition: 2,
-                previousActiveWorkspacePosition: 1,
-                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
-            })
+        // Where each workspace's row sits across the panel, as title -> x. Read from
+        // the live rows, so it is what the user would see rather than a number the
+        // component computed about itself. Off-panel rows are left out, because a
+        // workspace that has not arrived yet has no position to hold.
+        function contentPositions() {
+            var positions = {}
+            // Rooted at the body, so a layout with more than one strip is measured
+            // for what it actually shows rather than for one of its parts.
+            var rows = findAllByName(body, "windowHintWindowRow")
+                .concat(findAllByName(body, "windowHintNeighbourRow"))
+            for (var i = 0; i < rows.length; ++i) {
+                var row = rows[i]
+                if (!row.modelData || row.modelData.title === undefined)
+                    continue
+                var from = row.mapToItem(body, 0, 0).x
+                if (from + row.width <= 0 || from >= body.width)
+                    continue
+                positions[String(row.modelData.title)] = from
+            }
+            return positions
+        }
+
+        // Every workspace that was on the panel is still within a pixel of where it
+        // was. This is the claim that matters for a re-aim: the strip's own offset is
+        // ALLOWED to change, because renumbering its slots legitimately moves it, so
+        // only the content's position can say whether the user saw a jump.
+        function assertContentHeld(before, label) {
+            var after = contentPositions()
+            for (var title in before) {
+                if (!(title in after))
+                    continue
+                verify(Math.abs(after[title] - before[title]) <= 1,
+                    label + ": " + title + " stayed put, was at " + before[title]
+                        + " and is at " + after[title])
+            }
+        }
+
+        function test_aSwitchMidSlideReAimsWithoutMovingWhatIsOnScreen() {
+            // Holding mod and arrowing twice quickly lands a second switch while the
+            // first is still crossing. This is the case that has to be derived rather
+            // than stumbled into, and it has two halves.
+            //
+            // The MOTION continues from where the strip is, rather than from the new
+            // plan's own start offset - a restart would throw the content back to the
+            // edge of the panel. And the strip's slots are renumbered, because a move
+            // that extends the union at the right adds columns without disturbing the
+            // ones already held; where a re-aim does renumber them, the offset is
+            // corrected by the same amount - see the reversal test below. Either way
+            // the assertion is about the CONTENT, because that is what the user sees,
+            // and the strip's own x is an internal number that is allowed to change.
+            for (var direction = 0; direction < 2; ++direction) {
+                // The second and third destinations. Forward takes 1 -> 2 -> 3;
+                // backward 5 -> 4 -> 3, so the two runs finish on the same workspace
+                // and a landing in the wrong place cannot pass for the other case.
+                var first = direction === 0 ? 1 : 5
+                var second = direction === 0 ? 2 : 4
+                var third = direction === 0 ? 3 : 3
+                body.hint = root.framedHint(first, first)
+                wait(20)
+                body.hint = root.framedHint(second, first)
+                wait(Math.round(body.slideDuration / 2))
+                var before = contentPositions()
+                var moved = 0
+                for (var t in before) {
+                    if (Math.abs(before[t]) > 1)
+                        moved++
+                }
+                verify(moved > 0, "direction " + direction
+                    + ": the strip is mid-flight, so what follows is about a moving panel")
+
+                // The second switch, in the same direction: the common case.
+                body.hint = root.framedHint(third, second)
+                // No event-loop turn between the publish and the read, so a strip sent
+                // back to its start shows up here rather than a frame later.
+                assertContentHeld(before, "direction " + direction + " re-aim")
+                verify(body.swapping, "direction " + direction + ": and it is still crossing")
+                compare(body.plan.span, 1, "direction " + direction
+                    + ": re-aimed at the new one-step move")
+                // The arriving column is at the far end of the strip from where the
+                // first crossing's arriving column was, because the destination moved
+                // a second step in the same direction.
+                compare(body.plan.activeSlot, direction === 0 ? 2 : 1,
+                    "direction " + direction + ": with the arriving column where the plan says, was "
+                        + body.plan.activeSlot)
+
+                settleSlide()
+                // It landed on the SECOND destination, and the resting panel is the
+                // arriving frame alone.
+                compare(body.plan.slots, 3, "direction " + direction + ": three columns at rest")
+                compare(body.leavingHint, null, "direction " + direction + ": nothing held")
+                var landed = shownTitles()
+                compare(landed.indexOf("ws" + third) >= 0, true,
+                    "direction " + direction + ": the second destination is the one on screen")
+                compare(repeatedTitles().length, 0,
+                    "direction " + direction + ": and nothing is on screen twice")
+            }
+        }
+
+        function test_aSwitchMidSlideReversingDirectionKeepsTheContentStill() {
+            // The other direction, and the case that renumbers the strip. Arriving
+            // back past where the crossing came from extends the union at the LEFT, so
+            // every column the strip already holds moves up a slot - and the strip
+            // has to shift left by exactly that much, or the content on screen
+            // teleports sideways on the frame the second switch lands.
+            //
+            // The move chosen is 1 -> 2 then back to 0, because it is the one where
+            // the two plans' bases genuinely differ: reversing onto 1 would land on
+            // the same run of workspaces and need no correction at all, which is a
+            // real case but a vacuous one to assert against.
+            body.hint = root.framedHint(1, 1)
+            wait(20)
+            body.hint = root.framedHint(2, 1)
             wait(Math.round(body.slideDuration / 2))
-            var beforeX = live().x
-            verify(beforeX > 0, "mid-flight, was " + beforeX)
-            body.hint = root.makeHint({
-                activeWorkspacePosition: 3,
-                previousActiveWorkspacePosition: 2,
-                windows: [{ windowId: "21", title: "term2", appId: "kitty", icon: "", isFocused: true }]
-            })
-            // No frame turn between the assignment and the read: the layer must not
-            // have been sent back to its start.
-            compare(live().x, beforeX, "the arriving layer did not jump back")
-            verify(body.slideProgress < 1, "and the slide is still running")
+            var before = contentPositions()
+            var held = 0
+            for (var t in before)
+                held++
+            verify(held > 0, "there is content on the panel to hold still")
+
+            // Reverse, past the origin: the opposite direction, and a new base.
+            body.hint = root.framedHint(0, 2)
+            assertContentHeld(before, "reversal")
+            verify(body.swapping, "and it is still crossing")
+            verify(body.plan.base !== 0, "and the strip really was renumbered, base is "
+                + body.plan.base)
+            // Still one column per position, which is what keeps the reversal from
+            // being the moment the duplication comes back.
+            compare(body.plan.slots, body.plan.span + 3, "one column per position")
+            compare(repeatedTitles().length, 0, "and nothing is on screen twice")
+
             settleSlide()
-            // The Repeater has to have rebuilt its delegates for the second
-            // snapshot by now, so this is about which content landed, not about
-            // timing.
-            var landed = findAllByName(live(), "windowHintWindowRow")
-            compare(landed.length, 1, "one row on the arriving layer")
-            compare(landed[0].modelData.windowId, "21",
-                "the newer snapshot is the one that landed")
-            compare(outgoing().visible, false, "and the held copy was released")
+            compare(body.plan.slots, 3, "three columns at rest")
+            compare(shownTitles().indexOf("ws0") >= 0, true, "it landed back at 0")
+            compare(repeatedTitles().length, 0, "and nothing is on screen twice")
         }
 
         function test_sameWorkspaceRefreshCommitsWithoutAnimating() {
@@ -1235,7 +1586,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 ]
             })
             compare(body.swapping, false, "committed straight away")
-            compare(outgoing().visible, false, "and held nothing")
+            compare(body.leavingHint, null, "and held nothing")
             var rows = findAllByName(live(), "windowHintWindowRow")
             compare(rows.length, 2, "already the new list")
             compare(findByName(live(), "windowHintWindowTitle").text, "kitty")
@@ -1243,9 +1594,11 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         }
 
         function test_reducedMotionCommitsWithoutSliding() {
-            // Reduced motion means the swap is a replacement, not a displacement.
-            // Only the arriving layer ends up visible - two copies at the same
-            // offset would double every row's text.
+            // Reduced motion means the swap is a replacement, not a displacement. The
+            // strip is the arriving frame's own three columns from the first frame -
+            // a wider strip with no motion would show the leaving columns sitting
+            // beside the arriving ones, which is the duplication this whole change is
+            // about.
             Lazer.MotionTokens.reducedMotionOverride = true
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
@@ -1255,8 +1608,12 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                     { windowId: "b", title: "b", appId: "kitty", icon: "", isFocused: false }
                 ]
             })
-            compare(body.swapping, false, "no slide to wait for")
-            compare(outgoing().visible, false, "and nothing was held")
+            compare(body.swapping, false, "no crossing to wait for")
+            compare(body.leavingHint, null, "and nothing was held")
+            // The strip is three columns, so the leaving workspaces are not sitting
+            // beside the arriving one.
+            compare(body.plan.slots, 3, "the strip is the arriving frame alone")
+            compare(repeatedTitles().length, 0, "and nothing is on screen twice")
             var rows = findAllByName(live(), "windowHintWindowRow")
             compare(rows.length, 2)
             verify(rows[0].opacity > 0.9, "rows are visible, was " + rows[0].opacity)

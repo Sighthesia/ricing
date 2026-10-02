@@ -293,10 +293,20 @@ Item {
                 "and the surface is at least that wide, was " + item.implicitWidth)
             compare(item.implicitWidth, body.width + item.contentInset * 2,
                 "exactly the body plus the content column's inset")
-            // The last column ends inside the content column, which ends inside
+            // The strip's columns end inside the content column, which ends inside
             // the surface. All three of those have to hold or something is cut.
-            var next = findByName(body, "windowHintNextColumn")
-            verify(next.x + next.width <= column.width,
+            //
+            // Read off the strip's own width rather than off a named "next column":
+            // the columns are Repeater delegates of one component now, so they share
+            // a name, and the surface question is about the widest of them - which is
+            // what the strip's width says. A strip that was wider than the panel would
+            // paint past the surface here, and the crossing's extra columns are
+            // exactly the case that does.
+            var strip = findByName(body, "windowHintStrip")
+            verify(strip !== null, "the strip should exist")
+            compare(strip.x, 0, "and it starts at the panel's left edge")
+            compare(strip.width, body.width, "as wide as the panel at rest")
+            verify(strip.x + strip.width <= column.width,
                 "the last column ends inside the content column")
             verify(column.x + column.width <= item.width,
                 "and the content column ends inside the surface")
@@ -321,11 +331,15 @@ Item {
             compare(body.width, 3 * 180, "still three columns")
             compare(item.implicitWidth, body.width + item.contentInset * 2)
             var column = findByName(item, "actionsRoot")
-            var active = findByName(body, "windowHintColumn")
-            compare(active.x, 180, "and the active workspace is still the middle one")
+            // The active workspace is still the middle column, read from where the
+            // focus highlight is placed rather than from a named column delegate.
+            var wash = findByName(body, "windowHintFocusFrame")
+            verify(wash !== null, "the focus highlight should exist")
+            compare(wash.x, 180, "and the active workspace is still the middle one")
             // All three columns fit, so nothing is drawn past the surface.
-            var next = findByName(body, "windowHintNextColumn")
-            verify(next.x + next.width <= column.width,
+            var strip = findByName(body, "windowHintStrip")
+            compare(strip.width, 3 * 180, "the strip is three columns wide")
+            verify(strip.x + strip.width <= column.width,
                 "and the last column still ends inside the content column")
         }
 

@@ -2,50 +2,37 @@ import QtQuick
 import "../lazerbar"
 import "./WindowHintMenuLogic.js" as HintLogic
 
-// Body of the mod-key window hint: the windows on the workspace you are on, plus
-// the windows either side of it. Rendered inside the bar's popup, so it reuses
-// the popup's surface colors, section fill and shared reveal instead of owning a
-// surface of its own.
+// Body of the mod-key window hint: a strip of the workspaces around the one you
+// are on. Rendered inside the bar's popup, so it reuses the popup's surface
+// colors, section fill and shared reveal instead of owning a surface of its own.
 //
-// A workspace switch is a WHOLE-BODY change, once, without turning back: two
-// copies of the same strip, and one clock. Neither copy MOVES. The panel is a
-// window onto a fixed frame, and a single vertical seam sweeps across it - the
-// frame you are leaving to the left of the seam, the frame you are arriving at to
-// the right, and at every point of the travel the seam sits between two different
-// workspaces.
+// A workspace switch is a WHOLE-BODY displacement: the strip travels by exactly
+// as many columns as the workspace moved, once, without turning back, and it
+// carries BOTH frames with it. The panel is a three-column window onto the strip;
+// the strip is `span + 3` columns wide, so while it travels there is always a full
+// panel's worth of it under the window and the panel is never less than covered.
 //
-// Why nothing is translated, when the last four commits built this as a
-// full-panel displacement and made the traverse finish on its own clock. Because
-// the panel is a three-column frame of CONSECUTIVE workspaces, the frame you are
-// leaving and the frame you are arriving at SHARE TWO OF THEIR THREE COLUMNS. A
-// page turn is the right motion for a panel whose pages are disjoint, and this
-// one's are not: sliding one frame off and the other on by a whole panel width
-// puts the shared workspaces on screen in two places at once, and the user reads
-// that as duplicated window-title cards rather than as motion. Measured with a
-// probe replaying the publishes WindowHintService makes for one activation,
-// sampling which titles are actually inside the panel every 40ms across the whole
-// traverse:
+// Why one strip and not two copies crossing. The panel is a three-column frame of
+// CONSECUTIVE workspaces, so the frame being left and the frame arriving share
+// two of their three columns. Two copies sliding past each other therefore put a
+// shared workspace on screen twice - the same window titles, once as the card
+// column of the frame being left and once as a neighbour column of the frame
+// arriving. Measured with a probe sampling which titles were inside the panel
+// every 40ms across a whole crossing: 22 of 24 samples forward, 22 of 24
+// backward, 85 double-painted titles in 72 samples. The user reads that as
+// duplicated window-title cards.
 //
-//   forward 1->2   22 of 24 samples had a title painted twice (41 double-painted)
-//   backward 2->0  22 of 24 samples had a title painted twice (44 double-painted)
+// One strip cannot have the fault, and the reason is structural rather than
+// arithmetic: the strip holds each position exactly once, so there is only one
+// place a title could be painted from. See `WindowHintMenuLogic.stripPlan` for the
+// geometry and `stripColumns` for the ordering - both live there so this component
+// and its suite read one rule rather than two.
 //
-// A seam cannot have that fault, and the reason is arithmetic rather than taste.
-// The two frames' shared workspace W sits in the leaving frame's slot j and the
-// arriving frame's slot j-d, where d is how far the workspace moved. The leaving
-// copy is shown where 180j < seam and the arriving copy where seam < 180(j-d+1),
-// and those two cannot both hold for any d >= 1. The seam separates the shared
-// workspace from its own second copy by construction, at every progress value.
-//
-// Why two copies and not one. A single copy replaced in place leaves the panel
-// blank for a frame or fades, and both read as a fault rather than as motion. The
-// two gates below are complementary halves of the panel at every progress value,
-// so a band of uncovered panel is not expressible - the coverage this design
-// exists for is a property of the geometry rather than of two carefully matched
-// travel distances.
-//
-// Only the arriving copy carries the focus highlight and the indicator. Focus
-// belongs to the workspace you are moving to, and a marker on the outgoing copy
-// would blink a second time for a workspace you have already left.
+// Only the arriving copy's content carries the focus highlight and the indicator.
+// Focus belongs to the workspace you are moving to, and a marker on a column
+// still on its way out would blink a second time for a workspace you have already
+// left. Both travel WITH the strip, so the marker and the row it marks cross
+// together.
 Item {
     id: root
 
@@ -54,87 +41,86 @@ Item {
     property var hint: null
     signal windowActivated(string windowId)
 
-    // What is painted: the incoming copy's columns. Replaced at the START of a
-    // slide, not at the end - the outgoing copy is the one being held, and the
-    // panel is sized from what is arriving so a width change is masked by the
-    // arriving frame still being behind the seam.
-    property var columns: HintLogic.cappedColumns(null)
-    // The frame on its way out, held for the length of one slide. A depth-1
+    // What is painted: the strip, one column per workspace position, in order.
+    // Replaced at the START of a slide, not at the end - the frame being left is
+    // the one being held, and the panel is sized from what is arriving so a width
+    // change is masked by the arriving content still being off-panel.
+    property var columns: []
+    // The frame the strip is leaving, held for the length of one slide. Needed
+    // because the arriving snapshot only describes the three workspaces around the
+    // workspace being moved TO: the column for the workspace being left is in
+    // neither of the arriving snapshot's own three, and inventing an empty column
+    // for it would report "no windows" about a workspace that has some. A depth-1
     // hold is the whole of it: the launcher's display pool solves the same problem
-    // for a list that refills on every keystroke, which is not what a
-    // hold-to-see popup does.
-    property var outgoingColumns: HintLogic.cappedColumns(null)
+    // for a list that refills on every keystroke, which is not what a hold-to-see
+    // popup does.
+    property var leavingHint: null
     property bool shownReady: false
     // +1 when the workspace moved later in the list, -1 earlier, 0 unknown. It
-    // steers the seam's direction, not a transform - see `leavingHoldsTheLeft`.
+    // steers the strip's direction, not a transform: see the plan.
     property int swapDirection: 0
-    // 0 while a slide is in flight, 1 at rest. The one clock the whole motion
-    // runs on: both gates read it, so they cannot disagree about where the seam
-    // is, and there is no second animation to fall out of step.
+    // 0 while a slide is in flight, 1 at rest. The one clock the whole motion runs
+    // on: the strip's offset is a pure function of it, so there is no second
+    // animation to fall out of step.
     property real slideProgress: 1
     property bool swapping: slideProgress < 1
 
+    // The geometry of the crossing in flight, from `HintLogic.stripPlan`, or null
+    // at rest. The strip's own offset, the number of columns it is drawn with and
+    // the slot the active workspace occupies are all read off this one record, so
+    // the three cannot describe different crossings.
+    property var plan: null
+
     readonly property bool ready: root.shownReady
     // Three columns of one fixed width, always. The count does not vary with the
-    // content: the active workspace sits in the middle, and it can only stay in
-    // the middle if the frame around it is the same size whatever the neighbours
-    // are running. It also means the panel does not resize under the pointer as
-    // the user moves between an interior workspace and an edge one.
+    // content: the active workspace sits in the middle, and it can only stay in the
+    // middle if the frame around it is the same size whatever the neighbours are
+    // running. It also means the panel does not resize under the pointer as the
+    // user moves between an interior workspace and an edge one.
     readonly property int columnWidth: HintLogic.COLUMN_WIDTH
     readonly property int shownColumnCount: HintLogic.COLUMN_COUNT
-    // Where the seam is, in panel coordinates. 0 means the arriving frame owns
-    // the whole panel; the panel's own width means the leaving frame owns all of
-    // it. Read straight off `slideProgress` and NOT gated on `swapping`, because
-    // the resting seam is the answer in one direction and the other end in the
-    // other - and getting that wrong leaves the arriving gate shut at rest, which
-    // is a blank panel rather than a subtle fault.
+    // Where the strip's travel starts and ends, in pixels, and the offset as a
+    // function of the one clock. Computed rather than animated per layer because
+    // there is one object moving: the strip.
     //
-    // Which way it travels is the direction the workspace moved. Going to a later
-    // workspace, the workspace you are moving to was sitting to the RIGHT of the
-    // one you are leaving, so its frame arrives from the right: the seam starts at
-    // the far edge and the leaving copy holds the left. Going earlier, the mirror.
-    readonly property real seam: swapDirection >= 0
-        ? width * (1 - slideProgress) : width * slideProgress
-    readonly property bool leavingHoldsTheLeft: swapDirection >= 0
-    // The two gates. They are the same cut read twice: one of them is anchored to
-    // the panel's left edge and the other to its right, they meet at `seam`, and
-    // together they are exactly the panel at every progress value.
-    readonly property real outgoingGateX: leavingHoldsTheLeft ? 0 : root.seam
-    readonly property real outgoingGateWidth: leavingHoldsTheLeft
-        ? root.seam : width - root.seam
-    readonly property real incomingGateX: leavingHoldsTheLeft ? root.seam : 0
-    readonly property real incomingGateWidth: leavingHoldsTheLeft
-        ? width - root.seam : root.seam
-    // How far both copies dim at the middle of the crossing, 0 at either end.
+    // At progress q the strip's offset is `slideFrom + (slideTo - slideFrom) * q`,
+    // and the plan's start and end are the offsets at which the active workspace
+    // sits in the panel's middle column - at both ends, by construction, so neither
+    // direction needs a case.
+    property real slideFrom: 0
+    property real slideTo: 0
+    readonly property real slideOffset: slideFrom
+        + (slideTo - slideFrom) * slideProgress
+    // How far the strip dims at the middle of the crossing, 0 at either end.
     //
-    // A seam that swaps content in place has nothing about the content changing
-    // to carry it, so a small dip gives the panel some weight. It is safe here for
-    // the same reason it was safe before: both copies take the SAME value at the
-    // same moment, so the panel darkens uniformly instead of one copy showing
-    // through the other. Shallow on purpose: enough to register, far too little to
-    // read as a fade.
+    // A translation has no weight of its own: nothing about the content changes, so
+    // the panel slides rather than moves. A small dip gives it some, and it is safe
+    // here precisely because there is only one copy to dim - with two, they would
+    // have to dim together or the seam would show one through the other. Shallow on
+    // purpose: enough to register, far too little to read as a fade.
     readonly property real slideDip: Math.sin(Math.PI * slideProgress) * 0.12
     // Where the head hands over to the tail, as a share of the traverse.
     //
     // Small on purpose. The head is the quick departure, so the temptation is to
-    // let it carry most of the distance - and on a panel-width travel that reads as
-    // a lunge, because the bulk of the movement lands in the first fifth of a
+    // let it carry most of the distance - and on a multi-column travel that reads
+    // as a lunge, because the bulk of the movement lands in the first fifth of a
     // second and the rest crawls. Two tenths of the way is a departure; four tenths
-    // is most of the motion, and the seam looks like it is being thrown across the
-    // panel rather than carried.
+    // is most of the motion, and the columns look like they are being thrown across
+    // the panel rather than carried.
     readonly property real slideHeadShare: 0.4
     // The two clocks, carrying the indicator's two-speed SHAPE at a distance the
     // indicator's clocks were never asked to cover.
     //
-    // `medium`/`slow * 2` is right for the indicator because the indicator has to
+    // `medium` / `slow * 2` is right for the indicator because the indicator has to
     // cover sixteen pixels: its head really can put the bar there in 160ms. The
-    // crossing covers the panel's whole width, so the same head clock moves a
-    // third of a metre of content in the same breath - a different motion wearing
-    // the same numbers. These are scaled to the travel, not copied from it, and the
-    // two stay in the indicator's proportions: the tail is three times the head, so
-    // the arrival keeps lingering after the departure has finished.
-    readonly property int slideHeadDuration: MotionTokens.slow
-    readonly property int slideTailDuration: MotionTokens.slow * 3
+    // strip covers a few columns rather than the panel's whole width, and 160ms of
+    // departure followed by 480ms of settle is the same proportion the indicator
+    // uses for its much shorter travel - so the SHAPE is shared without the clocks
+    // being copied blind. The two stay in the indicator's proportions: the tail is
+    // three times the head, so the arrival keeps lingering after the departure has
+    // finished.
+    readonly property int slideHeadDuration: MotionTokens.medium
+    readonly property int slideTailDuration: MotionTokens.slow * 2
     // Both phases, for anything that has to wait the crossing out.
     readonly property int slideDuration: slideHeadDuration + slideTailDuration
     // The crossing's own recipe, and the indicator's, so a suite can compare the
@@ -146,9 +132,16 @@ Item {
     readonly property alias indicatorHeadMotion: indicatorHeadAnimation
     readonly property alias indicatorTailMotion: indicatorTailAnimation
     readonly property int rowHeight: 28
-    // The one row the focus indicator belongs to, or -1. Read from the INCOMING
-    // column, which is the content the user is looking at.
-    readonly property int focusedRowIndex: HintLogic.focusedIndexIn(columns.current.rows)
+    // The one row the focus indicator belongs to, or -1. Read from the ARRIVING
+    // active column, which is the content the user is being taken to.
+    readonly property var activeColumn: root.plan
+        ? root.columns[root.plan.activeSlot] : null
+    // The plan's slot count as a width, for the strip. Always derivable: the
+    // resting plan is three columns and a crossing's is its span plus three.
+    readonly property int stripWidth: root.plan
+        ? root.plan.slots * root.columnWidth : 0
+    readonly property int focusedRowIndex: HintLogic.focusedIndexIn(
+        root.activeColumn ? root.activeColumn.rows : null)
     // Left inset of a row's glyph, shared by the icon and the title so both start
     // on the same x - and derived from the indicator rather than a literal, so the
     // gutter between the marker and the glyph cannot drift when either moves. The
@@ -169,10 +162,21 @@ Item {
     // which row is current.
     readonly property real focusedRowTop: focusedRowIndex < 0 ? 0
         : focusedRowIndex * rowPitch
-    // The outgoing copy's height, while it is still on screen. The panel is sized
-    // to the taller of the two so a workspace with more windows on it does not have
-    // its bottom rows cut off by the panel edge for the length of the slide.
-    readonly property int _outgoingHeight: root.swapping ? outgoingStrip.contentHeight : 0
+    // The leaving frame's own height, from the row counts of the frame being held
+    // rather than from a second strip. A crossing's strip is as tall as the tallest
+    // of the two frames already, so this only matters for the instant between a
+    // snapshot arriving and the strip's delegates having laid out - where reading
+    // `strip.contentHeight` would report the new frame's height and size the panel
+    // to it for a frame, clipping the leaving frame's bottom rows.
+    //
+    // The row pitch rather than a delegate, so it is available before any layout
+    // has polished.
+    readonly property int _outgoingHeight: {
+        if (!root.leavingHint || !root.swapping)
+            return 0
+        const rows = HintLogic.cappedRows(root.leavingHint.windows).rows
+        return rows.length * root.rowPitch - root.listSpacing
+    }
 
     // --- indicator: the workspace widget's dual-speed edge tracker, rotated ---
     // The workspace indicator is a 16x3 bar travelling sideways, so its head/tail
@@ -209,16 +213,18 @@ Item {
     // --- the slide -------------------------------------------------------
     // A workspace switch replaces every row, so without this the panel's contents
     // are simply gone and remade between two frames. Here the leaving frame is
-    // held, the arriving frame is put in its place, and one clock drives the seam
-    // between them across the panel.
+    // held, the strip is rebuilt to carry both, and one clock drives it across.
     //
-    // Reduced motion, a first snapshot, and a change with no knowable direction
-    // (a window title edit on the same workspace) all commit straight away: an
-    // un-aimed animation would be motion for its own sake, and a title edit is not
-    // a page turn.
+    // Reduced motion, a first snapshot, a change with no knowable direction (a
+    // window title edit on the same workspace) and a move wider than the two
+    // frames together all commit straight away: an un-aimed animation would be
+    // motion for its own sake, and there is nothing to animate for a move whose
+    // middle column no snapshot knows anything about.
     function _onHintChanged() {
-        if (MotionTokens.reducedMotion || !root.shownReady)
+        if (MotionTokens.reducedMotion || !root.shownReady) {
+            root._lastFrame = root.hint
             return root._commitHint()
+        }
         const direction = HintLogic.switchDirection(root.hint)
         // A snapshot reporting no movement must NEVER cancel a crossing that is
         // already under way.
@@ -237,42 +243,111 @@ Item {
         // crossing and the crossing finishes on its own clock. With no crossing in
         // flight there is nothing to protect, and a title edit on the current
         // workspace commits straight away exactly as before.
-        if (direction === 0)
+        if (direction === 0) {
+            root._lastFrame = root.hint
             return root.swapping ? root._replaceArriving() : root._commitHint()
-        root.swapDirection = direction
-        // Already crossing: replace the arriving content and let the crossing
-        // continue. Re-holding the leaving frame here would put the seam back at
-        // the start of the panel - a visible jump backwards - and stopping the run
-        // would snap it to the end, which is the same artefact by another route.
+        }
+        const plan = HintLogic.stripPlan(
+            root.hint.previousActiveWorkspacePosition,
+            root.hint.activeWorkspacePosition)
+        // Too far to describe: the two frames' workspaces no longer form a
+        // contiguous run, so a column would have to be invented. Commit.
+        if (!plan) {
+            root._lastFrame = root.hint
+            return root._commitHint()
+        }
+        // The frame the strip is leaving is whichever one was on screen when this
+        // publish arrived - the resting frame for a fresh switch, and the frame
+        // mid-crossing is arriving at for a second switch. Latched before the
+        // arrival overwrites it, or the strip loses the column for the workspace
+        // being left.
+        const leaving = root._lastFrame
+        root._lastFrame = root.hint
+        root.leavingHint = leaving
+        root.swapDirection = plan.direction
+        // Already sliding: re-aim the same crossing rather than starting a new one,
+        // so the strip continues from where it is instead of jumping home.
         if (root.swapping)
-            return root._replaceArriving()
-        root._startSlide()
+            return root._reaimSlide(plan)
+        root._startSlide(plan)
     }
 
+    // The frame the panel was showing when the current publish arrived. The service
+    // overwrites `previousActiveWorkspacePosition` as it builds, so the "position
+    // being left" is only readable off the hint the panel was ALREADY showing.
+    property var _lastFrame: null
+
+    // Replace the panel's content outright, with no crossing. What is on screen
+    // becomes what the snapshot says, in one step, and the strip is rebuilt at rest
+    // so it is the arriving frame's own three columns with the active one in the
+    // middle.
     function _commitHint() {
         slideRun.stop()
         root.slideProgress = 1
-        root._replaceArriving()
-        // Nothing is on its way out, so the held copy goes with the commit.
-        root.outgoingColumns = HintLogic.cappedColumns(null)
+        root.leavingHint = null
+        root.swapDirection = 0
+        root.plan = null
+        root.slideFrom = 0
+        root.slideTo = 0
+        // A rest plan rather than no plan: the strip still needs to be drawn, and
+        // this is the one that says "three columns, active slot 1, offset 0" - the
+        // same shape the crossing's plan has, so every binding downstream can be
+        // written once. See `HintLogic.restPlan`.
+        root.plan = HintLogic.restPlan(root.hint)
+        root.columns = HintLogic.stripColumns(root.hint, null, root.plan)
+        root.shownReady = HintLogic.ready(root.hint)
     }
 
-    // Swap the content of the arriving copy without touching the crossing. The
-    // seam is what carries the motion and the content does not move, so the rows
-    // change under the crossing and the user sees the new workspace's list
-    // revealed from behind the seam.
+    // Swap the arriving frame's columns under the crossing, without touching the
+    // clock. The strip's offset is what carries the motion, so the rows change
+    // under it mid-crossing and the user sees the new workspace's list already in
+    // place behind the seam.
     function _replaceArriving() {
-        root.columns = HintLogic.cappedColumns(root.hint)
+        root.columns = HintLogic.stripColumns(root.hint, root.leavingHint, root.plan)
         root.shownReady = HintLogic.ready(root.hint)
     }
 
-    // Hold what is on screen, put the new content behind the seam, and run the
-    // clock. The held copy is a reference to the same columns object, so nothing
-    // is copied and the leaving rows keep their own delegates.
-    function _startSlide() {
-        root.outgoingColumns = root.columns
-        root.columns = HintLogic.cappedColumns(root.hint)
+    // Hold what is on screen, extend the strip to carry the new frame alongside
+    // it, and start the clock. The held frame is a reference to the same hint
+    // object, so nothing is copied and the leaving rows keep their own delegates.
+    function _startSlide(plan) {
+        root.plan = plan
+        root.columns = HintLogic.stripColumns(root.hint, root.leavingHint, plan)
         root.shownReady = HintLogic.ready(root.hint)
+        root.slideFrom = plan.startColumn * root.columnWidth
+        root.slideTo = plan.endColumn * root.columnWidth
+        root.slideProgress = 0
+        slideRun.restart()
+    }
+
+    // A second switch arrived mid-crossing. The strip must CONTINUE from where it
+    // is: re-aiming it to the new plan's own start offset would throw the content
+    // back to the edge of the panel, which is a visible jump rather than a
+    // correction.
+    //
+    // The compensation is `stripReshift`. A second move in the SAME direction only
+    // extends the union at the right, so the strip's existing slots keep their
+    // numbers and no correction is needed - the new plan's base equals the old
+    // one's and the strip simply continues. A move in the OTHER direction extends
+    // the union at the LEFT, which renumbers every column the strip already holds;
+    // shifting the strip left by exactly that many columns puts the content back
+    // where it was, so the reversal is a re-aim of the motion in progress and not
+    // a rearrangement of what is on screen.
+    function _reaimSlide(plan) {
+        const reshift = HintLogic.stripReshift(root.plan, plan)
+        // The offset the strip is AT right now, before the plan is replaced. Read
+        // from the clock rather than from the incoming plan, or the reshift is
+        // computed against a position the strip was never in.
+        const here = root.slideFrom
+            + (root.slideTo - root.slideFrom) * root.slideProgress
+        root.plan = plan
+        root.columns = HintLogic.stripColumns(root.hint, root.leavingHint, plan)
+        root.shownReady = HintLogic.ready(root.hint)
+        root.slideFrom = here - reshift * root.columnWidth
+        root.slideTo = plan.endColumn * root.columnWidth
+        // Restart the clock from the current offset, not from the crossing's own
+        // start: the re-aim is a new traverse over the remaining distance, and
+        // beginning it at 0 while the strip is already halfway across would jump.
         root.slideProgress = 0
         slideRun.restart()
     }
@@ -282,27 +357,22 @@ Item {
         // The crossing runs on the INDICATOR'S SHAPE: a quick departure on OutQuad,
         // then a long settle on OutSine, the tail three times the head.
         //
-        // That two-speed shape is what makes the indicator read as carrying weight
+        // That two-speed shape is what makes the motion read as carrying weight
         // rather than being dragged, and a single ease cannot produce it - the
         // symmetric `InOutSine` this replaced left and arrived at the same gentle
         // rate, which read as a shove.
         //
-        // The SHAPE is the indicator's; the clocks are not, and cannot be. The
-        // indicator has sixteen pixels to cross and can honestly put its bar
-        // somewhere in `medium`. The seam has the panel's whole width to cross, so
-        // the same clock throws most of the panel across before the settle even
-        // starts - measured on the previous numbers, 70% of the panel in 160ms and
-        // the remaining 30% over 480ms, which reads as a lunge followed by a crawl
-        // rather than as a carried crossing. The clocks here are scaled to the
-        // travel and the share is cut so the departure stays a departure.
+        // The SHAPE is the indicator's, and so are the clocks: the strip covers a
+        // few columns, and the indicator covers sixteen pixels, and `medium` then
+        // `slow * 2` is the same proportion of each. The earlier numbers scaled the
+        // indicator's clocks by the panel's whole width, which threw most of the
+        // content across before the settle began - measured at 70% of the panel in
+        // 160ms, a lunge followed by a crawl.
         //
         // What cannot be reproduced at all is the indicator's structure: its head
         // and tail are two positions running in PARALLEL with a drawn bar between
-        // them, so it settles in `slow * 2`. Here there is one position - the seam -
-        // and it has to cover both phases. Giving the two gates the two speeds
-        // separately would be the literal version and it does not work: they are
-        // complementary halves of the panel, so a gate running ahead of the other
-        // does not overlap it, it just leaves the panel's far edge uncovered.
+        // them, so it settles in `slow * 2`. Here there is one position - the
+        // strip - and it has to cover both phases.
         animations: [
             // The indicator's head, on the indicator's head clock.
             NumberAnimation {
@@ -322,10 +392,24 @@ Item {
             }
         ]
         onFinished: {
-            // The seam has reached the far edge, so the leaving copy's gate has
-            // closed to nothing and releasing the copy costs nothing on screen
-            // while keeping exactly one set of rows alive.
-            root.outgoingColumns = HintLogic.cappedColumns(null)
+            // The strip has landed with the arriving frame's active column in the
+            // middle, so the held frame goes with it and exactly one set of rows
+            // stays alive. The strip also narrows to the arriving frame's own three
+            // columns, and the offset returns to 0 to match: the resting plan says
+            // the active column is slot 1, which is the panel's middle column only
+            // at offset 0.
+            //
+            // Both are needed together. Narrowing the strip while the offset is
+            // still the crossing's end leaves the last two columns of the panel
+            // empty - the strip is three columns wide and sitting one column to the
+            // left, so it covers [0, 2C) and nothing else. Measured on the first
+            // run of this change: the final sample of every forward crossing had an
+            // unreached panel edge for exactly that reason.
+            root.leavingHint = null
+            root.plan = HintLogic.restPlan(root.hint)
+            root.columns = HintLogic.stripColumns(root.hint, null, root.plan)
+            root.slideFrom = 0
+            root.slideTo = 0
             root.slideProgress = 1
         }
     }
@@ -335,7 +419,8 @@ Item {
     readonly property real _barTop: Math.min(_headY, _tailY)
     readonly property real _barLength: indicatorLength + Math.abs(_headY - _tailY)
     readonly property bool hasTarget: focusedRowIndex >= 0
-            && focusedRowIndex < columns.current.rows.length
+            && activeColumn
+            && focusedRowIndex < activeColumn.rows.length
 
     Behavior on _headY {
         enabled: root._placed && !MotionTokens.reducedMotion && !root._snapping
@@ -406,92 +491,52 @@ Item {
         }
     }
 
-    // Three columns, always. The popup measures its geometry from this, so the host's
-    // `window-hint` width reads the body rather than keeping its own number - and
-    // the body reports the same number whether the neighbour workspaces are busy
-    // or empty, so the panel never changes size mid-hold.
-    implicitWidth: shownColumnCount * columnWidth
-    // The taller of the two copies while one is leaving. The empty-workspace
-    // placeholder lives inside the columns, so the columns' own height already
-    // accounts for it.
+    // Three columns, always. The popup measures its geometry from this, so the
+    // host's `window-hint` width reads the body rather than keeping its own number
+    // - and the body reports the same number whether the neighbour workspaces are
+    // busy or empty, so the panel never changes size mid-hold.
     //
-    // The gates' widths are deliberately not in here. A gate's rect is a per-frame
-    // change, and the popup sizes its layer-shell surface from the body's
-    // implicitWidth / implicitHeight, so anything that fed a gate's width into
-    // them would re-commit the surface on every frame of the crossing.
+    // The clip is what keeps the rest of the strip off the surface. A crossing
+    // carries `span + 3` columns through a three-column window, so up to three
+    // extra columns are travelling through the panel, and without a clip here they
+    // would paint outside the popup's own rect - and outside the layer-shell input
+    // region the host sized from this body's width.
+    clip: true
+    implicitWidth: shownColumnCount * columnWidth
+    // The taller of the two frames while a crossing is in flight, and the strip's
+    // own height once it has landed. The empty-workspace placeholder lives inside
+    // the columns, so the columns' own height already accounts for it.
     implicitHeight: ready
-        ? Math.max(root._outgoingHeight, incomingStrip.contentHeight)
+        ? Math.max(root._outgoingHeight, strip.contentHeight)
         : emptyText.implicitHeight
     width: implicitWidth
     height: implicitHeight
 
-    // The window onto the panel through which the outgoing copy is seen, and the
-    // share of the panel that window currently holds. The copy itself never
-    // moves: the strip below is parked at -x so the frame's three columns keep
-    // their own slots whatever the gate is doing, and the gate's rect is what
-    // decides how much of them there is to see.
-    //
-    // `clip` is a paint-time rect, not an input region - Qt Quick delivers events
-    // by geometry. That is fine here because nothing inside a gate is a tap
-    // target while the seam is moving (both strips report `interactive: false`),
-    // and once it lands the arriving gate is the whole panel.
-    Item {
-        id: outgoingLayer
-        objectName: "windowHintOutgoingLayer"
-        x: root.outgoingGateX
-        width: root.outgoingGateWidth
-        height: parent.height
-        clip: true
-        visible: root.ready && root.swapping
-        // Dims with its opposite number, so the seam never shows one copy through
-        // the other.
-        opacity: 1 - root.slideDip
-    }
-
+    // The strip. One object, carrying both frames, translated by the one clock. Its
+    // width is the whole run of workspaces; the panel is the three-column window
+    // onto it, and `clip` on the body is what keeps the rest of the run off the
+    // surface.
     BarWindowHintStrip {
-        id: outgoingStrip
-        objectName: "windowHintOutgoingStrip"
-        // Held in the outgoing layer, not beside it: the layer is the window, and
-        // the strip has to sit at absolute zero inside it so its columns stay in
-        // the frame's own slots - a copy that slid with the gate would be drawing
-        // the leaving frame from the wrong place.
-        parent: outgoingLayer
-        x: -outgoingLayer.x
+        id: strip
+        objectName: "windowHintStrip"
+        parent: root
+        // The strip's own offset. At rest it sits at 0 - the plan's end, with the
+        // active column in the panel's middle - and during a crossing it is
+        // somewhere between the plan's start and end.
+        x: root.slideOffset
         y: 0
-        columns: root.outgoingColumns
-        columnWidth: root.columnWidth
-        listSpacing: root.listSpacing
-        rowHeight: root.rowHeight
-        glyphInset: root.glyphInset
-        glyphWidth: root.glyphWidth
-        // What is leaving is not a tap target: the pointer is over content that
-        // is about to be somewhere else.
-        interactive: false
-    }
-
-    // The window onto the panel through which the arriving copy is seen - the
-    // other half of the same cut, and the whole of it once the seam has passed.
-    Item {
-        id: incomingLayer
-        objectName: "windowHintIncomingLayer"
-        x: root.incomingGateX
-        width: root.incomingGateWidth
-        height: parent.height
-        clip: true
-        visible: root.ready
+        width: root.stripWidth
+        height: root.height
+        // One object moving, so one dim. With two copies crossing this had to be
+        // applied to both in lockstep or the seam would show one through the other;
+        // with one strip there is no seam, and the value is a pure function of the
+        // clock - the same progress always gives the same opacity.
         opacity: 1 - root.slideDip
-    }
-
-    BarWindowHintStrip {
-        id: incomingStrip
-        objectName: "windowHintIncomingStrip"
-        parent: incomingLayer
-        // Absolute zero inside the gate, like the leaving copy: the arriving
-        // frame's columns keep their slots and the gate only decides how much of
-        // them the panel shows.
-        x: -incomingLayer.x
-        y: 0
         columns: root.columns
+        // Read off the plan the strip was built from, so the column that carries
+        // the card fill and the one the focus markers are placed against are the
+        // same column by construction.
+        activeSlot: root.plan ? root.plan.activeSlot : 1
         columnWidth: root.columnWidth
         listSpacing: root.listSpacing
         rowHeight: root.rowHeight
@@ -507,15 +552,13 @@ Item {
     // and the rows give up their own focused tint so exactly one highlight exists
     // at a time - two fills would read as two states.
     //
-    // A child of the arriving gate, so it is on the same side of the seam as the
-    // row it marks and is revealed with it: while the arriving frame is still
-    // behind the seam the marker is behind it too, and it comes into view as the
-    // seam uncovers the arriving active column. Pinned to the panel instead, it
-    // would be claiming a row the user is not being shown yet.
+    // A child of the strip, so it travels with the content it marks. Pinned to the
+    // panel, it would say the focus stayed put while the window list moved - two
+    // different claims about where the current window is.
     Rectangle {
         id: focusFrame
         objectName: "windowHintFocusFrame"
-        parent: incomingLayer
+        parent: strip
         z: 5
         radius: 6
         // The token the rows' focused tint used, so this is that highlight that
@@ -531,7 +574,7 @@ Item {
         // it marks, and the row spans its column's full width. Measured from the
         // active column's own x, so it cannot be drawn over a column that is not
         // the active one whatever the layout decided.
-        x: incomingStrip.activeColumnX
+        x: strip.activeColumnX
         y: root.focusedRowTop
         width: root.columnWidth
         height: root.rowHeight
@@ -560,7 +603,7 @@ Item {
     Rectangle {
         id: focusUnderline
         objectName: "windowHintFocusIndicator"
-        parent: incomingLayer
+        parent: strip
         z: 6
 
         width: root.indicatorThickness
@@ -569,7 +612,7 @@ Item {
         color: LazerTheme.osuGreen
         // Measured from the active column's own left edge, which is the same origin
         // the highlight uses, so the bar and the fill it marks always move together.
-        x: incomingStrip.activeColumnX + root.indicatorInset
+        x: strip.activeColumnX + root.indicatorInset
         y: root._barTop
         visible: root.hasTarget
         opacity: root.hasTarget ? 1 : 0

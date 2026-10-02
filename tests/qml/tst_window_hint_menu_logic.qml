@@ -291,6 +291,349 @@ Item {
             compare(Hint.switchDirection(null), 0)
         }
 
+        // ---- the strip: one column per workspace -------------------------
+        // A workspace's windows, titled after its own position, so a title in the
+        // panel names the workspace it came from and a repeated title is
+        // unambiguous. Shaped like WindowHintService's snapshot.
+        function framed(active, previous) {
+            function ws(position) {
+                return [{ windowId: "w" + position, title: "ws" + position,
+                    appId: "kitty", icon: "", isFocused: true }]
+            }
+            return {
+                workspaceId: "ws" + active,
+                workspaceIndex: active,
+                activeWorkspacePosition: active,
+                previousActiveWorkspacePosition: previous,
+                windows: ws(active),
+                previousWindows: ws(active - 1),
+                nextWindows: ws(active + 1)
+            }
+        }
+
+        function test_stripPlan_putsTheActiveColumnInTheMiddleAtBothEnds() {
+            // The claim the whole crossing rests on, and it is stated as the two
+            // ends rather than as a sign: at progress 0 the workspace being left is
+            // in the panel's middle column, and at progress 1 the workspace being
+            // moved to is. A strip is `span + 3` columns wide and the panel is
+            // three, so "column 1" is not the middle of the strip - it is the middle
+            // of the PANEL, which is what `startColumn` and `endColumn` are for.
+            for (var span = 1; span <= Hint.MAX_SWITCH_SPAN; ++span) {
+                for (var direction = 0; direction < 2; ++direction) {
+                    var from = direction === 0 ? 1 : 6
+                    var to = direction === 0 ? 1 + span : 6 - span
+                    var plan = Hint.stripPlan(from, to)
+                    // Slot `s` sits at panel column `s + offset`, so the middle is
+                    // reached when the offset is `1 - s`.
+                    var leavingSlot = from - plan.base
+                    var arrivingSlot = to - plan.base
+                    compare(plan.startColumn, 1 - leavingSlot,
+                        "span " + span + " dir " + direction
+                            + ": starts with the leaving workspace in the middle")
+                    compare(plan.endColumn, 1 - arrivingSlot,
+                        "span " + span + " dir " + direction
+                            + ": and ends with the arriving one there")
+                    compare(leavingSlot + plan.startColumn, 1,
+                        "span " + span + " dir " + direction + ": which is column 1")
+                    compare(arrivingSlot + plan.endColumn, 1,
+                        "span " + span + " dir " + direction + ": at both ends")
+                }
+            }
+        }
+
+        function test_stripPlan_isTheUnionOfTheTwoFrames() {
+            // `span + 3` columns, one per workspace, covering exactly the positions
+            // the two frames between them describe. Asserted as the set of positions
+            // rather than as a count, so a strip that is the right length but the
+            // wrong run fails here.
+            for (var span = 1; span <= Hint.MAX_SWITCH_SPAN; ++span) {
+                for (var direction = 0; direction < 2; ++direction) {
+                    var from = direction === 0 ? 2 : 5
+                    var to = direction === 0 ? 2 + span : 5 - span
+                    var plan = Hint.stripPlan(from, to)
+                    var positions = []
+                    for (var k = 0; k < plan.slots; ++k)
+                        positions.push(plan.base + k)
+                    var low = Math.min(from, to) - 1
+                    var high = Math.max(from, to) + 1
+                    compare(positions.length, high - low + 1,
+                        "span " + span + " dir " + direction + ": one column per position")
+                    compare(positions[0], low, "starting at the lowest")
+                    compare(positions[positions.length - 1], high, "and ending at the highest")
+                    // No repeats, which is the property the duplication depended on
+                    // before: each position appears once, so there is only one place
+                    // its windows could be painted from.
+                    var unique = {}
+                    for (var j = 0; j < positions.length; ++j)
+                        unique[positions[j]] = true
+                    compare(Object.keys(unique).length, positions.length,
+                        "span " + span + " dir " + direction + ": and no position twice")
+                }
+            }
+        }
+
+        function test_stripPlan_reportsTheArrivingColumnAsTheActiveSlot() {
+            // The slot the markers are placed against. The body reads it off this
+            // rather than keeping its own number, so the column carrying the card
+            // fill and the one the highlight sits on cannot be two different
+            // columns - which is what "the focus highlight is a child of the
+            // arriving column" needs in order to be true.
+            for (var span = 1; span <= Hint.MAX_SWITCH_SPAN; ++span) {
+                for (var direction = 0; direction < 2; ++direction) {
+                    var from = direction === 0 ? 1 : 6
+                    var to = direction === 0 ? 1 + span : 6 - span
+                    var plan = Hint.stripPlan(from, to)
+                    compare(plan.activeSlot, to - plan.base,
+                        "span " + span + " dir " + direction + ": the arriving position's slot")
+                    verify(plan.activeSlot >= 0 && plan.activeSlot < plan.slots,
+                        "span " + span + " dir " + direction + ": and it is on the strip, was "
+                            + plan.activeSlot)
+                    // The active slot is never the same as the leaving frame's active
+                    // slot, so the card fill is not on the column being left.
+                    var leavingSlot = from - plan.base
+                    verify(plan.activeSlot !== leavingSlot || span === 0,
+                        "span " + span + " dir " + direction + ": a different column from the leaving one")
+                }
+            }
+        }
+
+        function test_stripPlan_refusesAMoveWiderThanTheTwoFramesTogether() {
+            // Two three-column frames tile a contiguous run only while the move is no
+            // wider than they are together; one step apart they overlap in two
+            // positions, two steps in one, three in none, and at four steps the middle
+            // belongs to neither snapshot. A strip cannot have a column whose
+            // contents nothing knows.
+            compare(Hint.stripPlan(1, 1), null, "no move at all")
+            compare(Hint.stripPlan(2, 2), null, "the same position")
+            compare(Hint.stripPlan(2, -1), null, "an unknown previous position")
+            compare(Hint.stripPlan(-1, 2), null, "an unknown active one")
+            compare(Hint.stripPlan(0, 4), null, "four steps apart")
+            compare(Hint.stripPlan(4, 0), null, "four steps the other way")
+            compare(Hint.stripPlan(0, 9), null, "and further still")
+            // The boundary itself, from both directions, so the threshold is pinned
+            // rather than assumed.
+            compare(Hint.stripPlan(1, 4).span, Hint.MAX_SWITCH_SPAN, "three steps is allowed")
+            compare(Hint.stripPlan(4, 1).span, Hint.MAX_SWITCH_SPAN, "backwards too")
+            verify(Hint.MAX_SWITCH_SPAN === 3, "and the limit is three, was "
+                + Hint.MAX_SWITCH_SPAN)
+        }
+
+        function test_stripPlan_directionIsTheWorkspaceMove() {
+            compare(Hint.stripPlan(1, 2).direction, 1, "later in the list")
+            compare(Hint.stripPlan(2, 1).direction, -1, "earlier")
+            compare(Hint.stripPlan(1, 3).direction, 1, "and for a longer move")
+            compare(Hint.stripPlan(3, 1).direction, -1, "backwards")
+        }
+
+        function test_restPlan_isThreeColumnsWithTheActiveOneInTheMiddle() {
+            // A panel at rest is a plan too, deliberately the same shape, so the
+            // component's bindings are written once rather than branching on whether
+            // anything is moving.
+            var rest = Hint.restPlan(framed(4, 4))
+            compare(rest.slots, 3, "three columns")
+            compare(rest.activeSlot, 1, "active in the middle")
+            compare(rest.base, 3, "based at the active position's predecessor")
+            compare(rest.span, 0, "and nowhere to travel")
+            compare(rest.startColumn, 0, "starting at home")
+            compare(rest.endColumn, 0, "which is where it ends")
+            // A snapshot with no active workspace yet cannot say where its columns
+            // are, and says so rather than inventing a frame.
+            compare(Hint.restPlan(null), null)
+            compare(Hint.restPlan({ activeWorkspacePosition: -1 }), null)
+        }
+
+        function test_stripColumns_holdEachPositionOnce() {
+            // The heart of it, at the unit level. The strip is the ordered union of
+            // the two frames, so every position appears exactly once with its own
+            // windows - which is why a title cannot be painted twice during a
+            // crossing: there is only one column that could paint it.
+            //
+            // The two frames here share two workspaces, which is the case the old
+            // two-copy page turn got wrong.
+            var leaving = framed(1, 1)
+            var arriving = framed(2, 1)
+            var plan = Hint.stripPlan(1, 2)
+            var columns = Hint.stripColumns(arriving, leaving, plan)
+            compare(columns.length, plan.slots, "one column per slot")
+            var byPosition = {}
+            for (var i = 0; i < columns.length; ++i) {
+                byPosition[columns[i].position] = columns[i]
+                compare(columns[i].rows.length, 1, "position " + columns[i].position
+                    + " has its own window")
+                compare(columns[i].rows[0].title, "ws" + columns[i].position,
+                    "titled after its own position")
+            }
+            compare(columns[plan.activeSlot].position, 2, "and the active slot is the destination")
+        }
+
+        function test_stripColumns_readTheArrivingFrameWhereBothFramesKnow() {
+            // A position both frames describe is read from the ARRIVING one. The two
+            // agree on which workspace it is, and the arriving snapshot is the
+            // fresher reading of its windows - so a refresh that changes a title
+            // reaches the shared column too.
+            var leaving = framed(1, 1)
+            var arriving = framed(2, 1)
+            arriving.previousWindows = [{ windowId: "w1", title: "refreshed",
+                appId: "kitty", icon: "", isFocused: true }]
+            var columns = Hint.stripColumns(arriving, leaving, Hint.stripPlan(1, 2))
+            var shared = -1
+            for (var i = 0; i < columns.length; ++i) {
+                if (columns[i].position === 1)
+                    shared = i
+            }
+            verify(shared >= 0, "the shared position is on the strip")
+            compare(columns[shared].rows[0].title, "refreshed",
+                "and it took the arriving frame's reading")
+        }
+
+        function test_stripColumns_surviveAMissingOrColdFrame() {
+            // A first snapshot has no frame to leave, and a crossing is built from
+            // both. Neither may throw, and a column nothing knows about reads as empty
+            // rather than being invented.
+            var plan = Hint.stripPlan(1, 2)
+            var onlyArriving = Hint.stripColumns(framed(2, 1), null, plan)
+            compare(onlyArriving.length, plan.slots, "the strip is still the right length")
+            // Without the leaving frame the positions only it knew about are empty -
+            // honest, because the service has not reported those workspaces yet, and
+            // better than a column of invented content.
+            var empty = onlyArriving.filter(function(c) { return c.rows.length === 0 })
+            compare(empty.length, 1, "and the one the missing frame described is empty")
+            compare(empty[0].position, 0, "which was the workspace behind the origin")
+            // No frames at all: every column is empty, and none of them throws.
+            var nothing = Hint.stripColumns(null, null, plan)
+            compare(nothing.length, plan.slots, "still the right length")
+            for (var i = 0; i < nothing.length; ++i)
+                compare(nothing[i].rows.length, 0, "column " + i + " is empty")
+            compare(Hint.stripColumns(framed(2, 1), null, null).length, 0,
+                "and no plan means no strip at all")
+            // A column beyond what the frames describe - which `stripPlan` refuses to
+            // produce - reads as empty rather than throwing.
+            var beyond = { base: 0, span: 0, direction: 0, activeSlot: 1, slots: 3,
+                startColumn: 0, endColumn: 0 }
+            compare(Hint.stripColumns(framed(9, 9), null, beyond)[0].rows.length, 0)
+        }
+
+        function test_stripColumns_capEveryColumnAlike() {
+            // The cap applies wherever the rows came from - a workspace whose windows
+            // are read from the leaving frame is capped exactly like one read from
+            // the arriving frame, or the panel's height would depend on which side of
+            // the crossing a column happened to come from.
+            //
+            // Position 1 is deliberately the shared one: it is the arriving frame's
+            // previous workspace AND the leaving frame's active one, and the columns
+            // either side of it come from opposite frames. So one column exercises the
+            // cap applied to a leaving-frame read and another to an arriving-frame
+            // read, with the cap the same in both.
+            var many = []
+            for (var i = 0; i < 8; i++)
+                many.push({ windowId: "m" + i, title: "m" + i, isFocused: false })
+            var leaving = framed(1, 1)
+            // The leaving frame's PREVIOUS workspace, which is position 0 - a column
+            // only this frame knows about.
+            leaving.previousWindows = many
+            var arriving = framed(2, 1)
+            // The arriving frame's previous workspace, which is position 1 - the one
+            // both frames know.
+            arriving.previousWindows = many
+            // Its own active workspace, position 2, and its next, position 3, which
+            // only it knows about.
+            arriving.windows = many
+            arriving.nextWindows = many
+            var columns = Hint.stripColumns(arriving, leaving, Hint.stripPlan(1, 2))
+            var byPosition = {}
+            for (var c = 0; c < columns.length; ++c)
+                byPosition[columns[c].position] = columns[c]
+            // 0 and 2 are read from opposite frames - 0 only from the leaving one, 2
+            // only from the arriving one - 3 is the arriving frame's own next
+            // workspace, and 1 is the one both know, read from the arriving frame for
+            // the reason tested above. The cap is the same in every case.
+            for (var position = 0; position <= 3; ++position) {
+                compare(byPosition[position].rows.length, Hint.MAX_WINDOW_ROWS,
+                    "position " + position + " is capped")
+                compare(byPosition[position].hidden, 3,
+                    "position " + position + " and reports the rest")
+            }
+        }
+
+        function test_stripReshift_isTheDifferenceBetweenTheTwoBases() {
+            // The mid-crossing re-aim, stated from its two bases. It is NOT a function
+            // of the direction of the move, and the arithmetic is the interesting part:
+            // continuing forwards drops the workspace behind the one now being left and
+            // gains one ahead, so even a same-direction re-aim renumbers the strip.
+            // Only a re-aim landing on the same run of workspaces needs no correction.
+            compare(Hint.stripReshift(Hint.stripPlan(1, 2), Hint.stripPlan(2, 3)), -1,
+                "onwards: the union moved right, so the strip gives back one column")
+            compare(Hint.stripReshift(Hint.stripPlan(1, 2), Hint.stripPlan(2, 0)), 1,
+                "backwards past the origin: the union grew left, so the strip gives one")
+            compare(Hint.stripReshift(Hint.stripPlan(1, 2), Hint.stripPlan(2, 1)), 0,
+                "arriving back at the origin re-uses the same run: no correction")
+            compare(Hint.stripReshift(Hint.stripPlan(4, 2), Hint.stripPlan(2, 4)), 0,
+                "and a mirror-image pair does too")
+            // The sign is the base's, so going back the other way is the negation -
+            // the correction has to be reversible in that sense.
+            var first = Hint.stripPlan(1, 3)
+            var second = Hint.stripPlan(3, 5)
+            compare(Hint.stripReshift(first, second), -Hint.stripReshift(second, first),
+                "and the correction is the opposite in reverse")
+            // No previous plan means no renumbering to correct: a fresh crossing starts
+            // from the resting strip, which has no slots to renumber.
+            compare(Hint.stripReshift(null, second), 0, "nothing to correct from")
+            compare(Hint.stripReshift(first, null), 0, "nor to")
+        }
+
+        function test_stripReshift_holdsEveryColumnStillAcrossAReAim() {
+            // What the correction is FOR, asserted on the arithmetic the component
+            // uses: a column's position on the panel is its slot plus the strip's
+            // offset, and the re-aim changes both - the slot because the strip is
+            // renumbered, the offset because the motion continues from where it is -
+            // so the sum must not change. Swept over every re-aim of every width in
+            // both directions, because the property is about the pair of plans and
+            // there is no reason to trust one case of it.
+            var sweeps = 0
+            for (var span = 1; span <= Hint.MAX_SWITCH_SPAN; ++span) {
+                for (var direction = 0; direction < 2; ++direction) {
+                    var from = direction === 0 ? 2 : 6
+                    var to = direction === 0 ? 2 + span : 6 - span
+                    var first = Hint.stripPlan(from, to)
+                    for (var secondTo = 0; secondTo <= 6; ++secondTo) {
+                        if (secondTo === to)
+                            continue
+                        var second = Hint.stripPlan(to, secondTo)
+                        if (!second)
+                            continue
+                        var reshift = Hint.stripReshift(first, second)
+                        // Mid-crossing: the strip is some way along its own travel and
+                        // the re-aim continues from exactly there, not from the new
+                        // plan's start. 0.4 is the head share, so this is the state the
+                        // strip is in when the fastest part of the crossing is over.
+                        var progress = 0.4
+                        var offset = first.startColumn
+                            + (first.endColumn - first.startColumn) * progress
+                        for (var position = first.base; position < first.base + first.slots; ++position) {
+                            var before = (position - first.base) + offset
+                            var after = (position - second.base) + (offset - reshift)
+                            compare(after, before,
+                                "span " + span + " dir " + direction + " to " + secondTo
+                                    + ": position " + position + " held still")
+                            sweeps++
+                            // And what it would be WITHOUT the correction, so the
+                            // assertion above is about the compensation rather than
+                            // about nothing happening by luck.
+                            if (reshift !== 0) {
+                                var uncorrected = (position - second.base) + offset
+                                verify(uncorrected !== before,
+                                    "span " + span + " dir " + direction + " to " + secondTo
+                                        + ": uncorrected, position " + position
+                                        + " would move by " + reshift + " column(s)")
+                            }
+                        }
+                    }
+                }
+            }
+            verify(sweeps > 100, "and the sweep was wide enough to be worth something, was "
+                + sweeps)
+        }
+
         // ---- what the menu deliberately does not build -------------------
         function test_menuBuildsNoWorkspaceRows() {
             // The bar already reports the active workspace and the window list
