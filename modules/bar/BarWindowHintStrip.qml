@@ -49,6 +49,10 @@ Item {
     // What a column's own content is given: the cell less the padding, which is what
     // every row, placeholder and overflow line is laid out in.
     readonly property int cardWidth: Math.max(0, columnWidth - cellPaddingX * 2)
+    // Which row of the ACTIVE column holds focus, or -1. The body owns it and places
+    // the two shared markers from it; the strip needs it too, because the focused
+    // row's tint is the row's own fill and only the row can paint under its content.
+    property int focusedRowIndex: -1
     property int listSpacing: 6
     property int rowHeight: 28
     property int glyphInset: 20
@@ -135,9 +139,17 @@ Item {
                     height: root.rowHeight
                     radius: 6
                     transformOrigin: Item.Center
-                    color: rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
-                    // A Rectangle borders itself by default; the shared highlight is
-                    // the only focus signal here, so that default is off.
+                    // The focus tint is the row's OWN background, drawn under its icon
+                    // and title as children - `LauncherResultRow.qml`'s recipe, and the
+                    // reason the shared highlight above is border-only. Painting the tint
+                    // from a separate element above the row put a translucent panel of
+                    // `settingsSelected` over the icon and the text, veiling both.
+                    color: windowRow.index === root.focusedRowIndex
+                        ? LazerTheme.settingsSelected
+                        : (rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard)
+                    // A Rectangle borders itself by default; this row's own tint is its
+                    // focus signal, so that default is off - the outline that marks the
+                    // focused row is the one shared element, and it has its own border.
                     border.width: 0
                     scale: rowPress.pressed ? MotionTokens.pressScale : 1
                     enabled: root.interactive

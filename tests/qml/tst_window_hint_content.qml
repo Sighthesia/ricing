@@ -576,27 +576,42 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         }
 
         // ---- state markers ----------------------------------------------
-        function test_rowsDoNotPaintTheirOwnFocusFill() {
-            // The focus highlight is the one shared element that glides. A row
-            // that also tinted itself would put two fills on screen and read as
-            // two different states - and during the glide neither row is focused
-            // anyway, so the per-row fill would simply be gone.
+        function test_theFocusTintIsTheFocusedRowsOwnBackground() {
+            // The tint has to be painted by the ROW, because that is the only thing
+            // underneath the icon and the title. It was a separate element at z 5
+            // above the rows instead - the only arrangement that let a shared element
+            // mark an opaque card - and `settingsSelected` is the primary at a
+            // quarter alpha, so it veiled both. This is `LauncherResultRow.qml`'s
+            // arrangement: the row's own fill, with its content as children on top.
+            var tint = Lazer.LazerTheme.settingsSelected
             var rows = findAllByName(live(), "windowHintWindowRow")
-            compare(rows[0].color, Lazer.LazerTheme.settingsCard)
-            compare(rows[1].color, Lazer.LazerTheme.settingsCard,
-                "the focused row paints no fill of its own")
-            // A Rectangle borders itself by default; the shared highlight is the
-            // only focus signal here.
+            var tinted = rows.filter(function(r) { return r.color === tint })
+            compare(tinted.length, 1, "exactly one row carries the tint")
+            compare(tinted[0], rows[body.focusedRowIndex],
+                "and it is the focused row, not row " + rows.indexOf(tinted[0]))
+            compare(rows[0].color, Lazer.LazerTheme.settingsCard,
+                "the rows either side keep the plain card")
+            // A Rectangle borders itself by default; the tint is this row's signal,
+            // so the default hairline would be a second, wrong outline around it.
             compare(rows[0].border.width, 0)
         }
 
-        function test_focusHighlightIsTheOnlyFocusFill() {
-            // Exactly one element carries the focus fill for the whole list.
-            var wash = Lazer.LazerTheme.settingsSelected
-            var rows = findAllByName(live(), "windowHintWindowRow")
-            var filled = rows.filter(function(r) { return r.color === wash })
-            compare(filled.length, 0, "no row carries it")
-            compare(findByName(live(), "windowHintFocusFrame").color, wash, "the shared one does")
+        function test_theSharedHighlightCannotCoverTheRowContent() {
+            // The claim the whole rearrangement exists for: nothing that marks the
+            // focused row is painted over its icon or its title.
+            //
+            // A fully transparent fill is the assertion - anything with alpha would
+            // composite over the content, and at a quarter alpha it visibly veils it.
+            // The tint itself is the row's own background, which the content is a
+            // child of, so it is under the content by construction.
+            var frame = findByName(live(), "windowHintFocusFrame")
+            compare(frame.color.a, 0, "the shared highlight fills nothing, alpha was "
+                + frame.color.a)
+            // What it draws instead is the outline, so the glide is still visible.
+            verify(frame.border.width > 0, "it outlines instead, width was "
+                + frame.border.width)
+            compare(frame.border.color, Lazer.LazerTheme.settingsAccent,
+                "in the accent, was " + frame.border.color)
         }
 
         function test_indicatorClearsTheGlyph() {
@@ -655,7 +670,13 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 "and on the active column, inside its padding")
             compare(frame.width, rows[1].width, "and is exactly as wide")
             compare(frame.radius, rows[1].radius, "corners match the row's")
-            compare(frame.border.width, 0, "a fill, not an outline")
+            // The marker is an outline around the row, not a fill over it: a fill
+            // above the row is what veiled its icon and title. 1.5 is the launcher's
+            // `selectionFrame` border, stated here rather than read back from the
+            // component so the claim is a number this suite owns.
+            compare(frame.border.width, 1.5,
+                "an outline around it, not a fill over it, was " + frame.border.width)
+            compare(frame.color.a, 0, "and it fills nothing, alpha was " + frame.color.a)
 
             body.hint = root.makeHint({
                 windows: [

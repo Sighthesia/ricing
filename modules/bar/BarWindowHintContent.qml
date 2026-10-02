@@ -617,6 +617,10 @@ Item {
         columnWidth: root.columnWidth
         columnGutter: root.columnGutter
         cellPaddingX: root.cellPaddingX
+        // Read from the same `activeColumn` the strip's own columns come from, so the
+        // row that tints and the row the outline glides onto are the same row by
+        // construction rather than by two lookups agreeing.
+        focusedRowIndex: root.focusedRowIndex
         listSpacing: root.listSpacing
         rowHeight: root.rowHeight
         glyphInset: root.glyphInset
@@ -627,9 +631,16 @@ Item {
 
     // One shared focus highlight for the whole list, the way the launcher's does: a
     // single element that glides to the current row instead of every row showing
-    // and hiding its own. A filled wash rather than the launcher's border frame,
-    // and the rows give up their own focused tint so exactly one highlight exists
-    // at a time - two fills would read as two states.
+    // and hiding its own.
+    //
+    // BORDER-ONLY, which is the launcher's arrangement and the reason the tint lives
+    // in the row. This was a filled wash above the rows at z 5, the only way a
+    // separate element could mark an opaque card - and `settingsSelected` is the
+    // primary at a quarter alpha, so that wash veiled the icon and the title it was
+    // meant to be pointing at. The fill moved into the row's own background, where
+    // it sits UNDER the icon and the title as the row's children, and what glides
+    // here is the outline around it. Exactly one element still carries the tint at a
+    // time: the focused row's.
     //
     // A child of the strip, so it travels with the content it marks. Pinned to the
     // panel, it would say the focus stayed put while the window list moved - two
@@ -640,12 +651,11 @@ Item {
         parent: strip
         z: 5
         radius: 6
-        // The token the rows' focused tint used, so this is that highlight that
-        // moved rather than a new colour.
-        color: LazerTheme.settingsSelected
-        // A Rectangle draws a 1px border by default. This is a fill, and a default
-        // black hairline around it would read as an outline again.
-        border.width: 0
+        // Nothing filled, so this element cannot cover the row's content. The tint
+        // is `windowRow`'s own background instead, in the same token - see above.
+        color: "transparent"
+        border.width: root.hasTarget ? 1.5 : 0
+        border.color: LazerTheme.settingsAccent
         // Inert to input, so it can never intercept a tap meant for the row.
         enabled: false
 
