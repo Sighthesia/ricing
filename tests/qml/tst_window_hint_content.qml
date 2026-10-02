@@ -1144,7 +1144,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(body.columnPitch, body.columnWidth + body.columnGutter,
                 "the pitch is the column plus the gap")
 
-            // A SMALL, STATED margin on every side - not flush, and not the widget's 8.
+            // A margin on every side, sized from the widget rather than picked.
             //
             // Measured from real cards, not from the focus highlight: that sits on
             // whichever row is current, so its top edge says nothing about the band's
@@ -1158,7 +1158,13 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // it compared 0 against 0 and passed either way. Stated here it has to be
             // argued with, and 2 is the value the design settled on: zero read as one
             // solid mass, eight read as a floating margin.
-            var expectedMargin = 2
+            // 8 is `Workspaces.cellPadding` - the square's own content inset. Stated
+            // here, not read from `body.cellPadding`: a test whose expected value is
+            // the component's own constant cannot tell "the padding is there" from
+            // "the padding is gone" - with it at 0 the gap and the expected value were
+            // both 0 and the suite passed either way. Zero read as one solid mass, so
+            // the claim is a real margin.
+            var expectedMargin = 8
             var cards = findAllByName(body, "windowHintWindowRow")
             verify(cards.length > 0, "the active column has cards to measure against")
             if (cards.length > 0) {
@@ -1192,6 +1198,41 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 compare(bandBox.x + band.width - blockRight, expectedMargin,
                     "and to the right, was " + (bandBox.x + band.width - blockRight))
             }
+        }
+
+        function test_theBandHugsThePanelEdgeTheWayTheWidgetHugsTheBar() {
+            // The other half of the widget's arrangement, and the half that was
+            // backwards. `Workspaces.activeHighlight` is `barWidgetHeight` tall, and
+            // `barWidgetHeight` is `barLiveHeight - barWidgetGutter * 2` - so the band
+            // sits `barWidgetGutter` from the BAR's edge while its content sits
+            // `cellPadding` inside it. The panel had those the wrong way round: a 2px
+            // inner margin and an outer edge 10px in.
+            //
+            // 3 is `LazerTheme.barWidgetGutter`, read off the theme rather than
+            // restated, because the claim is about agreeing with a token.
+            var band = findByName(body, "windowHintColumnHighlight")
+            if (!band)
+                return
+            // Declared as the host declares it. Mounted on its own the body has no host
+            // inset, and then "near the panel's edge" and "near the body's edge" are the
+            // same measurement - and the band's whole point is that the two differ,
+            // since it deliberately reaches past the body into the popup's inset.
+            body.surfaceInset = 8
+            compare(band.y + body.surfaceInset, Lazer.LazerTheme.barWidgetGutter,
+                "the band's top edge is the gutter from the panel's, was "
+                    + (band.y + body.surfaceInset))
+            compare(body.height - (band.y + band.height) + body.surfaceInset,
+                Lazer.LazerTheme.barWidgetGutter,
+                "and its bottom edge, was "
+                    + (body.height - (band.y + band.height) + body.surfaceInset))
+            // Which means the band reaches past the body's own edge, into the popup's
+            // content inset - otherwise it could not be near the panel's edge at all.
+            verify(body.surfaceInset > Lazer.LazerTheme.barWidgetGutter,
+                "so the band does reach past the body's edge, inset is "
+                    + body.surfaceInset)
+            verify(band.y < 0,
+                "and it does, band y is " + band.y)
+            body.surfaceInset = 0
         }
 
         function test_theBandDoesNotTeleportAcrossACrossing() {

@@ -1931,6 +1931,11 @@ Item {
             BarWindowHintContent {
                 id: windowHintBody
                 objectName: "windowHintBody"
+                // The active workspace's band has to reach to `bandInset` from the
+                // SURFACE, which is further out than this body's own edge. Declared
+                // here because `contentInset` is this component's number, not the
+                // body's - the body cannot know how far its host inset it.
+                surfaceInset: root.contentInset
                 hint: root.payload ? root.payload.hint : null
                 onWindowActivated: windowId => root.handleHintWindow(windowId)
             }

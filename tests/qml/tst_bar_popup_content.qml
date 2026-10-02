@@ -341,9 +341,16 @@ Item {
             verify(wash !== null, "the focus highlight should exist")
             // One column plus the gap before it: the middle column starts a pitch in,
             // and the pitch is the column plus the gap.
-            // One column, plus the gap between columns, plus the hairline the cards
-            // sit inside their cell with.
-            compare(wash.x, 180 + 6 + 2,
+            // The host's inset is declared to the body, and the band's whole geometry
+            // depends on it: the band has to sit `bandWidgetGutter` from the SURFACE,
+            // which is further out than the body's own edge, so without this number it
+            // would measure against the body and sit twice as far in.
+            compare(body.surfaceInset, item.contentInset,
+                "the body is told how far the host insets it")
+
+            // One column, plus the gap between columns, plus the cell padding the cards
+            // sit inside the band with.
+            compare(wash.x, 180 + 6 + 8,
                 "and the active workspace is still the middle one, was " + wash.x)
             // All three columns fit, so nothing is drawn past the surface.
             var strip = findByName(body, "windowHintStrip")
