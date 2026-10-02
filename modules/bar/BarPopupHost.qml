@@ -126,6 +126,33 @@ PanelWindow {
     readonly property alias popupViewportItem: popupViewport
     readonly property alias contextActions: contextPopupActions
 
+    // The bodies behind the two slot subtrees - two identities, two action
+    // bodies, two context bodies - are the most expensive thing this host
+    // constructs, and they were constructed on every screen at every shell start
+    // for a popup nobody had asked for yet: the surface they paint into stays
+    // unmapped until `surfaceActive` flips, but `visible: false` still builds a
+    // subtree (only `Loader.active` does not). Measured headlessly against this
+    // file: 238ms cold for the action bodies and 100ms cold for the identities,
+    // per screen, per start - 338ms of a startup nobody ever sees. Both subtrees
+    // are therefore loaded on the first popup intent and latched on: a session
+    // that has shown one popup never pays it again, and the teardown paths
+    // (which clear currentIntent) cannot re-arm or oscillate it.
+    property bool _popupBodiesArmed: false
+    // The content slot Item stays eager and becomes the loaded content, so every
+    // body keeps the parent, the size bindings and the stacking order it had
+    // inline. Both loaders are deliberately left unsized: QQuickLoader copies its
+    // own size onto the loaded item whenever it has one, which would replace the
+    // slot's own width/height bindings with a duplicate of them.
+    readonly property var bodySlot: bodyLoader.item
+    // An id declared inside a Loader's Component is not visible from the
+    // enclosing scope, so the content slot republishes the two bodies the host
+    // measures and reads the tray menu from. Null until the first intent
+    // commits, which is why every reader below null-checks.
+    readonly property var popupActions: root.bodySlot ? root.bodySlot.actionsBody : null
+    readonly property var popupActionsOutgoing: root.bodySlot
+        ? root.bodySlot.outgoingActionsBody : null
+    readonly property var contextPopupActions: root.bodySlot ? root.bodySlot.contextBody : null
+
     signal actionRequested(string action)
     signal closeRequested()
 
@@ -271,19 +298,32 @@ PanelWindow {
     // viewport-space region rect. Read through a function because the region
     // rect is latched inside computeAndCommitTargets, which can run before the
     // viewport's geometry binding has settled on the first open.
-    // The content column's own enabled flag, read from the live item. A plain
+    // The content slot's own enabled flag, read from the live item. A plain
     // traversal rather than a stored reference, because the slot is rebuilt
-    // whenever the popup's content is exchanged.
+    // whenever the popup's content is exchanged, and it lives behind the body
+    // Loader (see _popupBodiesArmed) - so the walk steps into whatever the loader
+    // is currently showing. Before the first intent there is nothing to step
+    // into, and this reports null ("unmeasured") rather than "disabled".
     function _contentSlotEnabled() {
+        var slot = root._contentSlot()
+        return slot ? slot.enabled === true : null
+    }
+
+    function _contentSlot() {
         var host = popupItem ? popupItem.contentLayer : null
         if (!host)
             return null
-        var slot = null
+        var found = null
         for (var i = 0; i < host.children.length; i++) {
-            if (host.children[i] && host.children[i].objectName === "popupContentSlot")
-                slot = host.children[i]
+            var child = host.children[i]
+            if (!child)
+                continue
+            // A Loader's own objectName is the loader's; its `item` is the slot.
+            var candidate = child.item ? child.item : child
+            if (candidate && candidate.objectName === "popupContentSlot")
+                found = candidate
         }
-        return slot ? slot.enabled === true : null
+        return found
     }
 
     function _viewportY() {
@@ -669,6 +709,14 @@ PanelWindow {
         // A new intent revives the live host before replacement is evaluated.
         // This prevents a pending close from racing the single popup instance.
         cancelClose()
+        // Arm the body tree here, and before anything below measures it: the
+        // surface is sized from the bodies' implicit sizes, so a first open that
+        // raced its own construction would map against an empty slot. This is
+        // the only place an intent becomes current (open/surfaceActive are set
+        // just below), so arming here also covers the later commits - the
+        // exchange in commitExchange() and the reduced-motion swaps - which are
+        // all downstream of this function. Latched: never cleared.
+        root._popupBodiesArmed = true
         var isOpen = root.open && root.currentIntent
         // A close that already flipped open keeps the surface and both intents
         // alive until the exit cleanup runs: a new intent in that window must
@@ -1070,9 +1118,12 @@ PanelWindow {
     function measuredContentHeight(intentObj) {
         if (!intentObj)
             return 0
-        var height = String(intentObj.kind || "") === "context"
-                ? contextPopupActions.implicitHeight : popupActions.implicitHeight
-        return Number(height) || 0
+        // The bodies are null until the first intent has armed the loader, so
+        // this reports no measurement instead of throwing on the way there - the
+        // holder below is what keeps the slot usable in that window.
+        var body = String(intentObj.kind || "") === "context"
+                ? contextPopupActions : popupActions
+        return body ? (Number(body.implicitHeight) || 0) : 0
     }
 
     // A body whose rows have not arrived yet measures 0 - a tray menu awaits an
@@ -1533,7 +1584,9 @@ PanelWindow {
         }
         onTriggered: {
             if (root.open && root.surfaceActive) {
-                var trayContent = popupActions.trayMenuContent
+                // The tray body only exists once an intent has armed the loader,
+                // and this timer can also fire on the very tick that armed it.
+                var trayContent = root.popupActions ? root.popupActions.trayMenuContent : null
                 var isTray = root.currentIntent && root.currentIntent.actionKind === "tray" && trayContent
                 if (isTray) {
                     // Long DBus menus (clash-verge/fcitx) arrive in batches:
@@ -1781,217 +1834,255 @@ PanelWindow {
                 // the hovered tray delegate changes so no overlapping windows appear.
                 // Persistent context menus expose the header close affordance.
                 //
-                // A body-only intent (the mod-key window hint) collapses this to
-                // zero. Hidden, not merely short: `TwoLayerPopup` derives its
-                // slot size from `childrenRect`, which ignores invisible
-                // children - a zero-height wrapper with a 48px identity still
-                // inside would keep the slot 48 tall and leave the body offset
-                // by a band nothing paints.
-                sidebarData: Item {
-                    objectName: "popupIdentityTransition"
-                    width: root.popupSlotWidth
-                    implicitWidth: root.popupSlotWidth
-                    height: root.identityHeight
-                    implicitHeight: height
-                    visible: root.identityHeight > 0.5
-                    clip: true
+                // Loaded on the first intent instead of built at startup: the two
+                // identities below measure 100ms cold between them, per screen,
+                // per shell start, for a popup nobody had opened yet (the
+                // measurement behind _popupBodiesArmed). Synchronous on purpose:
+                // the first reveal measures this rail in the same call that arms
+                // it, and a deferred load would size the surface against an empty
+                // rail.
+                sidebarData: Loader {
+                    id: identityLoader
+                    active: root._popupBodiesArmed
+                    asynchronous: false
+                    // Left unsized on purpose: a sized Loader copies its own size
+                    // onto the loaded item, which would replace the slot's own
+                    // width/height bindings with a duplicate of them.
+                    sourceComponent: Component {
+                        // A body-only intent (the mod-key window hint) collapses
+                        // this to zero. Hidden, not merely short: `TwoLayerPopup`
+                        // derives its slot size from `childrenRect`, which ignores
+                        // invisible children - a zero-height wrapper with a 48px
+                        // identity still inside would keep the slot 48 tall and
+                        // leave the body offset by a band nothing paints.
+                        Item {
+                            objectName: "popupIdentityTransition"
+                            width: root.popupSlotWidth
+                            implicitWidth: root.popupSlotWidth
+                            height: root.identityHeight
+                            implicitHeight: height
+                            visible: root.identityHeight > 0.5
+                            clip: true
 
-                    // Incoming identity enters from the right and settles in
-                    // the same slot as the outgoing header.
-                    BarPopupIdentity {
-                        objectName: "popupIdentity"
-                        z: 1
-                        foregroundOpacity: root._exchangeCommitted ? root.contentSlideProgress : 1
-                        x: root._exchangeCommitted
-                                ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
-                        title: root.currentIntent ? (root.currentIntent.title || "") : ""
-                        iconSource: root.currentIntent ? (root.currentIntent.iconSource || "") : ""
-                        tintIcon: root.currentIntent ? root.currentIntent.tintIcon === true : false
-                        summary: root.currentIntent ? (root.currentIntent.summary || "") : ""
-                        hostWidth: root.popupSlotWidth
-                        showClose: root.currentIntent ? String(root.currentIntent.kind || "") === "context" : false
-                        onCloseRequested: root.requestAnimatedClose()
-                    }
+                            // Incoming identity enters from the right and settles in
+                            // the same slot as the outgoing header.
+                            BarPopupIdentity {
+                                objectName: "popupIdentity"
+                                z: 1
+                                foregroundOpacity: root._exchangeCommitted ? root.contentSlideProgress : 1
+                                x: root._exchangeCommitted
+                                        ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
+                                title: root.currentIntent ? (root.currentIntent.title || "") : ""
+                                iconSource: root.currentIntent ? (root.currentIntent.iconSource || "") : ""
+                                tintIcon: root.currentIntent ? root.currentIntent.tintIcon === true : false
+                                summary: root.currentIntent ? (root.currentIntent.summary || "") : ""
+                                hostWidth: root.popupSlotWidth
+                                showClose: root.currentIntent ? String(root.currentIntent.kind || "") === "context" : false
+                                onCloseRequested: root.requestAnimatedClose()
+                            }
 
-                    // Outgoing identity leaves to the left during replacement.
-                    BarPopupIdentity {
-                        objectName: "popupIdentityOutgoing"
-                        z: 0
-                        foregroundOpacity: root._exchangeCommitted ? 1 - root.contentSlideProgress : 1
-                        visible: root._transitionOutgoingIntent !== null
-                        x: root._exchangeCommitted
-                                ? -root.contentSlideSign * root._contentSlideDistance * root.contentSlideProgress : 0
-                        title: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.title || "") : ""
-                        iconSource: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.iconSource || "") : ""
-                        tintIcon: root._transitionOutgoingIntent ? root._transitionOutgoingIntent.tintIcon === true : false
-                        summary: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.summary || "") : ""
-                        hostWidth: root.popupSlotWidth
-                        showClose: false
+                            // Outgoing identity leaves to the left during replacement.
+                            BarPopupIdentity {
+                                objectName: "popupIdentityOutgoing"
+                                z: 0
+                                foregroundOpacity: root._exchangeCommitted ? 1 - root.contentSlideProgress : 1
+                                visible: root._transitionOutgoingIntent !== null
+                                x: root._exchangeCommitted
+                                        ? -root.contentSlideSign * root._contentSlideDistance * root.contentSlideProgress : 0
+                                title: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.title || "") : ""
+                                iconSource: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.iconSource || "") : ""
+                                tintIcon: root._transitionOutgoingIntent ? root._transitionOutgoingIntent.tintIcon === true : false
+                                summary: root._transitionOutgoingIntent ? (root._transitionOutgoingIntent.summary || "") : ""
+                                hostWidth: root.popupSlotWidth
+                                showClose: false
+                            }
+                        }
                     }
                 }
 
                 // Keep both menu bodies in one content host so only the active
                 // intent contributes to the popup height and visible surface.
-                contentData: Item {
-                     objectName: "popupContentSlot"
-                     // The slot is the ancestor whose rect bounds a displaced
-                     // body: `Item.clip` clips a child to the CLIPPING item's own
-                     // rect, so clipping each body only trims that body's own
-                     // children and does nothing about where the body sits. A
-                     // body offset to x=260 paints 260..520 against a 260 panel.
-                     //
-                     // The slot is also the input canvas carrying the submenu
-                     // catcher, so it may not shrink while that catcher is
-                     // summonable. Displaced is exactly the slide, and the slide
-                     // ends before a submenu can be summoned, so binding to it
-                     // keeps both contracts without a second clip owner.
-                     width: root.contentBodiesDisplaced ? root.paintedPanelWidth
-                             : root.popupContentWidth
-                     implicitWidth: root.popupContentWidth
-                     implicitHeight: root.popupHeightForIntent(root.currentIntent)
-                     height: implicitHeight
-                     // Visible height channel: animate toward the new content's
-                     // natural height so the exchange grows/shrinks smoothly
-                     // instead of snapping while the slide travels.
-                     Behavior on height {
-                         enabled: root._exchangeCommitted && !MotionTokens.reducedMotion
-                         NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutCubic }
-                     }
-                    // Keep hover replacement layers inside the content column;
-                    // an open tray submenu is the only intentional overflow.
-                    // While an exchange is mounted both bodies slide
-                    // horizontally, so force the clip even with a submenu open:
-                    // otherwise the sliding layers paint past the slot edge.
-                    clip: root._transitionOutgoingIntent !== null || !root.traySubmenuPanelAttached
-                     enabled: root.contentInteractive
-                     onImplicitHeightChanged: {
-                         // Record first: this handler is outside the implicitHeight
-                         // binding, so it is the safe place to latch the value the
-                         // binding will fall back on while rows are still missing.
-                         root.noteMeasuredHeight()
-                         root.updateTargetGeometry(root.currentIntent)
-                     }
-                     onImplicitWidthChanged: root.updateTargetGeometry(root.currentIntent)
+                //
+                // Loaded on the first intent instead of built at startup: the
+                // bodies below measure 238ms cold, per screen, per shell start,
+                // for a popup nobody had opened yet (the measurement behind
+                // _popupBodiesArmed). Synchronous on purpose: the same call that
+                // arms the loader measures these bodies to size the surface.
+                contentData: Loader {
+                    id: bodyLoader
+                    active: root._popupBodiesArmed
+                    asynchronous: false
+                    // Left unsized on purpose, see identityLoader above.
+                    sourceComponent: Component {
+                        Item {
+                            objectName: "popupContentSlot"
+                            // The slot is the ancestor whose rect bounds a displaced
+                            // body: `Item.clip` clips a child to the CLIPPING item's own
+                            // rect, so clipping each body only trims that body's own
+                            // children and does nothing about where the body sits. A
+                            // body offset to x=260 paints 260..520 against a 260 panel.
+                            //
+                            // The slot is also the input canvas carrying the submenu
+                            // catcher, so it may not shrink while that catcher is
+                            // summonable. Displaced is exactly the slide, and the slide
+                            // ends before a submenu can be summoned, so binding to it
+                            // keeps both contracts without a second clip owner.
+                            width: root.contentBodiesDisplaced ? root.paintedPanelWidth
+                                    : root.popupContentWidth
+                            implicitWidth: root.popupContentWidth
+                            implicitHeight: root.popupHeightForIntent(root.currentIntent)
+                            height: implicitHeight
+                            // Visible height channel: animate toward the new content's
+                            // natural height so the exchange grows/shrinks smoothly
+                            // instead of snapping while the slide travels.
+                            Behavior on height {
+                                enabled: root._exchangeCommitted && !MotionTokens.reducedMotion
+                                NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutCubic }
+                            }
+                            // Keep hover replacement layers inside the content column;
+                            // an open tray submenu is the only intentional overflow.
+                            // While an exchange is mounted both bodies slide
+                            // horizontally, so force the clip even with a submenu open:
+                            // otherwise the sliding layers paint past the slot edge.
+                            clip: root._transitionOutgoingIntent !== null || !root.traySubmenuPanelAttached
+                            enabled: root.contentInteractive
+                            onImplicitHeightChanged: {
+                                // Record first: this handler is outside the implicitHeight
+                                // binding, so it is the safe place to latch the value the
+                                // binding will fall back on while rows are still missing.
+                                root.noteMeasuredHeight()
+                                root.updateTargetGeometry(root.currentIntent)
+                            }
+                            onImplicitWidthChanged: root.updateTargetGeometry(root.currentIntent)
 
-                    // Settings section-block surface under the action rows; the
-                    // darker cards float on it exactly like the settings panel.
-                    Rectangle {
-                        objectName: "popupContentSurface"
-                        x: 0
-                        y: root.direction === "down" ? -1 : 0
-                        width: root.currentIntent
-                            && String(root.currentIntent.actionKind || "") === "tray"
-                            ? root.trayFaceWidth : parent.width
-                        height: parent.height + 1
-                        color: LazerTheme.settingsSection
-                    }
+                            // The bodies themselves are ids of THIS scope, which the
+                            // enclosing file cannot see, so they are republished for
+                            // the host to measure and read the tray menu from.
+                            readonly property var actionsBody: popupActions
+                            readonly property var outgoingActionsBody: popupActionsOutgoing
+                            readonly property var contextBody: contextPopupActions
 
-                    // Action layer bound to the hovered widget intent.
-                     // Incoming body enters from the right with the header.
-                     BarPopupActions {
-                         id: popupActions
-                         objectName: "popupActions"
-                         z: 1
-                         opacity: root._exchangeCommitted ? root.contentSlideProgress : 1
-                         x: root._exchangeCommitted
-                                 ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
-                         width: parent.width
-                         height: implicitHeight
-                         actionKind: root.currentIntent && root.currentIntent.kind !== "context"
-                                 ? (root.currentIntent.actionKind || "") : "context"
-                         payload: root.currentIntent ? root.currentIntent.payload : null
-                         onDismissRequested: root.dismissAnimated()
-                     }
+                            // Settings section-block surface under the action rows; the
+                            // darker cards float on it exactly like the settings panel.
+                            Rectangle {
+                                objectName: "popupContentSurface"
+                                x: 0
+                                y: root.direction === "down" ? -1 : 0
+                                width: root.currentIntent
+                                    && String(root.currentIntent.actionKind || "") === "tray"
+                                    ? root.trayFaceWidth : parent.width
+                                height: parent.height + 1
+                                color: LazerTheme.settingsSection
+                            }
 
-                      // Outgoing body leaves to the left while its replacement
-                      // is measured and morphs the host width/height.
-                      BarPopupActions {
-                          id: popupActionsOutgoing
-                          objectName: "popupActionsOutgoing"
-                         z: 0
-                         opacity: root._exchangeCommitted ? 1 - root.contentSlideProgress : 1
-                         visible: root._transitionOutgoingIntent !== null
-                         enabled: false
-                         x: root._exchangeCommitted
-                                 ? -root.contentSlideSign * root._contentSlideDistance * root.contentSlideProgress : 0
-                         width: parent.width
-                         height: implicitHeight
-                         actionKind: root._transitionOutgoingIntent
-                                 && root._transitionOutgoingIntent.kind !== "context"
-                                 ? (root._transitionOutgoingIntent.actionKind || "") : "context"
-                         payload: root._transitionOutgoingIntent
-                                 ? root._transitionOutgoingIntent.payload : null
-                     }
+                            // Action layer bound to the hovered widget intent.
+                             // Incoming body enters from the right with the header.
+                             BarPopupActions {
+                                 id: popupActions
+                                 objectName: "popupActions"
+                                 z: 1
+                                 opacity: root._exchangeCommitted ? root.contentSlideProgress : 1
+                                 x: root._exchangeCommitted
+                                         ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
+                                 width: parent.width
+                                 height: implicitHeight
+                                 actionKind: root.currentIntent && root.currentIntent.kind !== "context"
+                                         ? (root.currentIntent.actionKind || "") : "context"
+                                 payload: root.currentIntent ? root.currentIntent.payload : null
+                                 onDismissRequested: root.dismissAnimated()
+                             }
 
-                    // Retarget the layer-shell mask when a tray submenu grows or retracts.
-                    // extraWidth is the only channel needed: it flips 0<->panelWidth once
-                    // per open, which is exactly when the mask must widen. Retargeting on
-                    // submenuProgress instead restarted the geometry glide on every frame of
-                    // the slide, pinning displayWidth at its old value until the animation
-                    // ended: the panel was painted outside the input region the whole time,
-                    // so hover and taps stayed dead until the mask caught up afterwards.
-                    Connections {
-                        target: popupActions.trayMenuContent
-                        function onExtraWidthChanged() {
-                            root.updateTargetGeometry(root.currentIntent)
+                              // Outgoing body leaves to the left while its replacement
+                              // is measured and morphs the host width/height.
+                              BarPopupActions {
+                                  id: popupActionsOutgoing
+                                  objectName: "popupActionsOutgoing"
+                                 z: 0
+                                 opacity: root._exchangeCommitted ? 1 - root.contentSlideProgress : 1
+                                 visible: root._transitionOutgoingIntent !== null
+                                 enabled: false
+                                 x: root._exchangeCommitted
+                                         ? -root.contentSlideSign * root._contentSlideDistance * root.contentSlideProgress : 0
+                                 width: parent.width
+                                 height: implicitHeight
+                                 actionKind: root._transitionOutgoingIntent
+                                         && root._transitionOutgoingIntent.kind !== "context"
+                                         ? (root._transitionOutgoingIntent.actionKind || "") : "context"
+                                 payload: root._transitionOutgoingIntent
+                                         ? root._transitionOutgoingIntent.payload : null
+                             }
+
+                            // Retarget the layer-shell mask when a tray submenu grows or retracts.
+                            // extraWidth is the only channel needed: it flips 0<->panelWidth once
+                            // per open, which is exactly when the mask must widen. Retargeting on
+                            // submenuProgress instead restarted the geometry glide on every frame of
+                            // the slide, pinning displayWidth at its old value until the animation
+                            // ended: the panel was painted outside the input region the whole time,
+                            // so hover and taps stayed dead until the mask caught up afterwards.
+                            Connections {
+                                target: popupActions.trayMenuContent
+                                function onExtraWidthChanged() {
+                                    root.updateTargetGeometry(root.currentIntent)
+                                }
+                            }
+
+                            // Context actions reuse the same content owner and geometry.
+                             // Incoming context body follows the same right-to-left
+                             // content track as ordinary popup actions.
+                             BarContextPopupActions {
+                                 id: contextPopupActions
+                                 objectName: "contextPopupActions"
+                                 z: 1
+                                 opacity: root._exchangeCommitted ? root.contentSlideProgress : 1
+                                 x: root._exchangeCommitted
+                                         ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
+                                 width: parent.width
+                                 height: implicitHeight
+                                actionKind: root.currentIntent && root.currentIntent.kind === "context" ? "context" : ""
+                                widgetId: root.currentIntent ? (root.currentIntent.widgetId || "") : ""
+                                instanceKey: root.currentIntent ? (root.currentIntent.instanceKey || "") : ""
+                                section: root.currentIntent ? (root.currentIntent.section || "center") : "center"
+                                hasSettings: root.currentIntent ? root.currentIntent.hasSettings === true : false
+                                layoutMode: root.currentIntent ? root.currentIntent.layoutMode === true : false
+                                availableWidgets: root.currentIntent ? (root.currentIntent.availableWidgets || []) : []
+                                payload: root.currentIntent ? root.currentIntent.payload : null
+                                onActionRequested: action => {
+                                    if (action === "close" || action === "toggleLayoutMode")
+                                        root.requestAnimatedClose()
+                                 }
+                             }
+
+                             // Outgoing context actions remain mounted until the
+                             // shared transition reaches its settled state.
+                             BarContextPopupActions {
+                                 objectName: "contextPopupActionsOutgoing"
+                                 z: 0
+                                 opacity: root._exchangeCommitted ? 1 - root.contentSlideProgress : 1
+                                 visible: root._transitionOutgoingIntent !== null
+                                 enabled: false
+                                 x: root._exchangeCommitted
+                                         ? -root.contentSlideSign * root._contentSlideDistance * root.contentSlideProgress : 0
+                                 width: parent.width
+                                 height: implicitHeight
+                                 actionKind: root._transitionOutgoingIntent
+                                         && root._transitionOutgoingIntent.kind === "context" ? "context" : ""
+                                 widgetId: root._transitionOutgoingIntent
+                                         ? (root._transitionOutgoingIntent.widgetId || "") : ""
+                                 instanceKey: root._transitionOutgoingIntent
+                                         ? (root._transitionOutgoingIntent.instanceKey || "") : ""
+                                 section: root._transitionOutgoingIntent
+                                         ? (root._transitionOutgoingIntent.section || "center") : "center"
+                                 hasSettings: root._transitionOutgoingIntent
+                                         ? root._transitionOutgoingIntent.hasSettings === true : false
+                                 layoutMode: root._transitionOutgoingIntent
+                                         ? root._transitionOutgoingIntent.layoutMode === true : false
+                                 availableWidgets: root._transitionOutgoingIntent
+                                         ? (root._transitionOutgoingIntent.availableWidgets || []) : []
+                                 payload: root._transitionOutgoingIntent
+                                         ? root._transitionOutgoingIntent.payload : null
+                             }
                         }
                     }
-
-                    // Context actions reuse the same content owner and geometry.
-                     // Incoming context body follows the same right-to-left
-                     // content track as ordinary popup actions.
-                     BarContextPopupActions {
-                         id: contextPopupActions
-                         objectName: "contextPopupActions"
-                         z: 1
-                         opacity: root._exchangeCommitted ? root.contentSlideProgress : 1
-                         x: root._exchangeCommitted
-                                 ? root.contentSlideSign * root._contentSlideDistance * (1 - root.contentSlideProgress) : 0
-                         width: parent.width
-                         height: implicitHeight
-                        actionKind: root.currentIntent && root.currentIntent.kind === "context" ? "context" : ""
-                        widgetId: root.currentIntent ? (root.currentIntent.widgetId || "") : ""
-                        instanceKey: root.currentIntent ? (root.currentIntent.instanceKey || "") : ""
-                        section: root.currentIntent ? (root.currentIntent.section || "center") : "center"
-                        hasSettings: root.currentIntent ? root.currentIntent.hasSettings === true : false
-                        layoutMode: root.currentIntent ? root.currentIntent.layoutMode === true : false
-                        availableWidgets: root.currentIntent ? (root.currentIntent.availableWidgets || []) : []
-                        payload: root.currentIntent ? root.currentIntent.payload : null
-                        onActionRequested: action => {
-                            if (action === "close" || action === "toggleLayoutMode")
-                                root.requestAnimatedClose()
-                         }
-                     }
-
-                     // Outgoing context actions remain mounted until the
-                     // shared transition reaches its settled state.
-                     BarContextPopupActions {
-                         objectName: "contextPopupActionsOutgoing"
-                         z: 0
-                         opacity: root._exchangeCommitted ? 1 - root.contentSlideProgress : 1
-                         visible: root._transitionOutgoingIntent !== null
-                         enabled: false
-                         x: root._exchangeCommitted
-                                 ? -root.contentSlideSign * root._contentSlideDistance * root.contentSlideProgress : 0
-                         width: parent.width
-                         height: implicitHeight
-                         actionKind: root._transitionOutgoingIntent
-                                 && root._transitionOutgoingIntent.kind === "context" ? "context" : ""
-                         widgetId: root._transitionOutgoingIntent
-                                 ? (root._transitionOutgoingIntent.widgetId || "") : ""
-                         instanceKey: root._transitionOutgoingIntent
-                                 ? (root._transitionOutgoingIntent.instanceKey || "") : ""
-                         section: root._transitionOutgoingIntent
-                                 ? (root._transitionOutgoingIntent.section || "center") : "center"
-                         hasSettings: root._transitionOutgoingIntent
-                                 ? root._transitionOutgoingIntent.hasSettings === true : false
-                         layoutMode: root._transitionOutgoingIntent
-                                 ? root._transitionOutgoingIntent.layoutMode === true : false
-                         availableWidgets: root._transitionOutgoingIntent
-                                 ? (root._transitionOutgoingIntent.availableWidgets || []) : []
-                         payload: root._transitionOutgoingIntent
-                                 ? root._transitionOutgoingIntent.payload : null
-                     }
                 }
             }
         }
