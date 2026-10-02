@@ -39,16 +39,16 @@ Item {
     readonly property int columnPitch: columnWidth + columnGutter
     // Padding between the band's edge and the cards inside it, on every side.
     //
-    // `Workspaces.qml` makes its square `contentRow.implicitWidth + cellPadding * 2`
-    // wide and a fixed height taller than its content, then covers that square with
-    // `activeHighlight` exactly. So the widget's margin lives INSIDE the marked cell,
-    // and the highlight is the cell - which is the arrangement to copy, rather than
-    // insetting the highlight, which shrinks the marked cell and leaves the content
-    // overhanging it.
-    property int cellPadding: 0
+    // Horizontal padding inside the cell. `Workspaces.qml` makes its square
+    // `contentRow.implicitWidth + cellPadding * 2` wide, so the widget's own padding
+    // is 8 a side; the highlight then covers that square exactly, which is why the
+    // margin belongs inside the marked cell rather than between the highlight and the
+    // thing it marks. Vertical padding is the body's, since it comes from a different
+    // number - see `cellPaddingX` / `cellPaddingY` there.
+    property int cellPaddingX: 0
     // What a column's own content is given: the cell less the padding, which is what
     // every row, placeholder and overflow line is laid out in.
-    readonly property int cardWidth: Math.max(0, columnWidth - cellPadding * 2)
+    readonly property int cardWidth: Math.max(0, columnWidth - cellPaddingX * 2)
     property int listSpacing: 6
     property int rowHeight: 28
     property int glyphInset: 20
@@ -130,7 +130,7 @@ Item {
                     required property int index
 
                     objectName: "windowHintWindowRow"
-                    x: root.cellPadding
+                    x: root.cellPaddingX
                     width: root.cardWidth
                     height: root.rowHeight
                     radius: 6
@@ -241,7 +241,7 @@ Item {
                 // window's workspace.
                 BarWindowHintLabel {
                     objectName: "windowHintNeighbourRow"
-                    x: root.cellPadding
+                    x: root.cellPaddingX
                     width: root.cardWidth
                     // `modelData` / `index` are declared as required properties on
                     // the label, so the delegate model fills them. Binding them here
@@ -260,7 +260,7 @@ Item {
             // one would make the panel look as if it had a special case in it.
             BarWindowHintEmpty {
                 objectName: "windowHintColumnEmpty"
-                x: root.cellPadding
+                x: root.cellPaddingX
                 width: root.cardWidth
                 rowHeight: root.rowHeight
                 visible: !stripColumn.modelData
@@ -272,7 +272,7 @@ Item {
             // Empty when the list fit, so visibility binds straight to the text.
             Text {
                 objectName: "windowHintOverflow"
-                x: root.cellPadding
+                x: root.cellPaddingX
                 width: root.cardWidth
                 visible: stripColumn.isActiveSlot && stripColumn.modelData
                     ? HintLogic.overflowLabel(stripColumn.modelData.hidden) !== ""

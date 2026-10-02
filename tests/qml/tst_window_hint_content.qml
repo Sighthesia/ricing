@@ -217,7 +217,7 @@ Item {
         // still the guarantee that matters: the bug this test was written for left a
         // ~180px band of bare panel at one end, and a 180px column against a 22px
         // bound cannot pass it.
-        var slack = body.columnGutter + body.cellPadding * 2
+        var slack = body.columnGutter + body.cellPaddingX + body.cellPaddingY
         return leftmost <= slack + 1 && rightmost >= body.width - slack - 1
     }
 
@@ -357,13 +357,13 @@ Item {
             var leftColumn = neighbours[0].parent.mapToItem(strip(), 0, 0)
             var rightColumn = neighbours[1].parent.mapToItem(strip(), 0, 0)
             compare(wash.x, rowInStrip.x, "the highlight starts where the row starts")
-            compare(wash.x, strip().activeColumnX + body.cellPadding,
+            compare(wash.x, strip().activeColumnX + body.cellPaddingX,
                 "and on the active column, inside its padding")
-            compare(wash.width, body.columnWidth - body.cellPadding * 2,
+            compare(wash.width, body.columnWidth - body.cellPaddingX * 2,
                 "spanning the card inside the padding, was " + wash.width)
             // The left neighbour's column ends exactly where the active one begins,
             // so the check is that the highlight does not reach back over it.
-            compare(wash.x, leftColumn.x + body.columnPitch + body.cellPadding,
+            compare(wash.x, leftColumn.x + body.columnPitch + body.cellPaddingX,
                 "and starts where the left neighbour's column ends, inside its padding")
             verify(bar.x >= wash.x && bar.x < wash.x + wash.width,
                 "the indicator is on the highlight")
@@ -389,7 +389,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var visible = emptySlots.filter(function(s) { return s.visible })
             compare(visible.length, 1, "exactly one placeholder is showing")
             var slot = visible[0]
-            verify(slot.mapToItem(body, 0, 0).x < 1 + body.cellPadding,
+            verify(slot.mapToItem(body, 0, 0).x < 1 + body.cellPaddingX,
                 "and it is in the left column, was " + slot.mapToItem(body, 0, 0).x)
             compare(findByName(slot, "windowHintEmptySlotLabel").text, "No windows",
                 "which is that it has no windows")
@@ -402,7 +402,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(body.width, 3 * body.columnPitch - body.columnGutter,
                 "the panel did not resize")
             compare(findByName(live(), "windowHintFocusFrame").x,
-                body.columnPitch + body.cellPadding,
+                body.columnPitch + body.cellPaddingX,
                 "and the highlight is still on the active column")
         }
 
@@ -430,10 +430,10 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // the offsets are what says which is the active column.
             var xs = visible.map(function(s) { return s.mapToItem(body, 0, 0).x })
                 .sort(function(a, b) { return a - b })
-            compare(xs[0], body.cellPadding,
+            compare(xs[0], body.cellPaddingX,
                 "the first column takes the first slot, inside its padding")
-            compare(xs[1], body.columnPitch + body.cellPadding, "the second the second")
-            compare(xs[2], body.columnPitch * 2 + body.cellPadding, "and the third the third")
+            compare(xs[1], body.columnPitch + body.cellPaddingX, "the second the second")
+            compare(xs[2], body.columnPitch * 2 + body.cellPaddingX, "and the third the third")
         }
 
         function test_thePanelIsAsWideAsItsColumns() {
@@ -462,7 +462,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 body.hint = root.makeHint(combos[i])
                 wait(20)
                 var wash = findByName(live(), "windowHintFocusFrame")
-                compare(wash.x, body.columnPitch + body.cellPadding,
+                compare(wash.x, body.columnPitch + body.cellPaddingX,
                     "combination " + i + ": the active column is the middle one")
                 // And centred on the panel, not merely second of three.
                 compare(wash.x + wash.width / 2, body.width / 2,
@@ -618,7 +618,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var iconInStrip = icon.mapToItem(strip(), 0, 0)
             var gap = iconInStrip.x - (bar.x + bar.width)
             compare(gap, 12, "and keep a 12px gutter clear of the marker")
-            compare(wash.x, strip().activeColumnX + body.cellPadding,
+            compare(wash.x, strip().activeColumnX + body.cellPaddingX,
                 "and the marker is on the active column, inside its padding")
             verify(gap >= 8, "a gutter, not a hairline")
             // The title follows the glyph, so the whole row shifts with it.
@@ -651,7 +651,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var rowInStrip = rows[1].mapToItem(strip(), 0, 0)
             compare(frame.height, rows[1].height)
             compare(frame.x, rowInStrip.x, "starts where the row starts")
-            compare(frame.x, strip().activeColumnX + body.cellPadding,
+            compare(frame.x, strip().activeColumnX + body.cellPaddingX,
                 "and on the active column, inside its padding")
             compare(frame.width, rows[1].width, "and is exactly as wide")
             compare(frame.radius, rows[1].radius, "corners match the row's")
@@ -884,7 +884,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(visible.length, 1, "one placeholder, in the active column")
             var slot = visible[0]
             verify(Math.abs(slot.mapToItem(body, 0, 0).x
-                - (body.columnPitch + body.cellPadding)) < 1,
+                - (body.columnPitch + body.cellPaddingX)) < 1,
                 "and it is the middle column, was " + slot.mapToItem(body, 0, 0).x)
             var frame = findByName(slot, "windowHintEmptySlot")
             // QML hands a transparent colour back as #00000000, so that is what
@@ -1152,19 +1152,21 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // neighbours get plain labels - so every row found here belongs to the
             // column the band is on.
             //
-            // The expected number lives HERE, not read back from `body.cellPadding`: a
+            // The expected number lives HERE, not read back from `body.cellPaddingX`: a
             // test whose expected value is the component's own constant cannot tell
             // "the padding is there" from "the padding is gone" - with the padding at 0
             // it compared 0 against 0 and passed either way. Stated here it has to be
             // argued with, and 2 is the value the design settled on: zero read as one
             // solid mass, eight read as a floating margin.
-            // 8 is `Workspaces.cellPadding` - the square's own content inset. Stated
-            // here, not read from `body.cellPadding`: a test whose expected value is
-            // the component's own constant cannot tell "the padding is there" from
-            // "the padding is gone" - with it at 0 the gap and the expected value were
-            // both 0 and the suite passed either way. Zero read as one solid mass, so
-            // the claim is a real margin.
-            var expectedMargin = 8
+            // Two different numbers, because the widget's are. Its square is
+            // `contentRow.implicitWidth + cellPadding * 2` wide - 8 a side - while its
+            // height is a fixed `barWidgetHeight` of 42 with an 18px content row
+            // centred in it, leaving 12 above and below. Reading either from the
+            // component instead would make the test unable to disagree with it: an
+            // earlier version compared the gap against `body.cellPaddingX` and passed
+            // with or without a padding, because 0 matched 0.
+            var marginX = 8
+            var marginY = 12
             var cards = findAllByName(body, "windowHintWindowRow")
             verify(cards.length > 0, "the active column has cards to measure against")
             if (cards.length > 0) {
@@ -1186,16 +1188,16 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 var blockLeft = topCard.x
                 var blockRight = blockLeft + cards[0].width
                 var bandBox = band.mapToItem(box, 0, 0)
-                compare(blockTop - bandBox.y, expectedMargin,
+                compare(blockTop - bandBox.y, marginY,
                     "margin above the first card, was " + (blockTop - bandBox.y))
                 // The band's own height, not a mapped one: `mapToItem` returns a point.
                 // Measured at rest, where the scale is 1, so the untransformed height is
                 // the visual one.
-                compare(band.height - (blockBottom - bandBox.y), expectedMargin,
+                compare(band.height - (blockBottom - bandBox.y), marginY,
                     "and below the last, was " + (band.height - (blockBottom - bandBox.y)))
-                compare(blockLeft - bandBox.x, expectedMargin,
+                compare(blockLeft - bandBox.x, marginX,
                     "and to the left of the cards, was " + (blockLeft - bandBox.x))
-                compare(bandBox.x + band.width - blockRight, expectedMargin,
+                compare(bandBox.x + band.width - blockRight, marginX,
                     "and to the right, was " + (bandBox.x + band.width - blockRight))
             }
         }
@@ -1637,14 +1639,14 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // the markers are on it rather than pinned to the panel.
             compare(body.plan.activeSlot, 2, "the arriving column is the last slot")
             compare(findByName(live(), "windowHintFocusFrame").x,
-                2 * body.columnPitch + body.cellPadding,
+                2 * body.columnPitch + body.cellPaddingX,
                 "and the markers are placed against it, inside its padding")
             settleSlide()
             // Landed: it is the middle column, which is the same claim the resting
             // panel makes everywhere else.
             compare(body.plan.activeSlot, 1, "at rest the active column is the middle")
             compare(findByName(live(), "windowHintFocusFrame").x,
-                body.columnPitch + body.cellPadding,
+                body.columnPitch + body.cellPaddingX,
                 "at rest, inside the middle column's padding")
         }
 

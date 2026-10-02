@@ -83,23 +83,26 @@ Item {
     // `BarWindowHintStrip.columnGutter` for why the panel needs one.
     readonly property int columnGutter: LazerTheme.inlineGap
     readonly property int columnPitch: columnWidth + columnGutter
-    // TWO margins, and the widget is explicit about which is which:
+    // THREE margins, each lifted from the widget rather than chosen here:
     //
-    //   `Workspaces.activeHighlight`  y: workspaceRow.y, height: barWidgetHeight
-    //   `barWidgetHeight`             = barLiveHeight - barWidgetGutter * 2
-    //   `Workspaces.cellPadding`      = the square's own content inset
+    //   band   -> panel edge   `LazerTheme.barWidgetGutter`   3
+    //   card   -> band, sides  `Workspaces.cellPadding`       8
+    //   card   -> band, above  (barWidgetHeight 42 - the widget's 18px content
+    //             and below    row) / 2                        12
     //
-    // So the band sits `barWidgetGutter` - 3px - from the bar's edge, and the content
-    // sits `cellPadding` - 8px - inside the band. Two different numbers doing two
-    // different jobs, and the panel had them the wrong way round: it gave the band a
-    // 2px INNER margin and left the band's outer edge 10px in, which is the opposite of
-    // hugging the edge with the content padded inside it.
+    // The two card margins are different numbers because the widget's are: its square
+    // is `contentRow.implicitWidth + cellPadding * 2` wide, so 8 a side, while its
+    // height is a fixed `barWidgetHeight` with the content row centred in it, which
+    // leaves 12 above and below. Using 8 on all four sides - which is what this had -
+    // read as the cards crowding the band, and it is most visible vertically because
+    // the band here is full-height and the widget's is a fixed-height bar row.
     //
     // `surfaceInset` is how far the popup's own content column is inset from its
     // surface; `BarPopupActions` declares it. The band has to reach past it to get to
     // `bandInset` from the edge, which is why that reach is a negative offset here
     // rather than a padding on the body.
-    readonly property int cellPadding: 8
+    readonly property int cellPaddingX: 8
+    readonly property int cellPaddingY: 12
     readonly property int bandInset: LazerTheme.barWidgetGutter
     property int surfaceInset: 0
     // What the band reaches out past the body's own edges to sit `bandInset` from the
@@ -543,7 +546,7 @@ Item {
     // covering ground the body does not own.
     implicitHeight: ready
         ? Math.max(root._outgoingHeight, strip.contentHeight)
-            + cellPadding * 2 - bandOutset * 2
+            + cellPaddingY * 2 - bandOutset * 2
         : emptyText.implicitHeight
     width: implicitWidth
     height: implicitHeight
@@ -556,7 +559,7 @@ Item {
     // rectangle behind the squares - `activeHighlight`, covering the square exactly -
     // and this is the same surface one size up, in the same token, with the same
     // geometry: the cell, whose edges are the panel's edges, with the cards sitting
-    // `cellPadding` inside it.
+    // `cellPaddingX` inside it.
     //
     // A child of the BODY, not of the strip. The strip travels and its active slot
     // moves; the band does not, because the column you are looking at does not - so
@@ -571,9 +574,9 @@ Item {
         y: root.bandInset - root.surfaceInset
         x: root.bandX
         width: root.columnWidth
-        // The cell, not the card block: the cards sit `cellPadding` inside the band's
+        // The cell, not the card block: the cards sit `cellPaddingY` inside the band's
         // top and bottom edges, so the band is the block plus that padding on each side.
-        height: Math.max(0, strip.contentHeight + cellPadding * 2)
+        height: Math.max(0, strip.contentHeight + cellPaddingY * 2)
         radius: root.bandRadius
         color: LazerTheme.activeFill
         // The crossing's own progress, so the pulse cannot drift from the slide: one
@@ -598,8 +601,8 @@ Item {
         // the panel: the strip is the card block, and the padding belongs to the panel
         // around it. Sized from the panel it overran the bottom by a whole padding,
         // which put the band's bottom margin out of step with its top.
-        y: root.bandInset - root.surfaceInset + root.cellPadding
-        height: Math.max(0, root.height - cellPadding * 2 + bandOutset * 2)
+        y: root.bandInset - root.surfaceInset + root.cellPaddingY
+        height: Math.max(0, root.height - cellPaddingY * 2 + bandOutset * 2)
         width: root.stripWidth
         // One object moving, so one dim. With two copies crossing this had to be
         // applied to both in lockstep or the seam would show one through the other;
@@ -613,7 +616,7 @@ Item {
         activeSlot: root.plan ? root.plan.activeSlot : 1
         columnWidth: root.columnWidth
         columnGutter: root.columnGutter
-        cellPadding: root.cellPadding
+        cellPaddingX: root.cellPaddingX
         listSpacing: root.listSpacing
         rowHeight: root.rowHeight
         glyphInset: root.glyphInset
@@ -650,7 +653,7 @@ Item {
         // it marks, and the row spans its column's full width. Measured from the
         // active column's own x, so it cannot be drawn over a column that is not
         // the active one whatever the layout decided.
-        x: strip.activeColumnX + root.cellPadding
+        x: strip.activeColumnX + root.cellPaddingX
         y: root.focusedRowTop
         width: strip.cardWidth
         height: root.rowHeight
@@ -688,7 +691,7 @@ Item {
         color: LazerTheme.osuGreen
         // Measured from the active column's own left edge, which is the same origin
         // the highlight uses, so the bar and the fill it marks always move together.
-        x: strip.activeColumnX + root.cellPadding + root.indicatorInset
+        x: strip.activeColumnX + root.cellPaddingX + root.indicatorInset
         y: root._barTop
         visible: root.hasTarget
         opacity: root.hasTarget ? 1 : 0
