@@ -20,11 +20,13 @@ Item {
     property string source: ""
     property string ladder: ""
     property string lock: ""
+    property string bar: ""
     property bool shellLoaded: false
     property bool ladderLoaded: false
     property bool lockLoaded: false
+    property bool barLoaded: false
     readonly property bool sourcesReady: root.shellLoaded && root.ladderLoaded
-            && root.lockLoaded
+            && root.lockLoaded && root.barLoaded
 
     // Read the shell as text. The components whose order matters here cannot be
     // instantiated headlessly: `WlSessionLock` has no offscreen backend, so
@@ -85,6 +87,28 @@ Item {
         }
         onLoadFailed: error => {
             console.log("FAIL: read Lock.qml |", error)
+            root.failures++
+            Qt.quit()
+        }
+    }
+
+    // The bar, for the one fact the queue's hint task depends on: TopBar already
+    // resolves `WindowHintService.hintHeld` while the chrome is staging, so the
+    // queue's read is an ordering step and not the listener's first instantiation.
+    // Read as text for the same reason as Lock.qml — the bar is a PanelWindow tree
+    // and cannot be built headlessly.
+    FileView {
+        id: barSource
+        path: (Quickshell.env("PWD") || ".") + "/modules/bar/TopBar.qml"
+        blockLoading: true
+        watchChanges: false
+        onLoaded: {
+            root.bar = barSource.text()
+            root.barLoaded = true
+            root.run()
+        }
+        onLoadFailed: error => {
+            console.log("FAIL: read modules/bar/TopBar.qml |", error)
             root.failures++
             Qt.quit()
         }
@@ -268,6 +292,11 @@ Item {
             Qt.quit()
             return
         }
+        if (root.bar.length < 500) {
+            console.log("FAIL: TopBar.qml was not readable |", root.bar.length, "chars")
+            Qt.quit()
+            return
+        }
 
         // The lock must not be part of the lazily mounted chrome: a lock inside
         // it can only engage after the wallpaper reveal, which is exactly the
@@ -316,6 +345,7 @@ Item {
         root.checkLockExpectation()
         root.checkChromeStaging()
         root.checkFallback()
+        root.checkScreenlessReload()
         root.checkDeferredWarmup()
         root.checkStartupTaskQueue()
 
@@ -350,15 +380,20 @@ Item {
                    && root.bodyOf("function mountChrome()").indexOf(
                           "if (root._chromeMounted)") >= 0)
 
-        // Quiet-ready has exactly two writers: the lock's committed wave, and
-        // the bounded fallback. A third — reaching it off an earlier gate —
-        // would release post-startup work before the first screen finished.
+        // Quiet-ready has exactly three writers: the lock's committed wave, the
+        // bounded degraded fallback, and the screenless-reload settle. A fourth —
+        // reaching it off an earlier gate — would release post-startup work before
+        // the first screen finished. The count is what stops a new writer from
+        // arriving quietly, so the three are also each asserted in their own
+        // body.
         const writers = root.countOccurrences("root.startupQuietReady = true")
-        root.check("quiet-ready is written only by the wave and the fallback",
-                   writers === 2
+        root.check("quiet-ready is written only by the wave, fallback and settle",
+                   writers === 3
                    && root.bodyOf("function markStartupWaveStarted()").indexOf(
                           "root.startupQuietReady = true") >= 0
                    && root.bodyOf("function releaseStartupGates(reason)").indexOf(
+                          "root.startupQuietReady = true") >= 0
+                   && root.bodyOf("function settleScreenlessReload()").indexOf(
                           "root.startupQuietReady = true") >= 0,
                    "writers: " + writers)
     }
@@ -704,6 +739,136 @@ Item {
                    && root.indexOf("chromeLoader.active = false") < 0)
     }
 
+    // The hole the degraded watchdog's own gate leaves open, and the bounded
+    // normal completion that closes it. The watchdog is armed only while a startup lock is
+// still expected, which is right — a spent session has nothing for it to unblock
+// — but `WallpaperBackground.bootReady` is false while no screen exists
+// (WallpaperBootLogic.isReady returns false for an empty list, by design), so a
+// reload with no output would never mount the chrome, never open the deferred
+// queue, and would sit muted with the palette gate closed indefinitely.
+//
+// This path is a *normal* completion, not a degraded boot, and the checks are
+// written around that difference: it must release the same three gates the queue
+// waits on, and it must touch none of the things that make the degraded fallback
+// degraded — no startupFallbackUsed, no warning, no lock call.
+    function checkScreenlessReload() {
+        // The timer is the only thing that can trigger this path, so it is read
+        // from its own block: a `running` clause living somewhere else would let
+        // the rescue fire on a normal boot and pre-empt the degraded watchdog.
+        const rescue = root.normalized(root.enclosingBlock("id: startupReloadTimer"))
+        // Every clause in `running` is a reason *not* to act, so they all have to
+        // be there: without the screens clause this would pre-empt a normal boot
+        // whose output simply has not reported yet, and without the lock clause it
+        // would duplicate the degraded watchdog's own state.
+        root.check("the screenless reload rescue is bounded and exactly gated",
+                   root.indexOf("id: startupReloadTimer") >= 0
+                   && root.indexOf("id: startupReloadTimer") < root.chromeStart
+                   && rescue.indexOf("{ id: startupReloadTimer") === 0
+                   && rescue.indexOf("!lockModule.startupLockExpected") >= 0
+                   && rescue.indexOf("Quickshell.screens.length === 0") >= 0
+                   && rescue.indexOf("!root.startupWallpaperReady") >= 0
+                   && rescue.indexOf("!root.startupChromeReady") >= 0
+                   && rescue.indexOf("!root.startupWorkStarted") >= 0
+                   && rescue.indexOf("interval: LazerBar.MotionTokens.slow * 10") >= 0
+                   && rescue.indexOf("repeat: false") >= 0
+                   && rescue.indexOf("root.settleScreenlessReload()") >= 0,
+                   "rescue: " + rescue.slice(0, 320))
+
+        const body = root.bodyOf("function settleScreenlessReload()")
+        // It completes the ladder the same way the degraded fallback does, because
+        // with no output there is no lock surface that could ever report the wave.
+        const released = ["root.startupWallpaperReady = true", "root.mountChrome()",
+                          "root.startupChromeReady = true", "root.startupQuietReady = true",
+                          "StartupReveal.Events.waveStarted"]
+        let missing = []
+        for (let index = 0; index < released.length; index++) {
+            if (body.indexOf(released[index]) < 0)
+                missing.push(released[index])
+        }
+        root.check("the screenless reload rescue releases every startup gate",
+                   body.length > 0 && missing.length === 0,
+                   "missing: " + missing.join(", "))
+
+        // The distinction from a degraded boot. `startupFallbackUsed` is what the
+        // log and any later reader use to tell "this session came up badly" from
+        // "this session came up"; a reload that merely had no output must not set
+        // it, must not warn, and must not route through the degraded release.
+        const degraded = ["startupFallbackUsed", "console.warn", "releaseStartupGates("]
+        let crossed = []
+        for (let index = 0; index < degraded.length; index++) {
+            if (body.indexOf(degraded[index]) >= 0)
+                crossed.push(degraded[index])
+        }
+        root.check("the screenless reload rescue is not recorded as degraded",
+                   body.length > 0 && crossed.length === 0,
+                   "found: " + crossed.join(", "))
+
+        // Lock behaviour is untouched: no request, no cancellation, no
+        // reclassification. A manual request must keep the screenshot path it has
+        // today and PAM must never see a second owner.
+        const lockCalls = ["startupLock()", ".lock(", "requestSessionLock()", "unlock()",
+                           "startupRequest", "backgroundMode", "startupLockTimer",
+                           "sessionLock", "selfTest"]
+        crossed = []
+        for (let index = 0; index < lockCalls.length; index++) {
+            if (body.indexOf(lockCalls[index]) >= 0)
+                crossed.push(lockCalls[index])
+        }
+        root.check("the screenless reload rescue never touches lock behaviour",
+                   body.length > 0 && crossed.length === 0,
+                   "found: " + crossed.join(", "))
+
+        // Idempotent: the guard runs before anything else, and the writes sit in
+        // the ladder's own order — wallpaper gate, chrome gate, wave event, then
+        // quiet — which is the same sequence both other writers use. Quiet-ready is
+        // the last write because it is the signal the deferred queue reads.
+        const quietAt = body.indexOf("root.startupQuietReady = true")
+        const waveAt = body.indexOf("StartupReveal.Events.waveStarted")
+        root.check("the screenless reload rescue is idempotent",
+                   body.indexOf("if (root.startupQuietReady || root.startupWorkStarted)")
+                       >= 0
+                   // Guard first: a second trigger returns before the log, so it
+                   // cannot announce the same settle twice.
+                   && body.indexOf("if (root.startupQuietReady")
+                       < body.indexOf("console.log")
+                   && root.countOccurrencesIn(body, "root.startupQuietReady = true") === 1
+                   && quietAt > body.indexOf("root.startupWallpaperReady = true")
+                   && quietAt > body.indexOf("root.startupChromeReady = true")
+                   && waveAt > body.indexOf("root.startupChromeReady = true")
+                   && quietAt > waveAt,
+                   "body: " + root.normalized(body).slice(0, 240))
+
+        // The one place it does log, and it says "normally" rather than naming a
+        // degraded stage — a log line is how the manual reload check confirms this
+        // path ran, so it must not read like a failure.
+        const logAt = body.indexOf("console.log")
+        // statementEnd, not the next newline: the message is wrapped across two
+        // lines, and reading only the first would truncate the claim being checked.
+        const logText = root.normalized(
+            body.slice(logAt, statementEnd(body, logAt)))
+        root.check("the screenless reload rescue logs a normal completion",
+                   logAt >= 0
+                   && body.indexOf("console.warn") < 0
+                   && logText.indexOf("screenless reload with no startup lock:") >= 0
+                   && logText.indexOf("completing the startup ladder normally") >= 0
+                   && logText.indexOf("no degraded boot") >= 0,
+                   "log: " + logText.slice(0, 200))
+
+        // The rescue and the degraded watchdog must never be armed at once: both
+        // answer "nothing reported in 2.4 s", and one state can only justify one
+        // of them. The watchdog's gate is `startupLockExpected`; the rescue's is
+        // its negation, so overlap is impossible by construction — asserted here
+        // so the negation is not quietly dropped.
+        const armBody = root.normalized(root.bodyOf("function armStartupFallback()"))
+        root.check("the two bounded paths cannot compete for the same state",
+                   armBody.indexOf("!lockModule.startupLockExpected") >= 0
+                   && rescue.indexOf("!lockModule.startupLockExpected") >= 0
+                   && rescue.indexOf("startupFallbackTimer") < 0
+                   && root.countOccurrences("id: startupFallbackTimer") === 1
+                   && root.countOccurrences("id: startupReloadTimer") === 1,
+                   "arm: " + armBody.slice(0, 160) + " rescue: " + rescue.slice(0, 160))
+    }
+
     // Warmups left the chrome's completion callback: they run after the startup
     // wave, one event-loop turn apart, so they cannot occupy the first-paint
     // path. The delayed external-theme work stays exactly where it was.
@@ -717,9 +882,33 @@ Item {
                        "found in chrome at " + root.positionInChrome(warmups[index]))
         }
 
+        // ...and each one is back at the root, on the deferred queue. Read the
+        // root's own copy of the source: the queue body is outside the chrome
+        // component, so a warmup that only moved somewhere else would satisfy the
+        // absence checks above while nothing ever runs it.
+        const taskBody = root.normalized(root.bodyOf("function runStartupTask(index)"))
+        for (let index = 0; index < warmups.length; index++) {
+            root.check("the deferred queue runs " + warmups[index],
+                       taskBody.indexOf(warmups[index]) >= 0,
+                       "body: " + taskBody.slice(0, 240))
+        }
+
         root.check("external app theme keeps its delayed timer",
                    root.positionInChrome("Services.AppThemeService.apply()") >= 0
                    && root.positionInChrome("LazerBar.MotionTokens.slow * 5") >= 0)
+
+        // The window-hint task is ordering, not listener creation. TopBar resolves
+        // hintHeld during chrome staging, so a comment or a task claiming the queue
+        // installs the listener would be stating something false about the shell —
+        // and the next reader would move it. The claim is pinned to the bar's own
+        // resolution instead, so it stays true if the bar's wiring is the thing
+        // that changes.
+        root.check("the hint task is ordering, not the listener's first use",
+                   root.bar.indexOf(
+                       "readonly property bool windowHintHeld: "
+                           + "Services.WindowHintService.hintHeld") >= 0,
+                   "bar declares windowHintHeld at "
+                       + root.bar.indexOf("readonly property bool windowHintHeld:"))
     }
 
     // The root's deferred startup queue. Its whole reason to exist is that these

@@ -176,6 +176,49 @@ ShellRoot {
         startupFallbackTimer.stop()
     }
 
+    // Normal-completion settle for a reload that has no lock to wait for and no
+    // output to report from.
+    //
+    // Task 5's watchdog is gated on the lock still expecting a startup lock,
+    // because a spent session has no startup surface left to wave. That gate is
+    // right for the watchdog — there is genuinely nothing for it to unblock — but
+    // it leaves one real hole: `WallpaperBackground.bootReady` is false while no
+    // screen exists (WallpaperBootLogic.isReady returns false for an empty
+    // screen list, by design), so a reload with no output never mounts the
+    // chrome, never sets `startupChromeReady`, and therefore never opens the
+    // deferred queue. The shell would sit there muted, with the palette gate
+    // closed and no launcher, clipboard or hint listener, until an output
+    // appeared.
+    //
+    // This is not a degraded boot and is deliberately not reported as one. A
+    // session whose marker was already spent booted fine; it was reloaded while
+    // nothing was plugged in, and there is no lock request outstanding to fail.
+    // So unlike `releaseStartupGates` this writes only the root's own gates, never
+    // sets `startupFallbackUsed`, never warns, and never touches the lock — a
+    // manual request keeps the screenshot path it has today and PAM is untouched.
+    //
+    // The quiet gate closes for the same reason Task 5's fallback closes it: with
+    // no output there is no lock surface, so nothing could ever report the wave.
+    // A screen that appears later still mounts through `markWallpaperReady` and
+    // its surface waves as soon as it is created.
+    function settleScreenlessReload() {
+        if (root.startupQuietReady || root.startupWorkStarted)
+            return
+        console.log("[startup] screenless reload with no startup lock:",
+                    "completing the startup ladder normally, no degraded boot")
+        if (!root.startupWallpaperReady) {
+            root.startupWallpaperReady = true
+            root.advanceStartup(StartupReveal.Events.wallpaperReady)
+        }
+        root.mountChrome()
+        if (!root.startupChromeReady) {
+            root.startupChromeReady = true
+            root.advanceStartup(StartupReveal.Events.chromeReady)
+        }
+        root.advanceStartup(StartupReveal.Events.waveStarted)
+        root.startupQuietReady = true
+    }
+
     // ---- Deferred background work ------------------------------------------
     //
     // Launcher priming, clipboard cache loading and the window-hint listener used
@@ -214,8 +257,11 @@ ShellRoot {
     function runStartupTask(index) {
         if (index === 0) Services.LauncherService.primeApps()
         else if (index === 1) Services.ClipboardService.warmup()
-        // Reading a property is what instantiates WindowHintService; its
-        // Connections against NiriService are the hint listener itself.
+        // TopBar already resolves `WindowHintService.hintHeld` while the chrome is
+        // staging, so the singleton and its NiriService Connections exist well
+        // before this runs. What this task contributes is *ordering*: it moves the
+        // first live hint evaluation past the startup wave, on its own tick. Keep
+        // it for that, not as the listener's first instantiation.
         else if (index === 2) Services.WindowHintService.hintHeld
         else return false
         root.startupTaskIndex = index + 1
@@ -396,6 +442,36 @@ ShellRoot {
         repeat: false
         running: true
         onTriggered: root.armStartupFallback()
+    }
+
+    // The rescue for the hole the watchdog's own gate leaves open: a reload whose
+    // session marker was already spent while no output exists. `bootReady` is
+    // false with an empty screen list by design, so nothing in the normal chain
+    // will ever report, and the deferred queue would stay shut forever.
+    //
+    // Every clause is a reason this is the wrong moment to act, so `running`
+    // carries all of them rather than a separate hand-written stand-down: a
+    // screen appearing, the ladder already past the wallpaper gate, the chrome
+    // already staged, the deferred queue already under way, or the lock still
+    // expecting a startup lock (the marker read is asynchronous, so that verdict
+    // can arrive after this binding is first evaluated — `running` re-evaluates
+    // when it does). Only the exact state the watchdog's gate excludes can leave
+    // this timer armed.
+    //
+    // Deliberately the same budget as the degraded watchdog above: both answer
+    // "nothing reported in 2.4 s", so neither can pre-empt the other, and the
+    // two paths never compete for the same state. Read only as state — the
+    // rescue makes no request.
+    Timer {
+        id: startupReloadTimer
+        interval: LazerBar.MotionTokens.slow * 10
+        repeat: false
+        running: !lockModule.startupLockExpected
+                && Quickshell.screens.length === 0
+                && !root.startupWallpaperReady
+                && !root.startupChromeReady
+                && !root.startupWorkStarted
+        onTriggered: root.settleScreenlessReload()
     }
 
     // Read-only window onto the fullscreen auto-hide chain, so the live state can
