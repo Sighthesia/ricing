@@ -312,6 +312,19 @@ Variants {
                 // Only now is the outgoing wallpaper's decode pointless. The
                 // promoted slot is untouched: its pixels are what the circle was
                 // already showing, which is the whole point of promoting.
+                //
+                // A collapsed pair is the one promotion cannot do: `released` is
+                // then the very image that was just promoted, so releasing it
+                // would wipe the wallpaper that is on screen. Fail closed instead
+                // — keep the pixels, and hand the pair back distinct so the next
+                // switch still has a spare slot. Everything above already
+                // settled, so the transition is over either way.
+                if (roles.settledSlot === roles.incomingSlot) {
+                    console.warn("WallpaperBackground: refusing to promote a collapsed slot pair",
+                                 wallpaperWindow.settledSlot, wallpaperWindow.incomingSlot)
+                    wallpaperWindow.incomingSlot = SlotLogic.otherSlot(roles.settledSlot)
+                    return
+                }
                 released.source = ""
             }
 

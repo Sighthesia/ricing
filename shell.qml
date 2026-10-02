@@ -235,8 +235,19 @@ ShellRoot {
     // a hint listener. Chrome staging is the only report such a session can make,
     // so the lock's own expectation is the second way in. See
     // Lock.startupLockExpected.
+    //
+    // The self-test run is the third, and it has no wave either. Self-test mode
+    // deliberately skips `startupLock()` (see the root completion below), and the
+    // manual lock it arms in its place is not a startup request, so nothing emits
+    // `startupWaveStarted` — while `startupLockExpected` stays true, because the
+    // marker gate is never resolved for a request that is never made. Without
+    // this the self-test shell would sit muted with the palette gate closed for
+    // the whole run. It is a read of a test-only flag, it sits behind the same
+    // chrome-staged guard as the other two, and it makes no lock request of any
+    // kind: the self-test lock is armed by Lock itself, from its own completion.
     readonly property bool startupWorkDue: root.startupChromeReady
-            && (root.startupQuietReady || !lockModule.startupLockExpected)
+            && (root.startupQuietReady || !lockModule.startupLockExpected
+                || lockModule.selfTestEnabled)
     // Latch, because both conditions above can become true in either order and
     // the queue must run exactly once for a shell lifetime.
     property bool startupWorkStarted: false
@@ -557,6 +568,19 @@ ShellRoot {
             // existing component is created — so this reorders the build
             // without adding a surface, and the visual order below is unchanged.
             readonly property bool barStaged: topBar.startupReady === true
+            // One-way latch for the auxiliary mount, and the reason the Loaders
+            // below do not read `barStaged` directly. `barStaged` is a live
+            // binding over the current screen list, so it drops to false again on
+            // a re-key or a hotplug while the newly arrived screen batches its
+            // widgets; a Loader bound straight to it would destroy and recreate
+            // the notification host, the corner bezel and the overview backdrop
+            // mid-session, and would leave them gone for good if that re-batch
+            // never finished. Here the bar's *first* staging mounts them once,
+            // and only the chrome loader at the root can ever take them down
+            // again. `barStaged` still feeds `startupReady` below, so a re-key
+            // remains visible to the readiness report — which is harmless,
+            // because every report in this component is latched.
+            property bool auxiliariesMounted: false
             property bool overviewReady: false
             property bool notificationsReady: false
             property bool cornersReady: false
@@ -565,10 +589,21 @@ ShellRoot {
             readonly property bool startupReady: chromeRoot.barStaged
                     && chromeRoot.auxiliariesReady
 
+            // The bar's first staging is the cue to mount the auxiliary surfaces,
+            // and from there the latch decides: a re-key that drops `barStaged`
+            // again leaves them mounted. The change handler cannot miss that
+            // first transition, because TopBar's own staging is batched over
+            // timer ticks after construction — so `startupReady` is still false
+            // when this object is created and always arrives as a change.
+            onBarStagedChanged: {
+                if (barStaged)
+                    chromeRoot.markAuxiliariesMounted()
+            }
+
             // Blurred/tinted wallpaper niri renders inside its overview backdrop.
             Loader {
                 id: overviewLoader
-                active: chromeRoot.barStaged
+                active: chromeRoot.auxiliariesMounted
                 sourceComponent: Component { LazerBar.OverviewBackgroundWindow {} }
                 onStatusChanged: chromeRoot.reportAuxiliaryTerminal(overviewLoader, "overview")
             }
@@ -582,7 +617,7 @@ ShellRoot {
 
             Loader {
                 id: notificationLoader
-                active: chromeRoot.barStaged
+                active: chromeRoot.auxiliariesMounted
                 sourceComponent: Component { LazerBar.NotificationHost {} }
                 onStatusChanged: chromeRoot.reportAuxiliaryTerminal(notificationLoader, "notifications")
             }
@@ -593,7 +628,7 @@ ShellRoot {
             // paints its own corners from its own window. See TopBar.qml.
             Loader {
                 id: cornerLoader
-                active: chromeRoot.barStaged
+                active: chromeRoot.auxiliariesMounted
                 sourceComponent: Component { LazerBar.ScreenRoundedCorners {} }
                 onStatusChanged: chromeRoot.reportAuxiliaryTerminal(cornerLoader, "corners")
             }
@@ -618,6 +653,15 @@ ShellRoot {
                     chromeRoot.notificationsReady = true
                 else if (name === "corners")
                     chromeRoot.cornersReady = true
+            }
+
+            // One-way, like every other latch in this file: the first report wins
+            // and a later call is a no-op, so a re-key that flips `barStaged` back
+            // and forth cannot unmount what it already mounted.
+            function markAuxiliariesMounted() {
+                if (chromeRoot.auxiliariesMounted)
+                    return
+                chromeRoot.auxiliariesMounted = true
             }
 
             // Bounded fallback for the same reason as the root's: a loader that

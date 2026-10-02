@@ -112,6 +112,27 @@ Item {
                    "the released slot must be captured before the swap")
         }
 
+        // A collapsed role pair is the one promotion that cannot do: `released` is
+        // then the very image being promoted, so releasing it would wipe the
+        // wallpaper that is on screen. The pure helper deliberately returns an
+        // equal pair as it is — tst_wallpaper_slot_logic pins that — so the
+        // refusal has to live where the release happens. Fail closed: keep the
+        // pixels, and hand the pair back distinct so the next switch still has a
+        // spare slot.
+        function test_promotionRefusesToReleaseThePromotedSlot() {
+            var body = harness.bodyOf("function promoteIncoming()")
+            var guard = body.indexOf("roles.settledSlot === roles.incomingSlot")
+            var released = body.indexOf("released.source = \"\"")
+            verify(guard >= 0, "promotion must refuse a collapsed slot pair")
+            verify(released >= 0 && guard < released,
+                   "the collapsed-pair guard must come before the release")
+            verify(body.indexOf("SlotLogic.otherSlot(") > guard,
+                   "a refused promotion must hand the pair back distinct")
+            var warned = body.indexOf("console.warn", guard)
+            verify(warned > guard && warned < released,
+                   "a refused promotion must say so in the log")
+        }
+
         // Promotion is only meaningful for a slot that decoded. A direct settle
         // of a broken path fails inside its own source assignment, and the
         // failure handler releases the slot — promoting it anyway would put an

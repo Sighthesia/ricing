@@ -344,10 +344,12 @@ Item {
         root.checkRootLockBindings()
         root.checkLockExpectation()
         root.checkChromeStaging()
+        root.checkAuxiliaryLatch()
         root.checkFallback()
         root.checkScreenlessReload()
         root.checkDeferredWarmup()
         root.checkStartupTaskQueue()
+        root.checkSelfTestQueue()
 
         console.log("Totals: " + (root.failures === 0
             ? root.checks + " passed, 0 failed"
@@ -620,7 +622,7 @@ Item {
                        root.positionInChrome("id: " + loader) >= 0
                        && block.indexOf("{ id: " + loader) === 0
                        && block.indexOf(component) >= 0
-                       && block.indexOf("active: chromeRoot.barStaged") >= 0
+                       && block.indexOf("active: chromeRoot.auxiliariesMounted") >= 0
                        && block.indexOf("chromeRoot.reportAuxiliaryTerminal(") >= 0
                        && root.positionInChrome("property bool " + flag + ": false") >= 0,
                        "block: " + block.slice(0, 160))
@@ -649,6 +651,123 @@ Item {
                    && auxTimer.indexOf("repeat: false") >= 0
                    && auxTimer.indexOf("chromeRoot.releaseAuxiliaries()") >= 0,
                    "timer: " + auxTimer.slice(0, 200))
+    }
+
+    // The auxiliary surfaces mount once and stay mounted.
+    //
+    // `barStaged` is a *live* binding — `TopBar.startupReady` is a readiness check
+    // over the current screen list — so it drops to false again on a screen re-key
+    // or a hotplug while the newly arrived screen batches its widgets. A Loader
+    // bound straight to it therefore destroys and recreates NotificationHost,
+    // ScreenRoundedCorners and OverviewBackgroundWindow mid-session, and leaves
+    // them gone for good if that re-batch never finishes. The chrome latches its
+    // own mount instead; these checks pin the latch, its one-wayness, and the
+    // fact that no Loader still reads the live expression.
+    //
+    // Readiness and the bounded auxiliary watchdog deliberately keep reading
+    // `barStaged`: a duplicate readiness report is latched anyway, and the
+    // watchdog exists exactly to release the gate when a loader stalls. That is
+    // asserted by checkChromeStaging, so a rewire there turns red too.
+    function checkAuxiliaryLatch() {
+        // The latch: declared inside the chrome, closed, and written by one
+        // guarded function — the same shape the root uses for its own chrome mount.
+        const latchAt = root.indexOf("function markAuxiliariesMounted()")
+        const latch = root.normalized(root.source.slice(latchAt,
+                                                        statementEnd(root.source, latchAt)))
+        const guard = latch.indexOf("if (chromeRoot.auxiliariesMounted)")
+        const write = latch.indexOf("chromeRoot.auxiliariesMounted = true")
+        root.check("the auxiliary mount has its own one-way latch",
+                   root.positionInChrome("property bool auxiliariesMounted: false") >= 0
+                   && latchAt > root.chromeStart
+                   && guard >= 0 && write > guard,
+                   "latch: " + latch.slice(0, 200))
+
+        // One-way: the latch has exactly one writer and no clearing write
+        // anywhere. A `auxiliariesMounted = false` — from a change handler, a
+        // watchdog, or the fallback — would reintroduce the teardown this
+        // replaces, so its absence is asserted rather than assumed.
+        root.check("the auxiliary mount latch is never released",
+                   root.countOccurrences("chromeRoot.auxiliariesMounted = true") === 1
+                   && root.countOccurrencesIn(latch,
+                                   "chromeRoot.auxiliariesMounted = true") === 1
+                   && root.indexOf("chromeRoot.auxiliariesMounted = false") < 0,
+                   "writers: " + root.countOccurrences("chromeRoot.auxiliariesMounted = true")
+                       + ", clears: " + root.countOccurrences("chromeRoot.auxiliariesMounted = false"))
+
+        // What arms it: the bar's *first* staging. Read from the handler's own
+        // statement, so the guard cannot be satisfied by the latch function's text
+        // elsewhere in the file, and asserted in order — the guard first, so a
+        // later barStaged false cannot drive the latch back down.
+        const handlerAt = root.indexOf("onBarStagedChanged:")
+        const handler = root.normalized(root.source.slice(
+            handlerAt, statementEnd(root.source, handlerAt)))
+        root.check("the first bar staging mounts the auxiliary surfaces",
+                   handlerAt > root.chromeStart
+                   && handler.indexOf("onBarStagedChanged: { if (barStaged) "
+                                      + "chromeRoot.markAuxiliariesMounted() }") === 0,
+                   "handler: " + handler.slice(0, 200))
+
+        // And no Loader reads the live expression any more: exactly the three
+        // auxiliary Loaders activate on the latch, and the live binding appears
+        // in no `active:` at all. Counted across the chrome body, so a fourth
+        // loader added later on the latch would fail too.
+        const chromeText = root.normalized(
+            root.source.slice(root.chromeStart, root.chromeEnd))
+        root.check("no auxiliary loader activates on live bar readiness",
+                   root.positionInChrome("active: chromeRoot.barStaged") < 0
+                   && root.countOccurrences("active: chromeRoot.auxiliariesMounted") === 3
+                   && chromeText.indexOf("active: chromeRoot.barStaged") < 0,
+                   "latched: " + root.countOccurrences("active: chromeRoot.auxiliariesMounted")
+                       + ", live: " + root.countOccurrences("active: chromeRoot.barStaged"))
+    }
+
+    // Self-test mode skips the startup lock on purpose, so the shell it boots has
+    // no wave to wait for — while `startupLockExpected` stays true, because the
+    // marker gate is never resolved for a request that is never made. The queue
+    // would therefore never run: the pulse stays muted and the palette gate stays
+    // closed for the whole run. The self-test flag is the third way into the
+    // queue, behind the same staged-chrome guard as the other two.
+    function checkSelfTestQueue() {
+        // The condition whole, whitespace-collapsed, so a dropped disjunct or a
+        // reordered term fails rather than passing a substring probe.
+        const dueAt = root.indexOf("readonly property bool startupWorkDue:")
+        const dueText = root.normalized(
+            root.source.slice(dueAt, statementEnd(root.source, dueAt)))
+        root.check("self-test mode is a third way into the deferred queue",
+                   dueText === "readonly property bool startupWorkDue: "
+                       + "root.startupChromeReady && (root.startupQuietReady "
+                       + "|| !lockModule.startupLockExpected || lockModule.selfTestEnabled)",
+                   "condition: " + dueText.slice(0, 240))
+
+        // Behind the chrome guard, not instead of it: opening on the self-test
+        // flag alone would prime the launcher, the clipboard index and the hint
+        // listener before the bar exists.
+        const selfAt = dueText.indexOf("|| lockModule.selfTestEnabled")
+        root.check("the self-test queue still waits for the staged chrome",
+                   selfAt > dueText.indexOf("root.startupChromeReady")
+                   && selfAt > dueText.indexOf("&&")
+                   && selfAt > dueText.indexOf("root.startupQuietReady"),
+                   "condition: " + dueText.slice(0, 240))
+
+        // The self-test lock is Lock's own business: the root must still refuse
+        // the real startup auto-lock in self-test mode, and must never ask for a
+        // startup request from anywhere. Without both, "make the self-test reach
+        // the queue" would be satisfiable by letting it really auto-lock.
+        const completedAt = root.indexOf("Component.onCompleted: {")
+        const completed = root.normalized(root.source.slice(
+            completedAt, statementEnd(root.source, completedAt)))
+        const selfGuard = completed.indexOf("if (!lockModule.selfTestEnabled)")
+        root.check("self-test mode still skips the real startup auto-lock",
+                   selfGuard >= 0
+                   && completed.indexOf("lockModule.startupLock()") > selfGuard
+                   && root.indexOf("startupRequest") < 0,
+                   "completion: " + completed.slice(0, 240))
+
+        // Exactly two reads of the flag: this guard and the queue condition. A
+        // third would be self-test-only behaviour creeping into another path.
+        root.check("self-test mode is read in exactly two places",
+                   root.countOccurrences("lockModule.selfTestEnabled") === 2,
+                   "reads: " + root.countOccurrences("lockModule.selfTestEnabled"))
     }
 
     // The root's own watchdog: it releases every gate, logs the reason, and
@@ -981,22 +1100,29 @@ Item {
         // wave alone. That session has no startup lock, so no lock surface and no
         // startupWaveStarted signal ever fires; a queue waiting only on quiet-ready
         // would leave a reloaded shell with no launcher, no clipboard index and no
-        // hint listener for the rest of its life.
-        root.check("a reload with no startup wave still reaches the queue",
+        // hint listener for the rest of its life. The self-test run is the third
+        // way in for the same reason — no wave either — so all three disjuncts are
+        // asserted as one expression rather than probed for individually.
+        //
+        // The detail reads the declaration as a bounded statement: a fixed-offset
+        // slice around the first match drifted far enough past it to print the
+        // queue body, which named neither the term that was missing nor the one
+        // that had replaced it.
+        const dueAt = root.indexOf("readonly property bool startupWorkDue:")
+        root.check("a reload or a self-test run with no startup wave still reaches the queue",
                    root.normalized(root.source).indexOf(
                        "readonly property bool startupWorkDue: root.startupChromeReady "
-                           + "&& (root.startupQuietReady || !lockModule.startupLockExpected)")
+                           + "&& (root.startupQuietReady || !lockModule.startupLockExpected "
+                           + "|| lockModule.selfTestEnabled)")
                        >= 0,
-                   "condition: " + root.normalized(root.source).slice(
-                       Math.max(0, root.indexOf("startupWorkDue") - 80),
-                       root.indexOf("startupWorkDue") + 200))
+                   "condition: " + root.normalized(
+                       root.source.slice(dueAt, statementEnd(root.source, dueAt))).slice(0, 240))
 
         // ...and the chrome readiness *guards* that pair rather than being one of
         // two alternatives: these warmups are deferred past the staged bar, so a
         // condition that opened on the lock's expectation alone would warm up
         // before the bar exists. Read as a single declaration, so a comment below
         // it cannot vouch for the expression above.
-        const dueAt = root.indexOf("readonly property bool startupWorkDue:")
         const dueText = root.normalized(
             root.source.slice(dueAt, statementEnd(root.source, dueAt)))
         const chromeAt = dueText.indexOf("root.startupChromeReady")
