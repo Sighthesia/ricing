@@ -212,6 +212,13 @@ Item {
                 Loader {
                     id: routeLoader
                     anchors.fill: parent
+                    // Route pages are cold interactive content. Keeping the
+                    // LauncherPage alive while the wave is closed makes every
+                    // chrome mount compile its delegates, icons and fonts even
+                    // though the launcher is never visible. Retain it during
+                    // the closing animation, but do not construct it at shell
+                    // startup; opening sets phase before the route is needed.
+                    active: root.phase !== "closed"
                     sourceComponent: root.contentComponent
                 }
 

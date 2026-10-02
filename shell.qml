@@ -36,6 +36,7 @@ ShellRoot {
     property bool startupWallpaperReady: false
     property bool startupChromeReady: false
     property bool startupQuietReady: false
+    property bool startupWorkFinished: false
     // True once the bounded fallback below released a gate nothing ever
     // reported, so a degraded boot is visible in the log instead of silent.
     property bool startupFallbackUsed: false
@@ -285,6 +286,12 @@ ShellRoot {
     function finishStartupWork() {
         Services.RipplePulseService.startupMuted = false
         Services.ColorService.startupQuietReady()
+        // Reloads whose session marker was already spent, and self-test shells,
+        // have no startup wave signal. The deferred queue is their final startup
+        // gate, so close quiet-ready here once its three tasks are complete.
+        if (!root.startupQuietReady)
+            root.startupQuietReady = true
+        root.startupWorkFinished = true
     }
 
     // Both reporters reach the queue through one condition: the lock's wave on a
@@ -613,6 +620,7 @@ ShellRoot {
             Bar.TopBar {
                 id: topBar
                 startupStaging: true
+                startupPrewarmAllowed: root.startupWorkFinished
             }
 
             Loader {

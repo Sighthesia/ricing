@@ -382,20 +382,21 @@ Item {
                    && root.bodyOf("function mountChrome()").indexOf(
                           "if (root._chromeMounted)") >= 0)
 
-        // Quiet-ready has exactly three writers: the lock's committed wave, the
-        // bounded degraded fallback, and the screenless-reload settle. A fourth —
-        // reaching it off an earlier gate — would release post-startup work before
-        // the first screen finished. The count is what stops a new writer from
-        // arriving quietly, so the three are also each asserted in their own
-        // body.
+        // Quiet-ready has four writers: the lock's committed wave, the bounded
+        // degraded fallback, the screenless-reload settle, and the no-wave
+        // deferred-work queue after its final task. The last path is required
+        // for a same-session reload because there is no lock wave to close the
+        // quiet gate.
         const writers = root.countOccurrences("root.startupQuietReady = true")
-        root.check("quiet-ready is written only by the wave, fallback and settle",
-                   writers === 3
+        root.check("quiet-ready is written only by wave, fallback, settle and queue",
+                   writers === 4
                    && root.bodyOf("function markStartupWaveStarted()").indexOf(
                           "root.startupQuietReady = true") >= 0
                    && root.bodyOf("function releaseStartupGates(reason)").indexOf(
                           "root.startupQuietReady = true") >= 0
                    && root.bodyOf("function settleScreenlessReload()").indexOf(
+                          "root.startupQuietReady = true") >= 0
+                   && root.bodyOf("function finishStartupWork()").indexOf(
                           "root.startupQuietReady = true") >= 0,
                    "writers: " + writers)
     }

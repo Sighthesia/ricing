@@ -19,6 +19,10 @@ Variants {
     // so a geometry change invalidates the old record and reporting stays
     // idempotent: duplicate reports collapse and never rebuild a bar.
     property bool startupStaging: false
+    // Launcher page prewarm is deliberately held until the shell reaches its
+    // quiet-ready phase; otherwise its first delegate/icon/font construction
+    // competes with the startup reveal and bar staging.
+    property bool startupPrewarmAllowed: false
     property var finishedStartupScreens: []
     readonly property bool startupReady: BootLogic.isReady(
         root.finishedStartupScreens, root.currentStartupKeys())
@@ -714,6 +718,7 @@ Variants {
                 id: launcherSurface; anchors.fill: parent
                 coordinator: overlayCoordinator
                 session: Services.LauncherService
+                startupPrewarmAllowed: root.startupPrewarmAllowed
             }
         }
 

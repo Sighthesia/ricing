@@ -177,9 +177,16 @@ Item {
         id: prewarmArmTimer
         interval: 0
         repeat: false
-        running: !!root.session
+        // The launcher page is a cold-path prewarm, not startup chrome. Hold it
+        // until the shell's quiet-ready window so its delegates cannot compete
+        // with wallpaper reveal, lock wave, or first bar staging.
+        running: !!root.session && root.startupPrewarmAllowed === true
         onTriggered: prewarmLoader.active = true
     }
+
+    // Production owners set this after quiet-ready; standalone tests keep the
+    // historical default so the component remains self-contained.
+    property bool startupPrewarmAllowed: true
 
     Timer {
         id: prewarmReleaseTimer

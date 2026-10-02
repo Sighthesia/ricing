@@ -190,5 +190,15 @@ Item {
             verify(body.indexOf("incomingImage.source") >= 0,
                    "a failure must be attributed to the incoming slot")
         }
+
+        function test_bootReadinessWaitsForPersistedSettings() {
+            var text = harness.source.text
+            verify(text.indexOf("&& Services.SettingsService.settingsReady") >= 0,
+                   "bootReady must not accept the adapter's empty default path")
+            verify(text.indexOf("property bool bootWaitingForSettings") >= 0,
+                   "a screen must remember that it is waiting for settings")
+            verify(text.indexOf("onSettingsReadyChanged") >= 0,
+                   "the boot wallpaper must resume after settings load")
+        }
     }
 }

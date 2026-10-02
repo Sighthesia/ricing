@@ -78,6 +78,10 @@ QtObject {
         dnd: false,
     })
     property int widgetSettingsRevision: 0
+    // True once the persisted settings adapter has either loaded or reached a
+    // terminal missing/error state. Wallpaper bootstrap must not treat the
+    // default empty path as the user's actual wallpaper before this settles.
+    property bool settingsReady: false
     readonly property real panelSurfaceOpacity: appearance.enableBlur
         ? appearance.blurSurfaceOpacity
         : appearance.panelOpacity
@@ -419,6 +423,7 @@ QtObject {
         onFileChanged: reload()
         onAdapterUpdated: root.save()
         onLoaded: {
+            root.settingsReady = true
             root.ensureWidgetSettingDefaults("clock")
             root.ensureWidgetSettingDefaults("active-window")
             if (root.migrateClockTimeFormat())
@@ -426,6 +431,7 @@ QtObject {
             root._bumpWidgetSettingsRevision()
         }
         onLoadFailed: error => {
+            root.settingsReady = true
             if (error === FileViewError.FileNotFound) {
                 settingsFile.writeAdapter()
             } else {

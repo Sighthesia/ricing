@@ -28,6 +28,7 @@ Variants {
     // it keeps bootReady false while no screen exists at all.
     readonly property bool bootReady: BootLogic.isReady(
         root.finishedBootScreens, root.currentBootKeys())
+        && Services.SettingsService.settingsReady
     // Boot-completion keys, one per screen that already reported, in the
     // "<name>@<x>,<y>,<w>x<h>" form produced by WallpaperBootLogic.
     property var finishedBootScreens: []
@@ -87,6 +88,18 @@ Variants {
         root.refreshBootReady()
     }
 
+    // The JsonAdapter starts with an empty wallpaper path before settings.json
+    // lands. That empty default is not a terminal boot outcome when persisted
+    // settings may still provide a wallpaper; wait for the adapter's readiness
+    // signal instead of mounting chrome into a false empty boot.
+    Connections {
+        target: Services.SettingsService
+        function onSettingsReadyChanged() {
+            if (Services.SettingsService.settingsReady)
+                root.refreshBootReady()
+        }
+    }
+
     Scope {
         id: screenScope
         required property var modelData
@@ -135,6 +148,7 @@ Variants {
             // Whether this screen already took its first wallpaper transition;
             // that one is the boot reveal.
             property bool settledOnce: false
+            property bool bootWaitingForSettings: !Services.SettingsService.settingsReady
             // Decode budget for one wallpaper slot, in pixels. A wallpaper is
             // cropped to fill the screen, so decoding far past the screen's own
             // resolution is invisible, while two slots are live at once and each
@@ -372,6 +386,11 @@ Variants {
             // Single entry point so startup, panel commits, and file edits all
             // follow the same reveal path.
             function showWallpaper(path) {
+                if (!Services.SettingsService.settingsReady) {
+                    wallpaperWindow.bootWaitingForSettings = true
+                    return
+                }
+                wallpaperWindow.bootWaitingForSettings = false
                 if (!wallpaperWindow.surfaceReady) {
                     wallpaperWindow.deferredWallpaper = path
                     layoutRetry.restart()
@@ -596,7 +615,18 @@ Variants {
 
             // Pick up a wallpaper restored from persisted settings on startup.
             Component.onCompleted: {
-                wallpaperWindow.showWallpaper(Services.SettingsService.appearance.wallpaperPath)
+                if (Services.SettingsService.settingsReady)
+                    wallpaperWindow.showWallpaper(Services.SettingsService.appearance.wallpaperPath)
+            }
+
+            Connections {
+                target: Services.SettingsService
+                function onSettingsReadyChanged() {
+                    if (!Services.SettingsService.settingsReady
+                            || !wallpaperWindow.bootWaitingForSettings)
+                        return
+                    wallpaperWindow.showWallpaper(Services.SettingsService.appearance.wallpaperPath)
+                }
             }
         }
 
