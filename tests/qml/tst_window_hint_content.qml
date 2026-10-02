@@ -84,6 +84,41 @@ Item {
         return findByName(body, "windowHintOutgoingLayer")
     }
 
+    // Where the two gates meet. The gates are adjacent halves of the panel, so
+    // this is the left gate's far edge whichever way round they are.
+    function seamBetween(left, right) {
+        return left.x <= right.x ? left.x + left.width : right.x + right.width
+    }
+
+    // Every window row a gate is currently showing, as a list of window ids.
+    //
+    // Read off the real objects: the gate's own rect is the window onto the
+    // panel, and each row's own width says how much of it there is to see. A
+    // row is "shown" when the panel reveals more than a hair of it, so a row that
+    // is entirely behind the seam is not counted and a row the seam is halfway
+    // across is.
+    function shownWindowIds(gate) {
+        var ids = []
+        if (!gate || gate.width <= 0)
+            return ids
+        var rows = findAllByName(gate, "windowHintWindowRow")
+            .concat(findAllByName(gate, "windowHintPreviousRow"))
+            .concat(findAllByName(gate, "windowHintNextRow"))
+        for (var i = 0; i < rows.length; ++i) {
+            var row = rows[i]
+            // The Repeater leaves one role-less placeholder among the delegates,
+            // and every model role on it reads undefined.
+            if (!row.modelData || row.modelData.windowId === undefined)
+                continue
+            var from = row.mapToItem(body, 0, 0).x
+            var lo = Math.max(from, gate.x, 0)
+            var hi = Math.min(from + row.width, gate.x + gate.width, body.width)
+            if (hi - lo > 1)
+                ids.push(String(row.modelData.windowId))
+        }
+        return ids
+    }
+
     // The last activation the body reported. The body owns no niri call, so
     // this is the only place the tap route can be observed.
     QtObject {
@@ -719,66 +754,91 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         }
 
         function test_thePanelIsNeverLeftUncovered() {
-            // The reason there are two layers. A single layer sliding out leaves a
-            // band of empty panel on one side for the length of the travel, and a
-            // hole in a panel reads as a layout fault rather than as motion. So the
-            // two layers have to cover each other's vacated ground at every point
-            // of the slide - which is a claim about the whole travel, not about
-            // either end of it.
-            body.hint = root.makeHint({
-                activeWorkspacePosition: 3,
-                previousActiveWorkspacePosition: 2,
-                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
-            })
-            var panelWidth = body.width
-            for (var step = 0; step < 4; ++step) {
-                wait(Math.round(body.slideDuration / 4))
-                var out = outgoing()
-                var inn = live()
-                // The whole claim: the pair covers the panel from 0 to its width.
-                // The outgoing copy's right edge and the arriving copy's left edge
-                // meeting at one seam is what makes that true, so that identity is
-                // asserted directly rather than inferred from the end positions.
-                var seam = out.x + out.width
-                compare(seam, inn.x, "step " + step + ": the two layers meet at one seam")
-                verify(seam >= 0 && seam <= panelWidth,
-                    "step " + step + ": and the seam is inside the panel, was " + seam)
-                verify(out.x <= 0, "step " + step + ": the leaving copy has not uncovered the left")
-                verify(inn.x + inn.width >= panelWidth,
-                    "step " + step + ": nor the right")
+            // The reason there are two gates. A single copy replaced in place
+            // leaves a band of empty panel for the length of the crossing, and a
+            // hole in a panel reads as a layout fault rather than as motion. So
+            // the two windows onto the panel have to cover each other's vacated
+            // ground at every point of the crossing - which is a claim about the
+            // whole travel, not about either end of it, and about both directions.
+            //
+            // The claim is stated as the geometry: the two gates are the same cut
+            // read twice, so they are adjacent, they never overlap, and together
+            // they are the panel. Anything else - a gap, an overlap, one gate
+            // wider than the panel - is the fault.
+            for (var pass = 0; pass < 2; ++pass) {
+                body.hint = root.makeHint({
+                    // Later in the list on one pass, earlier on the other: the two
+                    // ends anchor the cut to opposite edges of the panel.
+                    activeWorkspacePosition: pass === 0 ? 3 : 1,
+                    previousActiveWorkspacePosition: pass === 0 ? 2 : 3,
+                    windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
+                })
+                var panelWidth = body.width
+                for (var step = 0; step < 4; ++step) {
+                    wait(Math.round(body.slideDuration / 4))
+                    var out = outgoing()
+                    var inn = live()
+                    var left = out.x <= inn.x ? out : inn
+                    var right = out.x <= inn.x ? inn : out
+                    compare(left.x, 0, "pass " + pass + " step " + step
+                        + ": the pair starts at the panel's edge")
+                    compare(right.x + right.width, panelWidth, "pass " + pass + " step " + step
+                        + ": and ends at the other one")
+                    compare(left.x + left.width, right.x, "pass " + pass + " step " + step
+                        + ": the two gates meet at one seam")
+                    compare(left.width + right.width, panelWidth, "pass " + pass + " step " + step
+                        + ": and together they are the whole panel")
+                    verify(seamBetween(left, right) >= 0
+                        && seamBetween(left, right) <= panelWidth,
+                        "pass " + pass + " step " + step
+                            + ": the seam is inside the panel, was " + seamBetween(left, right))
+                }
+                settleSlide()
             }
+            // And the two ends, which are what make it a crossing rather than a
+            // permanently half-open panel: the leaving copy holds all of it before
+            // the crossing and none of it after.
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 2, previousActiveWorkspacePosition: 1
+            })
+            compare(outgoing().width, body.width, "before the crossing it is all the leaving copy")
+            compare(live().width, 0, "and none of it is the arriving one")
             settleSlide()
+            compare(outgoing().width, 0, "and after it, none of it is")
+            compare(live().width, body.width, "and all of it is the arriving copy")
         }
 
         function test_bothLayersMoveTheSameWayAndTheSameDistance() {
-            // One traverse, not a round trip, and the two layers exactly one panel
-            // width apart in opposite directions. That identity is what keeps the
-            // panel covered: the outgoing copy's right edge and the arriving copy's
-            // left edge have to be the same number at every point of the slide, or
-            // they open a gap or overlap and double-draw the rows.
-            compare(live().x, 0, "the arriving layer rests at home")
+            // One crossing, not a round trip: the seam crosses the panel once, in
+            // the direction the workspace moved, and the two copies trade the
+            // panel over between them without either of them ever covering ground
+            // the other is also covering.
+            compare(live().x, 0, "the arriving gate rests open across the panel")
+            compare(outgoing().width, 0, "and the leaving one shut")
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            wait(Math.round(body.slideDuration / 2))
-            var out = outgoing()
-            var inn = live()
-            // Moving to a LATER workspace takes the content LEFT, because the new
-            // workspace was sitting to the right of the old one and has to cross to
-            // reach the middle. Getting this backwards would have the panel turn
-            // away from the direction the workspace went.
-            verify(out.x < 0, "the outgoing copy has set off leftwards, was " + out.x)
-            verify(inn.x > 0, "while the arriving one comes from the right, was " + inn.x)
-            // One panel width apart, which is the number that makes the pair cover
-            // the panel: the outgoing copy's right edge and the arriving copy's
-            // left edge are then the same point, and the seam sweeps across.
-            compare(inn.x - out.x, body.width, "exactly one panel width apart")
-            compare(out.x + out.width, inn.x, "so the two layers meet at one seam")
-
+            compare(outgoing().width, body.width, "the leaving copy starts with the whole panel")
+            var previousSeam = body.width
+            for (var step = 0; step < 5; ++step) {
+                wait(Math.round(body.slideDuration / 5))
+                var out = outgoing()
+                var inn = live()
+                var seam = seamBetween(out, inn)
+                // Towards a LATER workspace the arriving frame comes in from the
+                // right, so the leaving copy keeps the left and the seam walks
+                // leftwards. Getting that backwards would have the panel turn away
+                // from the direction the workspace went.
+                verify(seam < previousSeam, "step " + step + ": the seam has moved, was "
+                    + seam + " from " + previousSeam)
+                previousSeam = seam
+            }
             settleSlide()
-            compare(live().x, 0, "the arriving layer landed at home")
+            compare(live().x, 0, "the arriving gate ends open across the panel")
+            compare(live().width, body.width)
+            compare(outgoing().width, 0, "and the leaving one shut again")
             compare(outgoing().visible, false, "and the other one is gone")
         }
 
@@ -953,16 +1013,20 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         }
 
         function test_swapTravelsTheWayTheWorkspaceMoved() {
-            // The sign of the displacement follows the workspace move, mirrored:
-            // the content moves the way a page does when you turn forward.
+            // Which edge the arriving frame comes in from follows the workspace
+            // move. A later workspace was sitting to the RIGHT of the one being
+            // left, so its frame arrives from the right and the leaving copy keeps
+            // the left - the seam walks leftwards. Earlier, the mirror. Getting
+            // this backwards would have the panel turn away from the direction the
+            // workspace went.
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
             compare(body.swapDirection, 1, "moved later in the list")
-            wait(Math.round(body.slideDuration / 2))
-            verify(outgoing().x < 0, "and the content went left")
+            compare(outgoing().x, 0, "so the leaving copy holds the left")
+            compare(live().x, body.width, "and the arriving one enters from the right")
             settleSlide()
 
             body.hint = root.makeHint({
@@ -971,9 +1035,80 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 windows: [{ windowId: "21", title: "term2", appId: "kitty", icon: "", isFocused: true }]
             })
             compare(body.swapDirection, -1, "moved earlier in the list")
-            wait(Math.round(body.slideDuration / 2))
-            verify(outgoing().x > 0, "and the content went right")
+            compare(live().x, 0, "so the arriving one holds the left")
+            // The leaving copy is given up from its left, so it is the panel minus
+            // what the seam has taken. Read after the event loop has turned: the
+            // seam is at the far edge on the frame the crossing starts.
+            wait(Math.round(body.slideDuration / 4))
+            verify(outgoing().width > 0 && outgoing().width < body.width,
+                "which is the panel minus what the seam has taken, was " + outgoing().width)
+            verify(outgoing().x > 0, "and it has started at the seam, was " + outgoing().x)
             settleSlide()
+            // And the resting panel is whole again whichever way it was left.
+            compare(live().width, body.width, "the arriving copy ends with the whole panel")
+        }
+
+        // ---- the duplication this crossing used to have --------------------
+        function test_noWindowIsPaintedTwiceWhileTheSeamCrosses() {
+            // The regression. A workspace switch used to translate the two copies
+            // a whole panel width past each other, which is the right motion for a
+            // panel whose pages are disjoint - and this one's are not. The panel is
+            // a three-column frame of CONSECUTIVE workspaces, so the frame being
+            // left and the frame being arrived at share two of their three
+            // columns. A page turn of two overlapping frames therefore puts the
+            // shared workspace on screen twice, once as the card column of the
+            // frame being left and once as a neighbour column of the frame being
+            // arrived at - which the user reads as duplicated window-title cards.
+            //
+            // Measured with a probe replaying the publishes WindowHintService makes
+            // for one activation, sampling every 40ms across the whole crossing
+            // which titles were actually inside the panel:
+            //
+            //   forward  1->2   22 of 24 samples had a title painted twice (41)
+            //   backward 2->0   22 of 24 samples had a title painted twice (44)
+            //
+            // The rule is stated about the panel's contents, not about the
+            // arithmetic that produces them: no window may be inside the panel
+            // twice at any point of the crossing. The snapshots below are chosen so
+            // the two frames share a workspace - the resting frame's active
+            // workspace is the arriving frame's previous one, which is exactly the
+            // pair the old page turn put side by side.
+            body.hint = root.makeHint({ previousWindows: [], nextWindows: [] })
+            wait(20)
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 2,
+                previousActiveWorkspacePosition: 1,
+                previousWindows: [
+                    { windowId: "10", title: "kitty", appId: "kitty", icon: "", isFocused: false },
+                    { windowId: "11", title: "afloat", appId: "kitty", icon: "", isFocused: true }
+                ],
+                windows: [{ windowId: "40", title: "foot", appId: "foot", icon: "", isFocused: true }],
+                nextWindows: []
+            })
+            // Eight samples across 960ms: the duplication the old page turn
+            // produced was on screen for the first two thirds of the crossing, so
+            // several of these land inside it.
+            for (var step = 0; step < 8; ++step) {
+                wait(Math.round(body.slideDuration / 8))
+                var leaving = shownWindowIds(outgoing())
+                var arriving = shownWindowIds(live())
+                for (var i = 0; i < leaving.length; ++i) {
+                    verify(arriving.indexOf(leaving[i]) < 0,
+                        "step " + step + " (progress " + body.slideProgress.toFixed(2)
+                            + "): window " + leaving[i]
+                            + " is on screen in both the frame being left and the one arriving")
+                }
+            }
+            settleSlide()
+            // ...and the resting panel is one frame, not a composite: the two
+            // windows the shared workspace had are on screen once each, in the
+            // arriving frame's previous column, and the leaving gate holds nothing.
+            var landed = shownWindowIds(live())
+            compare(landed.filter(function(id) { return id === "10" }).length, 1,
+                "the first of the shared workspace's windows is shown once")
+            compare(landed.filter(function(id) { return id === "11" }).length, 1,
+                "and so is the second")
+            compare(shownWindowIds(outgoing()).length, 0, "the leaving gate holds nothing")
         }
 
         function test_onlyTheArrivingLayerCarriesTheFocusMarkers() {
