@@ -1,17 +1,30 @@
 #!/usr/bin/env bash
 # Headless-first test runner for Afloat.
 #
-# Why this exists: the suite used to be run by pointing QtTest and Quickshell
-# at the live session. Every root-level harness that instantiates a PanelWindow
-# (BarPopupHost, the visual probes) then mapped a real layer-shell surface over
-# the running desktop. Running the whole suite on the offscreen platform makes
-# that structurally impossible: offscreen has no layer-shell backend, so a
-# window-based harness fails to load instead of painting over your session.
+# Why this exists: the suite used to be run by pointing QtTest and Quickshell at
+# the live session, which damages the desktop twice over.
+#
+#   1. Every root-level harness that instantiates a PanelWindow (BarPopupHost,
+#      the visual probes) maps a real layer-shell surface over the running
+#      screen.
+#   2. Every tests/qml file gets its own real, niri-focused Wayland window. The
+#      damage there is not visual, which is why it survived so long: each focus
+#      change is an input-method focus change, and one suite run produced 1228
+#      fcitx5 FocusOut against 0 FocusIn, so the IME was deactivated and the
+#      user's typing discarded over and over, with nothing on screen to explain
+#      it. This is the reason the QtTest tier goes through scripts/qmltest.sh,
+#      which owns the platform and refuses to run on a graphical one.
+#
+# Offscreen closes both: no layer-shell backend, so window-based harnesses fail
+# to load instead of painting; and no window at all, so there is nothing to
+# focus.
 #
 # Usage:
 #   scripts/run-tests.sh                # whole suite, zero windows
 #   scripts/run-tests.sh tst_bar tst_osu # only harnesses/tests matching a name
 #   scripts/run-tests.sh -g             # also run the window-based harnesses
+#   scripts/run-tests.sh --suite        # QtTest tier as ONE process: ~5x faster,
+#                                      # and 1 window in the worst case, not ~70
 #   scripts/run-tests.sh --no-python    # skip the Python bridge tests
 #
 # Environment:
@@ -24,6 +37,7 @@ REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 QMLTESTRUNNER=/usr/lib/qt6/bin/qmltestrunner
+QMLTEST="$REPO_ROOT/scripts/qmltest.sh"
 QML_IMPORT_DIR=/usr/lib/qt6/qml
 TEST_TIMEOUT=${AFLOAT_TEST_TIMEOUT:-120}
 GUI_TIMEOUT=${AFLOAT_GUI_TIMEOUT:-180}
@@ -33,11 +47,18 @@ GUI_TIMEOUT=${AFLOAT_GUI_TIMEOUT:-180}
 # QML_XHR_ALLOW_FILE_READ lets the harnesses that assert on repo assets (the
 # lock PAM asset) read them; without it every one of those throws
 # "Invalid state" and reports a phantom failure.
+#
+# scripts/qmltest.sh owns that environment for the QtTest tier and refuses to
+# run on a graphical platform — a bare qmltestrunner inherits wayland from the
+# session, focuses a real window per file and storms fcitx5 with FocusOut. It
+# is invoked here rather than reimplemented so there is exactly one place where
+# the platform is decided.
 HEADLESS_ENV=(QT_QPA_PLATFORM=offscreen QT_QPA_FONTDIR=/usr/share/fonts
     QML_XHR_ALLOW_FILE_READ=1)
 
 RUN_GUI=0
 RUN_PYTHON=1
+SUITE=0
 FILTERS=()
 
 while [ $# -gt 0 ]; do
@@ -45,11 +66,14 @@ while [ $# -gt 0 ]; do
         -g|--gui)
             RUN_GUI=1
             ;;
+        -1|--suite)
+            SUITE=1
+            ;;
         --no-python)
             RUN_PYTHON=0
             ;;
         -h|--help)
-            sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+            sed -n '22,33p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         -*)
@@ -62,6 +86,11 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
+
+[ ${#FILTERS[@]} -eq 0 ] || [ "$SUITE" -eq 0 ] || {
+    echo "--suite runs the whole QtTest tier in one process; it takes no filters" >&2
+    exit 2
+}
 
 matches_filter() {
     [ ${#FILTERS[@]} -eq 0 ] && return 0
@@ -120,7 +149,18 @@ timed_out() {
 
 # ---------------------------------------------------------------- QtTest tier
 # tests/qml/tst_*.qml: pure JS/QML logic, no Quickshell singletons.
+#
+# Two lanes. --suite hands the whole directory to one qmltestrunner process:
+# ~5x faster and, more to the point, one window in the worst case instead of
+# one per file, so even a misconfigured run cannot storm the input method. The
+# default lane runs one process per file, which keeps the n/a-vs-red
+# classification and per-file isolation.
 run_qml_tests() {
+    if [ "$SUITE" -eq 1 ]; then
+        run_qml_suite
+        return 0
+    fi
+
     local files=()
     while IFS= read -r file; do
         matches_filter "$(basename "$file")" && files+=("$file")
@@ -134,9 +174,9 @@ run_qml_tests() {
         name=$(basename "$file")
         log=$(mktemp)
         report=$(mktemp)
-        run_capture "$log" "$TEST_TIMEOUT" env "${HEADLESS_ENV[@]}" \
-            QML_IMPORT_PATH="$QML_IMPORT_DIR" \
-            "$QMLTESTRUNNER" -input "$file" -o "$report,txt"
+        run_capture "$log" "$TEST_TIMEOUT" \
+            env "AFLOAT_TEST_TIMEOUT=$(( TEST_TIMEOUT * ${#files[@]} + 60 ))" \
+            "$QMLTEST" "$file" -o "$report,txt"
         rc=$?
         totals=$(grep -oP '^Totals: .*' "$report" | tail -1)
         if timed_out "$rc"; then
@@ -163,6 +203,58 @@ run_qml_tests() {
         fi
         rm -f "$log" "$report"
     done
+}
+
+# One process for the whole tests/qml directory. Cross-file interference is not
+# a concern here — verified green against the per-file lane — but the report
+# loses per-file attribution, so failures are listed by test name and the files
+# that need the Quickshell module are named separately.
+run_qml_suite() {
+    local log report rc totals real_fails qs_fails stem
+    log=$(mktemp)
+    report=$(mktemp)
+    section "QtTest (offscreen) — whole tests/qml in ONE process"
+
+    run_capture "$log" $(( TEST_TIMEOUT * 4 )) \
+        env "AFLOAT_TEST_TIMEOUT=$(( TEST_TIMEOUT * 4 ))" \
+        "$QMLTEST" --suite -o "$report,txt"
+    rc=$?
+    totals=$(grep -oP '^Totals: .*' "$report" | tail -1)
+    # A compile() failure is the known "QtTest cannot load Quickshell.*" gap, not
+    # a regression, so it must not turn the lane red.
+    qs_fails=$(grep -cE '^FAIL!.*compile\(\)' "$report" || true)
+    real_fails=$(grep -cE '^FAIL!' "$report" || true)
+    real_fails=$(( real_fails - qs_fails ))
+
+    if timed_out "$rc"; then
+        printf '  \033[33mTIMEOUT\033[0m the suite exceeded its budget\n'
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        FAILED_NAMES+=("tests/qml (suite timeout)")
+    elif [ -z "$totals" ]; then
+        # An empty report is not a green run: the process died before writing
+        # one. Reporting "ok" here is how a suite silently stops testing.
+        printf '  \033[31mERROR\033[0m   qmltestrunner wrote no report (exit %s)\n' "$rc"
+        tail -5 "$log" | sed 's/^/           /'
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        FAILED_NAMES+=("tests/qml (suite produced no report)")
+    elif [ "$real_fails" -gt 0 ]; then
+        printf '  \033[31mFAIL\033[0m   %s (%s real failure(s))\n' "$totals" "$real_fails"
+        grep -E '^FAIL!' "$report" | grep -vE 'compile\(\)' | sed 's/^/           /' | head -20
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+        FAILED_NAMES+=("tests/qml (suite)")
+    else
+        printf '  \033[32mok\033[0m     %s\n' "$totals"
+        PASS_COUNT=$((PASS_COUNT + 1))
+    fi
+
+    if [ "${qs_fails:-0}" -gt 0 ]; then
+        QS_MODULE_COUNT=$((QS_MODULE_COUNT + qs_fails ))
+        # No pipeline here: a `while read` in a subshell would drop the appends.
+        for stem in $(grep -oP '^FAIL!.*qmltestrunner::\K[A-Za-z0-9_]+(?=::compile\(\))' "$report" | sort -u); do
+            QS_MODULE_NAMES+=("$stem.qml")
+        done
+    fi
+    rm -f "$log" "$report"
 }
 
 # ---------------------------------------------------- Quickshell harness tier

@@ -13,9 +13,10 @@ Afloat is a Wayland desktop shell built with **Quickshell** (QML), targeting the
 
 ## Running & testing
 
-- **Run everything through `scripts/run-tests.sh`** — it defaults to the offscreen platform, so a test run never maps a window over the live desktop. `scripts/run-tests.sh <name-substring>…` filters, `--no-python` skips pytest, `-g` additionally runs the window-based harnesses (they will flash real windows — only when explicitly asked).
+- **Run everything through `scripts/run-tests.sh`** — it defaults to the offscreen platform, so a test run never maps a window over the live desktop. `scripts/run-tests.sh <name-substring>…` filters, `--no-python` skips pytest, `--suite` runs the whole QtTest tier as one process (~5x faster, and one window in the worst case instead of ~70), `-g` additionally runs the window-based harnesses (they will flash real windows — only when explicitly asked).
+- **For a single test file, use `scripts/qmltest.sh`**, never `qmltestrunner` directly: `scripts/qmltest.sh tst_bar_layout` (resolves under `tests/qml/`), or `scripts/qmltest.sh --suite` for everything in one process. A bare `qmltestrunner` inherits `QT_QPA_PLATFORM=wayland` from the session and creates a real, niri-focused window per file — see "Never disturb the live session" for what that costs.
 - Launch: `qs -p /path/to/afloat`. IPC: `scripts/afloat-ipc <target> <function> [args...]`.
-- Logic tests (pure `.js`, in `tests/qml/`) run under QtTest: `QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_bar_layout.qml -o -,txt`
+- Logic tests (pure `.js`, in `tests/qml/`) run under QtTest, which `scripts/qmltest.sh` wraps. The raw form, if you ever need it, is `QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_bar_layout.qml -o -,txt` — **and it must carry `QT_QPA_PLATFORM=offscreen`**, or it will steal keyboard focus.
   - Use the Qt6 runner path exactly — `/usr/bin/qmltestrunner` is Qt5 and fails silently. `qs -p tests/qml/tst_*.qml` runs **zero** tests (Quickshell never drives QtTest).
 - Service-behavior harnesses (need Quickshell singletons) live in the **repo root**: `qs -p tst_media_binding.qml` (from repo root). Under the offscreen platform a harness that instantiates a `PanelWindow` cannot load (`No PanelWindow backend loaded`) — the runner classifies that as window-only and skips it.
 - Python: `python3 -m pytest scripts/tests/`.
@@ -27,6 +28,21 @@ A test that maps a real window is indistinguishable, to the user, from their
 shell misbehaving. Offscreen is the mechanism that prevents it: the offscreen
 platform has no layer-shell backend, so a window-based harness *fails to load*
 instead of painting over the desktop. Never defeat it.
+
+**The damage is not only visual — a focused window breaks their typing.** A bare
+`qmltestrunner` inherits `QT_QPA_PLATFORM=wayland` and maps a real window per
+test file, which niri focuses. Measured: 1228 fcitx5 `FocusOut` against 0
+`FocusIn` in a single batch, because each of ~70 window creations deactivated
+the input method and discarded what was being typed. Nothing appears on screen,
+which is exactly why this survived so long and looked like a random IME glitch
+rather than a consequence of running the tests.
+
+So the platform must be chosen **at the invocation site**, by
+`scripts/qmltest.sh`, which refuses to run on a graphical platform and says so.
+No in-QML guard can substitute: `qmltestrunner` creates the window *before* it
+loads the test file, so a check inside the file's `Component.onCompleted` runs
+after the damage. When you need a real surface, the answer is `qs -p` on a
+window-only harness under `-g`, never QtTest.
 
 **Off limits — never run unprompted, and never inside automation:**
 
@@ -62,6 +78,13 @@ Rules when **adding** a test:
   (a sibling test's `init()` will not do it for you).
 - Run through the runner so `AFLOAT_APP_THEME_PREFIX` points at a throwaway
   prefix; without it `AppThemeService` restyles your real kitty/GTK config.
+  `scripts/qmltest.sh` applies that sandbox itself, so a single-file run is
+  safe on that axis too — but only if you go through it.
+- **Never invoke `qmltestrunner` directly**, not even for a one-off, and not
+  even inside a loop that you believe is short. Every bare invocation maps and
+  steals focus, and the tell is invisible: a repeat-and-check loop is the exact
+  shape that produced 1228 input-method deactivations. `scripts/qmltest.sh` is
+  the only supported entry point.
 - A test must be green the first time it runs. "It was red when I committed it"
   means it never executed (the suite could not load) or it was written against
   behaviour that had already changed — both are how the current

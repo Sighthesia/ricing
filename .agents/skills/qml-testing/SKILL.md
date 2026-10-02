@@ -70,6 +70,31 @@ has no layer-shell backend, so a harness that instantiates a `PanelWindow`
 and `scripts/run-tests.sh` reports it under "window-only (skipped, desktop
 untouched)".
 
+## QtTest also steals keyboard focus — the damage is invisible
+
+Offscreen is not only about painting. A bare `qmltestrunner` inherits
+`QT_QPA_PLATFORM=wayland` from the session and creates a **real, niri-focused
+Wayland window for every test file**. Each focus change is an input-method focus
+change: one suite run produced 1228 fcitx5 `FocusOut` and 0 `FocusIn`, so the
+IME was deactivated and the user's typing discarded dozens of times. No window
+is visible (they are undecorated and tiny), so the symptom reads as a random IME
+glitch and never as "the agent was running tests".
+
+Two consequences for how you run things:
+
+- **Go through `scripts/qmltest.sh`**, which forces the offscreen platform and
+  refuses a graphical one out loud. There is deliberately no override flag.
+- **A guard inside the test file cannot help.** `qmltestrunner` creates the
+  window *before* it loads the file, so a `Component.onCompleted` check runs
+  after the focus has already been taken. Only the invocation site can prevent
+  it. This is also why a "repeat 3 times to be sure" loop is the most dangerous
+  shape: it multiplies the focus churn.
+
+`scripts/run-tests.sh --suite` runs the whole `tests/qml` directory in one
+process: ~5x faster, and one window in the worst case instead of ~70. Verified
+free of cross-file interference against the per-file lane (1053 passed, the only
+failures being the 8 files that cannot load `Quickshell.*`).
+
 The eight such harnesses are the ones that flash windows over the running
 desktop: `tst_bar_popup_host`, `tst_bar_two_layer_popup`, `tst_real_volume`,
 `tst_top_volume_half` (all drive `BarPopupHost`'s `surfaceActive`), plus the
