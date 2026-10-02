@@ -9,8 +9,13 @@ import "../../modules/lazerbar" as Lazer
 // window-only popup harness cannot reach.
 Item {
     id: root
-    width: 480
-    height: 400
+    // Wide enough for the panel plus its strip overhang. The body sits at x 20 and
+    // the panel is three columns and two gaps across, and a synthesized click is
+    // dropped when its point falls outside the root - which silently turned the
+    // neighbour-tap test into "nothing was reported" rather than into a failure
+    // about geometry when the panel grew by a gutter.
+    width: 760
+    height: 520
 
     // A snapshot whose every workspace's single window is titled `ws<position>`, so
     // a title in the panel names the workspace it came from and a repeated title is
@@ -185,7 +190,22 @@ Item {
             if (hi > rightmost)
                 rightmost = hi
         }
-        return leftmost <= 1 && rightmost >= body.width - 1
+        // Within one GUTTER of each edge, not within a pixel.
+        //
+        // The columns are separated by a gap, so the gaps sweep across the panel as
+        // the strip travels, and one of them necessarily crosses each edge near the
+        // end of a crossing. Up to `columnGutter` of the edge is therefore showing the
+        // surface rather than a column at some instant.
+        //
+        // That is invisible, and deliberately so: the body sits inside the popup's own
+        // `contentInset` of 8px, which is wider than the 6px gap, so a gap crossing the
+        // body's edge lands in padding that already shows the surface. Asserting a hard
+        // flush edge here would be asserting something the panel does not and should
+        // not promise - the flush-column guarantee that mattered was that no whole
+        // BAND of panel went uncovered, which this still catches at 6px tolerance
+        // against a 552px panel.
+        var slack = body.columnGutter
+        return leftmost <= slack + 1 && rightmost >= body.width - slack - 1
     }
 
     // The last activation the body reported. The body owns no niri call, so
@@ -250,7 +270,8 @@ Item {
             // of rows that exist is not the same claim as three columns that are in
             // the right places.
             compare(body.plan.slots, 3, "the resting strip is three columns")
-            compare(strip().width, 3 * body.columnWidth, "and no wider than the panel")
+            compare(strip().width, 3 * body.columnPitch - body.columnGutter,
+                "and no wider than the panel")
             var active = findAllByName(live(), "windowHintWindowRow")
             compare(active.length, 2, "the active column's rows are cards")
             var neighbours = findAllByName(live(), "windowHintNeighbourRow")
@@ -269,9 +290,9 @@ Item {
             // the frame is checked as "one column's width either side" instead of as
             // three numbers that could drift apart while still passing.
             var activeSlotX = strip().activeColumnX
-            compare(placed[0].column, activeSlotX - body.columnWidth,
+            compare(placed[0].column, activeSlotX - body.columnPitch,
                 "a neighbour column one width to the left of the active one")
-            compare(placed[1].column, activeSlotX + body.columnWidth,
+            compare(placed[1].column, activeSlotX + body.columnPitch,
                 "and one the same width to the right")
             // Each column shows its OWN workspace's window, not a copy of the
             // active one - a neighbour that listed the active workspace's
@@ -327,7 +348,7 @@ Item {
             compare(wash.width, body.columnWidth, "spanning it")
             // The left neighbour's column ends exactly where the active one begins,
             // so the check is that the highlight does not reach back over it.
-            compare(wash.x, leftColumn.x + body.columnWidth,
+            compare(wash.x, leftColumn.x + body.columnPitch,
                 "and starts where the left neighbour's column ends")
             verify(bar.x >= wash.x && bar.x < wash.x + wash.width,
                 "the indicator is on the highlight")
@@ -363,8 +384,9 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 "the other side still has its one row")
             // The frame is unchanged, and the active workspace is still the middle.
             compare(body.shownColumnCount, 3)
-            compare(body.width, 3 * body.columnWidth, "the panel did not resize")
-            compare(findByName(live(), "windowHintFocusFrame").x, body.columnWidth,
+            compare(body.width, 3 * body.columnPitch - body.columnGutter,
+                "the panel did not resize")
+            compare(findByName(live(), "windowHintFocusFrame").x, body.columnPitch,
                 "and the highlight is still on the active column")
         }
 
@@ -375,8 +397,10 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             body.hint = root.makeHint({ windows: [], previousWindows: [], nextWindows: [] })
             wait(20)
             compare(body.shownColumnCount, 3, "three columns")
-            compare(body.width, 3 * body.columnWidth, "the same width as always")
-            compare(strip().width, 3 * body.columnWidth, "and the strip is no wider")
+            compare(body.width, 3 * body.columnPitch - body.columnGutter,
+                "the same width as always")
+            compare(strip().width, 3 * body.columnPitch - body.columnGutter,
+                "and the strip is no wider")
             // All three columns say they are empty - the middle one is not a special
             // case, because an empty workspace is the same fact wherever it is.
             var visible = findAllByName(live(), "windowHintColumnEmpty")
@@ -391,17 +415,17 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var xs = visible.map(function(s) { return s.mapToItem(body, 0, 0).x })
                 .sort(function(a, b) { return a - b })
             compare(xs[0], 0, "the first column takes the first slot")
-            compare(xs[1], body.columnWidth, "the second the second")
-            compare(xs[2], body.columnWidth * 2, "and the third the third")
+            compare(xs[1], body.columnPitch, "the second the second")
+            compare(xs[2], body.columnPitch * 2, "and the third the third")
         }
 
         function test_thePanelIsAsWideAsItsColumns() {
             // The host sizes the input slot from this number, so it has to be the
             // count times the column width and nothing else - a stray padding term
             // would leave a band of input region beside a narrower panel.
-            compare(body.width, body.shownColumnCount * body.columnWidth)
+            compare(body.width, body.shownColumnCount * body.columnPitch - body.columnGutter)
             compare(body.shownColumnCount, 3)
-            compare(body.width, 3 * body.columnWidth)
+            compare(body.width, 3 * body.columnPitch - body.columnGutter)
         }
 
         function test_theActiveWorkspaceIsAlwaysTheMiddleColumn() {
@@ -421,7 +445,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 body.hint = root.makeHint(combos[i])
                 wait(20)
                 var wash = findByName(live(), "windowHintFocusFrame")
-                compare(wash.x, body.columnWidth,
+                compare(wash.x, body.columnPitch,
                     "combination " + i + ": the active column is the middle one")
                 // And centred on the panel, not merely second of three.
                 compare(wash.x + wash.width / 2, body.width / 2,
@@ -447,7 +471,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // The slots are derived from the index rather than accumulated by a
             // layout pass, so each column knows where it belongs.
             for (var k = 0; k < columns.length; ++k) {
-                compare(columns[k].x, k * body.columnWidth,
+                compare(columns[k].x, k * body.columnPitch,
                     "column " + k + " holds slot " + k)
             }
         }
@@ -823,7 +847,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var showing = lines.filter(function(l) { return l.visible })
             compare(showing.length, 1, "one overflow line, on the active column")
             compare(showing[0].text, "+3 more windows")
-            verify(showing[0].mapToItem(body, 0, 0).x > body.columnWidth * 0.5,
+            verify(showing[0].mapToItem(body, 0, 0).x > body.columnPitch * 0.5,
                 "and it is in the middle column, was " + showing[0].mapToItem(body, 0, 0).x)
         }
 
@@ -840,7 +864,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 .filter(function(s) { return s.visible })
             compare(visible.length, 1, "one placeholder, in the active column")
             var slot = visible[0]
-            verify(Math.abs(slot.mapToItem(body, 0, 0).x - body.columnWidth) < 1,
+            verify(Math.abs(slot.mapToItem(body, 0, 0).x - body.columnPitch) < 1,
                 "and it is the middle column, was " + slot.mapToItem(body, 0, 0).x)
             var frame = findByName(slot, "windowHintEmptySlot")
             // QML hands a transparent colour back as #00000000, so that is what
@@ -984,10 +1008,11 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                     wait(20)
                     compare(strip().x, 0, "span " + span + " dir " + direction
                         + ": the strip rests at home")
-                    compare(strip().width, 3 * body.columnWidth, "as three columns")
+                    compare(strip().width, 3 * body.columnPitch - body.columnGutter,
+                        "as three columns")
 
                     body.hint = root.framedHint(to, from)
-                    compare(strip().width, (span + 3) * body.columnWidth,
+                    compare(strip().width, (span + 3) * body.columnPitch - body.columnGutter,
                         "span " + span + " dir " + direction
                             + ": and widens to the union while crossing")
                     // Towards a LATER workspace the strip travels left; earlier, it
@@ -1000,7 +1025,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                     // in both directions - a backward move starts it left of home, so
                     // that the frame being LEFT is the one under the panel at the
                     // start - so the claim is about the DISTANCE, not the endpoints.
-                    compare(Math.abs(body.slideTo - body.slideFrom), span * body.columnWidth,
+                    compare(Math.abs(body.slideTo - body.slideFrom), span * body.columnPitch,
                         "span " + span + " dir " + direction
                             + ": the crossing travels exactly the span, was "
                             + Math.abs(body.slideTo - body.slideFrom))
@@ -1045,7 +1070,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                     compare(strip().x, 0,
                         "span " + span + " dir " + direction + ": and it rests at home, was "
                             + strip().x)
-                    compare(strip().width, 3 * body.columnWidth,
+                    compare(strip().width, 3 * body.columnPitch - body.columnGutter,
                         "as the arriving frame's three columns again")
                     compare(body.plan.slots, 3, "and the plan says three slots")
                     compare(body.plan.activeSlot, 1, "with the active column in the middle")
@@ -1083,15 +1108,20 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // Under the pointer means nothing - it is decoration.
             verify(!highlight.enabled, "and inert to input")
 
-            // Inset from the column's own edges. At the full column width the band
-            // butts against its neighbours and reads as the panel's background rather
-            // than as a band under one workspace.
-            verify(host.highlightInset > 0, "inset from the column's edges, was "
-                + host.highlightInset)
-            compare(highlight.width, body.columnWidth - host.highlightInset * 2,
-                "as wide as one column less the inset, was " + highlight.width)
-            compare(highlight.x, host.activeColumnX + host.highlightInset,
-                "and inset on the left too, was " + highlight.x)
+            // The margin is the GAP BETWEEN COLUMNS, not a shrink of the band. The
+            // band was inset 8px instead, which is backwards: that leaves the column's
+            // own content overhanging the thing that marks it, and puts the breathing
+            // room inside the column instead of around it. The widget's highlight
+            // covers exactly one square and the margin comes from the spacing between
+            // squares; this is the same arrangement one size up.
+            verify(host.columnGutter > 0,
+                "and the columns are separated, by " + host.columnGutter)
+            compare(host.columnPitch, host.columnWidth + host.columnGutter,
+                "the pitch is the column plus the gap")
+            compare(highlight.width, body.columnWidth,
+                "as wide as the column it marks, was " + highlight.width)
+            compare(highlight.x, host.activeColumnX,
+                "and flush with it, was " + highlight.x)
 
             // CARRIED, NOT DRIVEN. The band must be exactly on the active slot at
             // every observable instant, including immediately after the plan changes
@@ -1107,17 +1137,17 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // it.
             body.hint = root.framedHint(5, 5)
             wait(60)
-            compare(highlight.x, host.activeColumnX + host.highlightInset,
+            compare(highlight.x, host.activeColumnX,
                 "a fresh frame places it without sliding, was " + highlight.x)
 
             body.hint = root.framedHint(6, 5)
-            compare(highlight.x, host.activeColumnX + host.highlightInset,
+            compare(highlight.x, host.activeColumnX,
                 "and the instant a crossing starts it is already there, was "
-                    + highlight.x + " against " + (host.activeColumnX + host.highlightInset))
+                    + highlight.x + " against " + host.activeColumnX)
             settleSlide()
-            compare(highlight.x, host.activeColumnX + host.highlightInset,
+            compare(highlight.x, host.activeColumnX,
                 "and the instant it lands, still there, was " + highlight.x)
-            compare(highlight.width, body.columnWidth - host.highlightInset * 2,
+            compare(highlight.width, body.columnWidth,
                 "at the resting width, was " + highlight.width)
         }
 
@@ -1444,13 +1474,13 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // Mid-crossing the arriving active column is still off to the side, and
             // the markers are on it rather than pinned to the panel.
             compare(body.plan.activeSlot, 2, "the arriving column is the last slot")
-            compare(strip().activeColumnX, 2 * body.columnWidth,
+            compare(strip().activeColumnX, 2 * body.columnPitch,
                 "and the markers are placed against it")
             settleSlide()
             // Landed: it is the middle column, which is the same claim the resting
             // panel makes everywhere else.
             compare(body.plan.activeSlot, 1, "at rest the active column is the middle")
-            compare(findByName(live(), "windowHintFocusFrame").x, body.columnWidth)
+            compare(findByName(live(), "windowHintFocusFrame").x, body.columnPitch)
         }
 
         function test_theMarkersTravelWithTheContentTheyMark() {
@@ -1491,7 +1521,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var columns = columnDelegates()
             compare(columns.length, 4, "a two-step crossing carries four columns")
             for (var i = 0; i < columns.length; ++i) {
-                compare(columns[i].x, i * body.columnWidth,
+                compare(columns[i].x, i * body.columnPitch,
                     "column " + i + " holds its slot mid-crossing")
             }
             settleSlide()

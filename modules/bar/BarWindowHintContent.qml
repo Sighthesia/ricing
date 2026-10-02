@@ -78,6 +78,11 @@ Item {
     // running. It also means the panel does not resize under the pointer as the
     // user moves between an interior workspace and an edge one.
     readonly property int columnWidth: HintLogic.COLUMN_WIDTH
+    // Gap between the three columns, and the pitch it produces. `inlineGap` is the
+    // bar's workspace widget's own spacing between its squares - see
+    // `BarWindowHintStrip.columnGutter` for why the panel needs one.
+    readonly property int columnGutter: LazerTheme.inlineGap
+    readonly property int columnPitch: columnWidth + columnGutter
     readonly property int shownColumnCount: HintLogic.COLUMN_COUNT
     // Where the strip's travel starts and ends, in pixels, and the offset as a
     // function of the one clock. Computed rather than animated per layer because
@@ -135,7 +140,7 @@ Item {
     // The plan's slot count as a width, for the strip. Always derivable: the
     // resting plan is three columns and a crossing's is its span plus three.
     readonly property int stripWidth: root.plan
-        ? root.plan.slots * root.columnWidth : 0
+        ? root.plan.slots * root.columnPitch - root.columnGutter : 0
     readonly property int focusedRowIndex: HintLogic.focusedIndexIn(
         root.activeColumn ? root.activeColumn.rows : null)
     // Left inset of a row's glyph, shared by the icon and the title so both start
@@ -310,8 +315,8 @@ Item {
         root.plan = plan
         root.columns = HintLogic.stripColumns(root.hint, root.leavingHint, plan)
         root.shownReady = HintLogic.ready(root.hint)
-        root.slideFrom = plan.startColumn * root.columnWidth
-        root.slideTo = plan.endColumn * root.columnWidth
+        root.slideFrom = plan.startColumn * root.columnPitch
+        root.slideTo = plan.endColumn * root.columnPitch
         root.slideProgress = 0
         slideRun.restart()
     }
@@ -339,8 +344,8 @@ Item {
         root.plan = plan
         root.columns = HintLogic.stripColumns(root.hint, root.leavingHint, plan)
         root.shownReady = HintLogic.ready(root.hint)
-        root.slideFrom = here - reshift * root.columnWidth
-        root.slideTo = plan.endColumn * root.columnWidth
+        root.slideFrom = here - reshift * root.columnPitch
+        root.slideTo = plan.endColumn * root.columnPitch
         // Restart the clock from the current offset, not from the crossing's own
         // start: the re-aim is a new traverse over the remaining distance, and
         // beginning it at 0 while the strip is already halfway across would jump.
@@ -477,7 +482,7 @@ Item {
     // would paint outside the popup's own rect - and outside the layer-shell input
     // region the host sized from this body's width.
     clip: true
-    implicitWidth: shownColumnCount * columnWidth
+    implicitWidth: shownColumnCount * columnPitch - columnGutter
     // The taller of the two frames while a crossing is in flight, and the strip's
     // own height once it has landed. The empty-workspace placeholder lives inside
     // the columns, so the columns' own height already accounts for it.
@@ -513,6 +518,7 @@ Item {
         // same column by construction.
         activeSlot: root.plan ? root.plan.activeSlot : 1
         columnWidth: root.columnWidth
+        columnGutter: root.columnGutter
         listSpacing: root.listSpacing
         rowHeight: root.rowHeight
         glyphInset: root.glyphInset

@@ -29,6 +29,18 @@ Item {
     // them.
     property var columns: []
     property int columnWidth: HintLogic.COLUMN_WIDTH
+    // Gap between columns, and the pitch it produces.
+    //
+    // The columns were flush: one column's right edge was the next one's left edge,
+    // so a band covering a whole column necessarily touched its neighbours on both
+    // sides and read as the panel's own background rather than as a band under one
+    // workspace. The bar's workspace widget does not have that problem because its
+    // squares are separated by `inlineGap` and the highlight covers exactly one
+    // square - the separation IS the margin. Same token, same idea, one size up: the
+    // band is as wide as the column it marks and the breathing room is around it,
+    // rather than the band being shrunk to make room inside it.
+    property int columnGutter: 0
+    readonly property int columnPitch: columnWidth + columnGutter
     property int listSpacing: 6
     property int rowHeight: 28
     property int glyphInset: 20
@@ -45,7 +57,7 @@ Item {
     // from, so the two cannot disagree about which column carries the card fill
     // and which the focus markers.
     property int activeSlot: 1
-    readonly property int activeColumnX: activeSlot * columnWidth
+    readonly property int activeColumnX: activeSlot * columnPitch
     // The tallest column on the strip, read off the live delegates. The panel is
     // sized from this, so it has to be the real laid-out height rather than a
     // prediction from the row counts - a column's height includes its overflow line
@@ -97,8 +109,6 @@ Item {
     // widget's squares are fixed and the highlight moves between them, whereas here
     // the columns move and the highlight rides along, which reads the same and has
     // nothing to keep in step.
-    readonly property real highlightInset: 8
-
     property bool _highlightOn: false
 
     // Place the band on the active slot. A binding on `activeColumnX` would do, and
@@ -124,8 +134,8 @@ Item {
         id: activeHighlight
         objectName: "windowHintColumnHighlight"
         z: -1
-        x: root.activeColumnX + root.highlightInset
-        width: Math.max(0, root.columnWidth - root.highlightInset * 2)
+        x: root.activeColumnX
+        width: root.columnWidth
         height: root.height
         visible: root._highlightOn
         color: LazerTheme.activeFill
@@ -152,7 +162,7 @@ Item {
             required property int index
             required property var modelData
 
-            x: stripColumn.index * root.columnWidth
+            x: stripColumn.index * root.columnPitch
             width: root.columnWidth
             spacing: root.listSpacing
             readonly property bool isActiveSlot: stripColumn.index === root.activeSlot

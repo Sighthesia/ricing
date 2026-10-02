@@ -285,10 +285,13 @@ Item {
             var body = findByName(item, "windowHintBody")
             var column = findByName(item, "actionsRoot")
             verify(body !== null, "the hint body should exist")
-            // Three columns of 180 is what the body needs, plus the content
-            // column's own inset on each side. Without that term the surface is
-            // 16px short and the right column is clipped.
-            compare(body.width, 3 * 180, "the body is as wide as its three columns")
+            // Three columns of 180 plus the gap between them, plus the content
+            // column's own inset on each side. Without the inset term the surface is
+            // 16px short and the right column is clipped; without the gap term it is
+            // 12px short and the right column is clipped by exactly that much.
+            compare(body.width, 3 * 180 + 2 * 6,
+                "the body is as wide as its three columns and the two gaps, was "
+                    + body.width)
             verify(item.implicitWidth >= body.width,
                 "and the surface is at least that wide, was " + item.implicitWidth)
             compare(item.implicitWidth, body.width + item.contentInset * 2,
@@ -328,17 +331,22 @@ Item {
             })
             wait(20)
             var body = findByName(item, "windowHintBody")
-            compare(body.width, 3 * 180, "still three columns")
+            compare(body.width, 3 * 180 + 2 * 6,
+                "still three columns and their gaps, was " + body.width)
             compare(item.implicitWidth, body.width + item.contentInset * 2)
             var column = findByName(item, "actionsRoot")
             // The active workspace is still the middle column, read from where the
             // focus highlight is placed rather than from a named column delegate.
             var wash = findByName(body, "windowHintFocusFrame")
             verify(wash !== null, "the focus highlight should exist")
-            compare(wash.x, 180, "and the active workspace is still the middle one")
+            // One column plus the gap before it: the middle column starts a pitch in,
+            // and the pitch is the column plus the gap.
+            compare(wash.x, 180 + 6,
+                "and the active workspace is still the middle one, was " + wash.x)
             // All three columns fit, so nothing is drawn past the surface.
             var strip = findByName(body, "windowHintStrip")
-            compare(strip.width, 3 * 180, "the strip is three columns wide")
+            compare(strip.width, 3 * 180 + 2 * 6,
+                "the strip is three columns and their gaps wide, was " + strip.width)
             verify(strip.x + strip.width <= column.width,
                 "and the last column still ends inside the content column")
         }
