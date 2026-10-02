@@ -1321,6 +1321,30 @@ Item {
                 Lazer.MotionTokens.reducedMotionOverride = false
             }
         }
+        // A handover to another tray icon must not leave the panel at the
+        // previous icon's height. Measured on a real fast sweep: the new menu
+        // measures 0 while its DBus fetch runs, heldHeight kept the old value,
+        // and the panel stood 421px tall with nothing in it - the flash beside
+        // the menu. The held height exists to steady ONE icon's arrival, so it
+        // is dropped when the icon changes.
+        function test_handoverDropsTheHeldHeight() {
+            var many = []
+            for (var i = 0; i < 12; i++)
+                many.push(fakeEntry("Row " + i))
+            var item = makeMenu(many)
+            // Read heldHeight directly rather than a derived total: it is the
+            // value the handover drops, and waiting on it needs no other layout.
+            tryVerify(function() { return item.heldHeight > 100 },
+                false, "tall menu should raise a real held height", 2000, 20)
+
+            // A handover is signalled by the handle changing. Emptying the rows
+            // too would race the async column measurement, and that race is not
+            // what this contract is about.
+            item.menuHandle = { id: "next-icon" }
+            compare(item.heldHeight, 0,
+                "a handover must not carry the previous icon's height")
+        }
+
         function test_faceOccludesSubmenu() {
             var item = makeMenu([fakeEntry("More", { hasChildren: true })])
             verify(item.submenuSurface.z < item.menuFace.z)

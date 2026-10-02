@@ -37,9 +37,17 @@ Item {
     // the previous icon instead of sliding it under the fresh list. The
     // close keeps its animation (data releases at progress 0) so the host
     // width morphs instead of snapping mid-exchange.
-    onMenuHandleChanged: closeSubmenu()
-    onTrayItemChanged: closeSubmenu()
-    onEntriesChanged: closeSubmenu()
+    // A handover to another tray icon. The held height is dropped as well as the
+    // submenu: it exists to keep the panel steady while ONE icon's rows arrive,
+    // and carrying it across handovers made the next icon's panel adopt the
+    // PREVIOUS icon's height. The fresh menu measures 0 for the frames its DBus
+    // fetch takes, so the panel stood at the old height - 421px of it, measured
+    // on a real sweep - with nothing in it, which is the flash beside the menu.
+    // Reset first: noteColumnHeight must not re-raise it from the same
+    // zero-height frame that triggered the handover.
+    onMenuHandleChanged: releaseHeldHeight()
+    onTrayItemChanged: releaseHeldHeight()
+    onEntriesChanged: releaseHeldHeight()
     readonly property bool stubEntriesActive: useStubEntries
         || (entries !== null && entries !== undefined && Logic.entryList(entries).length > 0)
     readonly property var entryModel: stubEntriesActive
@@ -195,6 +203,8 @@ Item {
     readonly property real submenuSurfaceY: Math.max(0, Math.min(
         submenuAnchorTopY - submenuTitleHeight,
         menuFlick.height - submenuSurfaceHeight))
+    // Stands in until the first real measurement, and is dropped on a handover
+    // so the next icon's panel does not adopt this one's height.
     property real heldHeight: 420
     property real rawColumnHeight: menuColumn.implicitHeight
     property real submenuAnimationTarget: 0
@@ -339,6 +349,14 @@ Item {
 
     function noteColumnHeight(value) {
         heldHeight = Logic.heldHeight(Math.min(Number(value), maxMenuHeight), heldHeight)
+    }
+
+    // Drop the held height on a handover and close any submenu the previous
+    // icon left, keeping the close animation so the host width still morphs
+    // instead of snapping mid-exchange.
+    function releaseHeldHeight() {
+        heldHeight = 0
+        closeSubmenu()
     }
 
     // Native DBus menus are loaded only when a real menu handle is present.
