@@ -98,6 +98,10 @@ case "${1:-}" in
 esac
 
 # Bare file names resolve under tests/qml, which is where a QtTest file belongs.
+# The suffix is appended because qmltestrunner requires it: given
+# `tests/qml/tst_foo` it exits 1 with NO output at all, which reads exactly like a
+# crash and sends you looking at the test instead of at the invocation. `-i` is
+# the documented shorthand, and `run-tests.sh` passes the full name.
 # An explicit -o from the caller wins, so the suite runner can capture a report
 # file instead of stdout; passing two -o makes qmltestrunner pick arbitrarily.
 args=()
@@ -106,7 +110,8 @@ for arg in "$@"; do
     case "$arg" in
         -o|--output) has_output=1; args+=("$arg") ;;
         */*)          args+=("$arg") ;;
-        *)            args+=("tests/qml/$arg") ;;
+        *.qml)        args+=("tests/qml/$arg") ;;
+        *)            args+=("tests/qml/$arg.qml") ;;
     esac
 done
 [ "$has_output" -eq 1 ] || args=( "${args[@]}" -o -,txt )

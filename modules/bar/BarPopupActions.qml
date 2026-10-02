@@ -26,14 +26,32 @@ Item {
     // the panel is one, two or three columns wide. A number kept here as well
     // would be a second answer to the same question, and the two would disagree
     // the moment a neighbour workspace ran empty.
+    //
+    // The body's own inset has to be added back. It reports the width of its
+    // columns, but it is laid out inside `contentColumn`, which insets each side
+    // by `contentInset`. Measuring the body and handing that number to the host
+    // as the surface width asks the panel to be 540 wide while only 524 of it
+    // has room for content - so the right column is drawn past the edge of the
+    // surface and clipped. The body must never be told to stretch to fill: it
+    // sizes itself from its columns, and a stretched body would just move the
+    // clipping to whichever column happened to be narrowest.
     implicitWidth: root.actionKind === "media" ? 420
         : (root.actionKind === "window-hint"
-            ? (windowHintBody.implicitWidth || 260) : 260)
+            ? (windowHintBody.implicitWidth > 0
+                ? windowHintBody.implicitWidth + root.contentInset * 2 : 260)
+            : 260)
     implicitHeight: root.actionKind === "context" ? 0 : contentColumn.implicitHeight + 16
     width: implicitWidth
     height: implicitHeight
     visible: root.actionKind !== "context"
     clip: false
+
+    // The horizontal inset the content column applies to itself, named because
+    // the window hint's surface width has to account for it (see `implicitWidth`).
+    // Declared here rather than in the column so the two cannot drift: a body
+    // measured without this term is 16px narrower than the space it is given, and
+    // the overflow is clipped rather than reported.
+    readonly property int contentInset: 8
 
     // Live services win over the hover-intent snapshot so the open popup
     // keeps tracking volume and brightness without being rebuilt.
@@ -789,8 +807,8 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.leftMargin: 8
-        anchors.rightMargin: root.actionKind === "tray" ? 0 : 8
+        anchors.leftMargin: root.contentInset
+        anchors.rightMargin: root.actionKind === "tray" ? 0 : root.contentInset
         anchors.topMargin: 8
         spacing: 8
         visible: true
@@ -1897,19 +1915,22 @@ Item {
         }
 
         // Mod-key window hint: the active workspace's windows, clickable to
-        // focus. The snapshot travels on the intent payload so a refresh while
-        // mod is held updates the rows in place.
+        // focus, with the neighbouring workspaces either side of it. The snapshot
+        // travels on the intent payload so a refresh while mod is held updates the
+        // rows in place.
         Item {
             id: windowHintContent
             objectName: "windowHintContent"
-            width: parent.width
+            // The body's own measured width, not the full column: the panel is
+            // exactly as wide as its columns, and letting it fill would stretch
+            // the last one instead of leaving the panel the size it asked for.
+            width: windowHintBody.implicitWidth
             height: windowHintBody.implicitHeight
             visible: root.actionKind === "window-hint"
 
             BarWindowHintContent {
                 id: windowHintBody
                 objectName: "windowHintBody"
-                width: parent.width
                 hint: root.payload ? root.payload.hint : null
                 onWindowActivated: windowId => root.handleHintWindow(windowId)
             }

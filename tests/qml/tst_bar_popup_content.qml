@@ -265,6 +265,65 @@ Item {
             }
         }
 
+        function test_theWindowHintFitsInsideItsOwnSurface() {
+            // The hint's columns are the surface. If the surface is narrower than
+            // the columns need, the overflow is clipped rather than reported - the
+            // right column is simply drawn past the edge of the panel and cut off,
+            // with nothing anywhere saying so.
+            var three = [{ windowId: "10", title: "a", icon: "", isFocused: false },
+                        { windowId: "11", title: "b", icon: "", isFocused: true }]
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "window-hint",
+                payload: { hint: {
+                    workspaceId: "42", activeWorkspacePosition: 1, previousActiveWorkspacePosition: 1,
+                    windows: three,
+                    previousWindows: [{ windowId: "20", title: "p", icon: "", isFocused: false }],
+                    nextWindows: [{ windowId: "30", title: "n", icon: "", isFocused: false }]
+                } }
+            })
+            wait(20)
+            var body = findByName(item, "windowHintBody")
+            var column = findByName(item, "actionsRoot")
+            verify(body !== null, "the hint body should exist")
+            // Three columns of 180 is what the body needs, plus the content
+            // column's own inset on each side. Without that term the surface is
+            // 16px short and the right column is clipped.
+            compare(body.width, 3 * 180, "the body is as wide as its three columns")
+            verify(item.implicitWidth >= body.width,
+                "and the surface is at least that wide, was " + item.implicitWidth)
+            compare(item.implicitWidth, body.width + item.contentInset * 2,
+                "exactly the body plus the content column's inset")
+            // The last column ends inside the content column, which ends inside
+            // the surface. All three of those have to hold or something is cut.
+            var next = findByName(body, "windowHintNextColumn")
+            verify(next.x + next.width <= column.width,
+                "the last column ends inside the content column")
+            verify(column.x + column.width <= item.width,
+                "and the content column ends inside the surface")
+        }
+
+        function test_theWindowHintNarrowsWithItsColumns() {
+            // The same accounting has to hold when a neighbour workspace is empty
+            // and the panel drops to two columns - otherwise the fix for the
+            // clipped case would just move the clipping.
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "window-hint",
+                payload: { hint: {
+                    workspaceId: "42", activeWorkspacePosition: 1, previousActiveWorkspacePosition: 1,
+                    windows: [{ windowId: "10", title: "a", icon: "", isFocused: true }],
+                    previousWindows: [],
+                    nextWindows: [{ windowId: "30", title: "n", icon: "", isFocused: false }]
+                } }
+            })
+            wait(20)
+            var body = findByName(item, "windowHintBody")
+            compare(body.width, 2 * 180, "two columns now")
+            compare(item.implicitWidth, body.width + item.contentInset * 2)
+            var next = findByName(body, "windowHintNextColumn")
+            verify(next.x + next.width <= findByName(item, "actionsRoot").width,
+                "and the last column still ends inside the content column")
+        }
+
         function test_volumeExposesSliderAndFakeCallback() {
             var fake = Qt.createQmlObject('import QtQuick; QtObject { property int setCalls: 0; property real last: -1; property int toggleCalls: 0; function setSinkVolume(v){ setCalls++; last=v } function toggleSinkMute(){ toggleCalls++ } }', root, "fakeVol")
             var item = createTemporaryObject(actionsComp, root, { actionKind: "volume", payload: { volumeService: fake, volume: 0.42, muted: true } })
