@@ -1112,13 +1112,14 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // The widget's own colour, so the panel and the bar agree.
             compare(band.color, Lazer.LazerTheme.activeFill, "in the widget's fill")
 
-            // Rounded like the cards it wraps. A sharp band read as a block of panel
-            // colour rather than as a slot with something in it.
-            var card = findByName(body, "windowHintWindowRow")
-            verify(card !== null, "a card to compare the radius against")
-            if (card)
-                compare(band.radius, card.radius,
-                    "the band's radius is the card's, was " + band.radius)
+            // Square, like both surfaces in the widget: its hover highlight and its
+            // active one are `radius: 0`. Stated as a literal rather than read from the
+            // card or from the component, because the claim is about matching a
+            // reference outside this file - a rounded band was tried and read as a slot
+            // floating over the panel rather than as the column itself.
+            compare(band.radius, 0,
+                "square, like the widget's hover and active highlights, was "
+                    + band.radius)
 
             // A child of the BODY, not of the strip. The strip travels and its active
             // slot moves; the band does not, because the column you are looking at
@@ -1143,18 +1144,21 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(body.columnPitch, body.columnWidth + body.columnGutter,
                 "the pitch is the column plus the gap")
 
-            // THE CELL'S MARGIN, on every side. Measured from real cards, not from the
-            // focused one: the focus highlight sits on whichever row is current, so its
-            // top edge says nothing about the band's margin. Only the ACTIVE column
-            // instantiates `windowHintWindowRow` - its neighbours get plain labels - so
-            // every row found here belongs to the column the band is on.
+            // FLUSH on every side. The band's reference is the widget's hover
+            // highlight - `anchors.fill: parent`, `radius: 0` - so the band IS the cell
+            // and the cards fill it, with no margin between them.
             //
-            // The expected number lives HERE, not read back from the component: a test
-            // whose expected value is the same constant the component used cannot tell
-            // "the padding is there" from "the padding is gone", and with the padding at
-            // 0 the measured gap is 0 and the expected value is 0 - so it passed with
-            // no padding at all. 8 is `Workspaces.cellPadding`.
-            var expectedPadding = 8
+            // Measured from real cards, not from the focus highlight: that sits on
+            // whichever row is current, so its top edge says nothing about the band's
+            // margin. Only the ACTIVE column instantiates `windowHintWindowRow` - its
+            // neighbours get plain labels - so every row found here belongs to the
+            // column the band is on.
+            //
+            // The expected value is a literal 0 and the claim is FLUSHNESS, not a
+            // number: an earlier version compared the measured gap against
+            // `body.cellPadding`, the same constant the component used, so with the
+            // padding at 0 it compared 0 against 0 and passed - with or without a
+            // padding. Asserting the gap must be zero cannot be argued with.
             var cards = findAllByName(body, "windowHintWindowRow")
             verify(cards.length > 0, "the active column has cards to measure against")
             if (cards.length > 0) {
@@ -1177,16 +1181,16 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 var blockLeft = topCard.x
                 var blockRight = blockLeft + cards[0].width
                 var bandBox = band.mapToItem(box, 0, 0)
-                compare(blockTop - bandBox.y, expectedPadding,
+                compare(blockTop - bandBox.y, 0,
                     "padding above the first card, was " + (blockTop - bandBox.y))
                 // The band's own height, not a mapped one: `mapToItem` returns a point.
                 // Measured at rest, where the scale is 1, so the untransformed height
                 // is the visual one.
-                compare(band.height - (blockBottom - bandBox.y), expectedPadding,
+                compare(band.height - (blockBottom - bandBox.y), 0,
                     "and below the last, was " + (band.height - (blockBottom - bandBox.y)))
-                compare(blockLeft - bandBox.x, expectedPadding,
+                compare(blockLeft - bandBox.x, 0,
                     "and to the left of the cards, was " + (blockLeft - bandBox.x))
-                compare(bandBox.x + band.width - blockRight, expectedPadding,
+                compare(bandBox.x + band.width - blockRight, 0,
                     "and to the right, was " + (bandBox.x + band.width - blockRight))
             }
         }

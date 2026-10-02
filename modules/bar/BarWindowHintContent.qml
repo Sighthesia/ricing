@@ -83,24 +83,27 @@ Item {
     // `BarWindowHintStrip.columnGutter` for why the panel needs one.
     readonly property int columnGutter: LazerTheme.inlineGap
     readonly property int columnPitch: columnWidth + columnGutter
-    // Padding between the band and the cards it marks, on every side.
+    // Padding between the band and the cards it marks. DELIBERATELY ZERO.
     //
-    // `Workspaces.qml`'s square is `contentRow.implicitWidth + cellPadding * 2` wide
-    // and a fixed height taller than its content, and `activeHighlight` covers that
-    // square exactly. So the margin in the widget is INSIDE the marked cell, not
-    // between the highlight and the thing it marks - which is why insetting the band
-    // was wrong here too: it shrank the marked cell while the cards stayed put, and
-    // they overhung it.
+    // The band's reference for this is the widget's HOVER highlight rather than its
+    // active one: `Workspaces.qml` draws hover as `anchors.fill: parent` with
+    // `radius: 0` - flush to the square's edges, sharp-cornered, no inset at all.
+    // That is the arrangement here: the band IS the cell and the cards fill it.
     //
-    // So the column is the square, the cards sit `cellPadding` inside it, and the band
-    // is taller than the card block by the same amount - which is what makes the band
-    // read as a cell with something in it rather than as a frame drawn tight around
-    // the cards.
-    readonly property int cellPadding: 8
-    // The band's radius, matching the cards it wraps. The design language keeps
-    // rounding for component details and a cell background around 6px cards is one;
-    // a sharp band read as a block of panel colour rather than as a slot.
-    readonly property int bandRadius: 6
+    // This went round three times. The band was inset 8px, which left the cards
+    // overhanging it; then the columns were given a gap with the band still flush,
+    // which left the band butting its neighbours; then the cards were inset 8px
+    // inside their cell, which made the band float around them and read as a separate
+    // surface rather than as the slot the cards are in. Flush is what all three were
+    // reaching for.
+    //
+    // Left as a property so the geometry stays in one place, but zero on purpose.
+    readonly property int cellPadding: 0
+    // The band's radius: square, like the widget's hover highlight and its active
+    // highlight - both are `radius: 0`. A rounded band was tried and read as a slot
+    // floating over the panel rather than as the column itself; the design language
+    // keeps rounding for component details, and a full-height column band is a band.
+    readonly property int bandRadius: 0
     // How far the band swells at the middle of a crossing, as a share of its size.
     // 2% is about 3.6px across a 180px column, which reads as a pulse rather than as
     // a zoom, and stays inside the 6px gutter at either side so it never touches a
