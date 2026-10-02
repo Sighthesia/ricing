@@ -77,6 +77,45 @@ Keep the widened canvas resting-state only: restore it the moment the slide
 settles, before a submenu can be summoned, or the catcher loses its ancestors
 again.
 
+### Enumerate the states, never one flag
+
+The bound above is a boolean, and a boolean that guards cleanup is where the next
+bug lives. Keying it off a single transition flag misses the window where some
+*other* path resets that flag while the thing it was protecting is still mounted.
+
+Measured on the tray popup: the gate read `_exchangeCommitted`, and
+`beginIntentReplacement()` resets that flag **on the very frame the new intent
+lands** while deliberately leaving the outgoing layer mounted until the slide
+ends. That is the only window in the whole state machine where the flag is false
+and a stale body still exists. The slot snapped 260 -> 504 with its clip still
+on, so the clip rect was 244px wider than the panel and the stale body painted
+the band beside it.
+
+Two properties made it survive five rounds of reading the code:
+
+- **The window is tiny** — ~18ms, one frame at 60Hz. It needs a *second* hop to
+  arrive inside it, so it reproduces on a fast sweep and never on a deliberate
+  hover. A bug that only appears under speed is a race; do not go looking for it
+  in the steady-state path.
+- **Every single-hop trace looks healthy.** Both bodies, the clip and the region
+  read correctly in each phase taken alone.
+
+So enumerate the states that actually require the bound — a stale body still
+mounted, a replacement pending, a transition in flight — and assert each one.
+
+### Sticky values must not cross an identity handover
+
+A fallback that stabilises an async arrival is scoped to the identity that
+produced it. `heldHeight` keeps one tray icon's panel from jittering while its
+rows arrive over DBus; carrying it into the next icon made that panel adopt the
+**previous** icon's height, and because the fresh menu measures 0 for the frames
+its fetch takes, that height is what the user saw (measured: a 421px panel
+holding a 0px body).
+
+Drop the value when its owner changes. Keep the resting default though — it
+stands in for the very first measurement, and zeroing it broke five first-open
+tests.
+
 ```qml
 readonly property real primaryMenuWidth: implicitWidth
 
