@@ -21,11 +21,18 @@ Variants {
     // the shell waits behind this flag instead of racing the wallpaper.
     //
     // The flag is a binding over the live screen list instead of a stored bool:
-    // Variants drops every child that is not a Scope, so a Connections object
-    // here would never be instantiated and the flag would only ever move when
-    // a screen reported. Reading Quickshell.screens inside the binding is what
-    // makes a hotplug, an added screen, or a resolution change recompute it, and
-    // it keeps bootReady false while no screen exists at all.
+    // reading Quickshell.screens inside the binding is what makes a hotplug, an
+    // added screen, or a resolution change recompute it, and it keeps bootReady
+    // false while no screen exists at all. It reads settingsReady the same way,
+    // so the flag moves on its own when settings land — this Variants needs no
+    // Connections of its own for that, and must not be given one (see below).
+    //
+    // Nothing may be declared as a direct child of this Variants ahead of the
+    // Scope. `Variants.delegate` defaults to the first child, so a stray object
+    // here does not get dropped for being the wrong type: it becomes the
+    // delegate, the per-screen Scope is never instantiated, and every wallpaper
+    // surface silently disappears from the compositor while the rest of the
+    // shell keeps working. See tests/qml/tst_variants_delegate.qml.
     readonly property bool bootReady: BootLogic.isReady(
         root.finishedBootScreens, root.currentBootKeys())
         && Services.SettingsService.settingsReady
@@ -95,18 +102,6 @@ Variants {
         if (root.bootStarted)
             return
         root.bootStarted = true
-    }
-
-    // The JsonAdapter starts with an empty wallpaper path before settings.json
-    // lands. That empty default is not a terminal boot outcome when persisted
-    // settings may still provide a wallpaper; wait for the adapter's readiness
-    // signal instead of mounting chrome into a false empty boot.
-    Connections {
-        target: Services.SettingsService
-        function onSettingsReadyChanged() {
-            if (Services.SettingsService.settingsReady)
-                root.refreshBootReady()
-        }
     }
 
     Scope {
