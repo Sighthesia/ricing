@@ -79,18 +79,12 @@ Item {
             }
         }
 
-        // What the neighbour column says when that workspace has no windows. Only
-        // for a neighbour: the active column has its own line further down, which
-        // names the workspace, and two of them saying the same thing in two
-        // different words would be two statements about one fact.
-        Text {
+        // The slot this column shows when its workspace has no windows.
+        BarWindowHintEmpty {
             objectName: "windowHintPreviousEmpty"
             width: parent.width
+            rowHeight: root.rowHeight
             visible: root.columns.previous.rows.length === 0
-            text: HintLogic.NEIGHBOUR_EMPTY_LABEL
-            color: LazerTheme.textMuted
-            font.pixelSize: 10
-            horizontalAlignment: Text.AlignHCenter
         }
     }
 
@@ -207,6 +201,17 @@ Item {
             }
         }
 
+        // The same slot the neighbour columns use. The active column is not
+        // special here: an empty workspace is the same fact wherever it is, and a
+        // different shape for the middle one would make the panel look like it had
+        // a special case in it rather than three equal columns.
+        BarWindowHintEmpty {
+            objectName: "windowHintActiveEmpty"
+            width: parent.width
+            rowHeight: root.rowHeight
+            visible: root.columns.current.rows.length === 0
+        }
+
         // Overflow line for the windows the cap left out. Empty when the list fit,
         // so visibility binds straight to the text - and a Column skips an
         // invisible child when it sizes itself, so the line needs no height binding
@@ -247,15 +252,12 @@ Item {
             }
         }
 
-        // The other side's empty line - see the previous column.
-        Text {
+        // The other side's slot - see the previous column.
+        BarWindowHintEmpty {
             objectName: "windowHintNextEmpty"
             width: parent.width
+            rowHeight: root.rowHeight
             visible: root.columns.next.rows.length === 0
-            text: HintLogic.NEIGHBOUR_EMPTY_LABEL
-            color: LazerTheme.textMuted
-            font.pixelSize: 10
-            horizontalAlignment: Text.AlignHCenter
         }
     }
 }

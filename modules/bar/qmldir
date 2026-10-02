@@ -11,6 +11,7 @@ BarPopupActions 1.0 BarPopupActions.qml
 BarWindowHintContent 1.0 BarWindowHintContent.qml
 BarWindowHintStrip 1.0 BarWindowHintStrip.qml
 BarWindowHintLabel 1.0 BarWindowHintLabel.qml
+BarWindowHintEmpty 1.0 BarWindowHintEmpty.qml
 BarPopupSlider 1.0 BarPopupSlider.qml
 BarContextPopupActions 1.0 BarContextPopupActions.qml
 BarTrayMenuContent 1.0 BarTrayMenuContent.qml

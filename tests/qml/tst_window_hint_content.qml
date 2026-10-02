@@ -212,9 +212,10 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             verify(findByName(live(), "windowHintPreviousColumn"), "the column is still there")
             compare(findAllByName(live(), "windowHintPreviousRow").length, 0, "and holds no row")
             var empty = findByName(live(), "windowHintPreviousEmpty")
-            verify(empty !== null, "the empty neighbour says something")
-            verify(empty.visible, "and is visible")
-            compare(empty.text, "No windows", "which is that it has no windows")
+            verify(empty !== null, "the empty neighbour shows something")
+            verify(empty.visible, "and it is visible")
+            compare(findByName(empty, "windowHintEmptySlotLabel").text, "No windows",
+                "which is that it has no windows")
             compare(findAllByName(live(), "windowHintNextRow").length, 1, "the other side is unaffected")
             verify(!findByName(live(), "windowHintNextEmpty").visible,
                 "and does not claim to be empty when it is not")
@@ -238,14 +239,14 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(body.shownColumnCount, 3, "three columns")
             compare(body.width, 3 * body.columnWidth, "the same width as always")
             // All three columns say they are empty, each in its own slot.
+            // All three, each in its own slot - the middle one is not a special
+            // case, because an empty workspace is the same fact wherever it is.
             verify(findByName(live(), "windowHintPreviousEmpty").visible)
+            verify(findByName(live(), "windowHintActiveEmpty").visible,
+                "and the active column uses the same placeholder")
             verify(findByName(live(), "windowHintNextEmpty").visible)
-            verify(findByName(live(), "windowHintNoWindows").visible,
-                "and the active one uses its own wording")
-            // The active column's line names the workspace; the neighbours' do not,
-            // because a column with no number on it cannot say which one it is.
-            compare(findByName(live(), "windowHintNoWindows").text, "No windows on this workspace")
-            compare(findByName(live(), "windowHintPreviousEmpty").text, "No windows")
+            compare(findByName(live(), "windowHintActiveEmpty").height, body.rowHeight,
+                "each standing where a row would")
             // Three columns at three distinct offsets - the frame is intact.
             compare(findByName(live(), "windowHintPreviousColumn").x, 0)
             compare(findByName(live(), "windowHintColumn").x, body.columnWidth)
@@ -323,7 +324,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             })
             // Sampled DURING the slide, which is the only time the two layers are
             // both on screen.
-            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            wait(Math.round(Lazer.MotionTokens.page / 2))
             verify(body.swapping, "still crossing")
             var previous = findAllByName(live(), "windowHintPreviousRow")
             var active = findAllByName(live(), "windowHintWindowRow")
@@ -525,11 +526,11 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             wait(Lazer.MotionTokens.slow * 2 + 150)
         }
 
-        // Wait out one full crossing. The slide is a single `medium` traverse with
+        // Wait out one full crossing. The slide is a single `page` traverse with
         // no stagger behind it, so this is the whole of it - plus room for the
         // animation's `onFinished` to have released the held copy.
         function settleSlide() {
-            wait(Lazer.MotionTokens.medium + 40)
+            wait(Lazer.MotionTokens.page + 40)
         }
 
         function test_indicatorFollowsAFocusSwitch() {
@@ -631,13 +632,39 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(findByName(live(), "windowHintOverflow").text, "+3 more windows")
         }
 
-        function test_emptyWorkspaceSaysSoInsteadOfABarePanel() {
+        function test_anEmptyWorkspaceShowsAPlaceholderNotAHole() {
+            // An empty workspace is a real state, not a missing snapshot: the bar
+            // already names the workspace, so the panel has to say something about
+            // it. The placeholder is a rectangle where a window row would be -
+            // blank space would read as a layout fault, and a filled card would
+            // read as a window that isn't there.
             body.hint = root.makeHint({ windows: [] })
             wait(20)
-            // An empty workspace is a real state: the bar names the workspace,
-            // so the body has to explain the bare list.
-            verify(findByName(live(), "windowHintNoWindows").visible)
             compare(findAllByName(live(), "windowHintWindowRow").length, 0)
+            var slot = findByName(live(), "windowHintActiveEmpty")
+            verify(slot.visible, "the active column shows its placeholder")
+            var frame = findByName(slot, "windowHintEmptySlot")
+            // QML hands a transparent colour back as #00000000, so that is what
+            // "no fill" reads as here.
+            compare(String(frame.color), "#00000000", "outlined, not filled - a fill is what a real row has")
+            compare(frame.border.width, 1, "a hairline outline marks the absence")
+            compare(String(frame.border.color), String(Lazer.LazerTheme.divider),
+                "in the shared divider token, so it tracks the theme")
+            compare(frame.enabled, false, "inert, so it cannot swallow a tap")
+            // Same footprint as a row, so the three columns stay on one pitch.
+            compare(slot.height, body.rowHeight)
+            var rows = findAllByName(live(), "windowHintWindowRow")
+            verify(rows.length > 0 || slot.height > 0, "a row-height placeholder")
+        }
+
+        function test_aPlaceholderIsHiddenWhenTheColumnHasWindows() {
+            // The other half of the same contract: a column with windows must not
+            // also show an empty slot, or every row would be doubled by a ghost.
+            body.hint = root.makeHint()
+            wait(20)
+            verify(!findByName(live(), "windowHintPreviousEmpty").visible)
+            verify(!findByName(live(), "windowHintActiveEmpty").visible)
+            verify(!findByName(live(), "windowHintNextEmpty").visible)
         }
 
         function test_coldSnapshotStatesItself() {
@@ -667,7 +694,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             verify(outgoing().visible, "the outgoing layer is mounted")
             // An animation reads its start value on the frame it starts, so the
             // travel has to be sampled after the event loop has turned.
-            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            wait(Math.round(Lazer.MotionTokens.page / 2))
             var leaving = findAllByName(outgoing(), "windowHintWindowRow")
             compare(leaving.length, 2, "the outgoing rows are still mounted")
             compare(leaving[0].modelData.windowId, "10", "and are the OLD ones")
@@ -705,7 +732,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             })
             var panelWidth = body.width
             for (var step = 0; step < 4; ++step) {
-                wait(Math.round(Lazer.MotionTokens.medium / 4))
+                wait(Math.round(Lazer.MotionTokens.page / 4))
                 var out = outgoing()
                 var inn = live()
                 // The whole claim: the pair covers the panel from 0 to its width.
@@ -735,7 +762,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            wait(Math.round(Lazer.MotionTokens.page / 2))
             var out = outgoing()
             var inn = live()
             // Moving to a LATER workspace takes the content LEFT, because the new
@@ -755,6 +782,49 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(outgoing().visible, false, "and the other one is gone")
         }
 
+        function test_theCrossingIsCarriedRatherThanShoved() {
+            // Asserted as a contract, like the click-flash recipe: a whole panel's
+            // width across the screen at `medium` has to accelerate hard out of
+            // rest and slam into the stop, and both ends are visible - the content
+            // reads as shoved rather than moved. `page` gives the same distance
+            // room to be covered without either end being abrupt, and `InOutSine`
+            // is the gentlest accelerate-and-settle there is; a quintic covers most
+            // of its distance in a burst at each extreme, which is the mechanical
+            // part of the motion.
+            verify(Lazer.MotionTokens.page >= 2 * Lazer.MotionTokens.medium,
+                "the traverse takes at least twice as long as a plain swap")
+            verify(body.hasOwnProperty("slideDip"), "and it dims a little in the middle")
+        }
+
+        function test_bothLayersDipTogetherSoTheSeamNeverShows() {
+            // The softening dim is only safe because both layers take the SAME
+            // value at the same moment. If they dipped independently the seam would
+            // show one through the other, which is worse than no dim at all.
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 3,
+                previousActiveWorkspacePosition: 2,
+                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
+            })
+            var out = outgoing()
+            var inn = live()
+            compare(out.opacity, inn.opacity, "the same value")
+            compare(out.opacity, 1, "and undimmed at rest")
+            // Sampled at the middle, where the dip is deepest. `page / 2` is only
+            // approximate, so this reads the peak rather than assuming it landed
+            // exactly there.
+            wait(Math.round(Lazer.MotionTokens.page / 2))
+            out = outgoing()
+            inn = live()
+            compare(out.opacity, inn.opacity, "still the same value in flight")
+            verify(out.opacity < 1, "and both have dipped, was " + out.opacity)
+            // Shallow: enough to register as weight, not enough to read as a fade
+            // - a fade at the seam is what the two layers exist to prevent.
+            verify(out.opacity > 0.8, "but only slightly, was " + out.opacity)
+            verify(out.opacity > 0, "and never to nothing")
+            settleSlide()
+            compare(live().opacity, 1, "and full again once landed")
+        }
+
         function test_theSlideIsOnePassAndDoesNotTurnBack() {
             // Progress runs 0 to 1 once. A value that overshot and came back would
             // be a bounce, and the whole point of the two layers is that the motion
@@ -766,7 +836,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             })
             var furthest = 0
             for (var step = 0; step < 5; ++step) {
-                wait(Math.round(Lazer.MotionTokens.medium / 5))
+                wait(Math.round(Lazer.MotionTokens.page / 5))
                 // Monotonic: each sample is at least as far along as the last.
                 verify(body.slideProgress >= furthest,
                     "step " + step + " went backwards, was " + body.slideProgress)
@@ -785,7 +855,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
             compare(body.swapDirection, 1, "moved later in the list")
-            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            wait(Math.round(Lazer.MotionTokens.page / 2))
             verify(outgoing().x < 0, "and the content went left")
             settleSlide()
 
@@ -795,7 +865,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 windows: [{ windowId: "21", title: "term2", appId: "kitty", icon: "", isFocused: true }]
             })
             compare(body.swapDirection, -1, "moved earlier in the list")
-            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            wait(Math.round(Lazer.MotionTokens.page / 2))
             verify(outgoing().x > 0, "and the content went right")
             settleSlide()
         }
@@ -810,7 +880,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            wait(Math.round(Lazer.MotionTokens.page / 2))
             compare(findAllByName(outgoing(), "windowHintFocusFrame").length, 0,
                 "no highlight on the copy that is leaving")
             compare(findAllByName(outgoing(), "windowHintFocusIndicator").length, 0,
@@ -833,7 +903,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            wait(Math.round(Lazer.MotionTokens.page / 2))
             var inn = live()
             var wash = findByName(inn, "windowHintFocusFrame")
             var bar = findByName(inn, "windowHintFocusIndicator")
@@ -860,7 +930,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 nextWindows: [{ windowId: "n1", title: "n1", icon: "", isFocused: false }],
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            wait(Math.round(Lazer.MotionTokens.page / 2))
             var inn = live()
             var active = findByName(inn, "windowHintColumn")
             var next = findByName(inn, "windowHintNextColumn")
@@ -888,7 +958,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 previousActiveWorkspacePosition: 1,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            wait(Math.round(Lazer.MotionTokens.page / 2))
             var beforeX = live().x
             verify(beforeX > 0, "mid-flight, was " + beforeX)
             body.hint = root.makeHint({

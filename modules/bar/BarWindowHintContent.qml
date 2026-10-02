@@ -51,7 +51,6 @@ Item {
     property bool swapping: slideProgress < 1
 
     readonly property bool ready: root.shownReady
-    readonly property bool hasWindows: columns.current.rows.length > 0
     // Three columns of one fixed width, always. The count does not vary with the
     // content: the active workspace sits in the middle, and it can only stay in
     // the middle if the frame around it is the same size whatever the neighbours
@@ -74,6 +73,16 @@ Item {
     // to its right as it slides out, which is what a narrower panel taking a wider
     // one out should look like.
     readonly property int slideDistance: width
+    // How far both layers dim at the middle of the crossing, 0 at either end.
+    //
+    // A pure translation across a fixed frame reads as two rigid boards being
+    // swapped past each other: it has no weight, because nothing about the content
+    // changes. A small dip gives it some, and it is safe to do here precisely
+    // because the two layers are the same shape at the same offset - both dim
+    // together, so the panel darkens uniformly instead of one layer showing
+    // through the other. Shallow on purpose: enough to register, far too little to
+    // read as a fade.
+    readonly property real slideDip: Math.sin(Math.PI * slideProgress) * 0.12
     readonly property int rowHeight: 28
     // The one row the focus indicator belongs to, or -1. Read from the INCOMING
     // column, which is the content the user is looking at.
@@ -195,14 +204,22 @@ Item {
         property: "slideProgress"
         from: 0
         to: 1
-        // One traverse, no halves. The old pair of exit-then-entrance spent longer
+        // One traverse, no halves - the old exit-then-entrance pair spent longer
         // than this in total and showed an empty or translucent panel through the
-        // middle of it; this moves once and is done.
-        duration: MotionTokens.medium
-        // Eased at both ends because the content is crossing a fixed frame rather
-        // than arriving somewhere: a `fast` ease-out would fling the seam across
-        // and then crawl.
-        easing.type: Easing.InOutQuint
+        // middle of it.
+        //
+        // `page`, not `medium`, because this carries a whole panel's width across
+        // the screen. At 160ms a 540px traverse has to accelerate hard out of rest
+        // and slam into the stop, and both ends are visible: the content appears
+        // to be shoved rather than moved. Doubling the time lets the same distance
+        // be covered without either end being abrupt, which is what the duration
+        // is actually for here.
+        duration: MotionTokens.page
+        // `InOutSine`, not `InOutQuint`. A quintic is very aggressive at its
+        // ends - it covers most of its distance in a short burst at each extreme -
+        // which is the mechanical part of the motion. Sine is the gentlest
+        // accelerate-and-settle there is and reads as weight being carried across.
+        easing.type: Easing.InOutSine
         onFinished: {
             // The outgoing copy is fully off-panel by now, so releasing it costs
             // nothing on screen and keeps exactly one set of rows alive.
@@ -284,13 +301,11 @@ Item {
     // the body reports the same number whether the neighbour workspaces are busy
     // or empty, so the panel never changes size mid-hold.
     implicitWidth: shownColumnCount * columnWidth
-    // The taller of the two layers while one is leaving, and the empty-workspace
-    // line when the active column has nothing in it - that line lives outside the
-    // columns, so it has to be added in by hand.
+    // The taller of the two layers while one is leaving. The empty-workspace
+    // placeholder lives inside the columns, so the columns' own height already
+    // accounts for it.
     implicitHeight: ready
-        ? Math.max(
-            Math.max(root._outgoingHeight, incomingStrip.contentHeight),
-            hasWindows ? 0 : noWindows.implicitHeight)
+        ? Math.max(root._outgoingHeight, incomingStrip.contentHeight)
         : emptyText.implicitHeight
     width: implicitWidth
     height: implicitHeight
@@ -307,6 +322,9 @@ Item {
         width: parent.width
         visible: root.ready && root.swapping
         x: -root.slideProgress * root.slideDistance * root.swapDirection
+        // Dims with its opposite number, so the seam never shows one layer
+        // through the other.
+        opacity: 1 - root.slideDip
     }
 
     BarWindowHintStrip {
@@ -336,6 +354,7 @@ Item {
         width: parent.width
         visible: root.ready
         x: (1 - root.slideProgress) * root.slideDistance * root.swapDirection
+        opacity: 1 - root.slideDip
     }
 
     BarWindowHintStrip {
@@ -508,26 +527,4 @@ Item {
         visible: !root.ready
     }
 
-    // The active workspace being empty is a real state, not a missing snapshot:
-    // the bar already names the workspace, so the body explains the bare list.
-    // Scoped to the ACTIVE column and carried by the incoming layer, so it does not
-    // sit still while the column it is about crosses the panel.
-    //
-    // Only the active column gets this line. The neighbours have their own inside
-    // the strip, worded without naming a workspace - two columns reporting the
-    // same fact in two different words would be two statements about one thing.
-    Text {
-        id: noWindows
-        objectName: "windowHintNoWindows"
-        parent: incomingLayer
-        x: incomingStrip.activeColumnX
-        width: root.columnWidth
-        visible: root.ready && !root.hasWindows
-        text: "No windows on this workspace"
-        color: LazerTheme.textMuted
-        font.pixelSize: 11
-        horizontalAlignment: Text.AlignHCenter
-        elide: Text.ElideRight
-        maximumLineCount: 1
-    }
 }
