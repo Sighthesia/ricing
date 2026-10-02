@@ -91,6 +91,15 @@ ShellRoot {
         root.advanceStartup(StartupReveal.Events.chromeMounted)
     }
 
+    // Wallpaper settings are ready before the first image outcome, so chrome can
+    // stage in parallel with the asynchronous wallpaper decode/reveal. The lock
+    // wave still waits for both wallpaperReady and chromeReady.
+    function mountChromeForWallpaperBootstrap() {
+        if (!Services.SettingsService.settingsReady)
+            return
+        root.mountChrome()
+    }
+
     // The wallpaper reports every terminal boot outcome — reveal, empty, error,
     // unchanged, reduced motion — so this is the normal path and not a special
     // case; the guard is what keeps it one-way when a screen re-key re-reads
@@ -360,6 +369,19 @@ ShellRoot {
             if (!bootReady || root.startupWallpaperReady)
                 return
             root.markWallpaperReady()
+        }
+
+        onBootStartedChanged: {
+            if (bootStarted)
+                root.mountChromeForWallpaperBootstrap()
+        }
+
+        Connections {
+            target: Services.SettingsService
+            function onSettingsReadyChanged() {
+                if (Services.SettingsService.settingsReady)
+                    root.mountChromeForWallpaperBootstrap()
+            }
         }
     }
 

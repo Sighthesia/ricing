@@ -18,6 +18,7 @@ Item {
     readonly property string launcher: readText("../../modules/lazerbar/LauncherSurface.qml")
     readonly property string topBar: readText("../../modules/bar/TopBar.qml")
     readonly property string shell: readText("../../shell.qml")
+    readonly property string wallpaper: readText("../../modules/lazerbar/WallpaperBackground.qml")
 
     TestCase {
         name: "StartupColdPaths"
@@ -33,6 +34,13 @@ Item {
             verify(root.launcher.indexOf(
                        "running: !!root.session && root.startupPrewarmAllowed === true") >= 0)
             verify(root.shell.indexOf("startupPrewarmAllowed: root.startupWorkFinished") >= 0)
+        }
+
+        function test_chromeMountsWhenWallpaperBootStarts() {
+            verify(root.wallpaper.indexOf("property bool bootStarted: false") >= 0)
+            verify(root.wallpaper.indexOf("root.reportBootStarted()") >= 0)
+            verify(root.shell.indexOf("onBootStartedChanged") >= 0)
+            verify(root.shell.indexOf("root.mountChromeForWallpaperBootstrap()") >= 0)
         }
     }
 }

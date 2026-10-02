@@ -29,6 +29,9 @@ Variants {
     readonly property bool bootReady: BootLogic.isReady(
         root.finishedBootScreens, root.currentBootKeys())
         && Services.SettingsService.settingsReady
+    // True once the first wallpaper request has started. Chrome uses this as
+    // the parallel bootstrap cue; bootReady remains the later lock-wave gate.
+    property bool bootStarted: false
     // Boot-completion keys, one per screen that already reported, in the
     // "<name>@<x>,<y>,<w>x<h>" form produced by WallpaperBootLogic.
     property var finishedBootScreens: []
@@ -86,6 +89,12 @@ Variants {
     function reportBootFinished(screenKey) {
         root.finishedBootScreens = BootLogic.markFinished(root.finishedBootScreens, screenKey)
         root.refreshBootReady()
+    }
+
+    function reportBootStarted() {
+        if (root.bootStarted)
+            return
+        root.bootStarted = true
     }
 
     // The JsonAdapter starts with an empty wallpaper path before settings.json
@@ -401,6 +410,7 @@ Variants {
                 // switches straight away and is never reported.
                 if (!wallpaperWindow.settledOnce) {
                     wallpaperWindow.settledOnce = true
+                    root.reportBootStarted()
                     wallpaperWindow.beginWallpaper(path, true)
                     return
                 }

@@ -44,6 +44,8 @@ Item {
                     Logic.Stages.quietReady)
             compare(Logic.advance(Logic.Stages.lockedFloor, "unknown"),
                     Logic.Stages.lockedFloor)
+            compare(Logic.advance(Logic.Stages.lockedFloor, "chrome-mounted"),
+                    Logic.Stages.chromeStaging)
         }
 
         // chrome-ready only records the gate: the stage stays on chromeStaging
@@ -96,8 +98,6 @@ Item {
         // A known event arriving before its stage is dropped rather than
         // skipping the ladder, so a mis-wired caller cannot jump to quiet-ready.
         function test_outOfOrderEventsDoNotSkipAStage() {
-            compare(Logic.advance(Logic.Stages.lockedFloor, "chrome-mounted"),
-                    Logic.Stages.lockedFloor)
             compare(Logic.advance(Logic.Stages.lockedFloor, "chrome-ready"),
                     Logic.Stages.lockedFloor)
             compare(Logic.advance(Logic.Stages.lockedFloor, "wave-started"),
@@ -106,13 +106,15 @@ Item {
                     Logic.Stages.wallpaperReveal)
             compare(Logic.advance(Logic.Stages.wallpaperReveal, "wave-started"),
                     Logic.Stages.wallpaperReveal)
+            compare(Logic.advance(Logic.Stages.chromeStaging, "wallpaper-ready"),
+                    Logic.Stages.chromeStaging)
         }
 
         // A stage the caller cannot read is read as the floor, so the next real
         // event still climbs the ladder instead of being dropped forever.
         function test_unknownStageStartsFromTheFloor() {
             compare(Logic.advance(undefined, "wallpaper-ready"), Logic.Stages.wallpaperReveal)
-            compare(Logic.advance(99, "chrome-mounted"), Logic.Stages.lockedFloor)
+            compare(Logic.advance(99, "chrome-mounted"), Logic.Stages.chromeStaging)
             compare(Logic.advance(99, "unknown"), Logic.Stages.lockedFloor)
             compare(Logic.advance("chromeStaging", "wave-started"), Logic.Stages.lockedFloor)
         }

@@ -32,6 +32,10 @@ var Events = {
 // a stage of its own — quiet-ready is the wave itself.
 var TRANSITIONS = [
     { from: Stages.lockedFloor, event: Events.wallpaperReady, to: Stages.wallpaperReveal },
+    // Chrome may mount as soon as the settings-backed wallpaper request has
+    // started. It stages alongside the wallpaper reveal; chrome-ready still
+    // remains a separate gate for the startup lock wave.
+    { from: Stages.lockedFloor, event: Events.chromeMounted, to: Stages.chromeStaging },
     { from: Stages.wallpaperReveal, event: Events.chromeMounted, to: Stages.chromeStaging },
     { from: Stages.chromeStaging, event: Events.chromeReady, to: Stages.chromeStaging },
     { from: Stages.chromeStaging, event: Events.waveStarted, to: Stages.quietReady },

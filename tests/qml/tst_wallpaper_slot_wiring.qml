@@ -200,5 +200,13 @@ Item {
             verify(text.indexOf("onSettingsReadyChanged") >= 0,
                    "the boot wallpaper must resume after settings load")
         }
+
+        function test_parallelChromeCueIsSeparateFromBootCompletion() {
+            var text = harness.source.text
+            verify(text.indexOf("property bool bootStarted: false") >= 0)
+            verify(text.indexOf("function reportBootStarted()") >= 0)
+            verify(text.indexOf("root.reportBootStarted()") >= 0)
+            verify(text.indexOf("readonly property bool bootReady") >= 0)
+        }
     }
 }
