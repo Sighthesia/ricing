@@ -4,6 +4,7 @@ import Quickshell.Wayland
 import "../lazerbar"
 import "../../services" as Services
 import "./BarHoverLogic.js" as BarHoverLogic
+import "./BarPopupMotion.js" as BarPopupMotion
 
 // Per-screen fixed hover popup host with stable PanelWindow geometry.
 // Keeps the layer-shell window size fixed; only the inner TwoLayerPopup
@@ -1034,19 +1035,34 @@ PanelWindow {
             && String(root.currentIntent.actionKind || "") === "tray"
         ? root.trayFaceWidth : root.popupWidthForIntent(root.currentIntent, popupActions)
 
-    // True exactly while a body is off its resting position. The content slot
-    // narrows to the painted panel for exactly this window and is the full input
-    // canvas again the moment the slide settles, which is also before a tray
+    // True exactly while the content slot's clip must stay pinned to the painted
+    // panel. The slot narrows to the panel for exactly this window and is the
+    // full input canvas again the moment it settles, which is also before a tray
     // submenu can be summoned - so the catcher never loses its ancestors.
-    // Stays true for as long as EITHER body is off its resting position. Slide
-    // progress alone is one frame too early: reaching 1 releases the bound, but
-    // the outgoing body stays `visible` until settleContentSlide() clears its
-    // intent in the same turn's aftermath. That gap put the still-mounted
-    // outgoing body - a tray menu whose rows have not arrived yet, so empty
-    // cards - back on screen at full offset for a single frame, floating beside
-    // the panel with nothing behind it. Track the mounted outgoing layer too.
-    readonly property bool contentBodiesDisplaced: root._exchangeCommitted
-            && (root.contentSlideProgress < 1 || root._transitionOutgoingIntent !== null)
+    //
+    // Three separate states each pin it, and none of them may be keyed off
+    // `_exchangeCommitted` alone:
+    //
+    //  * A stale body is still mounted. `settleContentSlide()` clears
+    //    `_transitionOutgoingIntent` only after the slide, so between the mount
+    //    and that clear the outgoing layer is painted at a partial offset with
+    //    rows that have not arrived - empty cards.
+    //  * A replacement is pending. `beginIntentReplacement()` resets
+    //    `_exchangeCommitted` on the very frame the new intent lands, and it
+    //    deliberately leaves `_transitionOutgoingIntent` mounted. Gating on
+    //    `_exchangeCommitted` released the clip there: measured on a fast sweep
+    //    between two adjacent tray icons, the slot went 260 -> 504 (the whole
+    //    tray input canvas) on exactly that frame while `outgoing=true` and
+    //    `committed=false`, with `clip` still true, so the clip rect was 244px
+    //    wider than the panel and the stale body painted the band beside it -
+    //    the "empty dark cards to the right of the menu" frame.
+    //  * A slide is in flight, on either body.
+    //
+    // The pending clause is the one a fast tray-to-tray hop needs: it is the
+    // only window where `_exchangeCommitted` is false while a stale body exists.
+    readonly property bool contentBodiesDisplaced: BarPopupMotion.contentBodiesDisplaced(
+            root._transitionOutgoingIntent !== null, root.pendingIntent,
+            root._exchangeCommitted, root.contentSlideProgress)
 
     // Pure: read from the content slot's implicitHeight BINDING, so it must not
     // write state. Writing from here re-enters the binding, which restarts the
