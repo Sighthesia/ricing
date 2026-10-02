@@ -270,6 +270,14 @@ Item {
             // be derived from each other - and a dropped column has to narrow the
             // panel rather than stretch the survivors to fill it.
             compare(Hint.COLUMN_WIDTH, 180)
+            // Three is the ceiling the panel can reach, and nothing above it may
+            // take a slot. It is also the count the slide distance used to be
+            // derived from, which was wrong: the distance has to be the panel's own
+            // current width for the two layers to meet exactly.
+            compare(Hint.MAX_COLUMNS, 3)
+            compare(Hint.MAX_COLUMNS, 1 + 2, "the active column and its two neighbours")
+            compare(Hint.columnCount(Hint.cappedColumns(makeHint())), Hint.MAX_COLUMNS,
+                "and a full panel reaches it")
         }
 
         function test_focusedIndexIn_readsARowList() {

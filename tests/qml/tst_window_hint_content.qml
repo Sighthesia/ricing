@@ -66,6 +66,24 @@ Item {
         return all.length > 0 ? all[0] : null
     }
 
+    // The body paints two copies of the strip mid-slide - the one leaving and the
+    // one arriving - and both use the same objectNames, because they are the same
+    // component. So a search rooted at the body would find every row twice, and a
+    // count or a position assertion would be about neither copy. Most tests want
+    // the content the user is looking at, which is the incoming layer; the slide
+    // tests ask for the outgoing one by name.
+    //
+    // Both helpers root their own search at `body` and must never be rewritten to
+    // call each other: `live()` walking itself is the infinite recursion that
+    // blows the stack.
+    function live() {
+        return findByName(body, "windowHintIncomingLayer") || body
+    }
+
+    function outgoing() {
+        return findByName(body, "windowHintOutgoingLayer")
+    }
+
     // The last activation the body reported. The body owns no niri call, so
     // this is the only place the tap route can be observed.
     QtObject {
@@ -108,7 +126,7 @@ Item {
 
         // ---- the list ---------------------------------------------------
         function test_bodyListsOneRowPerWindow() {
-            compare(findAllByName(body, "windowHintWindowRow").length, 2)
+            compare(findAllByName(live(), "windowHintWindowRow").length, 2)
         }
 
         // ---- the three columns -------------------------------------------
@@ -118,33 +136,33 @@ Item {
             // is always in the same place. The order is asserted by position, not
             // by existence: three sets of rows that exist is not the same claim
             // as three columns that are in the right places.
-            var previous = findByName(body, "windowHintPreviousColumn")
-            var active = findByName(body, "windowHintColumn")
-            var next = findByName(body, "windowHintNextColumn")
+            var previous = findByName(live(), "windowHintPreviousColumn")
+            var active = findByName(live(), "windowHintColumn")
+            var next = findByName(live(), "windowHintNextColumn")
             verify(previous && active && next, "all three columns exist")
             verify(previous.x + previous.width <= active.x, "previous is leftmost")
             verify(active.x + active.width <= next.x, "next is rightmost")
-            compare(findAllByName(body, "windowHintPreviousRow").length, 1)
-            compare(findAllByName(body, "windowHintNextRow").length, 1)
+            compare(findAllByName(live(), "windowHintPreviousRow").length, 1)
+            compare(findAllByName(live(), "windowHintNextRow").length, 1)
             // Each column shows its OWN workspace's window, not a copy of the
             // active one - a neighbour that listed the active workspace's
             // windows would be decoration pretending to be information.
-            compare(findByName(body, "windowHintPreviousRow").modelData.windowId, "20")
-            compare(findByName(body, "windowHintNextRow").modelData.windowId, "30")
+            compare(findByName(live(), "windowHintPreviousRow").modelData.windowId, "20")
+            compare(findByName(live(), "windowHintNextRow").modelData.windowId, "30")
         }
 
         function test_neighbourColumnsCarryNoState() {
             // Only the active column holds focus, so a card, a highlight or an
             // indicator on a neighbour would claim a second selection. The
             // neighbour labels are plain text over the panel's own surface.
-            var previous = findAllByName(body, "windowHintPreviousRow")[0]
-            var active = findAllByName(body, "windowHintWindowRow")[0]
+            var previous = findAllByName(live(), "windowHintPreviousRow")[0]
+            var active = findAllByName(live(), "windowHintWindowRow")[0]
             // The active row is a card; a neighbour is not.
             verify(active.color !== undefined, "the active row is a filled card")
             verify(previous.color === undefined, "a neighbour label paints no fill")
-            compare(findAllByName(body, "windowHintFocusFrame").length, 1,
+            compare(findAllByName(live(), "windowHintFocusFrame").length, 1,
                 "one highlight, for the whole panel")
-            compare(findAllByName(body, "windowHintFocusIndicator").length, 1,
+            compare(findAllByName(live(), "windowHintFocusIndicator").length, 1,
                 "and one indicator")
             // A neighbour row is still a tap target: focusing a window in another
             // workspace is the one thing that makes the neighbours worth showing,
@@ -153,7 +171,7 @@ Item {
         }
 
         function test_tappingANeighbourRowReportsItsId() {
-            var row = findAllByName(body, "windowHintNextRow")[0]
+            var row = findAllByName(live(), "windowHintNextRow")[0]
             mouseClick(row, row.width / 2, row.height / 2, Qt.LeftButton)
             compare(reported.window, "30")
         }
@@ -163,11 +181,11 @@ Item {
             // would be drawn under the previous workspace's labels and none of it
             // would be visible over the row it is supposed to mark. The rows are
             // positioned inside their column, so root-space is column.x + row.x.
-            var rows = findAllByName(body, "windowHintWindowRow")
-            var active = findByName(body, "windowHintColumn")
-            var wash = findByName(body, "windowHintFocusFrame")
-            var bar = findByName(body, "windowHintFocusIndicator")
-            var previous = findByName(body, "windowHintPreviousColumn")
+            var rows = findAllByName(live(), "windowHintWindowRow")
+            var active = findByName(live(), "windowHintColumn")
+            var wash = findByName(live(), "windowHintFocusFrame")
+            var bar = findByName(live(), "windowHintFocusIndicator")
+            var previous = findByName(live(), "windowHintPreviousColumn")
             compare(wash.x, active.x + rows[0].x, "the highlight starts where the row starts")
             compare(wash.width, active.width, "and spans the column")
             // The previous column ends exactly where the active one begins, so
@@ -178,7 +196,7 @@ Item {
                 "the indicator is on the highlight")
             // ...and the same on the far side, or the highlight would cover the
             // next workspace's labels.
-            var next = findByName(body, "windowHintNextColumn")
+            var next = findByName(live(), "windowHintNextColumn")
             verify(wash.x + wash.width <= next.x, "and stops before the next column")
         }
 
@@ -189,19 +207,20 @@ Item {
             // reads as a layout fault, not as "there is nothing over there".
             body.hint = root.makeHint({ previousWindows: [] })
             wait(20)
-            verify(findByName(body, "windowHintPreviousColumn"), "the column is still there")
-            compare(findAllByName(body, "windowHintPreviousRow").length, 0, "and holds no row")
-            compare(findAllByName(body, "windowHintNextRow").length, 1, "the other side is unaffected")
+            verify(findByName(live(), "windowHintPreviousColumn"), "the column is still there")
+            compare(findAllByName(live(), "windowHintPreviousRow").length, 0, "and holds no row")
+            compare(findAllByName(live(), "windowHintNextRow").length, 1, "the other side is unaffected")
             // Two columns wide, not three, and the active one moved up into the
             // slot the previous column vacated rather than staying put.
             compare(body.shownColumnCount, 2)
             compare(body.width, 2 * body.columnWidth, "the panel narrowed to fit")
-            settleColumn()
-            var active = findByName(body, "windowHintColumn")
-            var next = findByName(body, "windowHintNextColumn")
+            // No settle needed: the columns' slots are derived, not animated, so
+            // they are in their new places the moment the content changes.
+            var active = findByName(live(), "windowHintColumn")
+            var next = findByName(live(), "windowHintNextColumn")
             compare(active.x, 0, "active takes the freed slot")
             compare(next.x, body.columnWidth, "next follows it")
-            compare(findByName(body, "windowHintFocusFrame").x, active.x,
+            compare(findByName(live(), "windowHintFocusFrame").x, active.x,
                 "and the highlight follows the active column")
         }
 
@@ -213,8 +232,7 @@ Item {
             wait(20)
             compare(body.shownColumnCount, 1)
             compare(body.width, body.columnWidth)
-            settleColumn()
-            compare(findByName(body, "windowHintColumn").x, 0)
+            compare(findByName(live(), "windowHintColumn").x, 0)
         }
 
         function test_thePanelIsAsWideAsItsColumns() {
@@ -232,9 +250,9 @@ Item {
             // alone. If a neighbour column used a different spacing, the three
             // lists would not line up across the panel and the panel would read
             // as three unrelated stacks.
-            var previous = findByName(body, "windowHintPreviousColumn")
-            var active = findByName(body, "windowHintColumn")
-            var next = findByName(body, "windowHintNextColumn")
+            var previous = findByName(live(), "windowHintPreviousColumn")
+            var active = findByName(live(), "windowHintColumn")
+            var next = findByName(live(), "windowHintNextColumn")
             compare(previous.spacing, active.spacing, "previous matches the active pitch")
             compare(next.spacing, active.spacing, "next matches it too")
             compare(previous.width, active.width, "and the columns are peers in width")
@@ -246,10 +264,12 @@ Item {
             compare(next.x, body.columnWidth * 2, "next the third")
         }
 
-        function test_neighbourRowsArriveOnTheSameStagger() {
-            // A workspace switch replaces all three columns at once, so the
-            // arrival has to cover the neighbours too - otherwise the panel
-            // would drop its outer columns instantly and stagger only the middle.
+        function test_theWholePanelArrivesInOnePiece() {
+            // No row is left behind and none arrives on its own. A switch used to
+            // stagger the three columns in row by row, which meant the panel was
+            // briefly three different heights' worth of half-drawn content; now it
+            // is displaced as one object, so every row of every column crosses at
+            // the same time and none of them is ever partially faded in.
             var many = []
             for (var i = 0; i < 3; i++)
                 many.push({ windowId: "p" + i, title: "p" + i, icon: "", isFocused: false })
@@ -260,35 +280,43 @@ Item {
                 windows: many,
                 nextWindows: many
             })
-            // Sampled DURING the stagger: waiting it out first is what makes a
-            // stagger unverifiable.
-            wait(Lazer.MotionTokens.fast + Lazer.MotionTokens.dropdownItem + 40)
-            verify(body.entrancePending, "rows are still arriving")
-            var previous = findAllByName(body, "windowHintPreviousRow")
-            var next = findAllByName(body, "windowHintNextRow")
-            compare(previous.length, 3)
-            compare(next.length, 3)
-            verify(previous[0].opacity > 0.9, "neighbour's first row landed, was " + previous[0].opacity)
-            verify(previous[2].opacity < 0.1, "and its last has not, was " + previous[2].opacity)
-            verify(next[0].opacity > 0.9, "same on the far side, was " + next[0].opacity)
-            verify(next[2].opacity < 0.1, "and its last has not, was " + next[2].opacity)
-
-            // The flag has to stand down on the LONGEST of the three staggers.
-            // Standing it down on the active column's last row would leave a
-            // taller neighbour column pinned at the hidden value for good.
-            wait(Lazer.MotionTokens.dropdownItem * 2 + Lazer.MotionTokens.medium + 80)
-            compare(body.entrancePending, false)
-            verify(findAllByName(body, "windowHintPreviousRow")[2].opacity > 0.9)
-            verify(findAllByName(body, "windowHintNextRow")[2].opacity > 0.9)
+            // Sampled DURING the slide, which is the only time the two layers are
+            // both on screen.
+            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            verify(body.swapping, "still crossing")
+            var previous = findAllByName(live(), "windowHintPreviousRow")
+            var active = findAllByName(live(), "windowHintWindowRow")
+            var next = findAllByName(live(), "windowHintNextRow")
+            compare(previous.length, 3, "every neighbour row is there")
+            compare(active.length, 3, "and every active one")
+            compare(next.length, 3, "and the far side too")
+            // All opaque: a row that faded in on its own would be a hole in the
+            // displacement, and the point of the two layers is that there is none.
+            for (var r = 0; r < 3; ++r) {
+                verify(active[r].opacity > 0.9, "active row " + r + " is solid")
+                verify(previous[r].opacity > 0.9, "previous row " + r + " is solid")
+                verify(next[r].opacity > 0.9, "next row " + r + " is solid")
+            }
+            // And the outgoing copy is solid too, since it is a rigid body sliding
+            // off rather than a list dissolving.
+            // The copy that is leaving is the PREVIOUS content - the two windows
+            // the init snapshot installed. It has to be whole and opaque, because
+            // it is a rigid body sliding off rather than a list dissolving, and it
+            // must not already have become the new list.
+            var leaving = findAllByName(outgoing(), "windowHintWindowRow")
+            compare(leaving.length, 2, "the copy that is leaving is whole")
+            compare(leaving[0].modelData.windowId, "10", "and is the OLD content")
+            verify(leaving[0].opacity > 0.9, "and opaque")
+            settleSlide()
         }
 
         function test_bodyShowsNothingButTheList() {
             // The panel is body-only: no workspace strip, no header, no
             // divider. Anything here is a copy of what the bar already shows or
             // of what the rows themselves say.
-            verify(findByName(body, "windowHintWorkspaceChip") === null)
-            verify(findByName(body, "windowHintDivider") === null)
-            verify(findByName(body, "windowHintStrip") === null)
+            verify(findByName(live(), "windowHintWorkspaceChip") === null)
+            verify(findByName(live(), "windowHintDivider") === null)
+            verify(findByName(live(), "windowHintStrip") === null)
         }
 
         function test_bodyCarriesNoWorkspaceActivation() {
@@ -309,7 +337,7 @@ Item {
             // that also tinted itself would put two fills on screen and read as
             // two different states - and during the glide neither row is focused
             // anyway, so the per-row fill would simply be gone.
-            var rows = findAllByName(body, "windowHintWindowRow")
+            var rows = findAllByName(live(), "windowHintWindowRow")
             compare(rows[0].color, Lazer.LazerTheme.settingsCard)
             compare(rows[1].color, Lazer.LazerTheme.settingsCard,
                 "the focused row paints no fill of its own")
@@ -321,10 +349,10 @@ Item {
         function test_focusHighlightIsTheOnlyFocusFill() {
             // Exactly one element carries the focus fill for the whole list.
             var wash = Lazer.LazerTheme.settingsSelected
-            var rows = findAllByName(body, "windowHintWindowRow")
+            var rows = findAllByName(live(), "windowHintWindowRow")
             var filled = rows.filter(function(r) { return r.color === wash })
             compare(filled.length, 0, "no row carries it")
-            compare(findByName(body, "windowHintFocusFrame").color, wash, "the shared one does")
+            compare(findByName(live(), "windowHintFocusFrame").color, wash, "the shared one does")
         }
 
         function test_indicatorClearsTheGlyph() {
@@ -333,16 +361,16 @@ Item {
             // begins. The gutter is derived, not a literal, so moving either the
             // marker or the glyph cannot silently close it up again. Measured
             // from the ACTIVE column's edge, which is now the middle one.
-            var rows = findAllByName(body, "windowHintWindowRow")
-            var wash = findByName(body, "windowHintFocusFrame")
-            var bar = findByName(body, "windowHintFocusIndicator")
-            var icon = findByName(body, "windowHintWindowIcon")
+            var rows = findAllByName(live(), "windowHintWindowRow")
+            var wash = findByName(live(), "windowHintFocusFrame")
+            var bar = findByName(live(), "windowHintFocusIndicator")
+            var icon = findByName(live(), "windowHintWindowIcon")
             compare(icon.x, rows[0].children[0].x, "glyphs share one inset")
             var gap = icon.x - (bar.x - wash.x + bar.width)
             compare(gap, 12, "and keep a 12px gutter clear of the marker")
             verify(gap >= 8, "a gutter, not a hairline")
             // The title follows the glyph, so the whole row shifts with it.
-            var title = findByName(body, "windowHintWindowTitle")
+            var title = findByName(live(), "windowHintWindowTitle")
             compare(title.anchors.leftMargin, 8)
         }
 
@@ -352,9 +380,9 @@ Item {
             // rows at the default 0, the highlight at 5, the indicator at 6. With
             // the highlight on top the bar would be painted over and the current
             // window would lose its indicator entirely.
-            var rows = findAllByName(body, "windowHintWindowRow")
-            var wash = findByName(body, "windowHintFocusFrame")
-            var bar = findByName(body, "windowHintFocusIndicator")
+            var rows = findAllByName(live(), "windowHintWindowRow")
+            var wash = findByName(live(), "windowHintFocusFrame")
+            var bar = findByName(live(), "windowHintFocusIndicator")
             verify(bar.z > wash.z, "indicator above the highlight, was " + bar.z)
             verify(wash.z > rows[0].z, "highlight above the rows, was " + wash.z)
         }
@@ -362,13 +390,13 @@ Item {
         function test_focusHighlightStillGlidesAndSnaps() {
             // The launcher's contract, minus the border: only y is animated, and
             // the highlight is bounded by the row.
-            var frame = findByName(body, "windowHintFocusFrame")
-            var rows = findAllByName(body, "windowHintWindowRow")
+            var frame = findByName(live(), "windowHintFocusFrame")
+            var rows = findAllByName(live(), "windowHintWindowRow")
             compare(frame.enabled, false, "inert, so it cannot swallow a row tap")
             // Bounded by the row, not inset: the highlight has to cover exactly
             // the row it marks, and the row spans its column's full width. The
             // rows sit inside their column, so the comparison is made there too.
-            var active = findByName(body, "windowHintColumn")
+            var active = findByName(live(), "windowHintColumn")
             compare(frame.height, rows[1].height)
             compare(frame.x, active.x + rows[1].x, "starts where the row starts")
             compare(frame.width, rows[1].width, "and is exactly as wide")
@@ -384,9 +412,9 @@ Item {
             // Look the rows up again: the Repeater tore the old delegates down
             // when the snapshot was replaced, so a handle taken before the swap
             // reads a destroyed item.
-            var after = findAllByName(body, "windowHintWindowRow")
+            var after = findAllByName(live(), "windowHintWindowRow")
             wait(Math.round(Lazer.MotionTokens.settingsSidebarCollapse / 2))
-            var gliding = findByName(body, "windowHintFocusFrame")
+            var gliding = findByName(live(), "windowHintFocusFrame")
             // Mid-glide the highlight is between the two rows, which is what
             // makes it read as travelling rather than jumping. A highlight with
             // no Behavior on y would already be at 0 here.
@@ -394,9 +422,9 @@ Item {
                 "in flight between the rows, was " + gliding.y)
 
             wait(Lazer.MotionTokens.settingsSidebarCollapse + 120)
-            var moved = findByName(body, "windowHintFocusFrame")
+            var moved = findByName(live(), "windowHintFocusFrame")
             compare(moved.y, 0, "glided to the first row")
-            compare(findAllByName(body, "windowHintFocusFrame").length, 1, "one for the list")
+            compare(findAllByName(live(), "windowHintFocusFrame").length, 1, "one for the list")
         }
 
         function test_focusIsOneSharedIndicatorNotAPerRowMarker() {
@@ -404,13 +432,13 @@ Item {
             // travelling bar, and the launcher frames its current row with one
             // shared frame. N per-row markers would read as decoration, so there
             // must be exactly one of each for the whole list.
-            compare(findAllByName(body, "windowHintFocusIndicator").length, 1)
-            compare(findAllByName(body, "windowHintFocusFrame").length, 1)
-            verify(findByName(body, "windowHintFocusedBar") === null)
+            compare(findAllByName(live(), "windowHintFocusIndicator").length, 1)
+            compare(findAllByName(live(), "windowHintFocusFrame").length, 1)
+            verify(findByName(live(), "windowHintFocusedBar") === null)
         }
 
         function test_indicatorUsesTheWorkspaceIndicatorVocabulary() {
-            var bar = findByName(body, "windowHintFocusIndicator")
+            var bar = findByName(live(), "windowHintFocusIndicator")
             // Same tokens as the workspace indicator, turned 90 degrees for a
             // list that travels vertically: its thickness is that bar's height,
             // and its resting length is that bar's width.
@@ -425,7 +453,7 @@ Item {
             // The reason it is vertical: the workspace bar elongates along its
             // long axis, so this one must too. Stretching the short axis would
             // turn a bar into a rectangle mid-flight.
-            var bar = findByName(body, "windowHintFocusIndicator")
+            var bar = findByName(live(), "windowHintFocusIndicator")
             compare(bar.width, Lazer.LazerTheme.barIndicatorHeight, "stays bar-thin")
             verify(bar.height >= 16, "at least its resting length")
         }
@@ -435,14 +463,14 @@ Item {
             // tracking a row item, so this is the guard against the two drifting
             // apart: if the row height or the Column spacing changes and the
             // pitch is not updated, the bar would mark thin air.
-            var rows = findAllByName(body, "windowHintWindowRow")
-            var wash = findByName(body, "windowHintFocusFrame")
-            var bar = findByName(body, "windowHintFocusIndicator")
+            var rows = findAllByName(live(), "windowHintWindowRow")
+            var wash = findByName(live(), "windowHintFocusFrame")
+            var bar = findByName(live(), "windowHintFocusIndicator")
             var rowCentre = rows[1].y + rows[1].height / 2
             compare(bar.y + bar.height / 2, rowCentre, "centred on the row")
             compare(bar.x - wash.x, 4, "sits inside the active column's left edge")
             // Root space: the bar is a child of the panel, the row of its column.
-            var active = findByName(body, "windowHintColumn")
+            var active = findByName(live(), "windowHintColumn")
             verify(bar.x + bar.width < active.x + rows[1].x + rows[1].width,
                 "and within the row")
         }
@@ -456,19 +484,10 @@ Item {
             wait(Lazer.MotionTokens.slow * 2 + 150)
         }
 
-        // A full list swap: the exit, then the stagger, whose last row starts
-        // `rowCount - 1` steps in and takes `medium` to land.
-        function settleSwap(rowCount) {
-            wait(Lazer.MotionTokens.fast + 20)
-            var rows = Math.max(1, rowCount || findAllByName(body, "windowHintWindowRow").length)
-            wait((rows - 1) * Lazer.MotionTokens.dropdownItem + Lazer.MotionTokens.medium + 60)
-        }
-
-        // The strip's slide and the columns' own re-slotting both run on `medium`,
-        // and a column whose neighbour appeared or vanished does not arrive at its
-        // new slot until then. Geometry assertions have to wait for it; the panel
-        // width does not move, so it can be read immediately.
-        function settleColumn() {
+        // Wait out one full crossing. The slide is a single `medium` traverse with
+        // no stagger behind it, so this is the whole of it - plus room for the
+        // animation's `onFinished` to have released the held copy.
+        function settleSlide() {
             wait(Lazer.MotionTokens.medium + 40)
         }
 
@@ -485,14 +504,14 @@ Item {
             // Mid-travel the bar is stretched across the gap between head and
             // tail, which is the workspace indicator's motion: it elongates
             // along its long axis and contracts on arrival.
-            var bars = findAllByName(body, "windowHintFocusIndicator")
+            var bars = findAllByName(live(), "windowHintFocusIndicator")
             compare(bars.length, 1, "still one instance")
             verify(bars[0].height > 16, "stretched while the tail trails")
             compare(bars[0].width, Lazer.LazerTheme.barIndicatorHeight, "still bar-thin")
 
             settleIndicator()
-            var settled = findByName(body, "windowHintFocusIndicator")
-            var rows = findAllByName(body, "windowHintWindowRow")
+            var settled = findByName(live(), "windowHintFocusIndicator")
+            var rows = findAllByName(live(), "windowHintWindowRow")
             compare(settled.height, 16, "contracted on arrival")
             compare(settled.y + settled.height / 2, rows[0].height / 2, "centred on the first row")
         }
@@ -505,7 +524,7 @@ Item {
                 many.push({ windowId: String(i), title: "w" + i, icon: "", isFocused: i === 7 })
             body.hint = root.makeHint({ windows: many })
             wait(20)
-            verify(!findByName(body, "windowHintFocusIndicator").visible)
+            verify(!findByName(live(), "windowHintFocusIndicator").visible)
         }
 
         function test_underlineHiddenWhenNoWindowIsFocused() {
@@ -516,19 +535,19 @@ Item {
                 ]
             })
             wait(20)
-            verify(!findByName(body, "windowHintFocusIndicator").visible)
+            verify(!findByName(live(), "windowHintFocusIndicator").visible)
         }
 
         // ---- tap --------------------------------------------------------
         function test_tappingAWindowRowReportsItsId() {
-            var rows = findAllByName(body, "windowHintWindowRow")
+            var rows = findAllByName(live(), "windowHintWindowRow")
             mouseClick(rows[1], rows[1].width / 2, rows[1].height / 2, Qt.LeftButton)
             compare(reported.window, "11")
         }
 
         function test_tappingAnyRowIsLive() {
             // Every row is a target, not only the focused one.
-            var rows = findAllByName(body, "windowHintWindowRow")
+            var rows = findAllByName(live(), "windowHintWindowRow")
             mouseClick(rows[0], rows[0].width / 2, rows[0].height / 2, Qt.LeftButton)
             compare(reported.window, "10")
         }
@@ -537,7 +556,7 @@ Item {
             // Asserted as a contract, not by sampling an opacity mid-animation:
             // the duration and easing are the shared tokens, so a deliberate
             // retune of the recipe cannot silently desync this file.
-            var rows = findAllByName(body, "windowHintWindowRow")
+            var rows = findAllByName(live(), "windowHintWindowRow")
             var flash = rows[0].rowFlashAnimation
             compare(flash.property, "opacity")
             compare(flash.from, Lazer.MotionTokens.clickFlashOpacity)
@@ -550,7 +569,7 @@ Item {
         }
 
         function test_pressFlashRunsOnTap() {
-            var rows = findAllByName(body, "windowHintWindowRow")
+            var rows = findAllByName(live(), "windowHintWindowRow")
             var row = rows[0]
             mouseClick(row, row.width / 2, row.height / 2, Qt.LeftButton)
             // The same tap must both start the flash and report the activation.
@@ -567,8 +586,8 @@ Item {
                 many.push({ windowId: String(i), title: "w" + i, icon: "", isFocused: false })
             body.hint = root.makeHint({ windows: many })
             wait(20)
-            compare(findAllByName(body, "windowHintWindowRow").length, 8 - 3)
-            compare(findByName(body, "windowHintOverflow").text, "+3 more windows")
+            compare(findAllByName(live(), "windowHintWindowRow").length, 8 - 3)
+            compare(findByName(live(), "windowHintOverflow").text, "+3 more windows")
         }
 
         function test_emptyWorkspaceSaysSoInsteadOfABarePanel() {
@@ -576,26 +595,25 @@ Item {
             wait(20)
             // An empty workspace is a real state: the bar names the workspace,
             // so the body has to explain the bare list.
-            verify(findByName(body, "windowHintNoWindows").visible)
-            compare(findAllByName(body, "windowHintWindowRow").length, 0)
+            verify(findByName(live(), "windowHintNoWindows").visible)
+            compare(findAllByName(live(), "windowHintWindowRow").length, 0)
         }
 
         function test_coldSnapshotStatesItself() {
             body.hint = null
             wait(20)
-            compare(findAllByName(body, "windowHintWindowRow").length, 0)
+            compare(findAllByName(live(), "windowHintWindowRow").length, 0)
             verify(findByName(body, "windowHintEmpty").visible)
         }
 
-        // ---- swapping the list between workspaces ------------------------
-        function test_workspaceSwitchAnimatesTheListOutThenIn() {
-            // A workspace switch replaces every row, so the rows have to be seen
-            // leaving before the new ones arrive - otherwise the list is simply
-            // gone and remade between two frames. The slide is on the body, the
-            // one container that holds all three columns.
-            var list = findByName(body, "windowHintBody")
+        // ---- switching between workspaces --------------------------------
+        function test_workspaceSwitchHoldsTheOutgoingRowsWhileTheyLeave() {
+            // A workspace switch replaces every row, so the outgoing ones have to
+            // still be mounted while they travel off - otherwise the panel's
+            // contents are simply gone and remade between two frames. This is the
+            // part a depth-1 hold buys.
             compare(body.swapping, false, "settled to begin with")
-            compare(list.opacity, 1)
+            compare(outgoing().visible, false, "and nothing is held")
 
             body.hint = root.makeHint({
                 workspaceId: "43",
@@ -604,104 +622,193 @@ Item {
                 previousActiveWorkspacePosition: 1,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            // Mid-exit: the OLD rows are still the ones on screen, and the list
-            // is on its way out. This is the part a display pool of depth 1 buys.
-            verify(body.swapping, "swapping")
+            verify(body.swapping, "sliding")
+            verify(outgoing().visible, "the outgoing layer is mounted")
             // An animation reads its start value on the frame it starts, so the
             // travel has to be sampled after the event loop has turned.
-            wait(Math.round(Lazer.MotionTokens.fast / 2))
-            var during = findAllByName(body, "windowHintWindowRow")
-            compare(during.length, 2, "the outgoing rows are still mounted")
-            verify(list.opacity < 1, "and fading, was " + list.opacity)
-            verify(list.x !== 0, "and travelling")
+            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            var leaving = findAllByName(outgoing(), "windowHintWindowRow")
+            compare(leaving.length, 2, "the outgoing rows are still mounted")
+            compare(leaving[0].modelData.windowId, "10", "and are the OLD ones")
+            var arriving = findAllByName(live(), "windowHintWindowRow")
+            compare(arriving.length, 1, "while the new one is already in place")
+            compare(arriving[0].modelData.windowId, "20")
 
-            // Rows mid-flight must not be tappable: what is under the pointer is
-            // about to be discarded.
-            verify(!during[0].enabled, "a row mid-swap is not a tap target")
+            // Rows mid-slide are not tap targets on either side: what is under the
+            // pointer is leaving, or has not arrived.
+            verify(!leaving[0].enabled, "a row on the way out is not a tap target")
+            verify(!arriving[0].enabled, "nor is the one on its way in")
 
-            settleSwap()
-            var after = findAllByName(body, "windowHintWindowRow")
+            settleSlide()
+            compare(body.swapping, false)
+            compare(outgoing().visible, false, "the held copy is released")
+            compare(findAllByName(outgoing(), "windowHintWindowRow").length, 0,
+                "and its rows are gone with it")
+            var after = findAllByName(live(), "windowHintWindowRow")
             compare(after.length, 1, "the new list has taken over")
             compare(after[0].modelData.windowId, "20")
-            compare(body.swapping, false)
-            compare(list.opacity, 1, "and the list is opaque again")
-            compare(list.x, 0, "and the strip is home")
             verify(after[0].enabled, "rows are tappable once landed")
         }
 
-        function test_swapTravelsTheWayTheWorkspaceMoved() {
-            // Three columns side by side, so a switch is a horizontal slide: the
-            // whole strip leaves by one column and glides home while the new rows
-            // arrive. That continuity is the whole point - the alternative is one
-            // list blinking into another, with nothing carrying the eye across.
-            var strip = findByName(body, "windowHintBody")
-            compare(strip.x, 0, "the strip rests at home")
+        function test_thePanelIsNeverLeftUncovered() {
+            // The reason there are two layers. A single layer sliding out leaves a
+            // band of empty panel on one side for the length of the travel, and a
+            // hole in a panel reads as a layout fault rather than as motion. So the
+            // two layers have to cover each other's vacated ground at every point
+            // of the slide - which is a claim about the whole travel, not about
+            // either end of it.
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 3,
+                previousActiveWorkspacePosition: 2,
+                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
+            })
+            var panelWidth = body.width
+            for (var step = 0; step < 4; ++step) {
+                wait(Math.round(Lazer.MotionTokens.medium / 4))
+                var out = outgoing()
+                var inn = live()
+                // The whole claim: the pair covers the panel from 0 to its width.
+                // The outgoing copy's right edge and the arriving copy's left edge
+                // meeting at one seam is what makes that true, so that identity is
+                // asserted directly rather than inferred from the end positions.
+                var seam = out.x + out.width
+                compare(seam, inn.x, "step " + step + ": the two layers meet at one seam")
+                verify(seam >= 0 && seam <= panelWidth,
+                    "step " + step + ": and the seam is inside the panel, was " + seam)
+                verify(out.x <= 0, "step " + step + ": the leaving copy has not uncovered the left")
+                verify(inn.x + inn.width >= panelWidth,
+                    "step " + step + ": nor the right")
+            }
+            settleSlide()
+        }
 
+        function test_bothLayersMoveTheSameWayAndTheSameDistance() {
+            // One traverse, not a round trip, and the two layers exactly one panel
+            // width apart in opposite directions. That identity is what keeps the
+            // panel covered: the outgoing copy's right edge and the arriving copy's
+            // left edge have to be the same number at every point of the slide, or
+            // they open a gap or overlap and double-draw the rows.
+            compare(live().x, 0, "the arriving layer rests at home")
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 3,
+                previousActiveWorkspacePosition: 2,
+                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
+            })
+            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            var out = outgoing()
+            var inn = live()
+            // Moving to a LATER workspace takes the content LEFT, because the new
+            // workspace was sitting to the right of the old one and has to cross to
+            // reach the middle. Getting this backwards would have the panel turn
+            // away from the direction the workspace went.
+            verify(out.x < 0, "the outgoing copy has set off leftwards, was " + out.x)
+            verify(inn.x > 0, "while the arriving one comes from the right, was " + inn.x)
+            // One panel width apart, which is the number that makes the pair cover
+            // the panel: the outgoing copy's right edge and the arriving copy's
+            // left edge are then the same point, and the seam sweeps across.
+            compare(inn.x - out.x, body.width, "exactly one panel width apart")
+            compare(out.x + out.width, inn.x, "so the two layers meet at one seam")
+
+            settleSlide()
+            compare(live().x, 0, "the arriving layer landed at home")
+            compare(outgoing().visible, false, "and the other one is gone")
+        }
+
+        function test_theSlideIsOnePassAndDoesNotTurnBack() {
+            // Progress runs 0 to 1 once. A value that overshot and came back would
+            // be a bounce, and the whole point of the two layers is that the motion
+            // is a single displacement.
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 3,
+                previousActiveWorkspacePosition: 2,
+                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
+            })
+            var furthest = 0
+            for (var step = 0; step < 5; ++step) {
+                wait(Math.round(Lazer.MotionTokens.medium / 5))
+                // Monotonic: each sample is at least as far along as the last.
+                verify(body.slideProgress >= furthest,
+                    "step " + step + " went backwards, was " + body.slideProgress)
+                furthest = body.slideProgress
+            }
+            settleSlide()
+            compare(body.slideProgress, 1, "and it finishes at rest")
+        }
+
+        function test_swapTravelsTheWayTheWorkspaceMoved() {
+            // The sign of the displacement follows the workspace move, mirrored:
+            // the content moves the way a page does when you turn forward.
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
             compare(body.swapDirection, 1, "moved later in the list")
-            // Sampled mid-flight, not after it out: waiting the whole thing out
-            // first is what makes a slide unverifiable. An animation reads its
-            // start value on the frame it starts, so the sample comes after the
-            // event loop has turned.
-            wait(Math.round(Lazer.MotionTokens.fast / 2))
-            // Moving to a LATER workspace takes the strip LEFT, because the new
-            // workspace was sitting to the right of the old one and has to travel
-            // across to reach the middle. Getting this backwards would have the
-            // panel turn away from the direction the workspace went.
-            verify(strip.x < 0 && strip.x > -body.columnWidth,
-                "the strip has set off to one side, was " + strip.x)
-            verify(strip.x >= -body.columnWidth, "and by no more than one column")
+            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            verify(outgoing().x < 0, "and the content went left")
+            settleSlide()
 
-            settleSwap(1)
-            compare(findByName(body, "windowHintBody").x, 0, "and has come home")
-
-            // The other way has to mirror it: the direction is a record of which
-            // way the workspace moved, and the strip leaves against it so the
-            // previous workspace arrives from the far side.
             body.hint = root.makeHint({
                 activeWorkspacePosition: 1,
                 previousActiveWorkspacePosition: 3,
                 windows: [{ windowId: "21", title: "term2", appId: "kitty", icon: "", isFocused: true }]
             })
             compare(body.swapDirection, -1, "moved earlier in the list")
-            wait(Math.round(Lazer.MotionTokens.fast / 2))
-            verify(strip.x > 0 && strip.x < body.columnWidth,
-                "and to the other side, was " + strip.x)
-            settleSwap(1)
-            compare(findByName(body, "windowHintBody").x, 0)
+            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            verify(outgoing().x > 0, "and the content went right")
+            settleSlide()
         }
 
-        function test_theStripSlidesAsOneWithItsMarkers() {
-            // The strip carries the columns, the shared highlight and the
-            // indicator together. A highlight parked at its own resting x while
-            // the column slid out from under it would read as the focus staying
-            // put while the window list moved - two different claims about where
-            // the current window is.
+        function test_onlyTheArrivingLayerCarriesTheFocusMarkers() {
+            // Focus belongs to the workspace you are moving to. A marker on the
+            // outgoing copy would blink a second time for a workspace you have
+            // already left, and the two copies would disagree about which row is
+            // current while both are on screen.
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            wait(Math.round(Lazer.MotionTokens.fast / 2))
-            var strip = findByName(body, "windowHintBody")
-            var active = findByName(body, "windowHintColumn")
-            var wash = findByName(body, "windowHintFocusFrame")
-            var bar = findByName(body, "windowHintFocusIndicator")
-            verify(strip.x !== 0, "the strip is travelling, was " + strip.x)
-            compare(wash.x, strip.x + active.x, "the highlight rides with its column")
-            compare(bar.x - wash.x, 4, "and the indicator keeps its inset")
-            settleSwap(1)
-            // Landed: the markers are back exactly on the column, not near it.
-            var settled = findByName(body, "windowHintColumn")
-            compare(findByName(body, "windowHintFocusFrame").x, settled.x)
+            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            compare(findAllByName(outgoing(), "windowHintFocusFrame").length, 0,
+                "no highlight on the copy that is leaving")
+            compare(findAllByName(outgoing(), "windowHintFocusIndicator").length, 0,
+                "and no indicator")
+            compare(findAllByName(live(), "windowHintFocusFrame").length, 1,
+                "the arriving one carries the highlight")
+            compare(findAllByName(live(), "windowHintFocusIndicator").length, 1,
+                "and the indicator")
+            settleSlide()
         }
 
-        function test_neighbourColumnsTravelWithTheSwap() {
-            // Every column moves together, so the swap reads as one motion across
+        function test_theMarkersCrossWithTheContentTheyMark() {
+            // The highlight is a child of the arriving layer, so it travels with
+            // the column it is on. A highlight pinned to the panel while the column
+            // slid out from under it would read as the focus staying put while the
+            // window list moved - two different claims about where the current
+            // window is.
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 3,
+                previousActiveWorkspacePosition: 2,
+                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
+            })
+            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            var inn = live()
+            var wash = findByName(inn, "windowHintFocusFrame")
+            var bar = findByName(inn, "windowHintFocusIndicator")
+            var active = findByName(inn, "windowHintColumn")
+            verify(inn.x > 0, "the layer is mid-flight, was " + inn.x)
+            // Layer-local: the markers are children of the layer, so their own x is
+            // the same number whether or not the layer is moving. What has to hold
+            // is that they sit on the column, not that they are at some absolute
+            // position that a slide would have to be added to.
+            compare(wash.x, active.x, "the highlight sits on its column mid-slide")
+            compare(bar.x - wash.x, 4, "and the indicator keeps its inset")
+            settleSlide()
+        }
+
+        function test_theWholeStripTravelsNotJustTheActiveColumn() {
+            // Every column moves together, so the switch reads as one motion across
             // the panel. If only the active column travelled, the neighbours would
             // sit still while the middle slid and the switch would read as two
             // unrelated changes.
@@ -712,53 +819,55 @@ Item {
                 nextWindows: [{ windowId: "n1", title: "n1", icon: "", isFocused: false }],
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            wait(Math.round(Lazer.MotionTokens.fast / 2))
-            // The previous column is already in its slot and does not move; what
-            // has to hold is that the strip is mid-slide and still in order.
-            var strip = findByName(body, "windowHintBody")
-            var active = findByName(body, "windowHintColumn")
-            var next = findByName(body, "windowHintNextColumn")
-            verify(strip.x !== 0, "mid-slide, was " + strip.x)
-            compare(findByName(body, "windowHintPreviousColumn").x, 0, "previous holds the first slot")
-            compare(next.x - active.x, body.columnWidth, "and next is still one column along")
-            settleSwap(1)
-            // Landed: the new workspace is in the middle, and each neighbour slot
-            // shows what the new snapshot says for it rather than a stale list.
-            compare(findByName(body, "windowHintBody").x, 0)
-            compare(active.x, body.columnWidth)
-            compare(findByName(body, "windowHintPreviousRow").modelData.windowId, "p1")
-            compare(findByName(body, "windowHintNextRow").modelData.windowId, "n1")
+            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            var inn = live()
+            var active = findByName(inn, "windowHintColumn")
+            var next = findByName(inn, "windowHintNextColumn")
+            var previous = findByName(inn, "windowHintPreviousColumn")
+            // The columns keep their slots relative to each other; the LAYER is
+            // what is displaced, so all three move as one object.
+            compare(active.x, body.columnWidth, "active holds its slot")
+            compare(previous.x, 0, "previous holds the first slot")
+            compare(next.x - active.x, body.columnWidth, "and next is one column along")
+            settleSlide()
+            // Landed: each neighbour slot shows what the new snapshot says for it
+            // rather than a stale list.
+            compare(findByName(live(), "windowHintPreviousRow").modelData.windowId, "p1")
+            compare(findByName(live(), "windowHintNextRow").modelData.windowId, "n1")
         }
 
-
-        function test_rowsArriveOnAStaggerNotAllAtOnce() {
+        function test_aSwitchMidSlideDoesNotRestartIt() {
+            // Holding mod and arrowing twice quickly lands a second switch while
+            // the first is still crossing. Re-holding the outgoing copy there would
+            // snap the arriving layer back to its starting offset - a visible jump
+            // backwards - which is worse than the outgoing copy briefly naming a
+            // workspace one step behind.
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 2,
+                previousActiveWorkspacePosition: 1,
+                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
+            })
+            wait(Math.round(Lazer.MotionTokens.medium / 2))
+            var beforeX = live().x
+            verify(beforeX > 0, "mid-flight, was " + beforeX)
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
-                previousActiveWorkspacePosition: 1,
-                windows: [
-                    { windowId: "a", title: "a", appId: "kitty", icon: "", isFocused: true },
-                    { windowId: "b", title: "b", appId: "kitty", icon: "", isFocused: false },
-                    { windowId: "c", title: "c", appId: "kitty", icon: "", isFocused: false }
-                ]
+                previousActiveWorkspacePosition: 2,
+                windows: [{ windowId: "21", title: "term2", appId: "kitty", icon: "", isFocused: true }]
             })
-            // Sample DURING the stagger, not after it: waiting the whole thing
-            // out first is what makes a stagger unverifiable.
-            wait(Lazer.MotionTokens.fast + Lazer.MotionTokens.dropdownItem + 40)
-            verify(body.entrancePending, "rows are still arriving")
-
-            // Just after the first row's fade: it is up, the last is not. That
-            // gap IS the stagger; a single group fade would land them together.
-            var rows = findAllByName(body, "windowHintWindowRow")
-            compare(rows.length, 3)
-            verify(rows[0].opacity > 0.9, "first row landed, was " + rows[0].opacity)
-            verify(rows[2].opacity < 0.1, "last row has not, was " + rows[2].opacity)
-
-            // The flag stands down when the last row lands, or the rows would
-            // stay bound to the hidden value for the next swap.
-            wait(Lazer.MotionTokens.dropdownItem * 2 + Lazer.MotionTokens.medium + 80)
-            compare(body.entrancePending, false)
-            var landed = findAllByName(body, "windowHintWindowRow")
-            verify(landed[2].opacity > 0.9, "last row landed, was " + landed[2].opacity)
+            // No frame turn between the assignment and the read: the layer must not
+            // have been sent back to its start.
+            compare(live().x, beforeX, "the arriving layer did not jump back")
+            verify(body.slideProgress < 1, "and the slide is still running")
+            settleSlide()
+            // The Repeater has to have rebuilt its delegates for the second
+            // snapshot by now, so this is about which content landed, not about
+            // timing.
+            var landed = findAllByName(live(), "windowHintWindowRow")
+            compare(landed.length, 1, "one row on the arriving layer")
+            compare(landed[0].modelData.windowId, "21",
+                "the newer snapshot is the one that landed")
+            compare(outgoing().visible, false, "and the held copy was released")
         }
 
         function test_sameWorkspaceRefreshCommitsWithoutAnimating() {
@@ -774,15 +883,17 @@ Item {
                 ]
             })
             compare(body.swapping, false, "committed straight away")
-            var rows = findAllByName(body, "windowHintWindowRow")
+            compare(outgoing().visible, false, "and held nothing")
+            var rows = findAllByName(live(), "windowHintWindowRow")
             compare(rows.length, 2, "already the new list")
-            compare(findByName(body, "windowHintWindowTitle").text, "kitty")
-            verify(rows[1].opacity > 0.9, "and visible, was " + rows[1].opacity)
+            compare(findByName(live(), "windowHintWindowTitle").text, "kitty")
+            verify(rows[1].enabled, "and tappable")
         }
 
-        function test_reducedMotionCommitsWithoutHidingTheList() {
-            // The rows start hidden so the stagger can raise them; under reduced
-            // motion nothing raises them, so they must not be left that way.
+        function test_reducedMotionCommitsWithoutSliding() {
+            // Reduced motion means the swap is a replacement, not a displacement.
+            // Only the arriving layer ends up visible - two copies at the same
+            // offset would double every row's text.
             Lazer.MotionTokens.reducedMotionOverride = true
             body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
@@ -792,13 +903,13 @@ Item {
                     { windowId: "b", title: "b", appId: "kitty", icon: "", isFocused: false }
                 ]
             })
-            settleSwap()
-            compare(body.swapping, false)
-            compare(body.entrancePending, false, "no arrival to wait for")
-            var rows = findAllByName(body, "windowHintWindowRow")
+            compare(body.swapping, false, "no slide to wait for")
+            compare(outgoing().visible, false, "and nothing was held")
+            var rows = findAllByName(live(), "windowHintWindowRow")
             compare(rows.length, 2)
             verify(rows[0].opacity > 0.9, "rows are visible, was " + rows[0].opacity)
             verify(rows[1].opacity > 0.9, "all of them, was " + rows[1].opacity)
+            verify(rows[0].enabled, "and tappable")
         }
 
         // ---- switching while held ---------------------------------------
@@ -812,11 +923,11 @@ Item {
             settleIndicator()
             // The same body instance keeps rendering; nothing is rebuilt around
             // a new popup, which is what keeps the hold from flickering.
-            var rows = findAllByName(body, "windowHintWindowRow")
+            var rows = findAllByName(live(), "windowHintWindowRow")
             compare(rows.length, 1)
             // The list is now a different workspace's single window, so the
             // highlight has to follow rather than stay where the old rows were.
-            var frame = findByName(body, "windowHintFocusFrame")
+            var frame = findByName(live(), "windowHintFocusFrame")
             compare(frame.y, 0, "highlight sits on the only row")
             compare(frame.height, rows[0].height)
         }

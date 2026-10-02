@@ -122,6 +122,15 @@ function columnCount(columnsValue) {
 // the survivors to fill it.
 var COLUMN_WIDTH = 180
 
+// The most columns the panel can ever hold: the previous, the active and the next
+// workspace. `columnCount` cannot return more, so this is a statement about the
+// layout's ceiling rather than a number the renderer reads.
+//
+// The slide distance is NOT derived from this. It is the panel's own current
+// width, because the two layers crossing each other have to be exactly one panel
+// width apart: any other distance opens a gap between them or overlaps them.
+var MAX_COLUMNS = 3
+
 // Index of the focused row within a list of rows, or -1. niri reports at most one
 // focused window, so this is the single row the focus marker belongs to. An index
 // past the cap is never returned: the window is real but not on screen, and a
