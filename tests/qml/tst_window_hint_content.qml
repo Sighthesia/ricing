@@ -1032,65 +1032,42 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             }
         }
 
-        function test_theCrossingUsesTheIndicatorsCurve() {
-            // The contract, asserted as a recipe rather than by sampling: the
-            // crossing borrows the focus indicator's two-speed motion, because that
-            // is what reads as weight being carried. A head that commits fast and
-            // a tail that lingers cannot be expressed as one ease - a symmetric
-            // one leaves and arrives at the same rate, which is the shove.
-            var phases = body.slideAnimation.animations
-            compare(phases.length, 2, "the crossing is two phases, not one ease")
-            compare(phases[0].to, body.slideHeadShare, "the head hands over at the share")
-
-            // The SHAPE is the indicator's, checked against the indicator's own live
-            // Behaviors rather than against `MotionTokens`: the same two curves, in
-            // the same order. The CLOCKS deliberately differ - see the lunge bound
-            // below - so comparing durations here would be asserting the bug.
-            compare(phases[0].easing.type, body.indicatorHeadMotion.easing.type,
-                "the departure runs on the indicator's head curve")
-            compare(phases[1].easing.type, body.indicatorTailMotion.easing.type,
-                "the settle runs on the indicator's tail curve")
-
-            // The indicator's proportions: the tail is three times the head's flight,
-            // which is what keeps the arrival lingering after the departure is done.
-            verify(phases[1].duration >= 2 * phases[0].duration,
-                "and the tail is the long half, was "
-                    + phases[0].duration + " then " + phases[1].duration)
-            verify(body.slideDuration >= phases[0].duration + phases[1].duration,
-                "and the declared total covers both phases")
-
-            // THE LUNGE BOUND. This is the assertion that replaces the duration
-            // equality, and it is what the indicator's literal clocks cannot satisfy
-            // on a panel-width travel: the indicator has 16px to cross and can put
-            // its bar there in `medium`, but the same head clock throws most of a
-            // panel's content across the screen before the settle starts. Measured
-            // as average pixels-of-progress per millisecond over each phase, the
-            // departure may be faster than the settle but must not be a bolt -
-            // "70% in 160ms, then 30% over 480ms" is a throw followed by a crawl,
-            // which is what the crossing was reported as feeling like.
+        function test_theCrossingRunsOnTheLaunchersFocusCurve() {
+            // One ease, on the launcher's focus recipe.
             //
-            // The ratio is computed HERE, from the component's own declared numbers
-            // and its own width. The component states no speed and asserts nothing
-            // about one, so this is a design rule stated independently of the
-            // numbers it judges rather than a restatement of them.
-            // Stated as a ratio with a float tolerance, not as a product: a bound
-            // that the numbers can land exactly on must not fail on the rounding.
-            var bound = 2.0
-            var ratio = (body.slideHeadShare / phases[0].duration)
-                / ((1 - body.slideHeadShare) / phases[1].duration)
-            verify(ratio <= bound + 1e-6,
-                "the departure is a departure and not a throw, ratio "
-                    + ratio.toFixed(2) + "x the settle")
-            verify(body.slideHeadShare < 0.5,
-                "and it does not carry most of the crossing, was "
-                    + body.slideHeadShare)
+            // `LauncherPage`'s `selectionFrame` glides between result rows on
+            // `settingsSidebarCollapse` with OutQuint, and this is the same kind of
+            // move: a highlight and its list travelling together to a new row. Read
+            // off the animation itself rather than off the tokens it was written
+            // from - a test that reads `MotionTokens.slow` only proves a number exists
+            // somewhere in the file.
+            compare(body.slideAnimation.to, 1, "one traverse, start to end")
+            compare(body.slideAnimation.duration, Lazer.MotionTokens.settingsSidebarCollapse,
+                "on the launcher's focus clock, was " + body.slideAnimation.duration)
+            compare(body.slideAnimation.easing.type, Easing.OutQuint,
+                "and the launcher's focus curve")
+            compare(body.slideDuration, body.slideAnimation.duration,
+                "with the declared total matching the one animation")
 
-            // The panel's crossing gets more time than the indicator's own settle,
-            // because it has the panel's width to cover rather than a bar's length.
-            verify(body.slideDuration > body.indicatorTailMotion.duration,
-                "and the whole crossing outlasts the indicator settling, was "
-                    + body.slideDuration + " against " + body.indicatorTailMotion.duration)
-            verify(body.hasOwnProperty("slideDip"), "and it dims a little in the middle")
+            // ONE phase. This is the assertion that carries the request: the crossing
+            // used to be a departure and a settle run in sequence, borrowing the
+            // workspace indicator's two-speed shape. That indicator is a 16px bar
+            // whose head and tail are two positions running in PARALLEL, so its shape
+            // comes free; a crossing has one position, so the phases had to run one
+            // after the other, and the handover between them is visible as a change of
+            // gear halfway across. That is the "it feels like two paragraphs" report,
+            // and it cannot recur while there is no seam to hand over at.
+            verify(!body.slideAnimation.hasOwnProperty("animations")
+                || body.slideAnimation.animations.length === 0,
+                "and no second phase to hand over to")
+
+            // The span must not change the clock. A three-column jump covers the same
+            // 300ms and arrives three times as fast, which is what a fixed settle
+            // rhythm means; making the duration a function of the distance is what
+            // made a run of taps feel like a queue.
+            compare(body.slideDuration, Lazer.MotionTokens.settingsSidebarCollapse,
+                "and the clock is the same whatever the span")
+            verify(body.hasOwnProperty("slideDip"), "and it still dims a little in the middle")
         }
 
         function test_theStripDipsOnceInTheMiddleAndNoFurther() {

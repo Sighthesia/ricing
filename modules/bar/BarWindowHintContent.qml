@@ -99,35 +99,28 @@ Item {
     // have to dim together or the seam would show one through the other. Shallow on
     // purpose: enough to register, far too little to read as a fade.
     readonly property real slideDip: Math.sin(Math.PI * slideProgress) * 0.12
-    // Where the head hands over to the tail, as a share of the traverse.
+    // The crossing runs on the LAUNCHER'S FOCUS CURVE: one ease, OutQuint, over
+    // `settingsSidebarCollapse`. That is the recipe `LauncherPage`'s `selectionFrame`
+    // glides on when the launcher's focus moves between results, and this is the same
+    // kind of move - a highlight and a list travelling together to a new row.
     //
-    // Small on purpose. The head is the quick departure, so the temptation is to
-    // let it carry most of the distance - and on a multi-column travel that reads
-    // as a lunge, because the bulk of the movement lands in the first fifth of a
-    // second and the rest crawls. Two tenths of the way is a departure; four tenths
-    // is most of the motion, and the columns look like they are being thrown across
-    // the panel rather than carried.
-    readonly property real slideHeadShare: 0.4
-    // The two clocks, carrying the indicator's two-speed SHAPE at a distance the
-    // indicator's clocks were never asked to cover.
+    // It was a two-phase departure-then-settle before, borrowing the workspace
+    // indicator's two-speed shape, and that was wrong for this twice over. The
+    // indicator is a 16px bar whose head and tail are two POSITIONS with a drawn bar
+    // stretched between them; a crossing has one position, so the two phases had to
+    // run in sequence - and a handover between them reads as two paragraphs of
+    // motion rather than one. At 640ms it was also sluggish, because the settle was
+    // carrying three fifths of the travel at a crawl.
     //
-    // `medium` / `slow * 2` is right for the indicator because the indicator has to
-    // cover sixteen pixels: its head really can put the bar there in 160ms. The
-    // strip covers a few columns rather than the panel's whole width, and 160ms of
-    // departure followed by 480ms of settle is the same proportion the indicator
-    // uses for its much shorter travel - so the SHAPE is shared without the clocks
-    // being copied blind. The two stay in the indicator's proportions: the tail is
-    // three times the head, so the arrival keeps lingering after the departure has
-    // finished.
-    readonly property int slideHeadDuration: MotionTokens.medium
-    readonly property int slideTailDuration: MotionTokens.slow * 2
-    // Both phases, for anything that has to wait the crossing out.
-    readonly property int slideDuration: slideHeadDuration + slideTailDuration
-    // The crossing's own recipe, and the indicator's, so a suite can compare the
-    // two. A test that reads `MotionTokens.slow > MotionTokens.fast` instead checks
-    // that two numbers exist somewhere in the file, not that the crossing runs on
-    // them - which is exactly the mistake a retune would reintroduce, and which one
-    // already had.
+    // One continuous ease has no handover to see and lands in half the time. The
+    // duration is deliberately NOT a function of the span: a three-column jump covers
+    // the same 300ms and arrives three times as fast, which is what a fixed settle
+    // rhythm means, and what stops a run of taps from feeling like a queue.
+    readonly property int slideDuration: MotionTokens.settingsSidebarCollapse
+    // The crossing's own recipe, so a suite can assert the curve rather than the
+    // tokens it was written from - a test that reads `MotionTokens.slow` instead
+    // checks that a number exists somewhere in the file, not that the animation runs
+    // on it, which is exactly the mistake a retune of this file would reintroduce.
     readonly property alias slideAnimation: slideRun
     readonly property alias indicatorHeadMotion: indicatorHeadAnimation
     readonly property alias indicatorTailMotion: indicatorTailAnimation
@@ -352,45 +345,25 @@ Item {
         slideRun.restart()
     }
 
-    SequentialAnimation {
+    NumberAnimation {
         id: slideRun
-        // The crossing runs on the INDICATOR'S SHAPE: a quick departure on OutQuad,
-        // then a long settle on OutSine, the tail three times the head.
+        target: root
+        property: "slideProgress"
+        from: 0
+        to: 1
+        // The launcher's focus curve, verbatim: `LauncherPage`'s `selectionFrame`
+        // glides between result rows on `settingsSidebarCollapse` with OutQuint,
+        // and this is the same move - a highlight and its list going to a new row.
+        // One ease, one duration, no phases.
         //
-        // That two-speed shape is what makes the motion read as carrying weight
-        // rather than being dragged, and a single ease cannot produce it - the
-        // symmetric `InOutSine` this replaced left and arrived at the same gentle
-        // rate, which read as a shove.
-        //
-        // The SHAPE is the indicator's, and so are the clocks: the strip covers a
-        // few columns, and the indicator covers sixteen pixels, and `medium` then
-        // `slow * 2` is the same proportion of each. The earlier numbers scaled the
-        // indicator's clocks by the panel's whole width, which threw most of the
-        // content across before the settle began - measured at 70% of the panel in
-        // 160ms, a lunge followed by a crawl.
-        //
-        // What cannot be reproduced at all is the indicator's structure: its head
-        // and tail are two positions running in PARALLEL with a drawn bar between
-        // them, so it settles in `slow * 2`. Here there is one position - the
-        // strip - and it has to cover both phases.
-        animations: [
-            // The indicator's head, on the indicator's head clock.
-            NumberAnimation {
-                target: root
-                property: "slideProgress"
-                to: root.slideHeadShare
-                duration: root.slideHeadDuration
-                easing.type: Easing.OutQuad
-            },
-            // The indicator's tail, on the indicator's tail clock.
-            NumberAnimation {
-                target: root
-                property: "slideProgress"
-                to: 1
-                duration: root.slideTailDuration
-                easing.type: Easing.OutSine
-            }
-        ]
+        // The two-phase version this replaced was borrowing the workspace indicator's
+        // two-speed shape, which does not transplant. The indicator's head and tail
+        // are two positions running in PARALLEL with a drawn bar stretched between
+        // them, so its shape is free. A crossing has one position, so the phases had
+        // to run in sequence - and the seam between them is visible as a change of
+        // gear halfway across, which is the paragraph feel this removes.
+        duration: MotionTokens.settingsSidebarCollapse
+        easing.type: Easing.OutQuint
         onFinished: {
             // The strip has landed with the arriving frame's active column in the
             // middle, so the held frame goes with it and exactly one set of rows
