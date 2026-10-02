@@ -365,8 +365,12 @@ Item {
             // so the check is that the highlight does not reach back over it.
             compare(wash.x, leftColumn.x + body.columnPitch + body.cellPaddingX,
                 "and starts where the left neighbour's column ends, inside its padding")
-            verify(bar.x >= wash.x && bar.x < wash.x + wash.width,
-                "the indicator is on the highlight")
+            // The indicator is a mark BESIDE the row now, in the band's left padding,
+            // so it is left of the outline rather than over it - which is the widget's
+            // arrangement, where the indicator sits outside the marked square.
+            verify(bar.x + bar.width <= wash.x,
+                "the indicator is outside the highlight, its right edge was "
+                    + (bar.x + bar.width) + " against " + wash.x)
             // ...and the same on the far side, or the highlight would cover the next
             // workspace's labels.
             verify(wash.x + wash.width <= rightColumn.x,
@@ -614,28 +618,47 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 "in the accent, was " + frame.border.color)
         }
 
-        function test_indicatorClearsTheGlyph() {
-            // The indicator sits at the highlight's own left edge, so the row
-            // needs a real left margin or the bar ends a pixel before the icon
-            // begins. The gutter is derived, not a literal, so moving either the
-            // marker or the glyph cannot silently close it up again. Measured
-            // from the ACTIVE column's edge, which is now the middle one.
+        function test_theIndicatorSitsBesideTheCardNotInsideIt() {
+            // The marker is a mark BESIDE the row it marks, in the band's left padding.
+            // `Workspaces.qml` puts its indicator outside the marked square - under it,
+            // in the bar's own gap - and this had it 4px in from the card's left edge,
+            // between the card's edge and its icon.
             var rows = findAllByName(live(), "windowHintWindowRow")
             var wash = findByName(live(), "windowHintFocusFrame")
             var bar = findByName(live(), "windowHintFocusIndicator")
             var icon = findByName(live(), "windowHintWindowIcon")
             compare(icon.x, rows[0].children[0].x, "glyphs share one inset")
-            // The gap is measured in the STRIP's space: the icon is a child of its
-            // row and the marker a child of the strip, and a gutter between them is
-            // only meaningful once both are in one space. The strip is at rest here,
-            // so the two spaces coincide - but the comparison does not depend on
-            // that, which is the point of measuring in the space the marker lives in.
-            var iconInStrip = icon.mapToItem(strip(), 0, 0)
-            var gap = iconInStrip.x - (bar.x + bar.width)
-            compare(gap, 12, "and keep a 12px gutter clear of the marker")
+            // Left of the card, so its whole width is clear of the card's left edge.
+            // The bar is a child of the strip and the row a child of one of its
+            // columns, so the row is mapped into the strip's space before the two are
+            // comparable - the row's own x is measured from its column.
+            var rowInStrip = rows[0].mapToItem(strip(), 0, 0)
+            verify(bar.x + bar.width <= rowInStrip.x,
+                "the bar ends left of the card, was " + (bar.x + bar.width)
+                    + " against " + rowInStrip.x)
+            // Inside the band's own left padding though, or it would sit on the
+            // neighbouring column. Centred in it: 3px of a 3px bar in an 8px padding
+            // leaves 2px either side.
+            // Centred rather than pinned to either edge: `floor((8 - 3) / 2)` puts
+            // 2px on the left and leaves 3 on the right, so the claim is that the two
+            // gaps are within a pixel of each other and neither is zero. A bar flush
+            // to the band's edge would read as the band's own border.
+            var leftGap = bar.x - strip().activeColumnX
+            var rightGap = body.cellPaddingX - leftGap - bar.width
+            compare(leftGap, 2, "centred in the band's left padding, left gap was "
+                + leftGap)
+            verify(Math.abs(leftGap - rightGap) <= 1, "and centred, not pinned to one "
+                + "edge: " + leftGap + " and " + rightGap)
+            verify(leftGap > 0 && rightGap > 0, "with room on both sides")
+            // The icon's inset is a plain card padding, not room made for the marker:
+            // the marker is outside the card, so nothing inside has to clear it. 8 is
+            // `Workspaces.cellPadding` - the gap between an icon and its square's edge
+            // in the widget this panel keeps borrowing from - stated here rather than
+            // read back from the body, so the claim is a number the suite owns.
+            compare(icon.x, 8, "the icon sits at the widget's own card padding, was "
+                + icon.x)
             compare(wash.x, strip().activeColumnX + body.cellPaddingX,
-                "and the marker is on the active column, inside its padding")
-            verify(gap >= 8, "a gutter, not a hairline")
+                "and the outline is on the active column, inside its padding")
             // The title follows the glyph, so the whole row shifts with it.
             var title = findByName(live(), "windowHintWindowTitle")
             compare(title.anchors.leftMargin, 8)
@@ -714,13 +737,23 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
 
         function test_indicatorUsesTheWorkspaceIndicatorVocabulary() {
             var bar = findByName(live(), "windowHintFocusIndicator")
-            // Same tokens as the workspace indicator, turned 90 degrees for a
-            // list that travels vertically: its thickness is that bar's height,
-            // and its resting length is that bar's width.
+            var rows = findAllByName(live(), "windowHintWindowRow")
+            // Same bar as the workspace indicator, turned 90 degrees for a list that
+            // travels vertically: its thickness is that bar's height and its resting
+            // length is that bar's width. Read from the theme rather than restated,
+            // because the claim is about being the SAME bar -
+            // `Workspaces.indicatorBarWidth` is `barWidgetHeight - 16`, which is 26,
+            // and a literal 16 here had the panel carrying a shorter bar than the one
+            // above it on screen.
             compare(bar.width, Lazer.LazerTheme.barIndicatorHeight)
             compare(bar.radius, Lazer.LazerTheme.barIndicatorRadius)
             compare(bar.color, Lazer.LazerTheme.osuGreen)
-            compare(bar.height, 16)
+            compare(bar.height, Lazer.LazerTheme.barWidgetHeight - 16,
+                "as long as the widget's indicator, was " + bar.height)
+            // And it has to fit the row it marks, or it would be clipping or
+            // overhanging the card it belongs to.
+            verify(bar.height <= rows[0].height,
+                "and it fits inside the row, " + bar.height + " in " + rows[0].height)
             verify(bar.visible, "the focused row is on screen, so the bar is")
         }
 
@@ -730,7 +763,8 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // turn a bar into a rectangle mid-flight.
             var bar = findByName(live(), "windowHintFocusIndicator")
             compare(bar.width, Lazer.LazerTheme.barIndicatorHeight, "stays bar-thin")
-            verify(bar.height >= 16, "at least its resting length")
+            verify(bar.height >= Lazer.LazerTheme.barWidgetHeight - 16,
+                "at least its resting length, was " + bar.height)
         }
 
         function test_indicatorIsCentredOnTheFocusedRow() {
@@ -743,7 +777,13 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var bar = findByName(live(), "windowHintFocusIndicator")
             var rowCentre = rows[1].y + rows[1].height / 2
             compare(bar.y + bar.height / 2, rowCentre, "centred on the row")
-            compare(bar.x - wash.x, 4, "sits inside the active column's left edge")
+            // Clear of the outline's left edge, on the outside: 3px is what is left of
+            // the band's 8px left padding once the 3px bar and its 2px lead-in are
+            // taken. Stated rather than read back, so it is a claim about clearance
+            // and not a restatement of whatever the inset happens to be.
+            compare(wash.x - (bar.x + bar.width), 3,
+                "3px clear of the outline's left edge, was "
+                    + (wash.x - (bar.x + bar.width)))
             // The bar is a child of the strip and the row is a child of a column of
             // the strip, so the row has to be mapped into the strip's space before the
             // two can be compared - the row's own x is measured from its column.
@@ -783,13 +823,19 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // along its long axis and contracts on arrival.
             var bars = findAllByName(live(), "windowHintFocusIndicator")
             compare(bars.length, 1, "still one instance")
-            verify(bars[0].height > 16, "stretched while the tail trails")
+            // Longer than its resting length, which is the widget's own
+            // `indicatorBarWidth` - stated from the theme so the claim is "stretched
+            // past resting", not "stretched past whatever resting happens to be".
+            verify(bars[0].height > Lazer.LazerTheme.barWidgetHeight - 16,
+                "stretched while the tail trails, was " + bars[0].height)
             compare(bars[0].width, Lazer.LazerTheme.barIndicatorHeight, "still bar-thin")
 
             settleIndicator()
             var settled = findByName(live(), "windowHintFocusIndicator")
             var rows = findAllByName(live(), "windowHintWindowRow")
-            compare(settled.height, 16, "contracted on arrival")
+            compare(settled.height, Lazer.LazerTheme.barWidgetHeight - 16,
+                "contracted on arrival, back to the widget's own length, was "
+                    + settled.height)
             compare(settled.y + settled.height / 2, rows[0].height / 2, "centred on the first row")
         }
 
@@ -1688,7 +1734,8 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var row = findAllByName(strip(), "windowHintWindowRow")[0]
             var rowInStrip = row.mapToItem(strip(), 0, 0)
             compare(wash.x, rowInStrip.x, "the highlight sits on its row mid-crossing")
-            compare(bar.x - wash.x, 4, "and the indicator keeps its inset")
+            compare(wash.x - (bar.x + bar.width), 3,
+                "and the indicator keeps its clearance outside the outline")
             settleSlide()
         }
 

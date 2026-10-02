@@ -193,15 +193,30 @@ Item {
         ? root.plan.slots * root.columnPitch - root.columnGutter : 0
     readonly property int focusedRowIndex: HintLogic.focusedIndexIn(
         root.activeColumn ? root.activeColumn.rows : null)
-    // Left inset of a row's glyph, shared by the icon and the title so both start
-    // on the same x - and derived from the indicator rather than a literal, so the
-    // gutter between the marker and the glyph cannot drift when either moves. The
-    // indicator sits at the highlight's own edge, so the row needs a real left
-    // margin: without it the bar ends 1px before the icon begins.
-    readonly property int indicatorInset: 4
+    // Where the indicator sits, now that it is a mark BESIDE the card rather than a
+    // mark inside it. `Workspaces.qml` puts its indicator outside the marked square
+    // entirely - below it, in the bar's own gap - and this panel had it the other way
+    // round: 4px in from the card's left edge, which put a green bar between the
+    // card's edge and its icon and made the icon carry an inset it only had in order
+    // to make room. The marker is now in the band's left padding, centred in it, so
+    // it marks the row from outside and the card's own inset is just padding again.
+    //
+    // Centred rather than pinned to either edge, so it cannot drift off-centre if
+    // `cellPaddingX` and `indicatorThickness` ever stop agreeing.
     readonly property int indicatorThickness: LazerTheme.barIndicatorHeight
-    readonly property int indicatorGutter: 12
-    readonly property int glyphInset: indicatorInset + indicatorThickness + indicatorGutter
+    readonly property int indicatorInset: Math.max(
+        0, Math.floor((cellPaddingX - indicatorThickness) / 2))
+    // A row's glyph inset, shared by the icon and the title so both start on the
+    // same x - and shared by the ACTIVE column and its two neighbours, which read
+    // the same property, so the three columns' icons stay on one line.
+    //
+    // No longer derived from the indicator. It was `indicatorInset +
+    // indicatorThickness + indicatorGutter` - 19px - purely to leave the marker a
+    // gutter inside the card, and with the marker outside that whole chain is dead
+    // weight that would read as an arbitrary indent. It is the widget's own icon
+    // padding now: `Workspaces.cellPadding`, the gap between an icon and its square's
+    // edge.
+    readonly property int glyphInset: 8
     readonly property int glyphWidth: 16
     // Vertical pitch of the list: a row plus the Column's gap. The indicator is
     // positioned from this, so it has to agree with the Column's own spacing
@@ -234,13 +249,21 @@ Item {
     }
 
     // --- indicator: the workspace widget's dual-speed edge tracker, rotated ---
-    // The workspace indicator is a 16x3 bar travelling sideways, so its head/tail
-    // stretch lengthens it along its own long axis and it stays a bar. This list
-    // runs down a column, so the indicator is a 3x16 bar travelling downward: same
-    // tokens, same tracker, same formula, rotated 90 degrees. Stretching the WRONG
-    // axis would have turned a 3px bar into a tall rectangle mid-flight, which is a
-    // shape change rather than a bar growing.
-    readonly property int indicatorLength: 16
+    // The workspace indicator is `barWidgetHeight - 16` long and `barIndicatorHeight`
+    // thick - 26x3 on a 48px bar - and its head/tail stretch lengthens it along its
+    // own long axis so it stays a bar. This list runs down a column, so the indicator
+    // is that same bar turned 90 degrees: 3 wide, and the same length.
+    //
+    // It was 16 here, on a comment that also claimed the widget's bar was 16 -
+    // `Workspaces.indicatorBarWidth` is `barWidgetHeight - 16`, which is 26. So the
+    // bar was not the widget's bar at 90 degrees but a different, shorter one, and
+    // the eye already knows the real length from the bar at the top of the screen.
+    // The row is `rowHeight` tall and the length fits inside it, which the widget's
+    // also does inside its square.
+    //
+    // Stretching the WRONG axis would have turned a 3px bar into a tall rectangle
+    // mid-flight, which is a shape change rather than a bar growing.
+    readonly property int indicatorLength: LazerTheme.barWidgetHeight - 16
 
     property real _headY: 0
     property real _tailY: 0
@@ -680,15 +703,22 @@ Item {
     }
 
     // The focus indicator, in the workspace widget's vocabulary and motion, turned
-    // 90 degrees for a list that runs down a column: a short green bar beside the
-    // focused row's glyph, `barIndicatorHeight` thick with the same radius, in
-    // `osuGreen`. One instance for the whole list, driven by the dual-speed tracker
-    // above so a switch elongates along the bar's long axis and contracts on arrival
-    // rather than sliding at one rate.
-    // Stacking: rows paint at the default 0, the shared focus highlight sits above
-    // them at 5, and this indicator above the highlight at 6. The order matters —
-    // the indicator is a mark ON the highlight, and at the same z the declaration
-    // order alone would decide, so it is stated explicitly.
+    // 90 degrees for a list that runs down a column: a short green bar in the band's
+    // left padding, `barIndicatorHeight` thick with the same radius, in `osuGreen`.
+    // One instance for the whole list, driven by the dual-speed tracker above so a
+    // switch elongates along the bar's long axis and contracts on arrival rather than
+    // sliding at one rate.
+    //
+    // Beside the card, not inside it. The widget's indicator is outside the marked
+    // square - under it, in the bar's gap - and this one was 4px in from the card's
+    // left edge, between the card's edge and its icon. Now it sits in the band's left
+    // padding, so the row it marks is the thing it is next to and the card's own
+    // inset is padding again rather than room made for the marker.
+    //
+    // Stacking: rows paint at the default 0, the shared focus outline above them at
+    // 5, and this indicator above that at 6. Stated because at equal z the
+    // declaration order alone would decide, and the outline's left edge is exactly
+    // where this bar now sits.
     Rectangle {
         id: focusUnderline
         objectName: "windowHintFocusIndicator"
@@ -699,9 +729,9 @@ Item {
         height: root._barLength
         radius: LazerTheme.barIndicatorRadius
         color: LazerTheme.osuGreen
-        // Measured from the active column's own left edge, which is the same origin
-        // the highlight uses, so the bar and the fill it marks always move together.
-        x: strip.activeColumnX + root.cellPaddingX + root.indicatorInset
+        // Measured from the active column's own left edge - the band's edge, not the
+        // card's - so the bar and the outline it marks always move together.
+        x: strip.activeColumnX + root.indicatorInset
         y: root._barTop
         visible: root.hasTarget
         opacity: root.hasTarget ? 1 : 0

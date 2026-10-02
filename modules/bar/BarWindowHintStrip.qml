@@ -165,6 +165,9 @@ Item {
                     }
 
                     // App icon; the service resolves a themed path per window.
+                    // Its inset is a plain card padding - the indicator that used to
+                    // share this edge sits outside the card now, so there is nothing
+                    // here to make room for.
                     Image {
                         id: rowIcon
                         objectName: "windowHintWindowIcon"
