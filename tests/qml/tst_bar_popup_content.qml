@@ -348,9 +348,10 @@ Item {
             compare(body.surfaceInset, item.contentInset,
                 "the body is told how far the host insets it")
 
-            // One column, plus the gap between columns, plus the horizontal cell
-            // padding the cards sit inside the band with.
-            compare(wash.x, 180 + 6 + 8,
+            // One column, plus the gap between columns, plus the card's horizontal
+            // inset inside the band: the clearance, the indicator's width, and the
+            // clearance again - 8 + 3 + 8.
+            compare(wash.x, 180 + 6 + 8 + 3 + 8,
                 "and the active workspace is still the middle one, was " + wash.x)
             // All three columns fit, so nothing is drawn past the surface.
             var strip = findByName(body, "windowHintStrip")

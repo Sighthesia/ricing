@@ -83,12 +83,12 @@ Item {
     // `BarWindowHintStrip.columnGutter` for why the panel needs one.
     readonly property int columnGutter: LazerTheme.inlineGap
     readonly property int columnPitch: columnWidth + columnGutter
-    // THREE margins, each lifted from the widget rather than chosen here:
+    // Margins, each lifted from the widget rather than chosen here:
     //
     //   band   -> panel edge   `LazerTheme.barWidgetGutter`   3
-    //   card   -> band, sides  `Workspaces.cellPadding`       8
     //   card   -> band, above  (barWidgetHeight 42 - the widget's 18px content
     //             and below    row) / 2                        12
+    //   card   -> band, sides  `cardClearance` * 2 + the indicator's width  19
     //
     // The two card margins are different numbers because the widget's are: its square
     // is `contentRow.implicitWidth + cellPadding * 2` wide, so 8 a side, while its
@@ -97,11 +97,22 @@ Item {
     // read as the cards crowding the band, and it is most visible vertically because
     // the band here is full-height and the widget's is a fixed-height bar row.
     //
+    // The horizontal one is no longer 8, because the focus indicator lives in it. It
+    // is a mark OUTSIDE the card - `Workspaces.qml` has its indicator outside the
+    // marked square - so the padding holds the clearance, the bar and the clearance
+    // again, and all three are the same number so none of them can be quietly tighter
+    // than the others. See `cardClearance`.
+    //
     // `surfaceInset` is how far the popup's own content column is inset from its
     // surface; `BarPopupActions` declares it. The band has to reach past it to get to
     // `bandInset` from the edge, which is why that reach is a negative offset here
     // rather than a padding on the body.
-    readonly property int cellPaddingX: 8
+    // `Workspaces.cellPadding`, the widget's own gap between an icon and its square's
+    // edge. It is the panel's card padding, the indicator's clearance from the band and
+    // the indicator's clearance from the card - one number, because one number is what
+    // stops any of the three from drifting tighter than the others.
+    readonly property int cardClearance: 8
+    readonly property int cellPaddingX: cardClearance * 2 + indicatorThickness
     readonly property int cellPaddingY: 12
     readonly property int bandInset: LazerTheme.barWidgetGutter
     property int surfaceInset: 0
@@ -193,19 +204,21 @@ Item {
         ? root.plan.slots * root.columnPitch - root.columnGutter : 0
     readonly property int focusedRowIndex: HintLogic.focusedIndexIn(
         root.activeColumn ? root.activeColumn.rows : null)
-    // Where the indicator sits, now that it is a mark BESIDE the card rather than a
-    // mark inside it. `Workspaces.qml` puts its indicator outside the marked square
-    // entirely - below it, in the bar's own gap - and this panel had it the other way
-    // round: 4px in from the card's left edge, which put a green bar between the
-    // card's edge and its icon and made the icon carry an inset it only had in order
-    // to make room. The marker is now in the band's left padding, centred in it, so
-    // it marks the row from outside and the card's own inset is just padding again.
+    // The indicator, outside the card. `Workspaces.qml` puts its indicator outside the
+    // marked square - below it, in the bar's own gap - and this panel had it the other
+    // way round: 4px in from the card's left edge, between the card's edge and its
+    // icon, with the icon carrying a 19px inset whose only purpose was to make room.
     //
-    // Centred rather than pinned to either edge, so it cannot drift off-centre if
-    // `cellPaddingX` and `indicatorThickness` ever stop agreeing.
+    // Its clearance is `cardClearance` on BOTH sides, which is the whole point: the
+    // widget's marker sits one card-padding from its band, and a marker centring
+    // itself in whatever padding happened to be left over is a marker that reads as
+    // too close the moment any of the three numbers moves. One number, three gaps.
+    //
+    // It cannot drift off-centre either: `cellPaddingX` is this clearance twice plus
+    // `indicatorThickness`, so the two gaps are equal by construction rather than by a
+    // centring expression that has to be kept in step.
     readonly property int indicatorThickness: LazerTheme.barIndicatorHeight
-    readonly property int indicatorInset: Math.max(
-        0, Math.floor((cellPaddingX - indicatorThickness) / 2))
+    readonly property int indicatorInset: cardClearance
     // A row's glyph inset, shared by the icon and the title so both start on the
     // same x - and shared by the ACTIVE column and its two neighbours, which read
     // the same property, so the three columns' icons stay on one line.
@@ -213,10 +226,9 @@ Item {
     // No longer derived from the indicator. It was `indicatorInset +
     // indicatorThickness + indicatorGutter` - 19px - purely to leave the marker a
     // gutter inside the card, and with the marker outside that whole chain is dead
-    // weight that would read as an arbitrary indent. It is the widget's own icon
-    // padding now: `Workspaces.cellPadding`, the gap between an icon and its square's
-    // edge.
-    readonly property int glyphInset: 8
+    // weight that would read as an arbitrary indent. It is `cardClearance` now, the
+    // same padding the card's own edge gets and the marker gets.
+    readonly property int glyphInset: cardClearance
     readonly property int glyphWidth: 16
     // Vertical pitch of the list: a row plus the Column's gap. The indicator is
     // positioned from this, so it has to agree with the Column's own spacing

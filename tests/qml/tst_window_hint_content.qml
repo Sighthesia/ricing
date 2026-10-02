@@ -213,11 +213,18 @@ Item {
         // own surface around its content for the same reason.
         //
         // During a crossing that pattern slides under the panel, so the gap that is
-        // normally interior crosses an edge, and the bound is one whole gap. That is
-        // still the guarantee that matters: the bug this test was written for left a
-        // ~180px band of bare panel at one end, and a 180px column against a 22px
-        // bound cannot pass it.
-        var slack = body.columnGutter + body.cellPaddingX + body.cellPaddingY
+        // normally interior crosses an edge, and the bound is one whole gap - the
+        // gutter plus a card inset at each side of it. That is still the guarantee
+        // that matters: the bug this test was written for left a ~180px band of bare
+        // panel at one end, and a 180px column against a 44px bound cannot pass it.
+        //
+        // The bound is stated as the gap rather than as a constant because the gap
+        // MOVES with the padding: widening the cards' inset to make room for the focus
+        // indicator took it from `gutter + 2 * 8` = 22 to `gutter + 2 * 19` = 44, and
+        // a bound left at the old number started failing on the very first crossing
+        // sample - not because a band went uncovered but because the surface now shows
+        // twice as much between two cards as it did.
+        var slack = body.columnGutter + body.cellPaddingX * 2
         return leftmost <= slack + 1 && rightmost >= body.width - slack - 1
     }
 
@@ -639,17 +646,14 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // Inside the band's own left padding though, or it would sit on the
             // neighbouring column. Centred in it: 3px of a 3px bar in an 8px padding
             // leaves 2px either side.
-            // Centred rather than pinned to either edge: `floor((8 - 3) / 2)` puts
-            // 2px on the left and leaves 3 on the right, so the claim is that the two
-            // gaps are within a pixel of each other and neither is zero. A bar flush
-            // to the band's edge would read as the band's own border.
+            // One padding on both sides, which is the claim: the marker is as far from
+            // the band's edge as the card is from its own, and as far from the card as
+            // from the band. 8 is `Workspaces.cellPadding`, stated here so the suite
+            // owns the number rather than restating whatever the component computes.
             var leftGap = bar.x - strip().activeColumnX
             var rightGap = body.cellPaddingX - leftGap - bar.width
-            compare(leftGap, 2, "centred in the band's left padding, left gap was "
-                + leftGap)
-            verify(Math.abs(leftGap - rightGap) <= 1, "and centred, not pinned to one "
-                + "edge: " + leftGap + " and " + rightGap)
-            verify(leftGap > 0 && rightGap > 0, "with room on both sides")
+            compare(leftGap, 8, "8px clear of the band's left edge, was " + leftGap)
+            compare(rightGap, 8, "and 8px clear of the card, was " + rightGap)
             // The icon's inset is a plain card padding, not room made for the marker:
             // the marker is outside the card, so nothing inside has to clear it. 8 is
             // `Workspaces.cellPadding` - the gap between an icon and its square's edge
@@ -777,12 +781,11 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var bar = findByName(live(), "windowHintFocusIndicator")
             var rowCentre = rows[1].y + rows[1].height / 2
             compare(bar.y + bar.height / 2, rowCentre, "centred on the row")
-            // Clear of the outline's left edge, on the outside: 3px is what is left of
-            // the band's 8px left padding once the 3px bar and its 2px lead-in are
-            // taken. Stated rather than read back, so it is a claim about clearance
-            // and not a restatement of whatever the inset happens to be.
-            compare(wash.x - (bar.x + bar.width), 3,
-                "3px clear of the outline's left edge, was "
+            // The same clearance the band's left padding gives the card, and the same
+            // one the bar is placed with: 8. Stated rather than read back, so it is a
+            // claim about the gap and not a restatement of whatever the inset is.
+            compare(wash.x - (bar.x + bar.width), 8,
+                "8px clear of the outline's left edge, was "
                     + (wash.x - (bar.x + bar.width)))
             // The bar is a child of the strip and the row is a child of a column of
             // the strip, so the row has to be mapped into the strip's space before the
@@ -1219,20 +1222,21 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // neighbours get plain labels - so every row found here belongs to the
             // column the band is on.
             //
-            // The expected number lives HERE, not read back from `body.cellPaddingX`: a
-            // test whose expected value is the component's own constant cannot tell
-            // "the padding is there" from "the padding is gone" - with the padding at 0
-            // it compared 0 against 0 and passed either way. Stated here it has to be
-            // argued with, and 2 is the value the design settled on: zero read as one
-            // solid mass, eight read as a floating margin.
-            // Two different numbers, because the widget's are. Its square is
-            // `contentRow.implicitWidth + cellPadding * 2` wide - 8 a side - while its
-            // height is a fixed `barWidgetHeight` of 42 with an 18px content row
-            // centred in it, leaving 12 above and below. Reading either from the
-            // component instead would make the test unable to disagree with it: an
-            // earlier version compared the gap against `body.cellPaddingX` and passed
-            // with or without a padding, because 0 matched 0.
-            var marginX = 8
+            // The expected numbers live HERE, not read back from the component: a test
+            // whose expected value is the component's own constant cannot tell "the
+            // padding is there" from "the padding is gone" - with the padding at 0 it
+            // compared 0 against 0 and passed either way. Stated here they have to be
+            // argued with.
+            //
+            // Vertical is 12, because the widget's square is a fixed `barWidgetHeight`
+            // of 42 with an 18px content row centred in it, leaving 12 above and below.
+            //
+            // Horizontal is 19, and that is NOT the widget's card padding any more: the
+            // focus indicator lives in this padding now, so it holds a clearance, the
+            // indicator and a clearance again. 8 and 8, so the marker is as far from
+            // the band as the card is and as far from the card as the band is - one
+            // padding in three places rather than three numbers that merely look close.
+            var marginX = 8 + 3 + 8
             var marginY = 12
             var cards = findAllByName(body, "windowHintWindowRow")
             verify(cards.length > 0, "the active column has cards to measure against")
@@ -1734,8 +1738,8 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var row = findAllByName(strip(), "windowHintWindowRow")[0]
             var rowInStrip = row.mapToItem(strip(), 0, 0)
             compare(wash.x, rowInStrip.x, "the highlight sits on its row mid-crossing")
-            compare(wash.x - (bar.x + bar.width), 3,
-                "and the indicator keeps its clearance outside the outline")
+            compare(wash.x - (bar.x + bar.width), 8,
+                "and the indicator keeps its 8px clearance outside the outline")
             settleSlide()
         }
 
