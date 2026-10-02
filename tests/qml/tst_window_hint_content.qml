@@ -872,6 +872,65 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(live().opacity, 1, "and full again once landed")
         }
 
+        function test_aRefreshWithNoMovementDoesNotCancelTheCrossing() {
+            // The regression that made every retune of this traverse invisible.
+            //
+            // niri sends a second refresh about 40ms after the activation, because
+            // the window list changes as the new workspace comes up. The service has
+            // already advanced its record of the active workspace by then, so that
+            // snapshot carries the SAME position on both sides - it reads as "nothing
+            // moved" while a crossing is on screen showing that something very much
+            // did. Committing on it ended the crossing a few frames in.
+            //
+            // It is asserted as a state, not as elapsed time, so it does not depend
+            // on how fast the offscreen platform happens to tick.
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 3,
+                previousActiveWorkspacePosition: 2,
+                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
+            })
+            verify(body.swapping, "the activation starts a crossing")
+            wait(Math.round(body.slideDuration / 4))
+            verify(body.slideProgress > 0 && body.slideProgress < 1,
+                "which is under way, was " + body.slideProgress)
+            var before = body.slideProgress
+
+            // The follow-up publish: same workspace on both sides, fresh content.
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 3,
+                previousActiveWorkspacePosition: 3,
+                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
+            })
+            verify(body.slideProgress < 1,
+                "and the follow-up refresh does not snap it to the end, was "
+                    + body.slideProgress + " from " + before)
+            verify(body.swapping, "so it is still crossing")
+            // And it carries on rather than restarting: the value moved forward.
+            wait(Math.round(body.slideDuration / 8))
+            verify(body.slideProgress > before,
+                "and keeps going forward, was " + body.slideProgress + " from " + before)
+            settleSlide()
+            compare(body.slideProgress, 1, "and lands on its own clock")
+        }
+
+        function test_aRefreshWithNoMovementAndNoCrossingStillCommits() {
+            // The other half of the same decision, so the guard above cannot be
+            // satisfied by never committing anything: a title edit on the workspace
+            // already shown is not a page turn, and must not animate.
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 1,
+                previousActiveWorkspacePosition: 1,
+                windows: [{ windowId: "21", title: "renamed", appId: "kitty", icon: "", isFocused: true }]
+            })
+            verify(!body.swapping, "nothing is crossing")
+            compare(body.slideProgress, 1, "and it commits straight away")
+            compare(outgoing().visible, false, "with nothing held on the way out")
+            compare(findAllByName(outgoing(), "windowHintWindowRow").length, 0,
+                "and the held copy released")
+            wait(Math.round(body.slideDuration / 2))
+            compare(body.slideProgress, 1, "and never starts one afterwards")
+        }
+
         function test_theSlideIsOnePassAndDoesNotTurnBack() {
             // Progress runs 0 to 1 once. A value that overshot and came back would
             // be a bounce, and the whole point of the two layers is that the motion

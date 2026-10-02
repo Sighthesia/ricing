@@ -189,8 +189,25 @@ Item {
         if (MotionTokens.reducedMotion || !root.shownReady)
             return root._commitHint()
         const direction = HintLogic.switchDirection(root.hint)
+        // A snapshot reporting no movement must NEVER cancel a crossing that is
+        // already under way.
+        //
+        // niri sends a second refresh about 40ms after the activation, because the
+        // window list changes as the new workspace comes up. By then the service has
+        // already advanced its record of the active workspace, so that snapshot
+        // reports the SAME position on both sides and reads as "nothing moved".
+        // Committing on it stopped every crossing a few frames in - which is why the
+        // traverse's timing could be retuned three times over and never once looked
+        // different, because none of it was ever on screen.
+        //
+        // The two cases are genuinely different. "No movement" alongside a crossing
+        // means the new workspace's content, refreshed - not a denial of the move
+        // the crossing is already showing. So the content is replaced under the
+        // crossing and the crossing finishes on its own clock. With no crossing in
+        // flight there is nothing to protect, and a title edit on the current
+        // workspace commits straight away exactly as before.
         if (direction === 0)
-            return root._commitHint()
+            return root.swapping ? root._replaceArriving() : root._commitHint()
         root.swapDirection = direction
         // Already sliding: replace the arriving content and let the crossing
         // continue. Re-holding the outgoing copy here would send the arriving layer
