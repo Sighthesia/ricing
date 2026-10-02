@@ -1006,15 +1006,36 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                             + Math.abs(body.slideTo - body.slideFrom))
                     // One way only, sampled while it is still moving. The last sample
                     // is the landed one, which is at rest by definition.
+                    // Sampled only while the crossing is IN FLIGHT. Once it has
+                    // landed, the strip narrows back to the arriving frame's three
+                    // columns and its offset returns to 0 - so a sample taken after
+                    // the landing reads as "it went backwards" when it did not. At
+                    // `slideDuration / 5` per step the old loop ran past the end
+                    // whenever the clock was short, because a `wait()` overshoots by
+                    // however long the delegate rebuild takes.
                     var furthest = strip().x
-                    for (var step = 0; step < 4; ++step) {
-                        wait(Math.round(body.slideDuration / 5))
+                    var movingSamples = 0
+                    var movedSamples = 0
+                    for (var step = 0; step < 40 && body.swapping; ++step) {
+                        wait(1)
+                        if (!body.swapping)
+                            break
                         var here = strip().x
-                        verify(direction === 0 ? here < furthest : here > furthest,
+                        // Never the wrong way. Not strictly monotonic per sample: the
+                        // first tick can land before the animation has moved at all,
+                        // and a sample that has not started yet is not a reversal.
+                        verify(direction === 0 ? here <= furthest : here >= furthest,
                             "span " + span + " dir " + direction + " step " + step
                                 + ": one way only, was " + here + " from " + furthest)
+                        if (direction === 0 ? here < furthest : here > furthest)
+                            movedSamples++
                         furthest = here
+                        movingSamples++
                     }
+                    verify(movedSamples > 0,
+                        "span " + span + " dir " + direction
+                            + ": and it was seen actually moving, "
+                            + movingSamples + " samples")
                     // Landed: back at home, three columns, and the arriving frame's
                     // active column in the middle. The strip's own offset returns to
                     // 0 here because the resting plan says the active column is slot
@@ -1032,40 +1053,100 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             }
         }
 
-        function test_theCrossingRunsOnTheLaunchersFocusCurve() {
-            // One ease, on the launcher's focus recipe.
+        function test_theActiveWorkspaceHasTheWidgetsSlidingBackground() {
+            // The bar's workspace widget draws the active workspace as one rectangle
+            // that SLIDES between the squares, not as a fill on each square. This
+            // strip is that widget's run of columns at three times the size, so it
+            // carries the same sliding surface, and the same recipe.
+            var host = findByName(body, "windowHintStrip")
+            var highlight = findByName(body, "windowHintColumnHighlight")
+            verify(highlight !== null, "the strip carries a background surface")
+            if (!highlight)
+                return
+
+            // One surface for the whole strip, not one per column: a fill on each
+            // column's delegate would cross-fade between two of them, which is the
+            // popping this exists to avoid.
+            compare(findAllByName(body, "windowHintColumnHighlight").length, 1,
+                "exactly one, however many columns are on the strip")
+
+            // The widget's own colour, so the panel and the bar agree.
+            compare(highlight.color, Lazer.LazerTheme.activeFill, "in the widget's fill")
+
+            // Sharp-cornered. This is a column band, and rounding belongs to
+            // component details; the widget's surface is square for the same reason.
+            compare(highlight.radius, 0, "a square band, not a rounded card")
+
+            // A background, never an overlay on a title.
+            verify(highlight.z < 0, "below the columns, not over them")
+
+            // Under the pointer means nothing - it is decoration.
+            verify(!highlight.enabled, "and inert to input")
+
+            // At rest it sits exactly on the active column.
+            compare(highlight.width, body.columnWidth, "as wide as one column")
+            compare(highlight.x, host.activeColumnX,
+                "and on the active one, was " + highlight.x + " against "
+                    + host.activeColumnX)
+
+            // It slides rather than popping, on the widget's recipe - which is the
+            // same recipe the crossing runs, so the list and the band behind it
+            // arrive together instead of reading as two things happening at once.
+            var motion = host.highlightSlideAnimation
+            verify(motion !== undefined && motion !== null,
+                "and it has a slide of its own")
+            if (!motion)
+                return
+            compare(motion.duration, Lazer.MotionTokens.medium,
+                "on the workspace highlight's clock, was " + motion.duration)
+            compare(motion.easing.type, Easing.OutQuad,
+                "and the workspace highlight's curve")
+            compare(motion.duration, body.slideDuration,
+                "the same clock the crossing runs, so they arrive together")
+
+            // First placement snaps. A Behavior would otherwise slide the band in
+            // from the strip's left edge every time the panel opened - the guard the
+            // widget keeps for the same reason.
+            body.hint = root.framedHint(4, 4)
+            wait(60)
+            compare(highlight.x, host.activeColumnX,
+                "and a fresh frame places it without sliding, was " + highlight.x)
+        }
+
+        function test_theCrossingRunsOnTheWorkspacesHighlightCurve() {
+            // One ease, on the workspace widget's active-highlight recipe.
             //
-            // `LauncherPage`'s `selectionFrame` glides between result rows on
-            // `settingsSidebarCollapse` with OutQuint, and this is the same kind of
-            // move: a highlight and its list travelling together to a new row. Read
-            // off the animation itself rather than off the tokens it was written
-            // from - a test that reads `MotionTokens.slow` only proves a number exists
-            // somewhere in the file.
+            // `Workspaces.qml`'s `activeHighlight` slides on `MotionTokens.medium`
+            // with `Easing.OutQuad`, and this panel is that widget's run of columns
+            // at three times the size - so the list and the highlight it now carries
+            // have to arrive together, or they read as two things happening at once.
+            // Read off the animation itself rather than off the tokens it was written
+            // from: a test that reads `MotionTokens.medium` only proves a number
+            // exists somewhere in the file.
             compare(body.slideAnimation.to, 1, "one traverse, start to end")
-            compare(body.slideAnimation.duration, Lazer.MotionTokens.settingsSidebarCollapse,
-                "on the launcher's focus clock, was " + body.slideAnimation.duration)
-            compare(body.slideAnimation.easing.type, Easing.OutQuint,
-                "and the launcher's focus curve")
+            compare(body.slideAnimation.duration, Lazer.MotionTokens.medium,
+                "on the workspace highlight's clock, was " + body.slideAnimation.duration)
+            compare(body.slideAnimation.easing.type, Easing.OutQuad,
+                "and the workspace highlight's curve")
             compare(body.slideDuration, body.slideAnimation.duration,
                 "with the declared total matching the one animation")
 
             // ONE phase. This is the assertion that carries the request: the crossing
             // used to be a departure and a settle run in sequence, borrowing the
-            // workspace indicator's two-speed shape. That indicator is a 16px bar
-            // whose head and tail are two positions running in PARALLEL, so its shape
-            // comes free; a crossing has one position, so the phases had to run one
-            // after the other, and the handover between them is visible as a change of
-            // gear halfway across. That is the "it feels like two paragraphs" report,
-            // and it cannot recur while there is no seam to hand over at.
+            // workspace INDICATOR's two-speed shape. That indicator's head and tail
+            // are two positions running in PARALLEL, so its shape comes free; a
+            // crossing has one position, so the phases had to run one after the
+            // other, and the handover between them is a visible change of gear
+            // halfway across. That cannot recur while there is no seam to hand over
+            // at.
             verify(!body.slideAnimation.hasOwnProperty("animations")
                 || body.slideAnimation.animations.length === 0,
                 "and no second phase to hand over to")
 
-            // The span must not change the clock. A three-column jump covers the same
-            // 300ms and arrives three times as fast, which is what a fixed settle
-            // rhythm means; making the duration a function of the distance is what
-            // made a run of taps feel like a queue.
-            compare(body.slideDuration, Lazer.MotionTokens.settingsSidebarCollapse,
+            // The span must not change the clock: a three-column jump covers the same
+            // 160ms and arrives three times as fast, which is what a fixed settle
+            // rhythm means.
+            compare(body.slideDuration, Lazer.MotionTokens.medium,
                 "and the clock is the same whatever the span")
             verify(body.hasOwnProperty("slideDip"), "and it still dims a little in the middle")
         }

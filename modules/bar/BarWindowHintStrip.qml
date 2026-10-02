@@ -66,6 +66,79 @@ Item {
         return tallest
     }
 
+    // --- active-workspace background, the workspace widget's surface ---------
+    // The bar's `Workspaces.qml` draws the active workspace as one rectangle that
+    // SLIDES between the squares rather than each square popping its own fill, and
+    // this strip is that widget's run of columns at three times the size. So the
+    // active column gets the same sliding surface, from the same token and the same
+    // curve - and deliberately NOT a fill on the column's own delegate, which would
+    // cross-fade between two columns instead of travelling.
+    //
+    // Neighbour columns get no fill, matching the widget: there, a square that is
+    // not active has no fill either and shows only instant hover. Here the neighbour
+    // columns carry their own muted labels, so a tint behind them would say they are
+    // selected too.
+    //
+    // Settable x/width rather than a binding on `activeColumnX`, because the first
+    // placement has to snap: a Behavior would otherwise slide the surface in from the
+    // strip's left edge every time the panel opened. Same `_highlightPlaced` guard
+    // the widget uses, for the same reason.
+    // The band's own recipe, so a suite can assert it against the crossing's rather
+    // than against the tokens both were written from. A test that reads
+    // `MotionTokens.medium` proves a number exists, not that the band runs on it.
+    readonly property alias highlightSlideAnimation: activeHighlightSlide
+
+    property bool _highlightPlaced: false
+    property real _highlightX: 0
+    property bool _highlightOn: false
+
+    // Track the active slot. Called on the slot itself rather than on the columns'
+    // geometry: `activeSlot` is an integer, so it changes exactly when the active
+    // workspace does, and reading a column's laid-out x back here would resolve a
+    // beat after the model swap and leave the surface a column behind.
+    function _syncHighlight() {
+        if (root.columns.length === 0) {
+            root._highlightOn = false
+            return
+        }
+        const target = root.activeSlot * root.columnWidth
+        if (!root._highlightPlaced) {
+            // First placement snaps - there is nothing on screen to travel from.
+            root._highlightX = target
+            root._highlightPlaced = true
+        } else {
+            root._highlightX = target
+        }
+        root._highlightOn = true
+    }
+
+    onActiveSlotChanged: _syncHighlight()
+    Component.onCompleted: _syncHighlight()
+
+    // The sliding surface. Below the columns (`z: -1`, as in the widget) so it is a
+    // background and never an overlay on a title, and sharp-cornered: this is a
+    // column band, and the design language keeps rounding for component details.
+    Rectangle {
+        id: activeHighlight
+        objectName: "windowHintColumnHighlight"
+        z: -1
+        x: root._highlightX
+        width: root.columnWidth
+        height: root.height
+        visible: root._highlightOn
+        color: LazerTheme.activeFill
+        enabled: false
+
+        Behavior on x {
+            enabled: root._highlightPlaced && !MotionTokens.reducedMotion
+            NumberAnimation {
+                id: activeHighlightSlide
+                duration: MotionTokens.medium
+                easing.type: Easing.OutQuad
+            }
+        }
+    }
+
     // One delegate per workspace position. `x` is DERIVED from the index rather
     // than accumulated by a `Row`: a positioner's layout lands after the frame that
     // created the delegate, and a column's width is a binding that can resolve a

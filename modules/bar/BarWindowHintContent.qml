@@ -99,24 +99,27 @@ Item {
     // have to dim together or the seam would show one through the other. Shallow on
     // purpose: enough to register, far too little to read as a fade.
     readonly property real slideDip: Math.sin(Math.PI * slideProgress) * 0.12
-    // The crossing runs on the LAUNCHER'S FOCUS CURVE: one ease, OutQuint, over
-    // `settingsSidebarCollapse`. That is the recipe `LauncherPage`'s `selectionFrame`
-    // glides on when the launcher's focus moves between results, and this is the same
-    // kind of move - a highlight and a list travelling together to a new row.
+    // The crossing runs on the WORKSPACE WIDGET'S ACTIVE-HIGHLIGHT CURVE: one ease,
+    // `Easing.OutQuad` over `medium`. That is the recipe `Workspaces.qml`'s
+    // `activeHighlight` slides on, and it is the right reference twice over - this
+    // panel is a magnified view of that widget's three columns, and the highlight the
+    // strip now carries for its active column is the same surface the widget slides,
+    // so the list and the highlight must arrive together or they read as two things
+    // happening at once.
     //
-    // It was a two-phase departure-then-settle before, borrowing the workspace
-    // indicator's two-speed shape, and that was wrong for this twice over. The
-    // indicator is a 16px bar whose head and tail are two POSITIONS with a drawn bar
-    // stretched between them; a crossing has one position, so the two phases had to
-    // run in sequence - and a handover between them reads as two paragraphs of
-    // motion rather than one. At 640ms it was also sluggish, because the settle was
-    // carrying three fifths of the travel at a crawl.
+    // Before this it was two phases, a departure and a settle, borrowing the
+    // workspace INDICATOR's two-speed shape. That shape does not transplant: the
+    // indicator's head and tail are two positions running in PARALLEL with a drawn
+    // bar stretched between them, so fast and slow cost nothing. A crossing has one
+    // position, so the phases had to run in sequence, and the handover between them
+    // read as two paragraphs of motion. Then it was the launcher's focus curve,
+    // which was smooth but belonged to a different component and moved at a
+    // different weight.
     //
-    // One continuous ease has no handover to see and lands in half the time. The
-    // duration is deliberately NOT a function of the span: a three-column jump covers
-    // the same 300ms and arrives three times as fast, which is what a fixed settle
-    // rhythm means, and what stops a run of taps from feeling like a queue.
-    readonly property int slideDuration: MotionTokens.settingsSidebarCollapse
+    // The duration is deliberately NOT a function of the span: a three-column jump
+    // covers the same 160ms and arrives three times as fast, which is what a fixed
+    // settle rhythm means, and what stops a run of taps from feeling like a queue.
+    readonly property int slideDuration: MotionTokens.medium
     // The crossing's own recipe, so a suite can assert the curve rather than the
     // tokens it was written from - a test that reads `MotionTokens.slow` instead
     // checks that a number exists somewhere in the file, not that the animation runs
@@ -351,19 +354,18 @@ Item {
         property: "slideProgress"
         from: 0
         to: 1
-        // The launcher's focus curve, verbatim: `LauncherPage`'s `selectionFrame`
-        // glides between result rows on `settingsSidebarCollapse` with OutQuint,
-        // and this is the same move - a highlight and its list going to a new row.
+        // The workspace widget's active-highlight curve, verbatim: `Workspaces.qml`
+        // slides `activeHighlight` on `MotionTokens.medium` with `Easing.OutQuad`.
         // One ease, one duration, no phases.
         //
-        // The two-phase version this replaced was borrowing the workspace indicator's
-        // two-speed shape, which does not transplant. The indicator's head and tail
-        // are two positions running in PARALLEL with a drawn bar stretched between
-        // them, so its shape is free. A crossing has one position, so the phases had
-        // to run in sequence - and the seam between them is visible as a change of
-        // gear halfway across, which is the paragraph feel this removes.
-        duration: MotionTokens.settingsSidebarCollapse
-        easing.type: Easing.OutQuint
+        // The strip's own active-column highlight slides on the SAME recipe (see
+        // `BarWindowHintStrip`), so the list and the highlight behind it are on one
+        // clock. Sharing the widget's curve rather than a near miss is the point: the
+        // panel is that widget's columns at three times the size, and a crossing that
+        // does not move like the highlight it sits inside is the mismatch you can see
+        // without noticing you can see it.
+        duration: MotionTokens.medium
+        easing.type: Easing.OutQuad
         onFinished: {
             // The strip has landed with the arriving frame's active column in the
             // middle, so the held frame goes with it and exactly one set of rows
