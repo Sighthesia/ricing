@@ -214,8 +214,15 @@ Item {
             compare(coordinator.pendingTarget, "launcher")
             // Yield so any premature focus attempt would have run by now;
             // focus must stay out of the not-yet-opened surface.
+            //
+            // The wave keeps its route page unloaded while it is closed (that
+            // is what keeps the launcher's delegate tree off the startup path),
+            // so there is no page to ask about focus here. Asserting on a null
+            // page is what this assertion used to do, and it read as a crash
+            // rather than as the guarantee it was meant to state.
             wait(60)
-            verify(!host.page().searchField.activeFocus)
+            compare(launcherSurface.host.phase, "closed")
+            verify(host.page() === null)
 
             coordinator.ownerClosed("settings")
 
