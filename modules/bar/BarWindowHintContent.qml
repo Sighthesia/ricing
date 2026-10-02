@@ -83,6 +83,18 @@ Item {
     // through the other. Shallow on purpose: enough to register, far too little to
     // read as a fade.
     readonly property real slideDip: Math.sin(Math.PI * slideProgress) * 0.12
+    // Where the head hands over to the tail, as a share of the traverse. Past this
+    // point the remaining distance is covered on the indicator's long OutSine, so
+    // putting it too high leaves a short settle and too low leaves a long crawl
+    // before the content even starts moving.
+    readonly property real slideHeadShare: 0.82
+    // Both phases, for anything that has to wait the crossing out.
+    readonly property int slideDuration: MotionTokens.fast + MotionTokens.slow
+    // The crossing's own recipe, so a suite can assert the two phases rather than
+    // the tokens they were written from. A test that reads `MotionTokens.slow`
+    // instead checks that a token exists, not that the animation uses it - which
+    // is exactly the mistake a retune of this file would reintroduce.
+    readonly property alias slideAnimation: slideRun
     readonly property int rowHeight: 28
     // The one row the focus indicator belongs to, or -1. Read from the INCOMING
     // column, which is the content the user is looking at.
@@ -198,28 +210,40 @@ Item {
         slideRun.restart()
     }
 
-    NumberAnimation {
+    SequentialAnimation {
         id: slideRun
-        target: root
-        property: "slideProgress"
-        from: 0
-        to: 1
-        // One traverse, no halves - the old exit-then-entrance pair spent longer
-        // than this in total and showed an empty or translucent panel through the
-        // middle of it.
+        // The crossing runs on the INDICATOR's curve, not one symmetric ease.
         //
-        // `page`, not `medium`, because this carries a whole panel's width across
-        // the screen. At 160ms a 540px traverse has to accelerate hard out of rest
-        // and slam into the stop, and both ends are visible: the content appears
-        // to be shoved rather than moved. Doubling the time lets the same distance
-        // be covered without either end being abrupt, which is what the duration
-        // is actually for here.
-        duration: MotionTokens.page
-        // `InOutSine`, not `InOutQuint`. A quintic is very aggressive at its
-        // ends - it covers most of its distance in a short burst at each extreme -
-        // which is the mechanical part of the motion. Sine is the gentlest
-        // accelerate-and-settle there is and reads as weight being carried across.
-        easing.type: Easing.InOutSine
+        // The focus indicator beside the rows moves on two speeds: a head that
+        // commits fast on OutQuad and a tail that lingers on a much longer
+        // OutSine. That two-speed shape is what makes it read as carrying weight
+        // rather than being dragged, and a single ease cannot produce it - the
+        // symmetric `InOutSine` this replaced left and arrived at the same gentle
+        // rate, which read as a shove rather than a crossing.
+        //
+        // So the traverse is the same two phases, in sequence, on one progress
+        // value: most of the distance committed quickly, then a settle. The curves
+        // are the indicator's own. The head is `fast` and the tail `slow`, where
+        // the indicator uses `medium` and `slow * 2` - the same shape at a shorter
+        // travel, because a whole panel's width is not the indicator's 16px bar.
+        animations: [
+            // The indicator's head.
+            NumberAnimation {
+                target: root
+                property: "slideProgress"
+                to: root.slideHeadShare
+                duration: MotionTokens.fast
+                easing.type: Easing.OutQuad
+            },
+            // The indicator's tail.
+            NumberAnimation {
+                target: root
+                property: "slideProgress"
+                to: 1
+                duration: MotionTokens.slow
+                easing.type: Easing.OutSine
+            }
+        ]
         onFinished: {
             // The outgoing copy is fully off-panel by now, so releasing it costs
             // nothing on screen and keeps exactly one set of rows alive.

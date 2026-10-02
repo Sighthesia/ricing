@@ -324,7 +324,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             })
             // Sampled DURING the slide, which is the only time the two layers are
             // both on screen.
-            wait(Math.round(Lazer.MotionTokens.page / 2))
+            wait(Math.round(body.slideDuration / 2))
             verify(body.swapping, "still crossing")
             var previous = findAllByName(live(), "windowHintPreviousRow")
             var active = findAllByName(live(), "windowHintWindowRow")
@@ -526,11 +526,11 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             wait(Lazer.MotionTokens.slow * 2 + 150)
         }
 
-        // Wait out one full crossing. The slide is a single `page` traverse with
-        // no stagger behind it, so this is the whole of it - plus room for the
-        // animation's `onFinished` to have released the held copy.
+        // Wait out one full crossing. The slide is two phases on one clock with
+        // no stagger behind them, so the declared total is the whole of it - plus
+        // room for the animation's `onFinished` to have released the held copy.
         function settleSlide() {
-            wait(Lazer.MotionTokens.page + 40)
+            wait(body.slideDuration + 40)
         }
 
         function test_indicatorFollowsAFocusSwitch() {
@@ -694,7 +694,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             verify(outgoing().visible, "the outgoing layer is mounted")
             // An animation reads its start value on the frame it starts, so the
             // travel has to be sampled after the event loop has turned.
-            wait(Math.round(Lazer.MotionTokens.page / 2))
+            wait(Math.round(body.slideDuration / 2))
             var leaving = findAllByName(outgoing(), "windowHintWindowRow")
             compare(leaving.length, 2, "the outgoing rows are still mounted")
             compare(leaving[0].modelData.windowId, "10", "and are the OLD ones")
@@ -732,7 +732,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             })
             var panelWidth = body.width
             for (var step = 0; step < 4; ++step) {
-                wait(Math.round(Lazer.MotionTokens.page / 4))
+                wait(Math.round(body.slideDuration / 4))
                 var out = outgoing()
                 var inn = live()
                 // The whole claim: the pair covers the panel from 0 to its width.
@@ -762,7 +762,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            wait(Math.round(Lazer.MotionTokens.page / 2))
+            wait(Math.round(body.slideDuration / 2))
             var out = outgoing()
             var inn = live()
             // Moving to a LATER workspace takes the content LEFT, because the new
@@ -782,17 +782,32 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(outgoing().visible, false, "and the other one is gone")
         }
 
-        function test_theCrossingIsCarriedRatherThanShoved() {
-            // Asserted as a contract, like the click-flash recipe: a whole panel's
-            // width across the screen at `medium` has to accelerate hard out of
-            // rest and slam into the stop, and both ends are visible - the content
-            // reads as shoved rather than moved. `page` gives the same distance
-            // room to be covered without either end being abrupt, and `InOutSine`
-            // is the gentlest accelerate-and-settle there is; a quintic covers most
-            // of its distance in a burst at each extreme, which is the mechanical
-            // part of the motion.
-            verify(Lazer.MotionTokens.page >= 2 * Lazer.MotionTokens.medium,
-                "the traverse takes at least twice as long as a plain swap")
+        function test_theCrossingUsesTheIndicatorsCurve() {
+            // The contract, asserted as a recipe rather than by sampling: the
+            // crossing borrows the focus indicator's two-speed motion, because that
+            // is what reads as weight being carried. A head that commits fast and
+            // a tail that lingers cannot be expressed as one ease - a symmetric
+            // one leaves and arrives at the same rate, which is the shove.
+            var phases = body.slideAnimation.animations
+            compare(phases.length, 2, "the crossing is two phases, not one ease")
+            // The head, which commits most of the way quickly.
+            compare(phases[0].to, body.slideHeadShare, "the head hands over at the share")
+            verify(body.slideHeadShare > 0.5 && body.slideHeadShare < 1,
+                "and that share is most of the way, not all of it")
+            compare(phases[0].easing.type, Easing.OutQuad,
+                "on the indicator's head curve")
+            // The tail, which lingers. This is the assertion that matters: the tail
+            // must outlast the head or there is no two-speed shape left, and that
+            // is the whole difference between the indicator's motion and a plain
+            // ease. Read off the ANIMATION, not off the token - checking the token
+            // only proves a number exists somewhere in the file.
+            compare(phases[1].easing.type, Easing.OutSine,
+                "on the indicator's tail curve")
+            verify(phases[1].duration > phases[0].duration,
+                "and the tail outlasts the head, was "
+                    + phases[0].duration + " then " + phases[1].duration)
+            verify(body.slideDuration >= phases[0].duration + phases[1].duration,
+                "and the declared total covers both phases")
             verify(body.hasOwnProperty("slideDip"), "and it dims a little in the middle")
         }
 
@@ -812,7 +827,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // Sampled at the middle, where the dip is deepest. `page / 2` is only
             // approximate, so this reads the peak rather than assuming it landed
             // exactly there.
-            wait(Math.round(Lazer.MotionTokens.page / 2))
+            wait(Math.round(body.slideDuration / 2))
             out = outgoing()
             inn = live()
             compare(out.opacity, inn.opacity, "still the same value in flight")
@@ -836,7 +851,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             })
             var furthest = 0
             for (var step = 0; step < 5; ++step) {
-                wait(Math.round(Lazer.MotionTokens.page / 5))
+                wait(Math.round(body.slideDuration / 5))
                 // Monotonic: each sample is at least as far along as the last.
                 verify(body.slideProgress >= furthest,
                     "step " + step + " went backwards, was " + body.slideProgress)
@@ -855,7 +870,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
             compare(body.swapDirection, 1, "moved later in the list")
-            wait(Math.round(Lazer.MotionTokens.page / 2))
+            wait(Math.round(body.slideDuration / 2))
             verify(outgoing().x < 0, "and the content went left")
             settleSlide()
 
@@ -865,7 +880,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 windows: [{ windowId: "21", title: "term2", appId: "kitty", icon: "", isFocused: true }]
             })
             compare(body.swapDirection, -1, "moved earlier in the list")
-            wait(Math.round(Lazer.MotionTokens.page / 2))
+            wait(Math.round(body.slideDuration / 2))
             verify(outgoing().x > 0, "and the content went right")
             settleSlide()
         }
@@ -880,7 +895,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            wait(Math.round(Lazer.MotionTokens.page / 2))
+            wait(Math.round(body.slideDuration / 2))
             compare(findAllByName(outgoing(), "windowHintFocusFrame").length, 0,
                 "no highlight on the copy that is leaving")
             compare(findAllByName(outgoing(), "windowHintFocusIndicator").length, 0,
@@ -903,7 +918,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 previousActiveWorkspacePosition: 2,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            wait(Math.round(Lazer.MotionTokens.page / 2))
+            wait(Math.round(body.slideDuration / 2))
             var inn = live()
             var wash = findByName(inn, "windowHintFocusFrame")
             var bar = findByName(inn, "windowHintFocusIndicator")
@@ -930,7 +945,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 nextWindows: [{ windowId: "n1", title: "n1", icon: "", isFocused: false }],
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            wait(Math.round(Lazer.MotionTokens.page / 2))
+            wait(Math.round(body.slideDuration / 2))
             var inn = live()
             var active = findByName(inn, "windowHintColumn")
             var next = findByName(inn, "windowHintNextColumn")
@@ -958,7 +973,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 previousActiveWorkspacePosition: 1,
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
             })
-            wait(Math.round(Lazer.MotionTokens.page / 2))
+            wait(Math.round(body.slideDuration / 2))
             var beforeX = live().x
             verify(beforeX > 0, "mid-flight, was " + beforeX)
             body.hint = root.makeHint({
