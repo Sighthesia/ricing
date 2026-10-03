@@ -331,61 +331,95 @@ Item {
         return index * rowPitch + rowHeight / 2 - indicatorLength / 2
     }
 
-    // --- the crossing sweep ------------------------------------------------
+    // --- the crossing wrap -------------------------------------------------
     // The row marker does NOT glide from the old row to the new one when the
-    // workspace changes. It stretches to the whole column and is carried out through
-    // the leading edge - DOWN for the next workspace, UP for the previous one - so the
-    // direction of the switch is readable off the marker's own travel, and the new
-    // marker then appears on the row of the workspace being moved to.
+    // workspace changes. It leaves: from the card it is on now, travelling in the
+    // direction of the move, until it is out through the panel's edge and the clip has
+    // taken it. Then it comes back in through the OPPOSITE edge - a workspace switch
+    // is a list scrolling off one end and arriving from the other - and continues in the
+    // same direction onto the focused card of the workspace being moved to.
+    //
+    // So an upward switch (to the workspace above) exits through the top and re-enters
+    // at the bottom; a downward one is the mirror. Both halves travel the same way,
+    // which is what makes it read as one scrolling gesture rather than as a marker that
+    // teleported to the far edge and came back.
     //
     // This is `Workspaces.qml`'s indicator at panel scale. There the bar travels
-    // between two workspaces by being STRETCHED: its head runs to the new square's
-    // centre while a shadow trails, so the drawn span covers the gap and then
-    // contracts on arrival. The stretch IS the travel. Here the travel is
-    // deliberately longer than the panel - one whole column, past its edge - so the
-    // stretch overflows, and the body's own clip turns that overflow into a wipe.
-    // Same mechanism as the widget, one column further, and the one new thing is
-    // which edge it overflows: the direction of the move.
+    // between two workspaces by being STRETCHED - the head runs to the new square's
+    // centre while a shadow trails, so the drawn span covers the gap and contracts on
+    // arrival - and the workspace either side of the active one is genuinely off the
+    // widget, so the stretch has to overflow to reach it. Here the marker is one card
+    // tall and stays that size; what leaves the panel is the marker's POSITION, and the
+    // body's clip is what turns that into a disappearance.
     //
-    // A pure function of `slideProgress`, like the columns' own placement, and for
-    // the same reason: the marker leaving the panel and the columns trading places
-    // are one event, and the previous attempt at this gave them two clocks, which is
-    // how a crossing came to read as two paragraphs of motion.
+    // A pure function of `slideProgress`, like the columns' own placement: the marker
+    // leaving and the columns trading places are one event, and this file's standing
+    // rule is one clock per event.
     //
-    // In STRIP coordinates, so the strip's own `y` - the padding between the panel's
-    // top edge and the card block - is already applied. Zero is therefore the top of
-    // the block, and the marker's top edge starts there and travels by its own
-    // length; at progress 1 it is a whole column further on, which for a forward
-    // switch is entirely below the block and for a backward one entirely above it.
-    // Off the block is off the panel: the body clips, and the strip does not.
-    //
-    // `sweepBase` is what makes a re-aim survivable, and it exists because of the same
-    // thing `positionFrom` exists for. A re-aim restarts `slideProgress` at 0, so a
-    // sweep placed from `slideProgress` alone is back at the top of the column on the
-    // frame the second switch lands - the marker would leap a whole column upwards
-    // while the content it is attached to carried on from where it was, which is
-    // precisely the "two unrelated changes" the one-strip layout exists to prevent.
-    // So the sweep's position is `base + travel`, the same shape as the content's
-    // `positionFrom + (positionTo - positionFrom) * slideProgress`, and a re-aim hands
-    // it the value it had reached rather than zero.
-    readonly property real sweepHeight: Math.max(0, strip.contentHeight)
+    // Everything below is in STRIP coordinates, so the strip's own `y` - the padding
+    // between the panel's top edge and the card block - is already applied. The panel's
+    // clip is the body's rect, which in those coordinates is `_visTop .. _visBottom`.
+    readonly property real _stripY: bandInset - surfaceInset + cellPaddingY
+    readonly property real _visTop: -_stripY
+    readonly property real _visBottom: root.height - _stripY
+    // The row the marker is LEAVING from. The arriving frame's focused row is on screen
+    // from the crossing's first frame (`focusedRowIndex` is read off the arriving
+    // column), so the row being left has to be captured before the crossing starts or
+    // there is nothing for the marker to leave from. Derived from the HELD frame's own
+    // windows rather than from `focusedRowIndex` sampled at that instant, because a
+    // binding's value at the moment its inputs are being reassigned is not a thing to
+    // depend on - `focusedIndexIn` on the leaving hint says the same thing and is
+    // computed from data rather than from evaluation order.
+    property int _departingRowIndex: -1
+    // Where this leg's travel starts: the departing card's top edge. A re-aim hands it
+    // the value the wrap had reached, for the reason `positionFrom` exists - a re-aim
+    // restarts `slideProgress` at 0, and a leg that began at zero would put the marker
+    // back on the card it had already left.
+    property real _sweepLegStart: 0
     readonly property real sweepTravel: root.plan ? root.plan.direction : 0
-    property real sweepBase: 0
-    readonly property real sweepTop: sweepBase
-        + sweepTravel * sweepHeight * slideProgress
-    // What the marker spans while it sweeps: the whole column, for the bar as much as
-    // for the frame. Both are "the thing being marked" at that size - one column
-    // rather than one row - and the fallbacks keep a heightless panel from drawing a
-    // zero-height shape.
-    readonly property real sweepBarLength: sweepHeight > 0 ? sweepHeight : indicatorLength
-    readonly property real sweepFrameHeight: sweepHeight > 0 ? sweepHeight : rowHeight
-    // Whether a sweep is being drawn at all. A flag rather than `swapping`, which is
+    // The wrap's anchor: the top edge of the card the marker is marking. The frame IS
+    // that card's outline, so it draws at the anchor; the bar is a bar centred on the
+    // card, so it draws one `sweepBarOffset` lower. ONE anchor for both, because they
+    // are one gesture - two would be two chances to disagree about where the card is.
+    readonly property real sweepAnchor: _sweepAnchorAt()
+    readonly property real sweepBarOffset: rowHeight / 2 - indicatorLength / 2
+
+    function _sweepAnchorAt() {
+        const dir = root.sweepTravel
+        if (dir === 0)
+            return root.focusedRowTop
+        // Wholly clipped: one card's height past the edge, which covers the frame
+        // exactly and the bar one pixel more than it needs. Asking each for its own
+        // would put a 1px disagreement between two shapes meant to move as one.
+        const outY = dir < 0 ? root._visTop - root.rowHeight : root._visBottom
+        const backY = dir < 0 ? root._visBottom : root._visTop - root.rowHeight
+        const exitSpan = Math.max(0, dir * (outY - root._sweepLegStart))
+        const entrySpan = Math.max(0, dir * (root.focusedRowTop - backY))
+        const total = exitSpan + entrySpan
+        if (total <= 0)
+            return root.focusedRowTop
+        const covered = root.slideProgress * total
+        // The wrap falls exactly where the marker is wholly outside the clip on both
+        // counts, so the discontinuity in its position is never on screen. The two
+        // spans are the two halves' own distances rather than a fixed half each, so the
+        // speed through the exit and through the entry each match what they cover.
+        if (covered <= exitSpan)
+            return root._sweepLegStart + dir * covered
+        return backY + dir * (covered - exitSpan)
+    }
+
+    // Whether a wrap is being drawn. A flag rather than `swapping`, which is
     // `slideProgress < 1` and so goes false on the animation's LAST TICK - before
-    // `onFinished`, and before the strip has been narrowed back to the arriving
-    // frame's three columns. Clearing it here instead keeps the sweep on screen until
-    // the commit that ends the crossing has actually happened, so the marker cannot
-    // reappear against a strip that is still mid-narrow.
+    // `onFinished`, and before the strip has been narrowed back to the arriving frame's
+    // three columns. Clearing it in `onFinished` keeps the wrap up until the commit that
+    // ends the crossing has actually happened, so the marker cannot reappear against a
+    // strip that is still mid-narrow.
     property bool _sweeping: false
+    // Either frame having a focused row is enough to draw a marker. The leaving frame's
+    // row is the one the marker walks away from, so only a panel with nothing focused
+    // on either side has no marker at all.
+    readonly property bool sweepHasTarget: root.hasTarget
+        || root._departingRowIndex >= 0
 
     // --- the slide -------------------------------------------------------
     // A workspace switch replaces every row, so without this the panel's contents
@@ -467,7 +501,8 @@ Item {
         root.positionFrom = 0
         root.positionTo = 0
         root._sweeping = false
-        root.sweepBase = 0
+        root._departingRowIndex = -1
+        root._sweepLegStart = 0
         // A rest plan rather than no plan: the strip still needs to be drawn, and
         // this is the one that says "three columns, active slot 1, centred here" -
         // the same shape the crossing's plan has, so every binding downstream can be
@@ -502,10 +537,14 @@ Item {
         root.plan = plan
         root.columns = HintLogic.stripColumns(root.hint, root.leavingHint, plan)
         root.shownReady = HintLogic.ready(root.hint)
-        // Before the clock starts, so the sweep is on screen from the crossing's first
+        // The row the marker walks away from, and the place that walk starts. Taken
+        // before the clock starts, so the wrap is on screen from the crossing's first
         // frame and the resting marker is never seen mid-swap.
+        root._departingRowIndex = HintLogic.focusedIndexIn(
+            HintLogic.cappedRows(root.leavingHint ? root.leavingHint.windows : null).rows)
+        root._sweepLegStart = root._departingRowIndex < 0
+            ? root.focusedRowTop : root._departingRowIndex * root.rowPitch
         root._sweeping = true
-        root.sweepBase = 0
         root.positionFrom = plan.fromPosition
         root.positionTo = plan.toPosition
         root.slideProgress = 0
@@ -529,11 +568,11 @@ Item {
     // and the panel's centre, neither of which the re-aim disturbs - the new leg
     // simply starts at the position the old one had reached.
     function _reaimSlide(plan) {
-        // Read before the plan is replaced: `sweepTop` is derived from the plan's own
+        // Read before the plan is replaced: `sweepAnchor` is derived from the plan's own
         // direction, so reading it afterwards would measure the new leg's direction
         // against the old leg's progress.
         const here = root.panelPosition
-        const sweepHere = root.sweepTop
+        const wrapHere = root.sweepAnchor
         root.plan = plan
         root.columns = HintLogic.stripColumns(root.hint, root.leavingHint, plan)
         root.shownReady = HintLogic.ready(root.hint)
@@ -542,10 +581,13 @@ Item {
         // which would read as a second departure rather than as one move re-aimed.
         root._sweeping = true
         // The same compensation the content gets, for the same reason. Without it the
-        // clock's reset to 0 sends the marker back to the top of the column on this
-        // frame, while the columns carry on from where they were - and the marker would
-        // be travelling with content it had just been detached from.
-        root.sweepBase = sweepHere
+        // clock's reset to 0 puts the marker back on the card it had already left while
+        // the columns carry on from where they were - the marker travelling with content
+        // it had just been detached from, which is a visible jump.
+        //
+        // `_departingRowIndex` is deliberately NOT recaptured: the marker is mid-wrap
+        // rather than sitting on a card, so there is no card left to name.
+        root._sweepLegStart = wrapHere
         root.positionFrom = here
         root.positionTo = plan.toPosition
         // Restart the clock from the current position, not from the crossing's own
@@ -601,7 +643,8 @@ Item {
             // row in its place, which is the "then it shows up on the other workspace"
             // half of the effect.
             root._sweeping = false
-            root.sweepBase = 0
+            root._departingRowIndex = -1
+            root._sweepLegStart = 0
         }
     }
 
@@ -863,9 +906,9 @@ Item {
         }
     }
 
-    // The sweep's own outline: the same border-only mark, one column tall instead of
-    // one row, carried out through the leading edge. A SEPARATE element rather than a
-    // mode on the one above, and the reason is ordering rather than tidiness.
+    // The wrap's own outline: the same border-only mark, walking off the card it was on
+    // and arriving from the far edge. A SEPARATE element rather than a mode on the one
+    // above, and the reason is ordering rather than tidiness.
     //
     // `focusFrame.y` carries a `Behavior`, so a property that is both
     // behaviour-animated and a pure function of the crossing's clock is a race
@@ -886,14 +929,14 @@ Item {
         border.color: LazerTheme.settingsAccent
         enabled: false
 
-        // Placed from the arriving column exactly as `focusFrame` is, so the sweep
+        // Placed from the arriving column exactly as `focusFrame` is, so the wrap
         // stays on the workspace being moved to for the whole of its travel and
         // widens with that column as it comes in.
         x: strip.activeColumnX + root.cellPaddingX
-        y: root.sweepTop
+        y: root.sweepAnchor
         width: strip.activeCardWidth
-        height: root.sweepFrameHeight
-        visible: root._sweeping && root.hasTarget
+        height: root.rowHeight
+        visible: root._sweeping && root.sweepHasTarget
     }
 
     // The focus indicator, in the workspace widget's vocabulary and motion, turned
@@ -916,7 +959,8 @@ Item {
     //
     // What it does on a workspace SWITCH is not this bar's business: the crossing
     // sweep below owns the marker for the whole traverse, and this one is hidden until
-    // the sweep has carried the marker out through the leading edge. See `sweepTop`.
+    // the wrap has carried the marker off its card and in from the far edge. See
+    // `_sweepAnchorAt`.
     Rectangle {
         id: focusUnderline
         objectName: "windowHintFocusIndicator"
@@ -960,9 +1004,9 @@ Item {
         Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
     }
 
-    // The sweep's own bar: the indicator's vocabulary at column height, carried out
-    // through the leading edge. Separate element for the same reason as `sweepFrame`,
-    // and with one more thing to settle - the switch blink.
+    // The wrap's own bar: the indicator's own shape and length, carried off the card it
+    // was on and back in from the far edge. Separate element for the same reason as
+    // `sweepFrame`, and with one more thing to settle - the switch blink.
     //
     // The blink is a genuine part of a workspace switch and the widget plays one per
     // switch, so it cannot simply be left on the resting bar: that bar is hidden for
@@ -975,15 +1019,17 @@ Item {
         z: 6
 
         width: root.indicatorThickness
-        height: root.sweepBarLength
+        height: root.indicatorLength
         radius: LazerTheme.barIndicatorRadius
         color: LazerTheme.osuGreen
         // The same x as the resting bar - the arriving column's own left edge, in the
         // band's padding - so the sweep stays attached to the workspace being moved to
         // for the whole of its travel instead of drifting to the middle of the panel.
         x: strip.activeColumnX + root.indicatorInset
-        y: root.sweepTop
-        visible: root._sweeping && root.hasTarget
+        // One `sweepBarOffset` below the frame's anchor, so the bar stays centred on the
+        // card it marks for the whole of the wrap instead of hanging off its top edge.
+        y: root.sweepAnchor + root.sweepBarOffset
+        visible: root._sweeping && root.sweepHasTarget
 
         Rectangle {
             id: sweepFlashOverlay
