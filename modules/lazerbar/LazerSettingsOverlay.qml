@@ -13,8 +13,35 @@ Item {
     readonly property real requiredWidth: Logic.sidePanelWidth(width)
     readonly property int panelEnterDuration: MotionTokens.settingsSlide
     readonly property int panelExitDuration: MotionTokens.settingsSlide
-    // The panel handle callers write through; null until the first open has
-    // armed the loader. Every use inside this file goes through panelOrNull().
+    // ---- Host-facing panel inputs ---------------------------------------
+    //
+    // Hosts configure THIS overlay, never the panel directly. The panel is
+    // loaded on first use, so during construction - which is exactly when a
+    // host's `panel.appearanceSettings: ...` assignments run - the handle is
+    // null and writing to it fails the whole config to load with "Cannot assign
+    // to non-existent property". Accepting the inputs here keeps that contract
+    // working whether or not the panel happens to exist yet.
+    //
+    // The defaults are the live shell's own wiring, so a host that overrides
+    // nothing still gets exactly what it got before the panel was gated.
+    property var appearanceSettings: Services.SettingsService.appearance
+    property var barSettings: Services.SettingsService.bar
+    property var notificationSettings: Services.SettingsService.notifications
+    property var saveCallback: Services.SettingsService.save
+    property var appearanceDefaults: Services.SettingsService.appearanceDefaults
+    property var barDefaults: Services.SettingsService.barDefaults
+    property var notificationDefaults: Services.SettingsService.notificationDefaults
+    property var settingsReset: Services.SettingsService.resetCategorySetting
+    property var wallpaperService: Services.WallpaperService
+    property var locationService: Services.LocationService
+    property string effectiveSunrise: Services.SettingsService.effectiveSunrise
+    property string effectiveSunset: Services.SettingsService.effectiveSunset
+    property bool coordsValid: Services.SettingsService.locationCoordsValid
+    property string locationError: Services.LocationService.lastError
+    property string locationDisplayName: Services.LocationService.displayName
+    // The panel handle. Read-only in practice: the panel is built on first use,
+    // so this is null until then, and every internal use goes through
+    // panelOrNull(). Writes are only valid after an open has armed the loader.
     property alias panel: panelLoader.item
     property alias panelHost: panelHost
     // An alias cannot be null-checked, so these resolve to null — never
@@ -235,16 +262,25 @@ Item {
                     sidePanel: true
                     interactive: root.interactive
                     progress: root.progress
-                    // Default location-mode wiring (hosts may override via the
-                    // panel alias; e.g. tests inject fakes). Keeps every host
-                    // working even when it only passes appearance/bar/
-                    // notification settings.
-                    locationService: Services.LocationService
-                    effectiveSunrise: Services.SettingsService.effectiveSunrise
-                    effectiveSunset: Services.SettingsService.effectiveSunset
-                    coordsValid: Services.SettingsService.locationCoordsValid
-                    locationError: Services.LocationService.lastError
-                    locationDisplayName: Services.LocationService.displayName
+                    // Everything the host configures reaches the panel through
+                    // the overlay, so a host's construction-time assignments
+                    // land here whether or not this component existed when they
+                    // ran. Tests inject fakes the same way.
+                    appearanceSettings: root.appearanceSettings
+                    barSettings: root.barSettings
+                    notificationSettings: root.notificationSettings
+                    saveCallback: root.saveCallback
+                    appearanceDefaults: root.appearanceDefaults
+                    barDefaults: root.barDefaults
+                    notificationDefaults: root.notificationDefaults
+                    settingsReset: root.settingsReset
+                    wallpaperService: root.wallpaperService
+                    locationService: root.locationService
+                    effectiveSunrise: root.effectiveSunrise
+                    effectiveSunset: root.effectiveSunset
+                    coordsValid: root.coordsValid
+                    locationError: root.locationError
+                    locationDisplayName: root.locationDisplayName
                     onCloseRequested: root.requestClose()
                 }
             }

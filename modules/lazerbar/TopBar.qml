@@ -134,21 +134,24 @@ Variants {
                     ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
             LazerSettingsOverlay {
                 id: settingsOverlay; anchors.fill: parent
-                panel.appearanceSettings: Services.SettingsService.appearance
-                panel.barSettings: Services.SettingsService.bar
-                panel.notificationSettings: Services.SettingsService.notifications
-                panel.saveCallback: Services.SettingsService.save
-                panel.appearanceDefaults: Services.SettingsService.appearanceDefaults
-                panel.barDefaults: Services.SettingsService.barDefaults
-                panel.notificationDefaults: Services.SettingsService.notificationDefaults
-                panel.settingsReset: Services.SettingsService.resetCategorySetting
-                panel.wallpaperService: Services.WallpaperService
-                panel.locationService: Services.LocationService
-                panel.effectiveSunrise: Services.SettingsService.effectiveSunrise
-                panel.effectiveSunset: Services.SettingsService.effectiveSunset
-                panel.coordsValid: Services.SettingsService.locationCoordsValid
-                panel.locationError: Services.LocationService.lastError
-                panel.locationDisplayName: Services.LocationService.displayName
+                // Configured on the overlay, not through `panel.*`: the panel is built on
+                // first open, so at construction time the handle is null and
+                // writing to it fails the config to load.
+                appearanceSettings: Services.SettingsService.appearance
+                barSettings: Services.SettingsService.bar
+                notificationSettings: Services.SettingsService.notifications
+                saveCallback: Services.SettingsService.save
+                appearanceDefaults: Services.SettingsService.appearanceDefaults
+                barDefaults: Services.SettingsService.barDefaults
+                notificationDefaults: Services.SettingsService.notificationDefaults
+                settingsReset: Services.SettingsService.resetCategorySetting
+                wallpaperService: Services.WallpaperService
+                locationService: Services.LocationService
+                effectiveSunrise: Services.SettingsService.effectiveSunrise
+                effectiveSunset: Services.SettingsService.effectiveSunset
+                coordsValid: Services.SettingsService.locationCoordsValid
+                locationError: Services.LocationService.lastError
+                locationDisplayName: Services.LocationService.displayName
                 debugHoverEnabled: Services.SettingsService.hoverDebugEnabled
                 debugHoverToken: Services.SettingsService.hoverDebugToken
                 debugMaskOverride: Services.SettingsService.settingsMaskOverride

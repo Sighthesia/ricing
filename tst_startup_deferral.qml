@@ -61,6 +61,26 @@ Item {
         id: overlay
         width: 1280
         height: 720
+        // The host inputs are assigned in the same construction-time pattern
+        // modules/bar/TopBar.qml uses. That is the point of this instance: the
+        // panel does not exist while these run, so assigning them to `panel.*`
+        // instead of to the overlay fails the whole config to load - which is
+        // exactly the regression that shipped. Keep in step with TopBar's list.
+        appearanceSettings: Services.SettingsService.appearance
+        barSettings: Services.SettingsService.bar
+        notificationSettings: Services.SettingsService.notifications
+        saveCallback: Services.SettingsService.save
+        appearanceDefaults: Services.SettingsService.appearanceDefaults
+        barDefaults: Services.SettingsService.barDefaults
+        notificationDefaults: Services.SettingsService.notificationDefaults
+        settingsReset: Services.SettingsService.resetCategorySetting
+        wallpaperService: Services.WallpaperService
+        locationService: Services.LocationService
+        effectiveSunrise: Services.SettingsService.effectiveSunrise
+        effectiveSunset: Services.SettingsService.effectiveSunset
+        coordsValid: Services.SettingsService.locationCoordsValid
+        locationError: Services.LocationService.lastError
+        locationDisplayName: Services.LocationService.displayName
     }
 
     function verifyClosedState() {
@@ -115,6 +135,27 @@ Item {
         root.check("contentLayer resolves once built", overlay.contentLayer !== null)
         root.check("the open did not get stranded", overlay.phase === "opening",
                    "phase=" + overlay.phase)
+
+        // Every host-facing input must have reached the panel. The host assigns
+        // these at construction time, while the panel does not exist yet, so
+        // this is the only place the hand-off can be proven end to end - and
+        // getting it wrong is what broke the config load.
+        const forwarded = ["appearanceSettings", "barSettings", "notificationSettings",
+            "saveCallback", "appearanceDefaults", "barDefaults", "notificationDefaults",
+            "settingsReset", "wallpaperService", "locationService", "effectiveSunrise",
+            "effectiveSunset", "coordsValid", "locationError", "locationDisplayName"]
+        const missing = []
+        for (let i = 0; i < forwarded.length; i++) {
+            const value = overlay.panel[forwarded[i]]
+            if (value === undefined || value === null)
+                missing.push(forwarded[i])
+        }
+        root.check("every host input reached the panel", missing.length === 0,
+                   "null/undefined: " + missing.join(", "))
+        root.check("a host override survives the hand-off",
+                   overlay.panel.appearanceSettings === overlay.appearanceSettings
+                   && overlay.panel.locationDisplayName === overlay.locationDisplayName,
+                   "appearanceSettings/locationDisplayName did not round-trip")
 
         // The latch is one-way: a second open must not rebuild the panel, or the
         // saving would only move from the first start to the first reopen.
