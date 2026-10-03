@@ -3,6 +3,7 @@ import QtTest
 import "../../modules/lock"
 
 Item {
+    id: harness
     width: 320
     height: 240
 
@@ -232,6 +233,65 @@ Item {
             compare(bandArea(settled), 0, "no bands left at rest")
             compare(settled.pixel(160, 10), "#0000ff", "wallpaper unveiled")
             compare(settled.pixel(160, 230), "#0000ff", "wallpaper unveiled")
+        }
+
+        // No Image may sit inside a clipped item on this surface.
+        //
+        // The wallpaper used to be exactly that: the opening region's clip held
+        // the wallpaper and the lock controls, which is how it read as "wallpaper
+        // behind" the bands. On a `WlSessionLockSurface` the clipped subtree's
+        // image never painted — decoded, sized, mask fully open, and the screen
+        // stayed on the themed plate — while the lock controls in the same clip
+        // were perfectly visible and the identical component rendered correctly
+        // off the lock surface. The clip is what moved the failure.
+        //
+        // So the clip now lives on the layers above a full-screen wallpaper
+        // instead. This pins that, because the failure mode is invisible to every
+        // other assertion here: the pixel tests pass with the wallpaper back under
+        // a clip, since offscreen it renders either way.
+        function test_noWallpaperImageSitsInsideAClippedItem() {
+            var wallpaper = findByType(backdrop, "Image")
+            verify(wallpaper !== null, "the backdrop must have image layers")
+            verify(wallpaper.source.toString().indexOf("blue") >= 0,
+                   "the wallpaper is the blue layer in this fixture")
+            verify(!hasClippedAncestor(wallpaper),
+                   "the wallpaper must not be inside a clipped item on the lock surface")
+
+            // The capture is the one Image that stays clipped, and it has to: it
+            // is the opaque base a manual lock shows, so it belongs to the same
+            // clipped layer as the plate and the bands and is cut away by the same
+            // mask. It paints on the surface today, which is the evidence that the
+            // clip is not what stops an image rendering — being full-screen and
+            // unclipped is what the wallpaper needed.
+            var capture = findByType(backdrop, "Image", wallpaper)
+            verify(capture !== null, "the backdrop must have a capture layer")
+            verify(hasClippedAncestor(capture),
+                   "the capture belongs to the clipped base the mask cuts away")
+        }
+
+        function findByType(node, type, skip) {
+            if (!node)
+                return null
+            if (node !== skip && node.toString().indexOf(type) >= 0
+                    && node.source !== undefined)
+                return node
+            var kids = node.children
+            for (var i = 0; kids && i < kids.length; i++) {
+                var hit = findByType(kids[i], type, skip)
+                if (hit)
+                    return hit
+            }
+            return null
+        }
+
+        function hasClippedAncestor(node) {
+            for (var parent = node.parent; parent; parent = parent.parent) {
+                if (parent === harness)
+                    return false
+                if (parent.clip === true)
+                    return true
+            }
+            return false
         }
 
         // A capture that was expected and never arrived keeps its bounded wait,
