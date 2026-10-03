@@ -433,6 +433,21 @@ ShellRoot {
         }
     }
 
+    // A session-start lock owns every screen for the whole boot, so it can never
+    // watch a wallpaper circle grow underneath itself. Hand it its claim so each
+    // screen settles its boot wallpaper without a circle — otherwise the lock's
+    // wave, which waits for that circle to finish, holds a flat theme plate on
+    // screen for the length of the reveal. Only an engaged startup lock claims
+    // it, so a manual lock changes nothing and a reload with a spent marker
+    // never fires this at all, leaving the visible boot reveal as it was.
+    Connections {
+        target: lockModule
+
+        function onStartupLockEngaged() {
+            wallpaperBackground.adoptStartupLock()
+        }
+    }
+
     Loader {
         id: chromeLoader
         active: false

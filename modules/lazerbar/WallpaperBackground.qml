@@ -47,6 +47,9 @@ Variants {
     // True once the first wallpaper request has started. Chrome uses this as
     // the parallel bootstrap cue; bootReady remains the later lock-wave gate.
     property bool bootStarted: false
+    // True once a session-start lock has claimed the screens. See
+    // adoptStartupLock().
+    property bool startupLockAdopted: false
     // Boot-completion keys, one per screen that already reported, in the
     // "<name>@<x>,<y>,<w>x<h>" form produced by WallpaperBootLogic.
     property var finishedBootScreens: []
@@ -110,6 +113,23 @@ Variants {
         if (root.bootStarted)
             return
         root.bootStarted = true
+    }
+
+    // A session-start lock has claimed the screens. Its surface covers every
+    // wallpaper surface for the whole boot, so a boot circle can never be seen —
+    // while the lock's entry wave is gated on that circle finishing, which is
+    // what holds a flat theme plate on screen for the length of the reveal.
+    // Claiming the lock once here is what lets the lock's own wave be the reveal.
+    //
+    // One-way, and boot-only by construction: every caller below is guarded on
+    // the boot reveal still being in flight, so a live wallpaper switch after the
+    // lock is up keeps its circle and the user still sees it.
+    function adoptStartupLock() {
+        if (root.startupLockAdopted)
+            return
+        root.startupLockAdopted = true
+        for (var index = 0; index < root.screenWindows.length; index++)
+            root.screenWindows[index].settleBootWithoutCircle()
     }
 
     Scope {
@@ -571,10 +591,39 @@ Variants {
             // path share the palette gate and the animation restart.
             function startRevealAnimation() {
                 wallpaperWindow.bootRevealWaitingForImage = false
+                // A session-start lock is already covering this surface, so the
+                // boot circle is invisible — and the lock's wave waits on this
+                // reveal finishing. Decided here, at the one seam every boot
+                // circle starts from, so a lock that engages before the decode
+                // lands and a lock that engages after it are both caught.
+                if (wallpaperWindow.bootRevealActive && root.startupLockAdopted) {
+                    wallpaperWindow.settleBootWithoutCircle()
+                    return
+                }
                 // Palette extraction is a ~1.6s CPU-bound job, so it waits for
                 // the circle to finish growing.
                 Services.ColorService.revealStarted()
                 revealAnimation.restart()
+            }
+
+            // Finish a boot reveal that a session lock made invisible. The
+            // incoming slot already holds the decoded pixels the circle would
+            // have shown, so this promotes them instead of decoding a
+            // full-screen wallpaper a second time, and the boot reports as
+            // finished right away — which is what opens the lock's wave.
+            function settleBootWithoutCircle() {
+                if (!wallpaperWindow.bootRevealActive
+                        && !wallpaperWindow.bootRevealWaitingForImage)
+                    return
+                revealAnimation.stop()
+                wallpaperWindow.promoteIncoming()
+                // No circle ran, so nothing ever held the palette back. This is a
+                // no-op unless a reveal really was in flight.
+                Services.ColorService.revealCompleted()
+                // Reported while the boot is still flagged active: that flag is
+                // what "the boot reveal is over" is asked about here.
+                wallpaperWindow.reportBootIfActive()
+                wallpaperWindow.bootRevealActive = false
             }
 
             // Route live wallpaper changes into the shared reveal path.

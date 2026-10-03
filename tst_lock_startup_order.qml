@@ -350,6 +350,7 @@ Item {
         root.checkDeferredWarmup()
         root.checkStartupTaskQueue()
         root.checkSelfTestQueue()
+        root.checkStartupLockAdoption()
 
         console.log("Totals: " + (root.failures === 0
             ? root.checks + " passed, 0 failed"
@@ -998,6 +999,7 @@ Item {
     // wave, one event-loop turn apart, so they cannot occupy the first-paint
     // path. The delayed external-theme work stays exactly where it was.
     function checkDeferredWarmup() {
+
         const warmups = ["Services.LauncherService.primeApps()",
                          "Services.ClipboardService.warmup()",
                          "Services.WindowHintService.hintHeld"]
@@ -1175,5 +1177,66 @@ Item {
                    root.countOccurrences("startupMuted") === 2
                    && root.positionInChrome("startupMuted") < 0,
                    "occurrences: " + root.countOccurrences("startupMuted"))
+    }
+
+    // The startup lock covers every wallpaper surface for the whole boot, so the
+    // wallpaper's boot circle can never be seen — while the lock's wave is gated
+    // on that circle finishing. Left alone, that is a flat theme plate on screen
+    // for the length of the reveal. The root has to hand the lock its claim so
+    // each screen settles that boot wallpaper without a circle.
+    function checkStartupLockAdoption() {
+        const adoption = root.normalized(
+            root.enclosingBlock("function onStartupLockEngaged()"))
+
+        root.check("a startup lock hands its claim to the wallpaper",
+                   adoption.indexOf("target: lockModule") >= 0
+                   && adoption.indexOf("onStartupLockEngaged") >= 0
+                   && adoption.indexOf("wallpaperBackground.adoptStartupLock()") >= 0,
+                   "adoption: " + adoption.slice(0, 240))
+
+        // The root listens; it never reads the request flag. Reading it would put
+        // the "does this shell think this is a startup lock" decision back into
+        // the root, which is exactly the reclassification the fallback watchdog
+        // is forbidden from doing.
+        root.check("the claim is taken from a signal, not from the request flag",
+                   adoption.indexOf("startupRequest") < 0
+                   && adoption.indexOf("releaseStartupGates(") < 0
+                   && adoption.indexOf("startupFallbackUsed") < 0,
+                   "adoption: " + adoption.slice(0, 240))
+
+        // One call site. Two would let the wallpaper settle twice, and the second
+        // would run against a boot that has already reported.
+        root.check("the claim is made from exactly one place",
+                   root.countOccurrences("adoptStartupLock()") === 1
+                   && root.countOccurrences("onStartupLockEngaged") === 1,
+                   "occurrences: " + root.countOccurrences("adoptStartupLock()"))
+
+        // The lock emits it only past every rejection point, so a refused attempt
+        // cannot claim the wallpaper, and only for a startup request — a manual
+        // lock keeps the screenshot path it has today.
+        const lockSource = root.normalized(root.lock)
+        // Read from the lock file itself, not through bodyOf() — that helper only
+        // ever searches shell.qml, and would answer -1 on both sides here.
+        const lockAt = lockSource.indexOf("function lock(startup: bool): bool")
+        const lockBody = lockSource.slice(lockAt, lockAt + 700)
+        root.check("the lock emits the claim only for an accepted startup request",
+                   lockSource.indexOf("signal startupLockEngaged()") >= 0
+                   && lockBody.indexOf("if (startupRequest) root.startupLockEngaged()") >= 0
+                   // Past the one early return, so a state that cannot lock never
+                   // claims the wallpaper.
+                   && lockBody.indexOf("root.startupLockEngaged()")
+                      > lockBody.indexOf("if (!Controller.canLock(_state))"),
+                   "lock body: " + lockBody.slice(0, 400))
+
+        // The wiring is a sibling of the component, never a child of it: the
+        // wallpaper component's root object is a `Variants`, and an inline child
+        // written here would be taken as its delegate and delete every wallpaper
+        // surface. See WallpaperBackground's own header.
+        const wallpaperAt = root.indexOf("LazerBar.WallpaperBackground {")
+        const wallpaperEnd = root.closingBraceAt(wallpaperAt)
+        root.check("the claim is wired beside the wallpaper, not inside it",
+                   wallpaperAt >= 0
+                   && root.source.indexOf("adoptStartupLock()") > wallpaperEnd,
+                   "wallpaper block: " + wallpaperAt + ".." + wallpaperEnd)
     }
 }

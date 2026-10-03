@@ -35,6 +35,13 @@ Scope {
     property bool startupWallpaperReady: false
     property bool startupChromeReady: false
     property bool _startupWaveEmitted: false
+    // A startup request has been accepted and its surface is on the way. The
+    // wallpaper surfaces are covered from here until the user unlocks, so the
+    // root hands them this claim instead of letting them animate a boot reveal
+    // that cannot be seen — and that this lock's own entry wave waits on.
+    // Separate from `startupRequest` being a property so the root never has to
+    // read (and therefore never has to interpret) the request flag itself.
+    signal startupLockEngaged()
     // Whether a session-start lock is still to be expected at all. True while
     // the marker decision is unresolved (a startup request may still follow),
     // while a startup request is in flight, and while an unused attempt is still
@@ -114,6 +121,10 @@ Scope {
         // Explicit bool: only a literal startup request arms the wave gate;
         // every other call (including an omitted argument) is manual.
         startupRequest = startup === true
+        // Past every rejection point above, so this really is an engaged startup
+        // lock and not a refused attempt.
+        if (startupRequest)
+            root.startupLockEngaged()
         _startupWaveEmitted = false
         lockContext.reset()
         for (const image of root._snapshotImages)

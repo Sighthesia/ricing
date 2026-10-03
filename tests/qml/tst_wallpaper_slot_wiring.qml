@@ -229,5 +229,71 @@ Item {
             verify(text.indexOf("root.reportBootStarted()") >= 0)
             verify(text.indexOf("readonly property bool bootReady") >= 0)
         }
+
+        // A session-start lock covers the wallpaper surface for the whole boot,
+        // so the boot circle can never be seen — and the lock's entry wave is
+        // gated on that circle finishing, which is exactly what holds a flat
+        // theme plate on screen for the length of the reveal. The circle has to
+        // be given up at the one seam every boot circle starts from, so a lock
+        // that engages before the decode lands and one that engages after it are
+        // both caught.
+        function test_aStartupLockSettlesTheBootCircleInsteadOfAnimatingIt() {
+            var body = harness.bodyOf("function startRevealAnimation()")
+            verify(body.length > 0, "startRevealAnimation must be declared")
+            var gate = body.indexOf("root.startupLockAdopted")
+            var hold = body.indexOf("Services.ColorService.revealStarted()")
+            var restart = body.indexOf("revealAnimation.restart()")
+            verify(gate >= 0, "the circle must consult the startup-lock claim")
+            verify(hold >= 0 && restart >= 0, "the animated path must still be there")
+            verify(gate < hold && gate < restart,
+                   "the claim must be checked before the palette hold and the animation")
+            verify(body.indexOf("wallpaperWindow.bootRevealActive") >= 0,
+                   "only the boot reveal is given up; a live switch keeps its circle")
+        }
+
+        // The pixels are already decoded in the incoming slot, so the settle is a
+        // promotion. Re-assigning the source would decode a full-screen wallpaper
+        // a second time — the exact cost the two-slot change exists to remove, and
+        // settleDirectly would re-arm it by flipping `asynchronous` again.
+        function test_theStartupLockSettlePromotesInsteadOfDecodingAgain() {
+            var body = harness.bodyOf("function settleBootWithoutCircle()")
+            verify(body.length > 0, "settleBootWithoutCircle must be declared")
+            verify(body.indexOf("promoteIncoming()") >= 0,
+                   "the settle must promote the already-decoded slot")
+            verify(body.indexOf("settleDirectly(") < 0,
+                   "settleDirectly re-arms the decode and is the wrong handover here")
+            verify(body.indexOf("source = ") < 0,
+                   "the settle must never assign a source")
+            // The boot still has to report, or the lock's wave gate stays shut for
+            // the same reason it was shut before.
+            verify(body.indexOf("reportBootIfActive()") >= 0,
+                   "the settle must report the boot outcome")
+            verify(body.indexOf("Services.ColorService.revealCompleted()") >= 0,
+                   "the settle must release the palette hold")
+            // reportBootIfActive() asks whether the boot reveal is over, so the
+            // flag has to still be set when it is asked and cleared afterwards.
+            verify(body.indexOf("bootRevealActive = false")
+                   > body.indexOf("reportBootIfActive()"),
+                   "the report reads the boot flag, so it must come before it clears")
+            // A screen that already finished its boot is not asked to settle again.
+            verify(body.indexOf("!wallpaperWindow.bootRevealActive") >= 0,
+                   "an already-settled boot must be left alone")
+        }
+
+        // The claim is one-way and reaches every screen, not just the first: the
+        // windows live in a Variants scope, so this registry is the only way in.
+        function test_theStartupLockClaimIsOneWayAndReachesEveryScreen() {
+            var text = harness.source.text
+            verify(text.indexOf("property bool startupLockAdopted: false") >= 0,
+                   "the claim must be recorded on the root")
+            var body = harness.bodyOf("function adoptStartupLock()")
+            verify(body.length > 0, "adoptStartupLock must be declared")
+            verify(body.indexOf("if (root.startupLockAdopted)") >= 0,
+                   "the claim must be one-way")
+            verify(body.indexOf("root.screenWindows[index].settleBootWithoutCircle()") >= 0,
+                   "every registered screen window must be told")
+            verify(body.indexOf("root.screenWindows[0]") < 0,
+                   "only the first screen may not be settled")
+        }
     }
 }
