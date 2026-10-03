@@ -411,6 +411,16 @@ Item {
     // rather than from `focusedRowIndex` sampled at that instant, because a binding's
     // value while its own inputs are being reassigned is not a thing to depend on.
     property int _departingRowIndex: -1
+    // How far the departing column was scrolled when the switch was published, captured
+    // because the value is gone by the time anything else could read it.
+    //
+    // The panel scrolls the ACTIVE column to keep the focused card on screen, so a
+    // workspace whose focus is below the fifth row has its focused card drawn up inside
+    // the viewport. During the crossing that column is a NEIGHBOUR slot, which does not
+    // scroll, so the same card is drawn at its unscrolled position - tens of pixels below
+    // the panel. The departure therefore has to start from where the card WAS, which is
+    // the only place the user ever saw it, and that is this offset subtracted.
+    property real _departingScroll: 0
     // The panel's bottom edge in those coordinates, and a whole card past it: wholly
     // clipped, so the departure really is a disappearance rather than a marker parked
     // on the last row.
@@ -419,7 +429,7 @@ Item {
     // given zero length - the marker starts already off the bottom and the panel shows
     // the arrival alone. Degenerate rather than special-cased.
     readonly property real exitFrom: _departingRowIndex < 0 ? exitTo
-        : _departingRowIndex * rowPitch
+        : _departingRowIndex * rowPitch - _departingScroll
     // The panel's top edge in those coordinates, and a whole card above it. The
     // arrival's own start, for the same reason `exitTo` is the departure's.
     readonly property real crossingFrom: -_stripY - rowHeight
@@ -567,6 +577,7 @@ Item {
         crossingRun.stop()
         root._markerCrossing = false
         root._departingRowIndex = -1
+        root._departingScroll = 0
         root._exitFrom = 0
         // A rest plan rather than no plan: the strip still needs to be drawn, and
         // this is the one that says "three columns, active slot 1, centred here" -
@@ -600,6 +611,14 @@ Item {
     // it, and start the clock. The held frame is a reference to the same hint
     // object, so nothing is copied and the leaving rows keep their own delegates.
     function _startSlide(plan) {
+        // The departing column's scroll offset, captured BEFORE the plan or the columns
+        // are replaced. Both of those change which column is the active one, and a strip
+        // whose active column has just been rebuilt reports no scroll range for a frame -
+        // which clamps the offset to zero before anything downstream could read it. Read
+        // a line lower it was reliably 0, and the departure leg then started from the
+        // focused card's UNSCROLLED position: 170px below the panel, so the marker set off
+        // upward instead of down and the whole leg played out of sight.
+        root._departingScroll = strip.scrollOffset
         root.plan = plan
         root.columns = HintLogic.stripColumns(root.hint, root.leavingHint, plan)
         root.shownReady = HintLogic.ready(root.hint)
@@ -607,8 +626,14 @@ Item {
         // before either clock starts, so the departure is on screen from the crossing's
         // first frame - the marker is already sliding off the old card rather than
         // appearing on the new one and only then leaving.
+        // The UNCAPPED window list, deliberately. `cappedRows` truncates to the
+        // viewport's five rows, so a workspace whose focused window was further down
+        // reported no focused row at all - and the departure leg was then given zero
+        // length, which is why the marker never appeared to move down on exactly those
+        // switches. The arriving side has always read the uncapped list, so the two ends
+        // of the journey were answering the question differently.
         root._departingRowIndex = HintLogic.focusedIndexIn(
-            HintLogic.cappedRows(root.leavingHint ? root.leavingHint.windows : null).rows)
+            HintLogic.rowsFromList(root.leavingHint ? root.leavingHint.windows : null))
         root._exitFrom = root.exitFrom
         root._markerCrossing = true
         root.swapping = true
@@ -700,6 +725,7 @@ Item {
             root._snapIndicator(root._targetYFor(root.focusedRowIndex))
             root._markerCrossing = false
             root._departingRowIndex = -1
+            root._departingScroll = 0
             root._exitFrom = 0
         }
     }
@@ -759,7 +785,19 @@ Item {
 
     onHintChanged: _onHintChanged()
 
-    readonly property real _barTop: Math.min(_headY, _tailY)
+    // The bar's top edge, in the SAME space as `focusedRowTop` - which is a SCROLLED
+    // space, because the active column's own `y` is its negative scroll offset.
+    //
+    // The subtraction is the whole of it, and it was missing. `_targetYFor` and the
+    // tracker that consumes it are in the column's own UNSCROLLED coordinates, which is
+    // right for them - the stretch is a property of the list, not of where the viewport
+    // happens to be - but the bar is drawn as a sibling of the cards, so where it is
+    // drawn has to be where the cards are. With the column scrolled, the two disagreed by
+    // exactly the scroll offset: the outline sat on the focused card and the bar sat the
+    // same number of pixels below the list's own bottom. Measured on a twelve-window
+    // workspace with the focus on row 9, the outline landed on the card at y 136 and the
+    // bar at y 307 - 171px apart, which is the scroll.
+    readonly property real _barTop: Math.min(_headY, _tailY) - strip.scrollOffset
     readonly property real _barLength: indicatorLength + Math.abs(_headY - _tailY)
     readonly property bool hasTarget: focusedRowIndex >= 0
             && activeColumn
@@ -1204,6 +1242,19 @@ Item {
             // from a coordinate that never named a row.
             root._pendingTop = -1
             root._snapIndicator(root.hasTarget ? target : 0)
+            // ...and it is no longer a PLACEMENT. Zero is a coordinate that names no row,
+            // and the next real target has to arrive by snapping rather than by flying
+            // from it: `_retargetIndicator`'s genuine-switch branch animates the head and
+            // the tail from wherever they are, which from here means the bar entering on
+            // the FIRST card and sliding down to the focused one - a journey invented by
+            // the tracker's resting value, out of a state where there was nothing to
+            // travel from. Clearing `_placed` hands the next target to the first-placement
+            // branch below, which snaps.
+            //
+            // So this branch is not only "no row, park it" - it is also the statement
+            // that the marker is not currently on a row, which is what the stretch needs
+            // to know and had no way to ask.
+            root._placed = false
             return
         }
         // First placement snaps: there is nothing on screen to travel from.

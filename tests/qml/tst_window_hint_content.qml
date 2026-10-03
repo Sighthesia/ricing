@@ -1614,6 +1614,105 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             return seen
         }
 
+        function test_theDepartureIsFoundAndRunsDownwardForAFocusBelowTheViewport() {
+            // A workspace with more windows than the viewport shows, focused below the
+            // fifth row. This is the case where the departure used to vanish rather than
+            // to be seen: the departing row was read through `cappedRows`, which
+            // truncates to the viewport's five, so a focus on row 9 of twelve reported NO
+            // focused row, the departure leg was handed zero length, and the marker left
+            // sideways with nothing happening on the way out.
+            body.hint = root.tallFramedHint(2, 2, 12, 9)
+            wait(500)
+            var whereItWas = body.focusedRowTop
+            verify(strip().scrollOffset > 0,
+                "and the panel has scrolled to keep that card on screen, by "
+                    + strip().scrollOffset)
+            body.hint = root.tallFramedHint(3, 2, 12, 9)
+            wait(20)
+            compare(body._departingRowIndex, 9,
+                "the departing workspace's focused row is found")
+            compare(body.exitFrom, whereItWas,
+                "and the departure starts where that card actually was on screen, not at "
+                    + "its unscrolled position - which for row 9 would be "
+                    + (9 * body.rowPitch) + ", a card and a half below the panel")
+            driveSlideTo(0.5)
+            driveMarkerTo(0.45)
+            verify(body.crossingTop > whereItWas,
+                "moving DOWN the whole way, was " + body.crossingTop + " from "
+                    + whereItWas)
+            verify(body.crossingTop + body.rowHeight > clipBottom(),
+                "and out through the panel's bottom edge, so the clip takes it - "
+                    + body.crossingTop + " against a bottom of " + clipBottom())
+            settleSlide()
+            settleMarker()
+        }
+
+        function test_theLandingDoesNotJumpWhenTheColumnIsScrolled() {
+            // The outline is placed at the focused row's top edge in the SCROLLED space,
+            // and the bar used to be placed in the column's own UNSCROLLED one. With the
+            // column scrolled the two were the scroll offset apart - measured on this case
+            // as the outline on the card at y 136 and the bar at y 307 - and the landing
+            // handed over a bar that jumped by exactly that much. A jump on the frame the
+            // marker arrives is the one moment that reads as a mistake rather than as
+            // motion.
+            body.hint = root.tallFramedHint(2, 2, 12, 9)
+            // Past the tail's own `MotionTokens.slow * 2`, so the resting assertion below
+            // is about the placement rather than about a fraction of a pixel still in
+            // flight.
+            wait(700)
+            var scroll = strip().scrollOffset
+            verify(scroll > 0, "the panel is scrolled, by " + scroll)
+            compare(findByName(body, "windowHintFocusIndicator").y,
+                findByName(body, "windowHintFocusFrame").y + body.markerOffset,
+                "the bar is one markerOffset below the outline to begin with")
+            body.hint = root.tallFramedHint(3, 2, 12, 9)
+            var worst = 0
+            for (var step = 0; step <= 8; ++step) {
+                driveMarkerTo(step / 8)
+                worst = Math.max(worst, Math.abs(findByName(body, "windowHintFocusIndicator").y
+                    - findByName(body, "windowHintFocusFrame").y - body.markerOffset))
+            }
+            compare(worst, 0,
+                "and stays that way through the whole journey - the worst disagreement was "
+                    + worst + " against a scroll of " + scroll)
+            settleSlide()
+            settleMarker()
+            compare(findByName(body, "windowHintFocusIndicator").y,
+                findByName(body, "windowHintFocusFrame").y + body.markerOffset,
+                "and at the landing")
+        }
+
+        function test_aFocusAfterNothingWasFocusedSnapsRatherThanFlyingInFromTheFirstCard() {
+            // A workspace with nothing focused parks the tracker on a coordinate that
+            // names no row - zero, which is not a card. The next real focus has to SNAP
+            // onto its own row, because `_retargetIndicator`'s genuine-switch branch
+            // animates the head and the tail from wherever they are, and from there that
+            // is a journey from the first card down to the focused one: a path invented
+            // entirely by the resting value, out of a state where there was nothing to
+            // travel from.
+            body.hint = root.tallFramedHint(2, 2, 6, -1)
+            wait(300)
+            verify(!body.hasTarget, "the workspace has nothing focused")
+            verify(!body._placed, "so the marker is not on a row at all")
+            body.hint = root.tallFramedHint(2, 2, 6, 4)
+            wait(1)
+            compare(body.focusedRowIndex, 4, "and the focus arrives on row 4")
+            var onCard = body.focusedRowTop + body.markerOffset
+            var firstCard = body._targetYFor(0) - strip().scrollOffset
+                + body.markerOffset
+            var seen = []
+            for (var i = 0; i < 20; ++i) {
+                seen.push(findByName(body, "windowHintFocusIndicator").y)
+                wait(16)
+            }
+            verify(Math.min.apply(null, seen) >= onCard - 0.5,
+                "the bar is on that card from the first frame and never travels below it - "
+                    + "lowest seen " + Math.min.apply(null, seen) + " against a card at "
+                    + onCard + ", and the first card is at " + firstCard)
+            verify(Math.max.apply(null, seen) <= onCard + 0.5,
+                "nor does it overshoot it, highest seen " + Math.max.apply(null, seen))
+        }
+
         function test_theWholePanelArrivesInOnePiece() {
             // No row is left behind and none arrives on its own. A switch used to
             // stagger the three columns in row by row, which meant the panel was
