@@ -37,6 +37,16 @@ Item {
             return { id: id, displayName: name, favoriteWeight: weight, lastUsedAt: usedAt }
         }
 
+        function makeCategorized(id, name, category, usedAt) {
+            return {
+                id: id,
+                displayName: name,
+                category: category,
+                favoriteWeight: 0,
+                lastUsedAt: usedAt == null ? 0 : usedAt
+            }
+        }
+
         // Records every adapter call and keeps the completion callbacks so a
         // test resolves them in any order; nothing shells out or runs timers.
         function makeManualAdapter() {
@@ -77,6 +87,9 @@ Item {
             s._pooledMode = ""
             s.displayPool = []
             s._adapters = ({})
+            // A lens left behind by a previous test would silently filter
+            // this one's results.
+            s.category = ""
         }
 
         function openWithResults(items) {
@@ -405,6 +418,108 @@ Item {
 
             resolveExecute(apps, 0, { ok: true })
             compare(svc().visible, false)
+        }
+
+        // --- category chip rail ---
+
+        function openCategorized(items) {
+            var apps = makeManualAdapter()
+            svc()._adapters = ({ apps: apps })
+            svc().open()
+            wait(0)
+            apps.pendingRefreshes[0](items)
+            wait(30)
+            return apps
+        }
+
+        function chipById(id) {
+            var chips = page.categoryChips
+            for (var i = 0; i < chips.length; i++)
+                if (chips[i].id === id)
+                    return chips[i]
+            return null
+        }
+
+        function test_categoryChipsCarryLiveCountsForTheActiveMode() {
+            openCategorized([makeCategorized("a", "Steam", "games", 3),
+                             makeCategorized("b", "Firefox", "network", 2)])
+
+            var chips = page.categoryChips
+            compare(chips.length, 10)
+            compare(chips[0].id, "")
+            compare(chips[0].label, "All")
+            compare(chips[0].count, 2)
+            compare(chipById("games").count, 1)
+            compare(chipById("network").count, 1)
+            // An empty category keeps its slot so typing never reflows the bar.
+            compare(chipById("office").count, 0)
+
+            // Typing narrows the counts without dropping any chip.
+            keyClick(Qt.Key_F)
+            tryCompare(svc(), "query", "f")
+            compare(chipById("network").count, 1)
+            compare(chipById("games").count, 0)
+            compare(page.categoryChips.length, 10)
+        }
+
+        function test_categoryChipActivationNarrowsRowsAndKeepsSearchFocused() {
+            openCategorized([makeCategorized("a", "Steam", "games", 3),
+                             makeCategorized("b", "Firefox", "network", 2)])
+
+            var gamesIndex = -1
+            for (var i = 0; i < page.categoryChips.length; i++)
+                if (page.categoryChips[i].id === "games")
+                    gamesIndex = i
+            verify(gamesIndex > 0)
+
+            var chip = page.categoryBarItem.chipAt(gamesIndex)
+            verify(chip !== null)
+            tryVerify(function() { return chip.width > 0 }, 800)
+            mouseClick(chip, chip.width / 2, chip.height / 2)
+
+            tryCompare(svc(), "category", "games")
+            compare(svc().results.length, 1)
+            compare(svc().results[0].id, "a")
+            // Activating a chip hands the keyboard back so typing continues.
+            tryVerify(function() { return page.searchField.activeFocus }, 300)
+
+            // The row outside the lens folds through the shared contract
+            // instead of vanishing from the model.
+            var other = page.resultAt(1)
+            tryCompare(other, "height", 0, 1000)
+            compare(page.resultCount, 2)
+        }
+
+        function test_allChipClearsTheLens() {
+            openCategorized([makeCategorized("a", "Steam", "games", 3),
+                             makeCategorized("b", "Firefox", "network", 2)])
+            page.setCategory("games")
+            compare(svc().results.length, 1)
+
+            var all = page.categoryBarItem.chipAt(0)
+            verify(all !== null)
+            tryVerify(function() { return all.width > 0 }, 800)
+            mouseClick(all, all.width / 2, all.height / 2)
+
+            tryCompare(svc(), "category", "")
+            compare(svc().results.length, 2)
+        }
+
+        function test_emptyLensAndModeSwitchResetTheChipSelection() {
+            openCategorized([makeCategorized("a", "Steam", "games", 3)])
+            page.setCategory("games")
+            compare(svc().category, "games")
+            // A lens with no match is a different message from no query.
+            page.setCategory("office")
+            compare(svc().results.length, 0)
+            verify(page.emptyState.visible)
+
+            // Category ids are per-mode: switching routes rewinds to "All"
+            // and the rail swaps to the new mode's taxonomy.
+            page.handleModeSelected("clipboard")
+            tryCompare(svc(), "category", "")
+            compare(page.categoryChips.length, 7)
+            compare(page.categoryChips[1].id, "text")
         }
 
         // --- pointer activation ---

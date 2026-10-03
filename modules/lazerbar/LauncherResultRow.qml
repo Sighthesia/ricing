@@ -19,6 +19,10 @@ Item {
     property string searchQuery: ""
     readonly property bool matchesSearch: LauncherLogic.resultMatches(result, searchQuery)
     readonly property bool searchHidden: !matchesSearch
+    property string categoryFilter: ""
+    readonly property bool matchesCategory: LauncherLogic.matchesCategory(result, categoryFilter)
+    readonly property bool categoryHidden: !matchesCategory
+    readonly property bool hidden: searchHidden || categoryHidden
 
     readonly property string iconSource: result && result.icon ? String(result.icon) : ""
 
@@ -84,7 +88,7 @@ Item {
     property bool freshFromBuild: true
     property bool revealHeld: false
     property bool snapTransitions: true
-    readonly property bool geometryHeld: revealHeld || searchHidden
+    readonly property bool geometryHeld: revealHeld || hidden
     // Position-based reveal slot used by the page's entrance/refill waves.
     readonly property real entryExitDelay: Math.round(Math.min(150, Math.max(0, root.y / 6)))
     height: geometryHeld ? 0 : rowHeight + listGap

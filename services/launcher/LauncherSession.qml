@@ -18,6 +18,34 @@ QtObject {
     property string error: ""
     property int selectedIndex: -1
 
+    // Category lens applied on top of the text filter; "" is the unfiltered
+    // "All" chip. The id space is per-mode (apps read .desktop Categories,
+    // clipboard reads entry content), so the session treats it as a view
+    // filter over the pooled data instead of a query: it never reaches the
+    // data source, and results stay consistent with what the surface folds.
+    property string category: ""
+    // Set while a mode switch rewinds the lens; the pending refresh already
+    // reads category at commit time, so the reset must not pull again.
+    property bool _categoryResetInFlight: false
+
+    function resetCategory() {
+        if (root.category === "")
+            return
+        root._categoryResetInFlight = true
+        root.category = ""
+        root._categoryResetInFlight = false
+    }
+
+    onCategoryChanged: {
+        if (root._categoryResetInFlight || !root.visible)
+            return
+        // A lens change rides the pooled fast path: the full sorted set for
+        // this mode is already here, so no adapter call is needed.
+        root.refresh()
+    }
+
+    onModeChanged: root.resetCategory()
+
     // True while navigation and execution are accepted; loading and error
     // sessions surface their state instead of accepting input actions.
     readonly property bool interactive: !loading && error === ""
@@ -179,6 +207,9 @@ QtObject {
         if (closingMode === root._pooledMode)
             root._pooledMode = (closingMode === "apps" || closingMode === "clipboard") ? closingMode : ""
         root.query = ""
+        // A closed session always reopens unfiltered: a lens left over from
+        // the previous run would silently hide most of the list.
+        root.category = ""
         // Freeze the last visible set instead of zeroing results: an empty
         // array tears down every live row delegate, and the next open would
         // rebuild the whole list on its first frame — the idle-cold reopen
@@ -186,7 +217,7 @@ QtObject {
         // objects (and their delegates) alive while hidden; a pooled reopen
         // then commits the same ordered ids, the previous array identity
         // wins, and nothing is rebuilt at all.
-        root.results = LauncherLogic.filterResults(root.displayPool, "")
+        root.results = LauncherLogic.filterResults(root.displayPool, "", root.category)
         root.loading = false
         root.error = ""
         root.selectedIndex = -1
@@ -214,7 +245,7 @@ QtObject {
             var sorted = LauncherLogic.sortResults(outcome)
             root.displayPool = sorted
             root._pooledMode = "apps"
-            root.results = LauncherLogic.filterResults(sorted, "")
+            root.results = LauncherLogic.filterResults(sorted, "", root.category)
             root.selectedIndex = LauncherLogic.clampSelection(0, root.results.length)
         })
     }
@@ -257,7 +288,7 @@ QtObject {
         // the pool already holds the full sorted set for this open session.
         if (!forcePull && parsed.mode === _pooledMode && displayPool.length > 0) {
             var previous = root.results
-            var filtered = LauncherLogic.filterResults(displayPool, parsed.text)
+            var filtered = LauncherLogic.filterResults(displayPool, parsed.text, root.category)
             // Clearing the query always lands back on the first row; only a
             // narrowing edit preserves the anchored selection.
             root.selectedIndex = parsed.text.length > 0
@@ -312,7 +343,7 @@ QtObject {
         // survives, and without this every keystroke would re-hit the data
         // source after a reopen.
         root._pooledMode = pooledMode
-        var filtered = LauncherLogic.filterResults(root.displayPool, requestText)
+        var filtered = LauncherLogic.filterResults(root.displayPool, requestText, root.category)
         root.selectedIndex = requestText.length > 0
                 ? LauncherLogic.refilterSelection(previous, root.selectedIndex, filtered)
                 : LauncherLogic.clampSelection(0, filtered.length)

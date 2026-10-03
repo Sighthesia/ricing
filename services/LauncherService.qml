@@ -5,6 +5,7 @@ import Quickshell.Io
 import "./" as Services
 import "launcher"
 import "launcher/LauncherAdapters.js" as LauncherAdapters
+import "launcher/LauncherCategories.js" as LauncherCategories
 
 // Standalone launcher entry point: owns the niri keybind IPC surface and
 // re-exposes the LauncherSession state machine. Launcher visibility, query,
@@ -16,12 +17,18 @@ Singleton {
     // Production data-source adapters installed on the session seam: real
     // desktop-entry applications, cliphist clipboard history, and niri
     // shortcut binds. Unavailable sources resolve to explicit errors.
+    // Category classifiers travel with the adapters so every pooled item
+    // carries the id the chip bar filters on: desktop Categories for apps,
+    // content heuristics for clipboard, and the parser's own bind category
+    // for shortcuts (which needs no resolver).
     readonly property var _adapters: LauncherAdapters.createAdapters({
         appsSource: DesktopEntries.applications,
         launchCounts: Services.LaunchCountService,
         clipboardBackend: Services.ClipboardService,
         shortcutsBackend: Services.NiriShortcutService,
         iconResolver: function(name) { return name ? String(Quickshell.iconPath(name, true)) : "" },
+        appCategoryResolver: LauncherCategories.appCategoryOf,
+        clipCategoryResolver: LauncherCategories.clipCategoryOf,
         commands: LauncherAdapters.builtinCommands(),
         ipcHelperPath: Quickshell.shellDir + "/scripts/afloat-ipc",
         actionRunner: root._runShortcutAction
@@ -103,6 +110,8 @@ Singleton {
     }
     property alias query: session.query
     readonly property alias mode: session.mode
+    // Active category chip; "" is the unfiltered "All" chip.
+    property alias category: session.category
     property alias results: session.results
     // Stable per-mode pool the surface renders; text filtering is local.
     property alias displayPool: session.displayPool

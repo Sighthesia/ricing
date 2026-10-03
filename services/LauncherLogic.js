@@ -95,6 +95,67 @@ function escapeAction(queryText) {
     return { action: "close", query: text }
 }
 
+// ---- Category lens ----
+// The category chip bar narrows a pooled set on top of the text filter.
+// "" is the unfiltered "All" chip and the session's own "no lens" value, so
+// an item without a category id stays reachable while unfiltered and drops
+// out of every named chip.
+
+function normalizeCategory(value) {
+    return value == null ? "" : String(value)
+}
+
+function categoryOf(item) {
+    return item == null || item.category == null ? "" : String(item.category)
+}
+
+function matchesCategory(item, category) {
+    var wanted = normalizeCategory(category)
+    if (wanted.length === 0)
+        return true
+    return item != null && categoryOf(item) === wanted
+}
+
+// One pooled item answering both lenses at once: the text needle and the
+// active category.
+function itemVisible(item, text, category) {
+    return resultMatches(item, text) && matchesCategory(item, category)
+}
+
+// Per-category tally over a pooled set. Ids are registered from the whole
+// pool - not just the current text matches - so a chip keeps its slot (and
+// its 0 count) while typing instead of vanishing and reflowing the bar.
+// Unclassified items contribute to total only; they have no chip of their
+// own.
+function categorySummary(items, text) {
+    var categories = []
+    var counts = ({})
+    var total = 0
+    if (!items || !items.length)
+        return { total: 0, categories: categories }
+    for (var i = 0; i < items.length; i++) {
+        var item = items[i]
+        if (!item)
+            continue
+        var id = categoryOf(item)
+        if (id.length > 0) {
+            var key = "$" + id
+            if (!Object.prototype.hasOwnProperty.call(counts, key)) {
+                counts[key] = 0
+                categories.push({ id: id, count: 0 })
+            }
+        }
+        if (resultMatches(item, text)) {
+            total++
+            if (id.length > 0)
+                counts["$" + id]++
+        }
+    }
+    for (var c = 0; c < categories.length; c++)
+        categories[c].count = counts["$" + categories[c].id]
+    return { total: total, categories: categories }
+}
+
 // Searchable text for one pooled item; mirrors the adapter needles via
 // searchText with a displayName+description fallback.
 function haystackOf(item) {
@@ -108,18 +169,19 @@ function haystackOf(item) {
 
 // Client-side filtering over a pooled result set: keeps row identity stable
 // across keystrokes so the surface can fold/reveal instead of reloading.
-function filterResults(items, text) {
+function filterResults(items, text, category) {
     if (!items || !items.length)
         return []
     var needle = String(text == null ? "" : text).replace(/\s+/g, " ").trim().toLowerCase()
-    if (!needle)
+    var wanted = normalizeCategory(category)
+    if (!needle && wanted.length === 0)
         return items.slice()
     var out = []
     for (var i = 0; i < items.length; i++) {
         var item = items[i]
         if (!item)
             continue
-        if (haystackOf(item).toLowerCase().indexOf(needle) >= 0)
+        if (itemVisible(item, needle, wanted))
             out.push(item)
     }
     return out
@@ -128,17 +190,20 @@ function filterResults(items, text) {
 // Index of the last item matching text, or -1 when nothing matches; lets a
 // windowed list size itself so every current match is materialized instead
 // of waiting for a scroll that folded rows can never trigger. An empty
-// needle matches everything and reports the full range.
-function lastMatchIndex(items, text) {
+// needle matches everything and reports the full range. The category lens
+// takes part in the scan: a deep match hidden behind another chip must not
+// stretch the window.
+function lastMatchIndex(items, text, category) {
     if (!items || !items.length)
         return -1
     var needle = String(text == null ? "" : text).replace(/\s+/g, " ").trim().toLowerCase()
-    if (!needle)
+    var wanted = normalizeCategory(category)
+    if (!needle && wanted.length === 0)
         return items.length - 1
     for (var i = items.length - 1; i >= 0; i--) {
         if (!items[i])
             continue
-        if (haystackOf(items[i]).toLowerCase().indexOf(needle) >= 0)
+        if (itemVisible(items[i], needle, wanted))
             return i
     }
     return -1

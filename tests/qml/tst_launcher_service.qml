@@ -41,6 +41,25 @@ Item {
             return { id: id, displayName: name, favoriteWeight: weight, lastUsedAt: usedAt }
         }
 
+        function makeCategorized(id, name, category, usedAt) {
+            return {
+                id: id,
+                displayName: name,
+                category: category,
+                favoriteWeight: 0,
+                lastUsedAt: usedAt == null ? 0 : usedAt
+            }
+        }
+
+        function openWithCategories(items) {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+            svc().open()
+            wait(0)
+            apps.pendingRefreshes[0](items)
+            return apps
+        }
+
         // Records every adapter call and keeps the completion callbacks so a
         // test resolves them in any order; nothing shells out or runs timers.
         function makeManualAdapter() {
@@ -91,6 +110,7 @@ Item {
             svc()._adapters = ({})
             svc()._pooledMode = ""
             svc().displayPool = []
+            svc().category = ""
             svc()._metadataRefreshPending = false
             if (_clipboardStub) {
                 _clipboardStub.destroy()
@@ -857,6 +877,69 @@ Item {
             wait(0)
             compare(svc().mode, "shortcuts")
             compare(svc().query, ">key ")
+        }
+
+        // --- category lens ---
+
+        function test_categoryLensNarrowsResultsWithoutPullingAgain() {
+            var apps = openWithCategories([makeCategorized("a", "Steam", "games", 3),
+                                           makeCategorized("b", "Firefox", "network", 2)])
+            compare(svc().results.length, 2)
+            var pool = svc().displayPool
+
+            svc().category = "games"
+
+            // The lens rides the pooled fast path: same pool, same array
+            // object, no adapter round trip.
+            compare(apps.queries.length, 1)
+            verify(svc().displayPool === pool)
+            compare(svc().results.length, 1)
+            compare(svc().results[0].id, "a")
+            // A lens switch with no query starts the narrowed list at the top.
+            compare(svc().selectedIndex, 0)
+        }
+
+        function test_categoryLensCombinesWithTheTextFilter() {
+            openWithCategories([makeCategorized("a", "Steam", "games"),
+                                makeCategorized("b", "Steam Deck", "network"),
+                                makeCategorized("c", "Firefox", "network")])
+
+            svc().query = "steam"
+            compare(svc().results.length, 2)
+            svc().category = "network"
+            compare(svc().results.length, 1)
+            compare(svc().results[0].id, "b")
+        }
+
+        function test_categoryLensReachesRowsWithoutACategory() {
+            // An uncategorized row (a test fixture, a mode with no taxonomy)
+            // must stay reachable unfiltered and drop out of every chip.
+            openWithCategories([makeItem("a", "Alpha", 0, 0),
+                                makeCategorized("b", "Beta", "games")])
+            compare(svc().results.length, 2)
+            svc().category = "games"
+            compare(svc().results.length, 1)
+            compare(svc().results[0].id, "b")
+        }
+
+        function test_modeSwitchRevertsTheLensWithoutAnExtraPull() {
+            var apps = openWithCategories([makeCategorized("a", "Steam", "games")])
+            svc().category = "games"
+            compare(svc().category, "games")
+
+            svc().query = ">clip "
+
+            // Category ids are per-mode, so the lens rewinds to "All" - and
+            // the mode's own refresh must not be duplicated by the reset.
+            compare(svc().category, "")
+            compare(apps.queries.length, 1)
+        }
+
+        function test_closeRevertsTheLensSoReopenStartsUnfiltered() {
+            openWithCategories([makeCategorized("a", "Steam", "games")])
+            svc().category = "games"
+            svc().close()
+            compare(svc().category, "")
         }
     }
 }

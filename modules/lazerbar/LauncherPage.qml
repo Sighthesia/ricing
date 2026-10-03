@@ -1,6 +1,7 @@
 import QtQuick
 import "../../services/launcher"
 import "../../services/LauncherLogic.js" as LauncherLogic
+import "../../services/launcher/LauncherCategories.js" as LauncherCategories
 
 // Keyboard-first launcher content page for the wave surface: auto-focused
 // search rail, mode sidebar data with prefix rewriting, service-driven result
@@ -66,6 +67,24 @@ Item {
         return LauncherLogic.parseQuery(String(root.session.query)).text
     }
 
+    // Category chip lens: the active id ("" is the unfiltered "All" chip)
+    // and the chip model for the current mode, rebuilt from the pooled data
+    // and the live text filter. The model is built even for an empty pool so
+    // the rail's presence depends on the mode alone - a rail that appears
+    // with the first batch of data would shift the whole list mid-entrance.
+    readonly property string activeCategory: root.session && root.session.category != null
+                                                ? String(root.session.category) : ""
+    readonly property var categoryChips: LauncherCategories.chipsFor(
+        root.activeMode,
+        LauncherLogic.categorySummary(root.session ? root.session.displayPool : null,
+                                      root.activeSearchText))
+
+    function setCategory(id) {
+        if (!root.session)
+            return
+        root.session.category = id == null ? "" : String(id)
+    }
+
     // Emitted when a sidebar-driven mode change is applied to the session.
     signal modeChangeRequested(string mode)
     // Bubbled from the activated result row so the owning surface can replay
@@ -73,6 +92,8 @@ Item {
     signal exitFlingRequested(var spec)
 
     readonly property alias searchField: searchSurface
+    // Chip rail handle for probes and tests (chipAt resolves one chip).
+    readonly property alias categoryBarItem: categoryBar
     // Result access for tests and shell wiring.
     readonly property alias resultsView: resultsView
     readonly property int resultCount: resultsView.resultCount
@@ -533,7 +554,7 @@ Item {
             for (var g = 0; g < freshRows.length; g++) {
                 var grown = freshRows[g]
                 var grownId = grown.result ? String(grown.result.id) : ""
-                if (prevSet[grownId] === true || grown.searchHidden === true)
+                if (prevSet[grownId] === true || grown.hidden === true)
                     grown.releaseInstantly()
                 else
                     grown.holdInstantly()
@@ -672,7 +693,8 @@ Item {
             return
         }
         var needed = Math.min(root.resultWindowCap,
-                              LauncherLogic.lastMatchIndex(pool, root.activeSearchText) + 1)
+                              LauncherLogic.lastMatchIndex(pool, root.activeSearchText,
+                                                          root.activeCategory) + 1)
         if (needed <= root._resultWindowLimit) {
             windowStretchTimer.stop()
             return
@@ -688,13 +710,20 @@ Item {
         if (!pool || !pool.length)
             return
         var needed = Math.min(root.resultWindowCap,
-                              LauncherLogic.lastMatchIndex(pool, root.activeSearchText) + 1)
+                              LauncherLogic.lastMatchIndex(pool, root.activeSearchText,
+                                                          root.activeCategory) + 1)
         if (needed <= root._resultWindowLimit)
             return
         root._resultWindowExtra = needed - root.resultWindowBase
         Qt.callLater(root._scheduleRowsCommit)
     }
     onActiveSearchTextChanged: {
+        resultsView.normalizeViewport()
+        root._syncWindowToMatches()
+    }
+    // A chip switch folds rows exactly like a search edit, so the viewport
+    // needs the same clamp and deep-match stretch.
+    onActiveCategoryChanged: {
         resultsView.normalizeViewport()
         root._syncWindowToMatches()
     }
@@ -787,6 +816,31 @@ Item {
             _hoveredResult = null
     }
 
+    // Category chip rail between the search field and the results: the lens
+    // is part of the query surface, so it stays a flat full-width strip
+    // rather than its own panel. Modes whose taxonomy yields a single chip
+    // (shortcut binds, until their categories are known) take no space.
+    LauncherCategoryBar {
+        id: categoryBar
+        objectName: "launcherCategoryBar"
+        anchors.top: searchSurface.bottom
+        // Collapsed, the strip must not leave a gap where it used to be:
+        // the margin collapses with it so the results start where they did.
+        anchors.topMargin: visible ? 6 : 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: visible ? implicitHeight : 0
+        visible: root.categoryChips.length > 1
+        chips: root.categoryChips
+        selected: root.activeCategory
+        onChipSelected: id => {
+            root.setCategory(id)
+            // Typing after picking a category must keep going to the search
+            // field, so activation always hands the keyboard back.
+            root.focusSearch()
+        }
+    }
+
     // Clipboard preview pane: the selected entry rendered large — decoded
     // image or full multi-line text — beside a narrowed results list.
     // Pointing at any row previews it ahead of the keyboard selection. The
@@ -824,7 +878,11 @@ Item {
             var rev = root._thumbRev
             return rev >= 0 ? root.clipThumbPath(r) : ""
         }
-        anchors.top: searchSurface.bottom
+        // Anchored to the chip rail's bottom edge rather than to the strip
+        // itself: the rail collapses to zero height when a mode has no
+        // categories, and everything below then starts under the search
+        // field exactly as it did before the lens existed.
+        anchors.top: categoryBar.visible ? categoryBar.bottom : searchSurface.bottom
         anchors.topMargin: 12
         anchors.right: parent.right
         anchors.rightMargin: 8
@@ -984,11 +1042,11 @@ Item {
         }
     }
 
-    // Slim indexing notice between the search rail and the results; explains
+    // Slim indexing notice between the query surface and the results; explains
     // why a freshly opened session may miss applications for a few seconds.
     Rectangle {
         id: indexNotice
-        anchors.top: searchSurface.bottom
+        anchors.top: categoryBar.visible ? categoryBar.bottom : searchSurface.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         height: visible ? 26 : 0
@@ -1006,9 +1064,12 @@ Item {
         }
     }
 
+    // Same edge-anchored chain as the notice above: an anchor line must name an
+    // item's edge, never the item itself.
     Flickable {
         id: resultsView
-        anchors.top: indexNotice.visible ? indexNotice.bottom : searchSurface.bottom
+        anchors.top: indexNotice.visible ? indexNotice.bottom
+                                   : (categoryBar.visible ? categoryBar.bottom : searchSurface.bottom)
         anchors.left: parent.left
         anchors.right: previewPane.visible ? previewPane.left : parent.right
         anchors.bottom: parent.bottom
@@ -1274,6 +1335,7 @@ Item {
                     thumbPath: root._thumbRev >= 0 ? root.clipThumbPath(result) : ""
                     metaStamp: root._clipMetaRev
                     searchQuery: root.activeSearchText
+                    categoryFilter: root.activeCategory
                     selected: {
                         if (!root.session || !root.session.results || root.session.selectedIndex < 0)
                             return false
@@ -1371,7 +1433,9 @@ Item {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            text: "No results"
+            // An empty lens and an empty query are different failures: name
+            // the half of the filter that came up dry.
+            text: root.activeCategory.length > 0 ? "No results in this category" : "No results"
             color: LazerTheme.textMuted
             font.pixelSize: 14
         }

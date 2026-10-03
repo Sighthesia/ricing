@@ -119,6 +119,7 @@ Item {
                 name: name,
                 comment: comment || "",
                 icon: options && options.icon ? options.icon : "",
+                categories: options && options.categories ? options.categories : [],
                 noDisplay: !!(options && options.noDisplay),
                 execCalls: 0
             }
@@ -502,6 +503,96 @@ Item {
 
             verify(outcome && outcome.ok === false)
             verify(String(outcome.error).length > 0)
+        }
+
+        // --- categories ---
+
+        function test_appsAdapterTagsEntriesThroughTheInjectedClassifier() {
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource([
+                    makeAppEntry("steam", "Steam", "games", { categories: ["Game"] }),
+                    makeAppEntry("editor", "Editor", "", {})
+                ]),
+                // A stub resolver keeps the adapter contract under test; the
+                // production wiring is LauncherCategories.appCategoryOf.
+                appCategoryResolver: function(entry) {
+                    return entry.categories.length ? "games" : "other"
+                }
+            })
+
+            var outcome = "pending"
+            adapters.apps.refresh("", "apps", function(result) { outcome = result })
+
+            compare(outcome.length, 2)
+            var byId = ({})
+            for (var i = 0; i < outcome.length; i++)
+                byId[outcome[i].id] = outcome[i]
+            compare(byId["steam"].category, "games")
+            compare(byId["editor"].category, "other")
+            // The id rides searchText, so typing a category name finds it.
+            verify(byId["steam"].searchText.indexOf("games") >= 0)
+        }
+
+        function test_appsAdapterDefaultsToOtherWithoutAClassifier() {
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource([makeAppEntry("alpha", "Alpha", "",
+                                                        { categories: ["Game"] })])
+            })
+
+            var outcome = "pending"
+            adapters.apps.refresh("", "apps", function(result) { outcome = result })
+            compare(outcome[0].category, "other")
+        }
+
+        function test_builtinCommandsDeclareTheirChipBucket() {
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource([makeAppEntry("alpha", "Alpha", "")]),
+                commands: LauncherAdapters.builtinCommands()
+            })
+
+            var outcome = "pending"
+            adapters.apps.refresh("", "apps", function(result) { outcome = result })
+
+            var lock = outcome[1]
+            compare(lock.id, "cmd-lock")
+            // Locking the session is a system action, not an unclassified one.
+            compare(lock.category, "system")
+        }
+
+        function test_clipboardAdapterTagsEntriesThroughTheInjectedClassifier() {
+            clipBackend.items = [
+                { id: "1", preview: "plain sentence", mime: "text/plain", isImage: false, firstSeenMs: 1700000100000 },
+                { id: "2", preview: "shot", mime: "image/png", isImage: true, firstSeenMs: 1700000200000 }
+            ]
+            var adapters = LauncherAdapters.createAdapters({
+                clipboardBackend: clipBackend,
+                clipCategoryResolver: function(raw) { return raw.isImage ? "image" : "text" }
+            })
+
+            var outcome = "pending"
+            adapters.clipboard.refresh("", "clipboard", function(result) { outcome = result })
+
+            compare(outcome.length, 2)
+            compare(outcome[0].id, "1")
+            compare(outcome[0].category, "text")
+            compare(outcome[1].id, "2")
+            compare(outcome[1].category, "image")
+        }
+
+        function test_clipboardAdapterDefaultsToTextWithoutAClassifier() {
+            clipBackend.items = [
+                { id: "1", preview: "plain", mime: "text/plain", isImage: false, firstSeenMs: 1700000100000 },
+                { id: "2", preview: "shot", mime: "image/png", isImage: true, firstSeenMs: 1700000200000 }
+            ]
+            var adapters = LauncherAdapters.createAdapters({ clipboardBackend: clipBackend })
+
+            var outcome = "pending"
+            adapters.clipboard.refresh("", "clipboard", function(result) { outcome = result })
+
+            compare(outcome[0].category, "text")
+            // An image row keeps its own bucket even with no classifier: it is
+            // the one kind the raw entry already states.
+            compare(outcome[1].category, "image")
         }
 
         // --- clipboard ---

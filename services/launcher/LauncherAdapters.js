@@ -56,7 +56,7 @@ function appMatches(entry, needle) {
         || containsNormalized(entry.id, needle)
 }
 
-function appItem(entry, launchCounts, iconResolver) {
+function appItem(entry, launchCounts, iconResolver, categoryResolver) {
     var appId = String(entry.id == null ? "" : entry.id)
     var weight = launchCounts && typeof launchCounts.getLaunchCount === "function"
                  ? toCount(launchCounts.getLaunchCount(appId))
@@ -67,14 +67,21 @@ function appItem(entry, launchCounts, iconResolver) {
                      ? toCount(launchCounts.getLastLaunchAt(appId))
                      : 0
     var rawIcon = entry.icon == null ? "" : String(entry.icon)
+    // Category id from the entry's freedesktop Categories, so the chip bar
+    // can narrow the pool without a second scan. The id rides searchText as
+    // well: typing "games" then finds every game, matching what the chips
+    // advertise.
+    var category = categoryResolver ? String(categoryResolver(entry)) : "other"
     return {
         id: appId,
         // A broken .desktop may lack Name; fall back to the id so the app
         // stays listed (and launchable) instead of rendering a blank card.
         displayName: normalizeText(entry.name) || appId,
         description: entry.comment == null ? "" : String(entry.comment),
-        searchText: normalizeText(entry.name + " " + entry.comment + " " + entry.id).toLowerCase(),
+        searchText: normalizeText(entry.name + " " + entry.comment + " " + entry.id
+                                  + " " + category).toLowerCase(),
         icon: iconResolver ? String(iconResolver(rawIcon)) : directIconPath(rawIcon),
+        category: category,
         favoriteWeight: weight,
         lastUsedAt: lastUsedAt
     }
@@ -93,6 +100,7 @@ function builtinCommands() {
         description: "Lock the session",
         keywords: "lock lockscreen 锁屏 锁定 锁定屏幕",
         icon: "lock",
+        category: "system",
         actionId: "shell.lock.lock"
     }]
 }
@@ -118,6 +126,9 @@ function commandItem(command, index) {
         icon: command.icon == null ? "" : String(command.icon),
         actionId: command.actionId == null ? "" : String(command.actionId),
         managedByShell: true,
+        // Built-in commands declare their own chip bucket so they ride the
+        // same category lens as desktop entries.
+        category: command.category == null ? "other" : String(command.category),
         favoriteWeight: toCount(command.favoriteWeight),
         lastUsedAt: 0
     }
@@ -132,6 +143,7 @@ function createAppsAdapter(config) {
     var source = config.appsSource || null
     var launchCounts = config.launchCounts || null
     var iconResolver = typeof config.iconResolver === "function" ? config.iconResolver : null
+    var categoryResolver = typeof config.categoryResolver === "function" ? config.categoryResolver : null
     var commands = Array.isArray(config.commands) ? config.commands : []
     var actionRunner = typeof config.actionRunner === "function" ? config.actionRunner : null
     var ipcHelperPath = config.ipcHelperPath == null ? "" : String(config.ipcHelperPath)
@@ -193,7 +205,7 @@ function createAppsAdapter(config) {
                     continue
                 if (!appMatches(entry, needle))
                     continue
-                out.push(appItem(entry, launchCounts, cachedIcon))
+                out.push(appItem(entry, launchCounts, cachedIcon, categoryResolver))
             }
             for (var commandIndex = 0; commandIndex < commands.length; commandIndex++) {
                 var candidate = commands[commandIndex]
@@ -519,13 +531,19 @@ function parseClipboardImageMeta(preview) {
     }
 }
 
-function clipboardItem(raw) {
+function clipboardItem(raw, categoryResolver) {
     var preview = raw.preview == null ? "" : String(raw.preview)
     var isImage = !!raw.isImage
     var mime = raw.mime == null ? "text/plain" : String(raw.mime)
     var seenMs = toCount(raw.firstSeenMs)
     var imageMeta = isImage ? parseClipboardImageMeta(preview) : null
     var metadataReady = raw.metadataReady === true
+    // Content-derived bucket (image / link / code / color / number / text)
+    // so the clipboard list can be narrowed by kind without tagging entries
+    // by hand. The id also rides searchText, keeping "code" and "link"
+    // searchable next to the entry text itself.
+    var category = categoryResolver ? String(categoryResolver(raw))
+                                    : (isImage ? "image" : "text")
     var title = isImage
                  ? (metadataReady && Number(raw.imageWidth) > 0 && Number(raw.imageHeight) > 0
                     ? "[Image] " + Number(raw.imageWidth) + "x" + Number(raw.imageHeight)
@@ -549,18 +567,19 @@ function clipboardItem(raw) {
         id: raw.id == null ? "" : String(raw.id),
         displayName: title,
         description: description,
-        searchText: normalizeText(title + " " + description).toLowerCase(),
+        searchText: normalizeText(title + " " + description + " " + category).toLowerCase(),
         icon: "",
         previewText: preview,
         mime: mime,
         isImage: isImage,
         time: seenMs,
+        category: category,
         favoriteWeight: 0,
         lastUsedAt: seenMs
     }
 }
 
-function mapClipboardItems(items, needle) {
+function mapClipboardItems(items, needle, categoryResolver) {
     var out = []
     for (var index = 0; index < items.length; index++) {
         var raw = items[index]
@@ -568,7 +587,7 @@ function mapClipboardItems(items, needle) {
             continue
         if (needle && !containsNormalized(raw.preview, needle))
             continue
-        out.push(clipboardItem(raw))
+        out.push(clipboardItem(raw, categoryResolver))
     }
     return out
 }
@@ -579,6 +598,7 @@ function mapClipboardItems(items, needle) {
 function createClipboardAdapter(config) {
     config = config || {}
     var backend = config.clipboardBackend || null
+    var categoryResolver = typeof config.categoryResolver === "function" ? config.categoryResolver : null
     var waiting = null
     var completionHandler = null
     var availabilityHandler = null
@@ -591,7 +611,8 @@ function createClipboardAdapter(config) {
         var pending = waiting
         waiting = null
         if (pending)
-            pending.done(mapClipboardItems(Array.isArray(backend.items) ? backend.items : [], pending.needle))
+            pending.done(mapClipboardItems(Array.isArray(backend.items) ? backend.items : [],
+                                           pending.needle, categoryResolver))
     }
 
     // During the startup probe the service is not yet marked available.
@@ -638,7 +659,7 @@ function createClipboardAdapter(config) {
                           && isSignal(backend, "listCompleted")
                           && typeof backend.list === "function"
             if (items.length > 0 || !canWait) {
-                done(mapClipboardItems(items, needle))
+                done(mapClipboardItems(items, needle, categoryResolver))
                 return
             }
             // list() is a documented no-op until the backend's startup caches
@@ -648,7 +669,7 @@ function createClipboardAdapter(config) {
             // backend is ready. Backends without the seam (test doubles) keep
             // the previous waiting behavior.
             if (backend._firstSeenCacheReady === false) {
-                done(mapClipboardItems(items, needle))
+                done(mapClipboardItems(items, needle, categoryResolver))
                 return
             }
             waiting = { needle: needle, done: done }
@@ -880,12 +901,14 @@ function createAdapters(config) {
             appsSource: config.appsSource || null,
             launchCounts: config.launchCounts || null,
             iconResolver: config.iconResolver || null,
+            categoryResolver: config.appCategoryResolver || null,
             commands: config.commands,
             actionRunner: config.actionRunner,
             ipcHelperPath: config.ipcHelperPath
         }),
         clipboard: createClipboardAdapter({
-            clipboardBackend: config.clipboardBackend || null
+            clipboardBackend: config.clipboardBackend || null,
+            categoryResolver: config.clipCategoryResolver || null
         }),
         shortcuts: createShortcutsAdapter({
             shortcutsBackend: config.shortcutsBackend || null,

@@ -95,6 +95,8 @@ Item {
         "modules/lazerbar/RippleGlow.qml",
         "modules/lazerbar/WallpaperBackground.qml",
         "modules/lazerbar/WallpaperReveal.qml",
+        // launcher services (the chip taxonomy rides the adapters)
+        "services/LauncherService.qml",
         // lock
         "modules/lock/Lock.qml",
         "modules/lock/LockSurface.qml",
