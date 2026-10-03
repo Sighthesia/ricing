@@ -22,7 +22,6 @@ WlSessionLockSurface {
     readonly property string snapshotUrl: snapshot && screenIndex >= 0
             ? snapshot.snapshotUrlFor(screenIndex) : ""
     property string wallpaperPath: ""
-    property real decodeRatio: 1
     // Whether this request expects a pre-lock capture. The session-start lock
     // passes false, so its reveal is not gated on an image that will never exist.
     property bool captureExpected: true
@@ -314,8 +313,6 @@ WlSessionLockSurface {
         id: backdrop
         anchors.fill: parent
         snapshotSource: root.snapshotUrl
-        wallpaperSource: root.wallpaperPath
-        decodeRatio: root.decodeRatio
         captureExpected: root.captureExpected
         progress: root.waveProgress
         lightScheme: root.lightScheme
@@ -331,9 +328,9 @@ WlSessionLockSurface {
         screenHeight: Math.round(root.height)
     }
 
-    // Keep the screenshot visible for at least one settled frame before the
-    // mask starts. If capture fails, the opaque floor still starts the reveal
-    // after a bounded wait rather than exposing the wallpaper immediately.
+    // Keep the screenshot visible for at least one settled frame before the mask
+    // starts. If capture fails, the opaque floor still starts the reveal after a
+    // bounded wait rather than exposing the desktop immediately.
     Timer {
         id: revealStartTimer
         interval: 250
