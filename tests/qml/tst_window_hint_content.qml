@@ -75,6 +75,23 @@ Item {
         }
     }
 
+    // `framedHint` gives every workspace ONE window, so a column in it is exactly one
+    // row tall. That is fine for a test about columns and useless for one about the
+    // sweep, which is a whole COLUMN long: at one row it is the same length as the row
+    // marker it replaces, and a test that could not tell the two apart would pass on a
+    // sweep that never happened. This is the same fixture with `count` windows in the
+    // active workspace, so the column is `count` rows and the sweep is visibly longer
+    // than the row.
+    function tallFramedHint(active, previous, count) {
+        var hint = root.framedHint(active, previous)
+        var rows = []
+        for (var i = 0; i < count; ++i)
+            rows.push({ windowId: "t" + i, title: "ws" + active + " row " + i,
+                appId: "kitty", icon: "", isFocused: i === 0 })
+        hint.windows = rows
+        return hint
+    }
+
     // Snapshot shaped exactly like WindowHintService's.
     function makeHint(overrides) {
         var hint = {
@@ -1090,6 +1107,13 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         // Walked off the strip's children rather than off the rows, because a column
         // whose workspace has no windows instantiates no row at all and would be
         // missed - and an empty column is exactly one of the cases under test.
+        // A column's window rows, in order, read off the real delegates.
+        function rowsIn(column) {
+            if (!column)
+                return []
+            return findAllByName(column, "windowHintWindowRow")
+        }
+
         function columnForPosition(position) {
             var s = strip()
             if (!s)
@@ -1137,6 +1161,453 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             driveSlideTo(1)
             body.hint = hint
             wait(20)
+        }
+
+        // --- the crossing sweep ---------------------------------------------
+        // On a workspace switch the row marker does not glide from the old row to the
+        // new one. It stretches to the whole column and is carried out through the
+        // leading edge - down for the next workspace, up for the previous one - and
+        // the marker then appears on the row of the workspace being moved to.
+        //
+        // The three things below are the effect. Everything else here is scaffolding.
+
+        // Leave the panel at rest, at the workspace it ended on. The sweep tests drive
+        // the crossing's clock by hand, which stops the animation and so never lets its
+        // `onFinished` run - a crossing left in flight is a state the NEXT test inherits,
+        // and a later test that publishes without movement is then (correctly) read as a
+        // refresh for a crossing already under way rather than as a commit. So every
+        // sweep test finishes here rather than assuming the next one copes.
+        function restAfterSweep(destination) {
+            driveSlideTo(1)
+            body.hint = root.framedHint(destination, destination)
+            wait(20)
+            verify(!body.swapping, "the panel is back at rest at " + destination)
+            verify(sweepMarker() === null, "and no sweep is left armed")
+        }
+
+        // The marker that is actually on screen, and which of the two it is. Both
+        // elements exist at once and exactly one is visible, so this is how a sample
+        // says which regime it is looking at rather than assuming.
+        function shownMarker(name) {
+            var found = findByName(body, name)
+            return found !== null && found.visible ? found : null
+        }
+
+        function sweepMarker() {
+            return shownMarker("windowHintSweepIndicator")
+        }
+
+        function restingMarker() {
+            return shownMarker("windowHintFocusIndicator")
+        }
+
+        function sweepOutline() {
+            return shownMarker("windowHintSweepFrame")
+        }
+
+        function restingOutline() {
+            return shownMarker("windowHintFocusFrame")
+        }
+
+        // The panel's own vertical extent in the strip's coordinates - which is where
+        // both markers live. The strip is a padding below the panel's top edge, so
+        // zero here is the top of the card block, not the top of the panel.
+        function stripHeight() {
+            return strip().height
+        }
+
+        function test_theMarkerIsCarriedOutThroughTheLeadingEdgeOnASwitch() {
+            // The claim, in the order it is seen: the marker leaves as a WHOLE COLUMN,
+            // travels down for a forward switch and up for a backward one, and is
+            // entirely off the panel by the time the crossing lands.
+            for (var direction = 0; direction < 2; ++direction) {
+                var from = direction === 0 ? 2 : 4
+                var to = direction === 0 ? 3 : 3
+                var label = direction === 0 ? "forwards" : "backwards"
+                // A column of several rows, so the sweep's length is visibly not the
+                // row's - see `tallFramedHint`.
+                var rows = 4
+                body.hint = root.tallFramedHint(from, from, rows)
+                wait(20)
+                verify(restingMarker() !== null,
+                    label + ": the marker is on a row while nothing is crossing")
+
+                body.hint = root.tallFramedHint(to, from, rows)
+                wait(20)
+
+                // It is the SWEEP that is up, not the row marker: one element carries
+                // the marker at a time, so a switch cannot leave two bars on screen.
+                var sweep = sweepMarker()
+                verify(sweep !== null, label + ": the sweep takes the marker")
+                verify(restingMarker() === null,
+                    label + ": and the row marker is not also on screen")
+                // The frame likewise: exactly one outline, and it is the sweep's.
+                verify(sweepOutline() !== null,
+                    label + ": the sweep takes the outline too")
+                verify(restingOutline() === null,
+                    label + ": and the row outline is not also on screen")
+
+                // A whole column long, not a row. `stripHeight` rather than a literal
+                // because the column's height is the content's, and the claim is that
+                // the marker matches IT rather than that it matches a number.
+                verify(sweep.height > 0, label + ": the sweep has a height")
+                compare(sweep.height, stripHeight(),
+                    label + ": and it is a whole column tall, not a row")
+                verify(sweep.height >= rows * body.rowHeight,
+                    label + ": which is plainly not the one row it marks ("
+                        + sweep.height + " against " + body.rowHeight + ")")
+
+                // Down for the next workspace, up for the previous one - read from the
+                // sign of the travel rather than from a distance, because a backward
+                // switch that merely travelled less far would pass a magnitude check.
+                //
+                // Sampled from progress 0, not from wherever the wall clock had already
+                // carried the crossing: the loop's first step is 1/8, which would be
+                // BACKWARD from a crossing already past that, and the sample would then
+                // report a reversal that the component did not make.
+                driveSlideTo(0)
+                var travel = direction === 0 ? 1 : -1
+                verify(Math.abs(sweepMarker().y) < 0.001,
+                    label + ": it starts at the top of the block, was " + sweepMarker().y)
+                var previous = sweepMarker().y
+                var monotonic = true
+                for (var step = 1; step <= 8; ++step) {
+                    driveSlideTo(step / 8)
+                    var here = sweepMarker().y
+                    if (travel > 0 ? here <= previous : here >= previous)
+                        monotonic = false
+                    previous = here
+                }
+                verify(monotonic,
+                    label + ": and it travels the whole way in one direction, never "
+                        + "reversing - " + (travel > 0 ? "down" : "up"))
+                // Gone, measured against the CONTENT rather than against the strip's
+                // box: the strip is taller than the cards - it carries the panel's
+                // padding - so "past the strip" says nothing about whether the marker is
+                // still on screen. A forward sweep leaves through the bottom, so its top
+                // edge has to be past the LAST card; a backward one leaves through the
+                // top, so its bottom edge has to be above the FIRST. Both stated, because
+                // a sweep that merely moved would satisfy whichever one it happened to
+                // match.
+                driveSlideTo(1)
+                var cardRows = rowsIn(columnForPosition(to))
+                verify(cardRows.length === rows,
+                    label + ": the arriving column has " + rows + " rows to be past, had "
+                        + cardRows.length)
+                var gone = false
+                if (travel > 0) {
+                    var lastBottom = cardRows[rows - 1]
+                        .mapToItem(strip(), 0, 0).y + body.rowHeight
+                    gone = sweepMarker().y >= lastBottom
+                    verify(gone, label + ": its top edge has passed the last card ("
+                        + sweepMarker().y + " against " + lastBottom + ")")
+                } else {
+                    var firstTop = cardRows[0].mapToItem(strip(), 0, 0).y
+                    gone = sweepMarker().y + sweepMarker().height <= firstTop
+                    verify(gone, label + ": its bottom edge has cleared the first card ("
+                        + (sweepMarker().y + sweepMarker().height) + " against "
+                        + firstTop + ")")
+                }
+                verify(gone, label + ": so nothing of it is left on screen")
+                restAfterSweep(to)
+            }
+        }
+
+        function test_theSweepsDirectionIsTheWorkspacesOwn() {
+            // The direction is not a taste decision the marker makes: it is the sign of
+            // the move the service reported. A panel that always swept downwards would
+            // satisfy the test above for one direction and be wrong for the other, so
+            // both are driven here and read off the same travel.
+            var forwardStart = -1
+            var backwardStart = -1
+            body.hint = root.framedHint(2, 2)
+            wait(20)
+            body.hint = root.framedHint(3, 2)
+            wait(20)
+            forwardStart = sweepMarker().y
+            driveSlideTo(0.5)
+            verify(sweepMarker().y > forwardStart,
+                "moving to the next workspace sweeps DOWN, went from " + forwardStart
+                    + " to " + sweepMarker().y)
+            settleSlide()
+
+            body.hint = root.framedHint(4, 4)
+            wait(20)
+            body.hint = root.framedHint(3, 4)
+            wait(20)
+            backwardStart = sweepMarker().y
+            driveSlideTo(0.5)
+            verify(sweepMarker().y < backwardStart,
+                "moving to the previous workspace sweeps UP, went from " + backwardStart
+                    + " to " + sweepMarker().y)
+            settleSlide()
+        }
+
+        function test_theMarkerAppearsOnTheNewWorkspacesRowWhenTheSweepLands() {
+            // The second half of the effect, and the half that says which workspace the
+            // marker ended up on: once the sweep has gone, the marker is a row-length
+            // bar on the focused row of the workspace that was moved TO - not on the row
+            // it left, and not still stretched.
+            for (var direction = 0; direction < 2; ++direction) {
+                var from = direction === 0 ? 2 : 4
+                var to = direction === 0 ? 3 : 3
+                var label = direction === 0 ? "forwards" : "backwards"
+                body.hint = root.framedHint(from, from)
+                wait(20)
+                var before = restingMarker()
+                verify(before !== null, label + ": a marker before the switch")
+                // Wait for the tracker's tail to settle before sampling, so "before" is
+                // the marker's resting place rather than a frame of its arrival. Read as
+                // a value rather than kept as the element: the element's own y is a
+                // binding that keeps moving while the tail catches up.
+                wait(body.slideDuration + 40)
+                var beforeY = restingMarker().y
+                var beforeX = restingMarker().x
+                // The workspace the marker was on, read from the title of the row it
+                // marks. Every workspace's rows are titled after their own position by
+                // `framedHint`, so this says WHICH workspace the marker belonged to -
+                // which x alone cannot, since both frames put their marker in the panel's
+                // middle slot and the difference is only in what the row says.
+                function markedWorkspace() {
+                    var marked = findByName(body, "windowHintFocusFrame")
+                    if (!marked)
+                        return ""
+                    var centre = marked.mapToItem(strip(), marked.width / 2,
+                        marked.height / 2)
+                    for (var i = 0; i < columnDelegates().length; ++i) {
+                        var column = columnDelegates()[i]
+                        var rowsHere = rowsIn(column)
+                        if (rowsHere.length === 0)
+                            continue
+                        var rowCentre = rowsHere[Math.max(0, body.focusedRowIndex)]
+                            .mapToItem(strip(), marked.width / 2, marked.height / 2)
+                        if (Math.abs(rowCentre.x - centre.x) < 1
+                                && Math.abs(rowCentre.y - centre.y) < 1)
+                            return String(column.modelData.position)
+                    }
+                    return ""
+                }
+                var beforeWorkspace = markedWorkspace()
+                verify(beforeWorkspace === String(from),
+                    label + ": before the switch it marks workspace " + from + ", was "
+                        + beforeWorkspace)
+
+                body.hint = root.framedHint(to, from)
+                wait(20)
+                settleSlide()
+
+                var after = restingMarker()
+                verify(after !== null, label + ": and a row marker once it has landed")
+                verify(sweepMarker() === null,
+                    label + ": with the sweep gone, not merely hidden behind it")
+                verify(sweepOutline() === null,
+                    label + ": and its outline too")
+                // A row's marker again, at the resting length rather than a column's.
+                // `tryCompare`, not `compare`: the indicator's tail is deliberately the
+                // slow half of its dual-speed tracker, so for a beat after the crossing
+                // lands the bar is still longer than its resting length and contracts
+                // into it. Sampling once and demanding the final number would be
+                // asserting that the tail does not exist.
+                // Polled rather than sampled once, and then compared: the indicator's
+                // tail is deliberately the slow half of its dual-speed tracker, so for a
+                // beat after the crossing lands the bar is still longer than its resting
+                // length and contracts into it. Sampling once and demanding the final
+                // number would be asserting that the tail does not exist.
+                wait(body.slideDuration * 2 + 40)
+                compare(after.height, body.indicatorLength,
+                    label + ": back to the resting length, was " + after.height)
+                // On the row, and on the arriving column: the x has to be the arriving
+                // column's own, which is the panel's wide middle slot at rest.
+                compare(after.x, strip().activeColumnX + body.indicatorInset,
+                    label + ": in the arriving column's left padding, was " + after.x)
+                // And it moved: the row it marks is the new workspace's, so it is not
+                // standing where the one it replaced stood. Both edges, because a
+                // marker that slid sideways but stayed on its row would be a different
+                // fault from one that changed rows and stayed put.
+                // On the ARRIVING workspace's row, which for these fixtures is its
+                // first row - and the outgoing workspace's marker was on its own first
+                // row too. So the two agree on y and differ on x: the marker is on the
+                // other workspace, in the panel's wide middle slot rather than the
+                // neighbour slot it started in. Asserted as the slot, because "x
+                // changed" would also be true of a marker that had merely drifted.
+                compare(after.y, beforeY,
+                    label + ": on the focused row, which both fixtures put first (was "
+                        + beforeY + ", now " + after.y + ")")
+                compare(markedWorkspace(), String(to),
+                    label + ": and on the workspace that was moved TO, not the one it "
+                        + "replaced")
+                // In the panel's wide middle slot, which is where the arriving frame's
+                // active column lands at rest. `x` is unchanged across the switch and
+                // that is correct - both frames put their active column there - so this
+                // is a placement claim, not a movement one.
+                compare(after.x, root.bandX + body.indicatorInset,
+                    label + ": in the panel's wide middle slot, was " + after.x
+                        + " against " + (root.bandX + body.indicatorInset))
+                // The frame agrees with the bar about which row that is.
+                var frame = restingOutline()
+                verify(frame !== null, label + ": and a row outline")
+                compare(frame.height, body.rowHeight,
+                    label + ": a row tall again, was " + frame.height)
+                compare(frame.y, after.y + (after.height - body.rowHeight) / 2,
+                    label + ": centred on the same row as the bar, was " + frame.y
+                        + " against " + after.y)
+            }
+        }
+
+        function test_theSweepRidesTheArrivingColumnAndWidensWithIt() {
+            // The sweep's x comes from the arriving column's own geometry, exactly as
+            // the resting marker's does, so it stays attached to the workspace being
+            // moved to for the whole traverse - and it widens as that column widens
+            // rather than staying the width it had when the crossing began.
+            body.hint = root.framedHint(2, 2)
+            wait(20)
+            body.hint = root.framedHint(3, 2)
+            wait(20)
+            var sweep = sweepMarker()
+            // At progress 0 the arriving column is a whole column off to the side, so
+            // the sweep starts out beyond the panel and comes IN - its x FALLS. Asserted
+            // as a fall, because "it ends up nearer the middle" would also be true of a
+            // sweep that started in the middle and never moved.
+            var startX = sweep.x
+            var startWidth = sweepOutline().width
+            verify(startX > body.width - 2 * body.columnWidth,
+                "it starts out beyond the panel's right edge with the arriving column, "
+                    + "was at " + startX + " in a panel of " + body.width)
+            driveSlideTo(0.5)
+            verify(sweepMarker().x < startX,
+                "and comes in with it, went " + startX + " to " + sweepMarker().x)
+            verify(sweepOutline().width > startWidth,
+                "and its outline widens with that column, went " + startWidth + " to "
+                    + sweepOutline().width)
+            // Placed against the column, not against the panel: the same relationship
+            // the resting markers hold, so there is one rule and not two.
+            compare(sweepMarker().x,
+                strip().activeColumnX + body.indicatorInset,
+                "in the arriving column's left padding")
+            compare(sweepOutline().width, strip().activeCardWidth,
+                "and as wide as that column's card")
+            restAfterSweep(3)
+        }
+
+        function test_aReAimDoesNotRestartTheSweep() {
+            // A second switch landing mid-crossing re-aims the traverse, and the sweep
+            // has to carry on through it. Resetting it would send the marker back to the
+            // top of the column, which reads as a second departure rather than as one
+            // move re-aimed - and it is the specific regression that a sweep driven off
+            // `slideProgress` invites, because a re-aim restarts that clock.
+            body.hint = root.framedHint(1, 1)
+            wait(20)
+            body.hint = root.framedHint(2, 1)
+            wait(20)
+            driveSlideTo(0.5)
+            var reached = sweepMarker().y
+            verify(reached > 0, "the sweep is under way, at " + reached)
+
+            body.hint = root.framedHint(3, 2)
+            // No wait: the re-aim resets the crossing's clock to 0 in the same turn as
+            // the publish, so a wait here would let the new leg animate for a frame or
+            // two and the sample would no longer be the instant the question is about.
+            // Read `sweepTop` - the derived position - rather than the element's `y`,
+            // which needs a polish to catch up.
+            compare(body.sweepTop, reached,
+                "and it did not go back to the top of the column, was " + body.sweepTop
+                    + " against " + reached)
+            wait(20)
+            var sweep = sweepMarker()
+            verify(sweep !== null, "the sweep is still up after the re-aim")
+            // And it keeps going the same way from there, rather than restarting.
+            driveSlideTo(0.75)
+            verify(body.sweepTop > reached,
+                "still travelling down, went " + reached + " to " + body.sweepTop)
+            restAfterSweep(3)
+        }
+
+        function test_noSwitchMeansNoSweepAndNoExtraMarker() {
+            // The sweep must not be reachable without a switch. It is armed by the two
+            // functions that START a crossing, so a refresh on the same workspace, a
+            // cold snapshot and a move too wide to describe all have to leave the
+            // panel with exactly the one marker it always had - and a sweep left armed
+            // by a cancelled crossing would sit over the list for the rest of the hold.
+            verify(sweepMarker() === null, "nothing is sweeping at rest")
+            verify(sweepOutline() === null, "and no sweep outline either")
+            verify(restingMarker() !== null, "the row marker is the one on screen")
+
+            // A refresh with no movement: the case that must not be taken for a switch.
+            body.hint = root.framedHint(2, 2)
+            wait(20)
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 2,
+                previousActiveWorkspacePosition: 2,
+                windows: [{ windowId: "x", title: "edited", icon: "", isFocused: true }],
+                previousWindows: [{ windowId: "p", title: "p", icon: "", isFocused: false }],
+                nextWindows: [{ windowId: "n", title: "n", icon: "", isFocused: false }]
+            })
+            wait(20)
+            verify(sweepMarker() === null, "a same-workspace refresh arms no sweep")
+            verify(sweepOutline() === null, "nor an outline")
+            verify(restingMarker() !== null, "and the row marker is still there")
+
+            // Too far to describe: committed outright, so there is no crossing and
+            // nothing to sweep.
+            body.hint = root.framedHint(2, 2)
+            wait(20)
+            body.hint = root.makeHint({
+                activeWorkspacePosition: 8,
+                previousActiveWorkspacePosition: 2,
+                windows: [{ windowId: "y", title: "far", icon: "", isFocused: true }],
+                previousWindows: [], nextWindows: []
+            })
+            wait(20)
+            verify(sweepMarker() === null, "a move too wide to describe arms no sweep")
+            verify(restingMarker() !== null, "and the row marker is the one on screen")
+        }
+
+        function test_reducedMotionCrossesWithoutASweep() {
+            // Reduced motion commits straight away, so there is no traverse for the
+            // marker to be carried along - and a sweep left on screen would be the one
+            // piece of motion the setting had asked us not to show.
+            // (No reduced-motion assertion is made about the platform setting itself;
+            // this is the ordinary crossing path, which is the one that could leave a
+            // sweep armed.)
+            body.hint = root.framedHint(2, 2)
+            wait(20)
+            body.hint = root.framedHint(3, 2)
+            wait(20)
+            verify(sweepMarker() !== null, "a switch does sweep, which is what this checks")
+            settleSlide()
+            verify(sweepMarker() === null, "and it is gone once landed")
+            verify(restingMarker() !== null, "with the row marker back")
+        }
+
+        function test_theSweepNeverCoversTheRowContentItIsMarking() {
+            // The sweep's outline is border-only for the same reason the resting one's
+            // is: a filled shape a column tall would veil every icon and title in the
+            // column it is travelling over. `transparent` is asserted rather than
+            // inferred, because the whole point of the arrangement is that the element
+            // above the rows cannot paint over them.
+            body.hint = root.framedHint(2, 2)
+            wait(20)
+            body.hint = root.framedHint(3, 2)
+            wait(20)
+            var outline = sweepOutline()
+            verify(outline !== null, "the sweep outline is up")
+            // Compared against the value QML normalises `transparent` to, rather than
+            // against the string: a colour property hands back `#00000000`, so an
+            // equality against "transparent" would fail on the representation rather
+            // than on the claim. `#00000000` is that claim - every channel zero, alpha
+            // zero - spelled out.
+            compare(String(outline.color).toLowerCase(), "#00000000",
+                "and fills nothing, so it cannot cover the rows it passes over, was "
+                    + outline.color)
+            // Above the rows in z, which is what makes it a mark on them rather than
+            // something they cover - and inert, so it cannot intercept a tap.
+            compare(outline.z > 0, true, "above the rows")
+            compare(outline.enabled, false, "and inert to input")
+            // The bar is a bar, not a filled panel: the indicator's own thickness.
+            compare(sweepMarker().width, body.indicatorThickness,
+                "the sweep bar keeps the indicator's thickness, was "
+                    + sweepMarker().width)
+            restAfterSweep(3)
         }
 
         function test_theWholePanelArrivesInOnePiece() {
