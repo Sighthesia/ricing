@@ -93,17 +93,23 @@ and logged a misleading degraded-boot warning.
 **Rule: after changing any boot duration, grep for every timeout, watchdog and
 budget that references it, and make each one cover the new length explicitly.**
 
-## 6. Slow, soft motion is legitimate load shedding
+## 6. Long, soft motion is legitimate load shedding
 
-DymicShell's wallpaper reveal is `Math.round(3000 / speedFactor)` with
-`Easing.InOutSine` (default speedFactor 1.0) — a three-second soft sweep from the
-centre. Afloat originally shipped 480ms `OutCubic`, a hard stop.
+DymicShell's wallpaper reveal runs `Math.round(3000 / speedFactor)` (default
+speedFactor 1.0) — a three-second open from the centre. Afloat originally shipped
+480ms `OutCubic`, a hard stop.
 
-A gentle open does not cost frames; it **hides** the initialization happening
+A long open does not cost frames; it **hides** the initialization happening
 underneath it. Treat boot motion as a load-shedding decision, not only a taste
 decision. Keep a user-initiated action on a fast contract — a live wallpaper switch
 should not crawl open for three seconds, so the two are separate tokens
 (`wallpaperBootReveal` vs `wallpaperSwap`) selected by a shared rule.
+
+**Copy the reference's duration, not its whole contract.** DymicShell's curve is
+`InOutSine`, which eases back off at the end and reads as the transition settling;
+this shell ships `InQuad` instead, which accelerates all the way out so the open
+commits. A comment that says "follows DymicShell" without saying *which part*
+invites someone to "restore parity" and undo a deliberate choice.
 
 Reference: `DymicShell/modules/background/BackgroundWindow.qml` (this user's local
 checkout at `~/0_Files/Producing/Software/Quickshell/DymicShell`).

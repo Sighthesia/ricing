@@ -28,16 +28,21 @@ QtObject {
 
     // Wallpaper swaps are large-surface reveals; keep them calm but not slow.
     readonly property int wallpaperSwap: 480
-    // The boot reveal is a separate contract from a live switch, and follows
-    // DymicShell's background window: a 3000ms InOutSine open at its default
+    // The boot reveal is a separate contract from a live switch. Its DURATION is
+    // DymicShell's: 3000ms, its `Math.round(3000 / speedFactor)` at the default
     // speedFactor of 1.0 (DymicShell/modules/background/BackgroundWindow.qml).
-    // Slow and soft on purpose, so the shell finishes mounting underneath the
-    // circle instead of being caught mid-reveal. Startup deliberately skips
-    // DymicShell's fixed 150ms black hold: this shell waits for the wallpaper's
-    // own pixels instead of a guessed delay, and re-adding a fixed hold would
-    // undo that. Reference: DymicShell, MIT.
+    // A long open is deliberate — it lets the shell finish mounting underneath
+    // the circle instead of being caught mid-reveal.
+    //
+    // Its CURVE is a local choice, not a port: InQuad, which starts slow and
+    // accelerates all the way out with no deceleration tail. DymicShell's
+    // InOutSine eases back off at the end, which reads as settling; this one
+    // commits. Startup deliberately also skips DymicShell's fixed 150ms black
+    // hold — this shell waits for the wallpaper's own pixels instead of a
+    // guessed delay, and re-adding a fixed hold would undo that.
+    // Reference: DymicShell, MIT.
     readonly property int wallpaperBootReveal: 3000
-    readonly property int wallpaperBootRevealEasing: Easing.InOutSine
+    readonly property int wallpaperBootRevealEasing: Easing.InQuad
     readonly property int waveRoute: 160
     readonly property int settingsSlide: 600
     readonly property int settingsContentDelay: 200

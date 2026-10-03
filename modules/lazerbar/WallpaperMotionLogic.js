@@ -4,12 +4,17 @@
 // different contracts, so the decision lives here rather than inline in the
 // component where nothing can test it.
 //
-// The boot reveal follows DymicShell's background window
-// (DymicShell/modules/background/BackgroundWindow.qml): `Easing.InOutSine` over
-// `Math.round(3000 / speedFactor)` with its default speedFactor of 1.0. That is
-// deliberately slow and soft — the point is to open gently over whatever the
-// shell is still mounting, rather than to draw attention to the transition.
-// Reference: DymicShell, MIT.
+// The boot reveal's DURATION is DymicShell's: `Math.round(3000 / speedFactor)` at
+// its default speedFactor of 1.0
+// (DymicShell/modules/background/BackgroundWindow.qml). Long on purpose — it lets
+// the shell finish mounting underneath the circle instead of being caught
+// mid-reveal. Reference: DymicShell, MIT.
+//
+// Its CURVE is not DymicShell's. That shell eases back off at the end
+// (InOutSine), which reads as the transition settling; this one accelerates all
+// the way out (InQuad), so the open commits rather than lands. The value is
+// supplied by the caller as a token — see MotionTokens.wallpaperBootRevealEasing —
+// so the curve is stated once and both this module and the test read it.
 //
 // A live switch keeps the shell's own snappier contract: the user asked for that
 // wallpaper and is waiting on the result, so it should not crawl open for three

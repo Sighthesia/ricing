@@ -57,19 +57,24 @@ Item {
                    "the boot reveal must not reuse the swap curve")
         }
 
-        // The real tokens, not the stand-ins above: the boot contract is
-        // DymicShell's background window, so 3000ms at its default speedFactor
-        // of 1.0 with InOutSine. Pinned so a future retune is a deliberate edit
-        // rather than a drift nobody notices.
-        function test_theBootTokensAreDymicShellsNumbers() {
+        // The real tokens, not the stand-ins above. The duration is DymicShell's
+        // (3000ms at its default speedFactor of 1.0); the curve is a local
+        // choice — InQuad, accelerating all the way out with no easing tail.
+        // Pinned so a future retune is a deliberate edit rather than a drift
+        // nobody notices.
+        function test_theBootTokensAreDymicShellsDurationAndALocalCurve() {
             compare(Lazer.MotionTokens.wallpaperBootReveal, 3000,
                     "DymicShell's reveal is Math.round(3000 / speedFactor) at 1.0")
-            compare(Lazer.MotionTokens.wallpaperBootRevealEasing, Easing.InOutSine)
+            compare(Lazer.MotionTokens.wallpaperBootRevealEasing, Easing.InQuad,
+                    "the boot curve is a local choice, not DymicShell's InOutSine")
             // And the live switch is untouched by that change.
             compare(Lazer.MotionTokens.wallpaperSwap, 480)
             verify(Lazer.MotionTokens.wallpaperBootReveal
                    > Lazer.MotionTokens.wallpaperSwap,
                    "the boot reveal must be the slower of the two")
+            verify(Lazer.MotionTokens.wallpaperBootRevealEasing
+                   !== Lazer.MotionTokens.clickFlashEasing,
+                   "the boot curve must not borrow an unrelated token's easing")
         }
     }
 }
