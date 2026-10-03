@@ -69,6 +69,18 @@ Scope {
     property string wallpaperPath: selfTestEnabled
             ? Quickshell.env("AFLOAT_LOCK_WALLPAPER") || ""
             : String(Services.SettingsService.appearance.wallpaperPath || "")
+    // Highest device pixel ratio among the session's screens, so the lock's own
+    // wallpaper layer decodes at least as sharply as the wallpaper window behind
+    // it. Under-estimating costs sharpness and over-estimating costs memory.
+    readonly property real wallpaperDecodeRatio: {
+        var highest = 1
+        for (var index = 0; index < Quickshell.screens.length; index++) {
+            var ratio = Quickshell.screens[index].devicePixelRatio
+            if (ratio > highest)
+                highest = ratio
+        }
+        return highest
+    }
     property int selfTestDelayMs: 5000
     property bool _selfTestArmed: false
     signal selfTestFinished()
@@ -333,6 +345,7 @@ Scope {
             lockContext: lockContext
             snapshot: snapshot
             wallpaperPath: root.wallpaperPath
+            decodeRatio: root.wallpaperDecodeRatio
             captureExpected: root.backgroundMode === SurfaceLogic.backgroundModes.screenshot
             startupRequest: root.startupRequest
             startupRevealAllowed: !root.startupRequest

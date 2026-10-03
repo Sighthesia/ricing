@@ -35,6 +35,7 @@ Item {
         id: backdrop
         anchors.fill: parent
         snapshotSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="red"/></svg>')
+        wallpaperSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="blue"/></svg>')
     }
 
     // Temporary instances are parented here, above the shared `backdrop`. Parenting
@@ -59,6 +60,7 @@ Item {
             height: 240
             lightScheme: true
             snapshotSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="red"/></svg>')
+            wallpaperSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="blue"/></svg>')
         }
     }
 
@@ -68,6 +70,7 @@ Item {
             width: 320
             height: 240
             snapshotSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="red"/></svg>')
+            wallpaperSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="blue"/></svg>')
 
             // Test markers share the wallpaper reveal clip with production content.
             Rectangle {
@@ -92,6 +95,7 @@ Item {
             width: 320
             height: 240
             captureExpected: false
+            wallpaperSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="blue"/></svg>')
         }
     }
 
@@ -110,7 +114,10 @@ Item {
             // and a request with no capture at all is ready from the start, which
             // is what stops a session-start lock from burning its whole grace
             // window on an image that was never coming.
-            verify(item.imagesReady === true, "a decoded capture is ready with no wallpaper to wait for")
+            // Readiness waits on the capture *and* the wallpaper layer, so a
+            // request that brought no capture still has one image to wait for.
+            verify(item.imagesReady === false,
+                   "a capture alone is not ready while the wallpaper layer is loading")
         }
 
         // `grabImage` samples the grabbed item's rectangle rather than its own
@@ -126,14 +133,10 @@ Item {
 
         function isThemeDark(c) { return c.r < 0.2 && c.g < 0.2 && c.b < 0.2 }
         function isThemeLight(c) { return c.r > 0.8 && c.g > 0.8 && c.b > 0.8 }
-        // The wave no longer paints a wallpaper: what it opens is transparent, so
-        // whatever is behind the surface shows through. Assert against a sentinel
-        // desktop rather than alpha, because `grabImage` flattens transparency onto
-        // white and would make an empty region indistinguishable from a white plate.
-        function isDesktop(c) { return c.b > 0.9 && c.r < 0.1 && c.g < 0.1 }
+        function isWallpaperBlue(c) { return c.b > 0.9 && c.r < 0.1 && c.g < 0.1 }
         function isScreenshotRed(c) { return c.r > 0.9 && c.g < 0.1 && c.b < 0.1 }
 
-        // Pixels that are neither the pre-lock screenshot nor the desktop carry
+        // Pixels that are neither the pre-lock screenshot nor the wallpaper carry
         // wave bands or the themed floor; their count measures how much is on
         // screen.
         function bandArea(image) {
@@ -141,7 +144,7 @@ Item {
             for (var x = 8; x < 320; x += 8)
                 for (var y = 0; y < 240; y += 8) {
                     var c = image.pixel(x, y)
-                    if (!isScreenshotRed(c) && !isDesktop(c))
+                    if (!isScreenshotRed(c) && !isWallpaperBlue(c))
                         ++bands
                 }
             return bands
@@ -160,20 +163,17 @@ Item {
             compare(item.maskProgress, 1)
         }
 
-        function test_desktopUnveiledAtBandTail() {
+        function test_wallpaperUnveiledAtBandTail() {
             tryCompare(backdrop, "imagesReady", true)
             // Mid-sweep three zones read top to bottom: the pre-lock screenshot
-            // ahead, pink bands, and the live desktop behind where the bands
-            // swept past. The desktop reads as transparent here because nothing
-            // is painted over it — which is exactly what lets the real wallpaper
-            // show through on the surface.
+            // ahead, pink bands, wallpaper behind where the bands swept past.
             backdrop.progress = 0.5
             wait(120)
             var sweeping = grabImage(backdrop)
             compare(sweeping.pixel(160, 10), "#ff0000", "screenshot ahead")
             var midSweep = sweeping.pixel(160, 120)
-            verify(!isScreenshotRed(midSweep) && !isDesktop(midSweep), "pink bands")
-            verify(isDesktop(sweeping.pixel(160, 230)), "desktop behind")
+            verify(!isScreenshotRed(midSweep) && !isWallpaperBlue(midSweep), "pink bands")
+            verify(isWallpaperBlue(sweeping.pixel(160, 230)), "wallpaper behind")
             // Open and settled frames stay pure.
             backdrop.progress = 0
             wait(120)
@@ -183,7 +183,7 @@ Item {
             wait(120)
             var settled = grabImage(backdrop)
             compare(bandArea(settled), 0, "no bands left at rest")
-            verify(isDesktop(settled.pixel(160, 10)), "settled desktop")
+            verify(isWallpaperBlue(settled.pixel(160, 10)), "settled desktop")
         }
 
         function test_foregroundContentUsesTheWallpaperRevealClip() {
@@ -220,12 +220,12 @@ Item {
                 if (stages[i] === 0.5) {
                     compare(image.pixel(160, 10), "#ff0000", "screenshot at 0.5")
                     var mid = image.pixel(160, 120)
-                    verify(!isScreenshotRed(mid) && !isDesktop(mid), "bands at 0.5")
-                    verify(isDesktop(image.pixel(160, 230)), "bottom at 0.5")
+                    verify(!isScreenshotRed(mid) && !isWallpaperBlue(mid), "bands at 0.5")
+                    verify(isWallpaperBlue(image.pixel(160, 230)), "bottom at 0.5")
                 } else {
                     if (stages[i] === 1) {
-                        verify(isDesktop(image.pixel(160, 10)), "top at 1")
-                        verify(isDesktop(image.pixel(160, 230)), "bottom at 1")
+                        verify(isWallpaperBlue(image.pixel(160, 10)), "top at 1")
+                        verify(isWallpaperBlue(image.pixel(160, 230)), "bottom at 1")
                     } else {
                         compare(image.pixel(160, 10), "#ff0000", "top screenshot at 0")
                         compare(image.pixel(160, 230), "#ff0000", "bottom screenshot at 0")
@@ -244,7 +244,7 @@ Item {
             compare(closed.pixel(160, 10), "#ff0000", "light scheme still uses the screenshot")
             item.progress = 1
             wait(120)
-            verify(isDesktop(grabImage(item).pixel(160, 230)), "desktop remains revealed")
+            verify(isWallpaperBlue(grabImage(item).pixel(160, 230)), "wallpaper remains revealed")
         }
 
         function test_missingSnapshotFallsBackToTheThemedFloor() {
@@ -280,8 +280,8 @@ Item {
             // Ahead of the sweep the whole surface is still the opaque floor, so
             // the sentinel desktop behind it must not show anywhere — that is what
             // keeps a lock from exposing the desktop before its first frame.
-            verify(!isDesktop(closed.pixel(160, 10)), "floor ahead of the sweep")
-            verify(!isDesktop(closed.pixel(160, 230)), "floor ahead of the sweep")
+            verify(!isWallpaperBlue(closed.pixel(160, 10)), "floor ahead of the sweep")
+            verify(!isWallpaperBlue(closed.pixel(160, 230)), "floor ahead of the sweep")
             compare(closed.pixel(160, 10), closed.pixel(160, 230),
                    "the floor is one flat surface ahead of the sweep")
 
@@ -289,37 +289,55 @@ Item {
             wait(120)
             var settled = grabImage(item)
             compare(bandArea(settled), 0, "no bands left at rest")
-            verify(isDesktop(settled.pixel(160, 10)), "desktop unveiled")
-            verify(isDesktop(settled.pixel(160, 230)), "desktop unveiled")
+            verify(isWallpaperBlue(settled.pixel(160, 10)), "wallpaper unveiled")
+            verify(isWallpaperBlue(settled.pixel(160, 230)), "wallpaper unveiled")
         }
 
-        // The backdrop decodes exactly one image: the pre-lock capture.
+        // The wallpaper layer must decode synchronously.
         //
-        // It used to decode two. The wallpaper was painted here as well, and it
-        // never reached the screen: on a `WlSessionLockSurface` the image reported
-        // Ready with correct geometry and the mask fully open, and the lock screen
-        // stayed on the themed plate — the same "object exists, properties
-        // correct, never renders" trap this shell already documents for Repeater
-        // delegates. Removing the clip did not fix it, which is what proved the
-        // image itself was the problem.
-        //
-        // So there is no wallpaper layer any more. The wave opens onto
-        // transparency and the desktop behind the surface shows through, which is
-        // both what was asked for and a whole full-screen decode cheaper on the
-        // one frame the lock screen is judged on. Pinning the absence matters:
-        // offscreen this component renders a wallpaper perfectly well, so every
-        // pixel test here would pass with the layer restored.
-        function test_theBackdropDecodesNoWallpaper() {
-            var images = findImages(backdrop)
-            verify(images.length === 1,
-                   "only the pre-lock capture may be decoded, found " + images.length)
-            verify(String(images[0].source).indexOf("red") >= 0,
-                   "the one image is the capture, not a wallpaper")
+        // This is the whole fix, and it is invisible offscreen: an
+        // `Image` with `asynchronous: true` renders correctly in a normal scene
+        // graph and in a plain QtTest view, so every pixel test here passes either
+        // way. On a `WlSessionLockSurface` the async decode reports Ready and never
+        // repaints when it lands, and the lock screen keeps showing whatever is
+        // underneath for the rest of its life — a themed plate on entry, the
+        // wallpaper window's floor mid-sweep. The sibling `screenshot` has always
+        // painted on that surface, and it is synchronous.
+        function test_theWallpaperLayerDecodesSynchronously() {
+            var wallpaper = findBySource(backdrop, "blue")
+            verify(wallpaper !== null, "the backdrop must paint a wallpaper")
+            verify(wallpaper.asynchronous === false,
+                   "the wallpaper must decode synchronously or it never paints on a "
+                   + "session-lock surface")
 
-            // And no property may reintroduce one: a caller wiring a wallpaper
-            // back in would silently reintroduce the decode.
-            verify(backdrop.wallpaperSource === undefined,
-                   "the backdrop must not accept a wallpaper source at all")
+            // Clipped or not: an image under a clip was the first theory and it was
+            // wrong. Pinned so nobody re-adds it as the explanation.
+            verify(!hasClippedAncestor(wallpaper),
+                   "the wallpaper must not be inside a clipped item")
+        }
+
+        function findBySource(node, needle) {
+            if (!node)
+                return null
+            if (node.source !== undefined && String(node.source).indexOf(needle) >= 0)
+                return node
+            var kids = node.children
+            for (var i = 0; kids && i < kids.length; i++) {
+                var hit = findBySource(kids[i], needle)
+                if (hit)
+                    return hit
+            }
+            return null
+        }
+
+        function hasClippedAncestor(node) {
+            for (var parent = node.parent; parent; parent = parent.parent) {
+                if (parent === harness)
+                    return false
+                if (parent.clip === true)
+                    return true
+            }
+            return false
         }
 
         function findImages(node) {

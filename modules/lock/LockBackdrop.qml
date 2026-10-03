@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import "../lazerbar" as Lazer
+import "../lazerbar/WallpaperSlotLogic.js" as SlotLogic
 
 // Edge-trailing reveal: the pink bands sweep whatever opaque base this request
 // brought, and behind them the desktop itself is unveiled. Three zones stay
@@ -22,6 +23,7 @@ import "../lazerbar" as Lazer
 Item {
     id: root
     property url snapshotSource: ""
+    property url wallpaperSource: ""
     // Whether this request expects a capture at all. The session-start lock
     // deliberately has none: there is no settled desktop to photograph, so the
     // wave opens straight onto the live desktop. Waiting on that empty slot as if
@@ -30,6 +32,11 @@ Item {
     // gets the same bounded wait, and then opens onto the desktop too.
     property bool captureExpected: true
     property real progress: 0
+    // Device pixel ratio the wallpaper layer decodes for, supplied by the lock
+    // owner as the highest ratio among the session's screens: one surface serves
+    // every screen, so the maximum is the only estimate that cannot come out
+    // short, and over-estimating costs memory rather than sharpness.
+    property real decodeRatio: 1
     property bool lightScheme: Lazer.LazerTheme.lightScheme
     property color surfaceColorOverride: "transparent"
     // Mask delay in progress units: wide enough for a full pink zone, short
@@ -38,7 +45,16 @@ Item {
     readonly property real maskProgress: Math.max(0, Math.min(1, (root.progress - root.maskDelay) / (1 - root.maskDelay)))
     readonly property bool snapshotReady: !root.captureExpected
             || screenshot.status === Image.Ready
+    // Decode budget for the wallpaper layer, shared with the wallpaper window's
+    // slots so both hold comparable pixels.
+    readonly property size wallpaperDecodeSize: {
+        var decode = SlotLogic.sourceSize(root.width, root.height,
+                                         root.decodeRatio,
+                                         8 * 1024 * 1024)
+        return Qt.size(decode.width, decode.height)
+    }
     readonly property bool imagesReady: snapshotReady
+            && wallpaperBody.status === Image.Ready
     readonly property bool revealContentInteractive: openedRegion.height > 0.5
     readonly property Item revealContentHost: foregroundBody
     readonly property color surfaceColor: root.surfaceColorOverride.a > 0.5
@@ -46,13 +62,40 @@ Item {
             : (root.lightScheme ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.bgDark)
     default property alias content: foregroundBody.data
 
+    // The wallpaper, full screen and unclipped: this is what the wave unveils, and
+    // it has to be painted here rather than left to the desktop behind. The
+    // desktop is not a dependable answer on this surface — a session lock covers
+    // the output, so what shows through a transparent region is the wallpaper
+    // window's floor until its own slots paint, which is the dark band this
+    // layer replaced.
+    //
+    // `asynchronous: false` is load-bearing, not a default. An `Image` with
+    // `asynchronous: true` on a `WlSessionLockSurface` reports Ready and never
+    // repaints when the decode lands: the lock screen then keeps showing
+    // whatever is underneath for the rest of its life. The sibling `screenshot`
+    // has always worked on the same surface, and it is synchronous. A full-screen
+    // decode here is the cost `asynchronous: true` exists to avoid, but paying it
+    // is what makes the layer visible at all — and it happens while the opaque
+    // floor still covers the screen, so it is never on a visible frame.
+    Image {
+        id: wallpaperBody
+        anchors.fill: parent
+        source: root.wallpaperSource
+        fillMode: Image.PreserveAspectCrop
+        visible: String(root.wallpaperSource).length > 0
+        asynchronous: false
+        // Same budget as the wallpaper window's slots, so the lock does not decode
+        // a 4K file at full size to fill a screen it already has a capped decode of.
+        sourceSize: root.wallpaperDecodeSize
+    }
+
     // Everything the wave has not opened yet: the themed floor, the pre-lock
     // capture, and the four bands sweeping across them. Clipped to the region
     // above the mask, so it is cut away from the bottom as the wave passes and
-    // the desktop underneath takes over. The floor is opaque from the first frame
-    // and only for as long as it covers the whole surface, which is what keeps a
-    // session lock from showing the desktop before it has committed its first
-    // frame.
+    // the wallpaper underneath takes over. The floor is opaque from the first
+    // frame and only for as long as it covers the whole surface, which is what
+    // keeps a session lock from showing anything before it has committed its
+    // first frame.
     Item {
         id: coveredBase
         anchors.left: parent.left

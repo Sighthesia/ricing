@@ -22,6 +22,7 @@ WlSessionLockSurface {
     readonly property string snapshotUrl: snapshot && screenIndex >= 0
             ? snapshot.snapshotUrlFor(screenIndex) : ""
     property string wallpaperPath: ""
+    property real decodeRatio: 1
     // Whether this request expects a pre-lock capture. The session-start lock
     // passes false, so its reveal is not gated on an image that will never exist.
     property bool captureExpected: true
@@ -313,6 +314,8 @@ WlSessionLockSurface {
         id: backdrop
         anchors.fill: parent
         snapshotSource: root.snapshotUrl
+        wallpaperSource: root.wallpaperPath
+        decodeRatio: root.decodeRatio
         captureExpected: root.captureExpected
         progress: root.waveProgress
         lightScheme: root.lightScheme
