@@ -297,7 +297,23 @@ Item {
     // offset is part of where the row is, not an adjustment applied to the marker: a
     // marker placed at `index * rowPitch` would sit at the row's unscrolled position and
     // point at the wrong window the moment the column had been scrolled.
-    readonly property real focusedRowTop: focusedRowIndex < 0 ? 0
+    // Where there is no focused row the marker is placed wholly ABOVE the panel, and
+    // that is the whole of how "no row" is expressed.
+    //
+    // It used to be 0, which is the FIRST card's top edge - a perfectly real coordinate
+    // naming a row that is not there, and the root of two separate faults. A bar
+    // appearing in an empty workspace, because the marker was at the first card's
+    // position with only its opacity standing between it and the screen; and a flicker on
+    // every switch, because a visibility flag cannot survive a snapshot that arrives
+    // mid-crossing with no windows in it yet - which is what niri sends while a workspace
+    // is still coming up. Each of those snapshots was a real flip of that flag, and a flip
+    // of a flag the eye can see IS a flicker.
+    //
+    // A position cannot flicker. A snapshot with no windows puts the marker off the top
+    // edge, where the next snapshot with windows brings it down onto the card: an arrival
+    // rather than a blink.
+    readonly property real noRowTop: _offTop
+    readonly property real focusedRowTop: focusedRowIndex < 0 ? noRowTop
         : focusedRowIndex * rowPitch - strip.scrollOffset
     // The leaving frame's own height, from the row counts of the frame being held
     // rather than from a second strip. A crossing's strip is as tall as the tallest
@@ -362,17 +378,19 @@ Item {
 
     // --- the crossing displacement ---------------------------------------
     // On a workspace switch ONE instance of the row marker travels the whole height of
-    // the panel: it leaves the focused card of the workspace being left by sliding DOWN,
-    // is gone once the clip has taken it below the bottom edge, comes back in through
-    // the TOP, and slides down onto the focused card of the workspace being moved to.
+    // the panel, in the direction the list is going. To the workspace below: it leaves
+    // the focused card of the workspace being left by sliding DOWN, is gone once the clip
+    // has taken it below the bottom edge, comes back in through the TOP and slides down
+    // onto the focused card of the one being moved to. To the workspace above, all four
+    // of those are mirrored - up out of the top, back in through the bottom, up onto the
+    // card.
     //
-    // Both directions are fixed and neither depends on which way the workspace went.
-    // That is the whole of the reference being followed: the old superisland window
-    // hint's title-card focus rectangle displaced in from one fixed edge onto the focused
-    // card on every switch, never from whichever side the move happened to be on. One
-    // exit side and one entry side mean the journey reads as the same gesture every
-    // time, so the direction of the switch is carried by the content swapping underneath
-    // rather than by the marker changing its mind about where to come from or go to.
+    // The rule underneath is the reference being followed: the old superisland window
+    // hint's title-card focus rectangle displaced onto the focused card along the axis the
+    // move was going, never across it. One exit edge and the opposite entry edge mean the
+    // journey reads as one continuous sweep, so the direction of the switch is carried by
+    // the marker AND by the content - rather than the marker contradicting the content by
+    // always travelling the same way.
     //
     // (That reference is a horizontal capsule row and this is a vertical card column, so
     // there was no code to port - only the rule, which is the part that mattered.)
@@ -398,12 +416,16 @@ Item {
     // at the edge.
     // The DEPARTURE leg: the card the marker leaves from, and the point it leaves at.
     //
-    // The departure is DOWNWARD and it is unconditional - the focus drains out of the
-    // bottom of the panel whichever way the workspace went, and is gone by the time the
-    // clip has taken it. The entry is from above the top and equally unconditional. One
-    // exit side and one entry side mean the journey reads as the same gesture every
-    // time, and the direction of the switch is carried by the content swapping
-    // underneath rather than by the marker changing its mind about where to go.
+    // The departure leaves by the EDGE THE SWITCH IS HEADED FOR. Moving to the workspace
+    // below, the focus drains out of the BOTTOM; moving to the workspace above, it rises
+    // out of the TOP. The arrival comes back in through the OPPOSITE edge and travels the
+    // same way as the departure, so each switch is one continuous sweep in the direction
+    // the list is going rather than a marker that changes its mind about which way is up.
+    //
+    // So the exit side and the entry side are not two independent choices: one number
+    // fixes both, and the gesture is always "out of one edge and back in through the
+    // other". That is what the workspace widget's own indicator does when it travels
+    // between workspaces, at a fifth the size.
     //
     // Which card it leaves is the DEPARTING frame's own focused row, not the arriving
     // one's: `focusedRowIndex` is read off the arriving column and is already the new
@@ -421,21 +443,46 @@ Item {
     // the panel. The departure therefore has to start from where the card WAS, which is
     // the only place the user ever saw it, and that is this offset subtracted.
     property real _departingScroll: 0
-    // The panel's bottom edge in those coordinates, and a whole card past it: wholly
-    // clipped, so the departure really is a disappearance rather than a marker parked
-    // on the last row.
-    readonly property real exitTo: root.height - _stripY + rowHeight
+    // The two positions that are wholly outside the clip: a whole card past each edge.
+    // Wholly, so the marker really does disappear rather than parking on the first or
+    // last row.
+    readonly property real _offTop: -_stripY - rowHeight
+    readonly property real _offBottom: root.height - _stripY + rowHeight
+    // Which way this journey runs. A switch to the workspace BELOW leaves downward and
+    // arrives from the top; a switch to the workspace ABOVE rises out of the top and
+    // arrives from the bottom.
+    //
+    // Captured rather than read from `plan`, and deliberately NOT recaptured by a re-aim.
+    // The marker has already left by the time a second switch can arrive, so reversing
+    // the sign then would bend its path mid-flight - out of the bottom and back in from
+    // the top is still one sweep, whereas a bend is neither. The re-aim's own direction
+    // governs the columns, which is what it is for.
+    property int _journeyDirection: 1
+    readonly property bool _journeyUp: root._journeyDirection < 0
+    // The point the departure leaves at, and the point the arrival enters from: the two
+    // off-panel positions, in the order this journey runs through them.
+    readonly property real exitTo: _journeyUp ? _offTop : _offBottom
     // A frame with nothing focused has no card to leave from, so the departure leg is
     // given zero length - the marker starts already off the bottom and the panel shows
     // the arrival alone. Degenerate rather than special-cased.
     readonly property real exitFrom: _departingRowIndex < 0 ? exitTo
         : _departingRowIndex * rowPitch - _departingScroll
-    // The panel's top edge in those coordinates, and a whole card above it. The
-    // arrival's own start, for the same reason `exitTo` is the departure's.
-    readonly property real crossingFrom: -_stripY - rowHeight
+    // The arrival's own start - the edge OPPOSITE the one the departure left by, for
+    // the reason given above.
+    readonly property real crossingFrom: _journeyUp ? _offBottom : _offTop
     // Where the arrival lands: the focused card's own top edge, in the SCROLLED space
     // that `focusedRowTop` is measured in.
-    readonly property real crossingTo: focusedRowTop
+    //
+    // With nothing focused on the arriving side there is no card to land on, and
+    // `focusedRowTop` answers "no row" with 0 - which is the FIRST card's top edge, a
+    // perfectly real coordinate naming a row that is not there. Folding the arrival's
+    // end back onto its start makes the leg degenerate instead: the marker stays above
+    // the panel for the whole of it rather than descending onto the first card of an
+    // empty column.
+    // Degenerate rather than landing on the first card of a column with nothing in it.
+    // Both ends of that leg are off the panel on this journey's own side, so the marker
+    // is out of sight for the whole of it.
+    readonly property real crossingTo: hasTarget ? focusedRowTop : crossingFrom
 
     // The marker traverses the panel in ONE clock, in two legs: down and out through
     // the bottom, then in through the top and down onto the card. The corner between
@@ -454,8 +501,8 @@ Item {
     // reach one of those rather than simply being abandoned.
     property bool _markerCrossing: false
     // The leg currently in progress, and how far through it. `InOutQuad` is at its
-    // fastest exactly here, so the marker leaves the bottom edge at speed and re-enters
-    // the top at the same speed: one continuous downward sweep rather than two stops.
+    // fastest exactly here, so the marker leaves through one edge at speed and re-enters
+    // through the other at the same speed: one continuous sweep rather than two stops.
     readonly property bool _onExitLeg: crossingClock < 0.5
     readonly property real legProgress: _onExitLeg
         ? crossingClock * 2 : (crossingClock - 0.5) * 2
@@ -482,9 +529,12 @@ Item {
     readonly property real markerWidth: Math.max(0, (_onExitLeg
         ? strip.columnWidthFor(_leavingPosition)
         : strip.activeColumnWidthNow) - cellPaddingX * 2)
-    // Either frame having a focused row is enough to draw the marker. The departure leg
-    // marks the card being left, which is a row the arriving frame knows nothing about,
-    // so an arriving frame with nothing focused must not make the departure invisible.
+    // Whether there is a row to mark anywhere in the journey. The departure marks the
+    // card being left, which the arriving frame knows nothing about, so an empty arriving
+    // workspace must not make the departure invisible - and with "no row" now expressed as
+    // an off-panel position rather than as this flag, the arrival leg of such a crossing
+    // is already out of sight. That is what lets this be the simple OR it used to be:
+    // nothing has to consult the leg, and nothing can flicker on the way through.
     readonly property bool markerHasTarget: hasTarget || _departingRowIndex >= 0
     // The bar is the same gesture one `markerOffset` lower at every point of it: at rest
     // it is a bar centred on its card, so the offset that puts it there is the offset it
@@ -579,6 +629,7 @@ Item {
         root._departingRowIndex = -1
         root._departingScroll = 0
         root._exitFrom = 0
+        root._journeyDirection = 1
         // A rest plan rather than no plan: the strip still needs to be drawn, and
         // this is the one that says "three columns, active slot 1, centred here" -
         // the same shape the crossing's plan has, so every binding downstream can be
@@ -632,6 +683,7 @@ Item {
         // length, which is why the marker never appeared to move down on exactly those
         // switches. The arriving side has always read the uncapped list, so the two ends
         // of the journey were answering the question differently.
+        root._journeyDirection = plan.direction
         root._departingRowIndex = HintLogic.focusedIndexIn(
             HintLogic.rowsFromList(root.leavingHint ? root.leavingHint.windows : null))
         root._exitFrom = root.exitFrom
@@ -722,11 +774,12 @@ Item {
             // otherwise clearing the flag hands over a bar that is suddenly stretched
             // again, which is a second motion starting at the exact moment the first one
             // finished.
-            root._snapIndicator(root._targetYFor(root.focusedRowIndex))
+            root._snapIndicator(root._restingY())
             root._markerCrossing = false
             root._departingRowIndex = -1
             root._departingScroll = 0
             root._exitFrom = 0
+            root._journeyDirection = 1
         }
     }
 
@@ -1198,11 +1251,32 @@ Item {
     function _revealFocusedRow() {
         if (root.focusedRowIndex < 0)
             return
-        strip.revealRow(root.focusedRowIndex, !root.swapping)
+        // Not animated for the WHOLE journey, not just the strip's half of it. The
+        // marker's landing target is `focusedRowTop`, which carries the scroll offset - so
+        // a reveal still easing when the arrival leg began would move that target under a
+        // marker that is halfway down travelling to it, and the marker would chase it for
+        // 300ms. niri's second publish about 40ms into a switch is what makes that likely
+        // rather than merely possible, since that is when the new workspace's windows
+        // arrive and the reveal they call for has to happen.
+        strip.revealRow(root.focusedRowIndex, !root.swapping && !root._markerCrossing)
+    }
+
+    // Where the bar rests when there is no row to mark: the same off-panel position the
+    // outline uses, converted into the tracker's own UNSCROLLED space (which is the
+    // scrolled one plus `scrollOffset`, since `_barTop` subtracts it again on the way
+    // out). `_targetYFor(-1)` is not it - that expression is `index * rowPitch + ...`, so
+    // an index of -1 is a real coordinate about a row above the panel, and the next real
+    // target's `Behavior` then animates FROM it.
+    //
+    // Named rather than written out because it has more than one caller, and one of them
+    // had put the marker's own landing back on a negative row.
+    function _restingY() {
+        return root.hasTarget ? root._targetYFor(root.focusedRowIndex)
+            : root.noRowTop + strip.scrollOffset + root.markerOffset
     }
 
     function _syncIndicator() {
-        var target = root._targetYFor(root.focusedRowIndex)
+        var target = root._restingY()
         // While the marker is travelling, it is placed by the crossing's clock and by
         // nothing else. The tracker exists to stretch the bar ALONG its long axis when
         // the focus moves within one workspace - the widget's dual-speed lead/trail - and
@@ -1241,7 +1315,7 @@ Item {
             // dual-speed stretch doing its job, rather than arriving pre-stretched
             // from a coordinate that never named a row.
             root._pendingTop = -1
-            root._snapIndicator(root.hasTarget ? target : 0)
+            root._snapIndicator(root._restingY())
             // ...and it is no longer a PLACEMENT. Zero is a coordinate that names no row,
             // and the next real target has to arrive by snapping rather than by flying
             // from it: `_retargetIndicator`'s genuine-switch branch animates the head and

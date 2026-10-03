@@ -1251,9 +1251,11 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         }
 
         function test_theMarkerLeavesTheOldCardDownwardAndOutThroughTheBottom() {
-            // The half that was missing. It starts ON the focused card of the workspace
-            // being left - not in the panel's middle, which is where the arriving card is
-            // going to be - and slides down until the clip has taken it entirely.
+            // The departure on a switch to the workspace BELOW. It starts ON the focused
+            // card of the workspace being left - not in the panel's middle, which is where
+            // the arriving card is going to be - and slides down until the clip has taken
+            // it entirely. The mirror of this, for a switch to the workspace above, is in
+            // `test_theJourneyRunsInTheDirectionTheListIsGoing`.
             startCrossingOverTwoRows(2, 2, 3, 0)
             driveMarkerTo(0)
             // The departing card's own top edge, and the departing column's own x.
@@ -1279,43 +1281,102 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                     + clipBottom())
         }
 
-        function test_theDepartureIsDownwardWhicheverWayTheWorkspaceWent() {
-            // Both directions fixed. Asserted for a forward and a backward switch against
-            // the same geometry, because a departure that mirrored the switch would pass
-            // every test that looked at one direction.
-            var ends = {}
-            var onOwnColumn = {}
+        function test_theJourneyRunsInTheDirectionTheListIsGoing() {
+            // The direction of the switch decides which edge the marker leaves by, and the
+            // arrival comes back through the opposite one - so a switch to the workspace
+            // below is one downward sweep and a switch to the workspace above is one
+            // upward sweep.
+            //
+            // Measured in each direction against ITS OWN geometry, because the two are
+            // mirror images and a test that compared them would only be able to say they
+            // differ. What has to hold is that each travels the way its own switch went.
+            var downward = { }
+            var upward = { }
             for (var direction = 0; direction < 2; ++direction) {
                 var from = direction === 0 ? 2 : 4
+                var to = direction === 0 ? 3 : 3
+                var bag = direction === 0 ? downward : upward
                 var label = direction === 0 ? "forwards" : "backwards"
-                startCrossingOverTwoRows(from, 1, 3, 0)
-                // The strip first: its column x is read live further down, and a moving
-                // strip means the marker and the column are sampled at two instants.
+                startCrossingOverTwoRows(from, 1, to, 0)
+                // Departure: away from the card, through the edge this switch is headed
+                // for, and wholly outside the clip by the end of it.
                 driveSlideTo(0.5)
-                driveMarkerTo(0.49)
-                ends[label] = outline().y
-                // Compared HERE, with the strip held at this crossing's own mid-point:
-                // read afterwards it would be measured against a panel that has settled
-                // three workspaces along.
-                onOwnColumn[label] = outline().x
-                    === strip().columnXFor(from) + body.cellPaddingX
+                driveMarkerTo(0)
+                var from1 = body.crossingTop
+                driveMarkerTo(0.4999)
+                var to1 = body.crossingTop
+                bag.label = label
+                bag.exitFrom = from1
+                bag.exitTo = to1
+                bag.exitAt = body.exitTo
+                bag.offPanel = to1 + body.rowHeight <= clipTop() + 0.5
+                    || to1 >= clipBottom() - 0.5
+                // Arrival: in through the other edge, onto the card.
+                driveMarkerTo(0.5)
+                bag.enterFrom = body.crossingTop
+                driveMarkerTo(1)
+                bag.enterTo = body.crossingTop
                 settleMarker()
-                landDrivenSlide(3)
+                landDrivenSlide(to)
                 body.hint = root.tallFramedHint(from, from, 4, 1)
                 wait(20)
             }
-            compare(ends.forwards, ends.backwards,
-                "both leave through the same place, " + ends.forwards + " and "
-                    + ends.backwards)
-            verify(ends.forwards + body.rowHeight > clipBottom(),
-                "which is below the panel, not above it")
-            // Not the same place, and not meant to be: a backward switch's departing
-            // column is on the far side of the panel from a forward switch's. What has to
-            // hold is that each leaves from ITS OWN departing column, which is a different
-            // claim and the one a mirrored departure would fail.
-            verify(onOwnColumn.forwards, "forwards leaves from the column of the "
-                + "workspace it is leaving")
-            verify(onOwnColumn.backwards, "and so does backwards")
+            verify(downward.exitTo > downward.exitFrom,
+                "a switch to the workspace below leaves DOWNWARD, from "
+                    + downward.exitFrom + " to " + downward.exitTo)
+            verify(downward.offPanel, "and is wholly below the panel's bottom edge by "
+                + "the end of it, at " + downward.exitTo + " against a bottom of "
+                + clipBottom())
+            verify(downward.enterFrom + body.rowHeight <= clipTop(),
+                "and the arrival enters from above the top, at " + downward.enterFrom)
+            verify(downward.enterTo > downward.enterFrom,
+                "coming down onto the card, to " + downward.enterTo)
+
+            verify(upward.exitTo < upward.exitFrom,
+                "a switch to the workspace above rises UPWARD, from "
+                    + upward.exitFrom + " to " + upward.exitTo)
+            verify(upward.offPanel, "and is wholly above the panel's top edge by the "
+                + "end of it, at " + upward.exitTo + " against a top of " + clipTop())
+            verify(upward.enterFrom >= clipBottom(),
+                "and the arrival enters from below the bottom, at " + upward.enterFrom)
+            verify(upward.enterTo < upward.enterFrom,
+                "coming up onto the card, to " + upward.enterTo)
+
+            // Not the same DISTANCE, and not meant to be: the two off-panel positions are
+            // a fixed distance outside the panel's two edges, and the card being left is
+            // nearer one of them than the other. What the two journeys share is the
+            // direction and the two edges, both of which is asserted above.
+            verify(Math.abs(upward.exitTo - upward.exitFrom) > 0
+                && Math.abs(downward.exitTo - downward.exitFrom) > 0,
+                "and both journeys actually travel")
+        }
+
+        function test_aReversedSwitchKeepsTheDepartureGoingTheWayItStarted() {
+            // A second switch landing mid-journey re-aims the columns, and the marker's
+            // captured direction is deliberately NOT re-read: it has already left by then,
+            // and reversing the sign mid-flight would bend its path. Out through one edge
+            // and back in through the other is still one sweep.
+            body.hint = root.framedHint(4, 4)
+            wait(20)
+            body.hint = root.framedHint(3, 4)
+            wait(20)
+            driveMarkerTo(0)
+            compare(body._journeyDirection, -1, "a switch upward runs the journey upward")
+            driveMarkerTo(0.3)
+            var heading = body.crossingTop
+            var direction = body._journeyDirection
+            body.hint = root.framedHint(4, 3)
+            wait(20)
+            compare(body._journeyDirection, direction,
+                "and a switch back the other way mid-journey does not bend it")
+            compare(body._exitFrom, heading,
+                "and it carries on from exactly where it had reached, rather than "
+                    + "jumping")
+            driveMarkerTo(0.35)
+            verify(body.crossingTop < heading,
+                "still travelling upward, was " + body.crossingTop + " against " + heading)
+            settleSlide()
+            settleMarker()
         }
 
         function test_theCornerIsWhollyOutsideTheClipOnBothCounts() {
@@ -1340,9 +1401,10 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 "and the arrival still lands exactly on the focused card")
         }
 
-        function test_theMarkerArrivesFromTheTopOntoTheCard() {
-            // The half that was already right, kept: from above the panel's top edge,
-            // wholly clipped, down onto the focused card, moving down the whole way.
+        function test_theMarkerArrivesFromTheOppositeEdgeOntoTheCard() {
+            // The arrival: wholly outside the clip at the edge the departure did NOT leave
+            // by, moving the whole way onto the focused card. Sampled on a switch to the
+            // workspace below, so that edge is the top and the travel is down.
             startCrossingOverTwoRows(2, 2, 3, 3)
             driveMarkerTo(0.5)
             verify(outline().y + body.rowHeight <= clipTop(),
@@ -1353,6 +1415,8 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 verify(sample[i] > sample[i - 1],
                     "it moves down the whole arrival, sample " + i + " was " + sample[i]
                         + " after " + sample[i - 1])
+            compare(body._journeyDirection, 1,
+                "because this switch went to the workspace below")
             driveMarkerTo(1)
             compare(body.crossingTop, body.focusedRowTop,
                 "landing exactly on the focused card")
@@ -1711,6 +1775,100 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                     + onCard + ", and the first card is at " + firstCard)
             verify(Math.max.apply(null, seen) <= onCard + 0.5,
                 "nor does it overshoot it, highest seen " + Math.max.apply(null, seen))
+        }
+
+        function test_switchingIntoAnEmptyWorkspaceShowsNoMarkerOnTheArrival() {
+            // Switching INTO an empty workspace. The departure has a card to leave - the
+            // old workspace's focused one - so the marker is legitimately drawn for the
+            // first half of the journey. The arrival has nothing to arrive on, and the
+            // visible test used to be "either frame has a focused row", which is right for
+            // the departure and wrong for the arrival: the marker stayed drawn, descended
+            // onto the first card of an empty column and faded, which from the outside is
+            // a bar appearing out of nowhere and then disappearing.
+            body.hint = root.tallFramedHint(2, 2, 8, 3)
+            wait(500)
+            verify(body.hasTarget, "the workspace being left has a focused card")
+            var before = findByName(body, "windowHintFocusIndicator").opacity
+            verify(before > 0.9, "and its indicator is drawn, at " + before)
+
+            body.hint = root.tallFramedHint(3, 2, 8, -1)
+            wait(20)
+            verify(!body.hasTarget, "the one being moved to has nothing focused")
+            compare(body._departingRowIndex, 3,
+                "while the one being left does, so the departure still has a card to "
+                    + "leave and is still drawn")
+            verify(body.markerHasTarget, "for the departure")
+            compare(body.crossingTo, body.crossingFrom,
+                "but the arrival's leg is degenerate rather than landing on the first "
+                    + "card, which is what `focusedRowTop` reports for no row at all")
+
+            // Wall clock rather than a driven clock, because what is being checked is the
+            // opacity FADE - the flag flips at the corner and the fade takes another
+            // `MotionTokens.fast` after it, and a driven clock stops the very animation
+            // that has to be caught finishing.
+            var peak = 0
+            var frames = 0
+            while (body.markerHasTarget && frames < 60) {
+                wait(16)
+                frames += 1
+                peak = Math.max(peak, findByName(body, "windowHintFocusIndicator").opacity)
+            }
+            verify(frames < 60, "and the departure is over rather than running forever")
+            verify(peak <= before + 1e-6,
+                "the indicator never brightens once the departure is over - highest "
+                    + peak + " against " + before + " before the switch")
+            wait(220)
+            compare(findByName(body, "windowHintFocusIndicator").opacity, 0,
+                "and it is gone once the fade finishes")
+            compare(findByName(body, "windowHintFocusFrame").opacity, 0,
+                "with the outline too")
+            settleSlide()
+            settleMarker()
+            compare(findByName(body, "windowHintFocusIndicator").opacity, 0,
+                "and nothing reappears once the crossing is over")
+            compare(body.focusedRowTop, body.noRowTop,
+                "and the frame is parked on the off-panel no-row position, not on the "
+                    + "first card")
+            compare(findByName(body, "windowHintFocusIndicator").y,
+                body.focusedRowTop + body.markerOffset,
+                "with the bar one markerOffset below it, so the two still agree")
+        }
+
+        function test_switchingOutOfAnEmptyWorkspaceShowsOnlyTheArrival() {
+            // The mirror, and the other half of the same rule. Nothing is focused on the
+            // workspace being left, so there is no card to leave: the departure leg is
+            // given zero length and nothing is drawn for it. The arrival still has a card,
+            // so the marker appears at the corner - which is off the panel on both counts,
+            // so it appears by arriving rather than by blinking on.
+            body.hint = root.tallFramedHint(2, 2, 8, -1)
+            wait(500)
+            verify(!body.hasTarget, "the workspace has nothing focused")
+            compare(findByName(body, "windowHintFocusIndicator").opacity, 0,
+                "and no indicator is drawn")
+            body.hint = root.tallFramedHint(3, 2, 8, 5)
+            wait(20)
+            compare(body._departingRowIndex, -1,
+                "so the departing frame reports no focused row")
+            driveSlideTo(0.5)
+            driveMarkerTo(0.25)
+            compare(body.exitFrom, body.exitTo,
+                "and the departure leg is given no length at all")
+            // Not a visibility flag: the marker is nominally drawn, because the arrival
+            // does have a card to mark - but it is sitting on a position that is wholly
+            // outside the clip, which is how "there is nothing to leave" is expressed now.
+            verify(body.markerHasTarget,
+                "the marker is nominally drawn, since the arrival has a card")
+            verify(body.crossingTop >= clipBottom()
+                || body.crossingTop + body.rowHeight <= clipTop(),
+                "and is out of sight on the departure, at " + body.crossingTop
+                    + " against a panel of " + clipTop() + " to " + clipBottom())
+            driveSlideTo(1)
+            driveMarkerTo(0.75)
+            verify(body.markerHasTarget, "the arrival does have a card")
+            settleSlide()
+            settleMarker()
+            compare(findByName(body, "windowHintFocusIndicator").y, body.focusedRowTop
+                + body.markerOffset, "and the bar lands on it")
         }
 
         function test_theWholePanelArrivesInOnePiece() {
@@ -3695,11 +3853,19 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(body.focusedRowIndex, -1, "no focused window means no row")
             verify(!body.hasTarget, "and so no target")
 
-            // Zero, not a negative offset: the marker's own documented rest value,
-            // the one `_snapIndicator` writes before the first placement.
-            compare(body._barTop, 0, "parked at rest, not at row -1")
-            verify(body._barTop >= 0,
-                "and never at a coordinate above the panel, was " + body._barTop)
+            // ABOVE the panel, not at row 0 and not at row -1. It used to be 0, which is
+            // the first card's top edge - a real coordinate naming a row that is not there,
+            // and standing between the bar and the screen with nothing but its opacity. A
+            // position off the panel removes that: "no row" is now somewhere rather than
+            // something that has to be hidden, which is what let a snapshot arriving
+            // mid-switch with no windows yet in it flicker instead of simply arriving
+            // empty.
+            compare(body._barTop, body.noRowTop + body.markerOffset,
+                "parked off the panel rather than on row 0 or row -1, was " + body._barTop)
+            verify(body._barTop + body.indicatorLength <= -body._stripY,
+                "and wholly above the panel's top edge, was " + body._barTop)
+            compare(body._barTop, body.focusedRowTop + body.markerOffset,
+                "and in step with the outline, which rests in the same place")
             compare(body._barLength, Lazer.LazerTheme.barWidgetHeight - 16,
                 "contracted, not left stretched from the lost target")
 
