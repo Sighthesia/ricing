@@ -266,6 +266,13 @@ Item {
     // exactly - asserted against a real row's bottom edge in the suite.
     readonly property int rowPitch: rowHeight + listSpacing
     readonly property int listSpacing: 6
+    // How many rows the active column shows at once. A VIEWPORT, not a cap: the column
+    // scrolls, so every window is reachable and nothing is summarised away. The strip
+    // owns the number and the body reads it, so the panel's height and the column's
+    // clip cannot be two different viewports.
+    readonly property int viewportRows: HintLogic.MAX_WINDOW_ROWS
+    readonly property int viewportHeight: Math.max(0,
+        viewportRows * rowPitch - listSpacing)
     // Top edge of the focused row, 0 when there is none. One source of truth for
     // both markers below, so the frame and the indicator can never disagree about
     // which row is current.
@@ -273,8 +280,13 @@ Item {
     // strip's own top - the band is what sits a padding above them, not the cards -
     // so this carries no padding term. It did, briefly, and put the row highlight a
     // whole padding below the card it is drawn over.
+    // The focused row's top edge in the STRIP's own coordinates - which is a SCROLLED
+    // space, because the active column's `y` is its negative scroll offset. So the
+    // offset is part of where the row is, not an adjustment applied to the marker: a
+    // marker placed at `index * rowPitch` would sit at the row's unscrolled position and
+    // point at the wrong window the moment the column had been scrolled.
     readonly property real focusedRowTop: focusedRowIndex < 0 ? 0
-        : focusedRowIndex * rowPitch
+        : focusedRowIndex * rowPitch - strip.scrollOffset
     // The leaving frame's own height, from the row counts of the frame being held
     // rather than from a second strip. A crossing's strip is as tall as the tallest
     // of the two frames already, so this only matters for the instant between a
@@ -288,7 +300,12 @@ Item {
         if (!root.leavingHint || !root.swapping)
             return 0
         const rows = HintLogic.cappedRows(root.leavingHint.windows).rows
-        return rows.length * root.rowPitch - root.listSpacing
+        // Clamped to the viewport, like `strip.contentHeight`. The leaving frame is held
+        // for the length of a crossing, and a twelve-window workspace would otherwise
+        // size the panel to twelve rows for exactly as long - a visible jump out of the
+        // viewport and back.
+        return Math.min(rows.length * root.rowPitch - root.listSpacing,
+            root.viewportHeight)
     }
 
     // --- indicator: the workspace widget's dual-speed edge tracker, rotated ---
@@ -749,8 +766,13 @@ Item {
     // beyond this body's edges by reaching for the surface. With no host inset that is
     // the block plus its padding; with one it shrinks, because the band is already
     // covering ground the body does not own.
+    // Bounded by the VIEWPORT, which is what the cap used to do by truncating the list.
+    // A twelve-window workspace now scrolls within five rows instead of collapsing the
+    // rest into a summary line, and the panel is the same size either way - so the
+    // layer-shell input region still does not grow once per added window.
     implicitHeight: ready
-        ? Math.max(root._outgoingHeight, strip.contentHeight)
+        ? Math.min(root.viewportHeight,
+            Math.max(root._outgoingHeight, strip.contentHeight))
             + cellPaddingY * 2 - bandOutset * 2
         : emptyText.implicitHeight
     width: implicitWidth
@@ -814,6 +836,9 @@ Item {
         // which put the band's bottom margin out of step with its top.
         y: root.bandInset - root.surfaceInset + root.cellPaddingY
         height: Math.max(0, root.height - cellPaddingY * 2 + bandOutset * 2)
+        // The active column's own clip is its business; the strip's height is the
+        // viewport the body sized the panel from, which the columns are then measured
+        // against.
         // One object dimming, so one dim. With two copies crossing this had to be
         // applied to both in lockstep or the seam would show one through the other;
         // with one strip there is no seam, and the value is a pure function of the
@@ -833,6 +858,9 @@ Item {
         columnWidth: root.columnWidth
         activeColumnWidth: root.activeColumnWidth
         columnGutter: root.columnGutter
+        // One viewport, declared once: the body sizes the panel from it and the strip
+        // clips the column to it, so the two cannot be different numbers.
+        viewportRows: root.viewportRows
         cellPaddingX: root.cellPaddingX
         // Read from the same `activeColumn` the strip's own columns come from, so the
         // row that tints and the row the outline glides onto are the same row by
@@ -844,6 +872,10 @@ Item {
         glyphWidth: root.glyphWidth
         interactive: !root.swapping
         onWindowActivated: windowId => root.windowActivated(windowId)
+        onScrollOffsetChanged: root._onScrollChanged()
+        // A crossing replaces the list, and the new column's content can be shorter
+        // than the offset the old one was scrolled to.
+        onContentHeightChanged: strip.clampScroll()
     }
 
     // One shared focus highlight for the whole list, the way the launcher's does: a
@@ -1079,6 +1111,28 @@ Item {
     // leaves the bar one switch behind. This is the same discipline the workspace
     // widget uses, where `updateIndicator` computes `centerX` itself and passes it
     // into the tracker.
+    // The active column scrolled. The markers are positioned from `focusedRowTop`,
+    // which already carries the offset, so this is about the marker's own TRACKER: the
+    // dual-speed tracker holds committed targets, and a scroll that moved the row under
+    // it without re-anchoring would leave the bar easing toward a position the row has
+    // already left.
+    function _onScrollChanged() {
+        if (root.swapping)
+            return
+        root._retargetIndicator(root._targetYFor(root.focusedRowIndex),
+            String(root.focusedRowIndex))
+    }
+
+    // Reveal the focused window when focus moves to a row the viewport does not show.
+    // niri moves focus on its own (a window raises, a shortcut focuses another), and a
+    // marker pointing at a scrolled-out row is a marker pointing at nothing - the same
+    // reason `focusedIndexIn` refuses to return an index past the cap.
+    function _revealFocusedRow() {
+        if (root.focusedRowIndex < 0)
+            return
+        strip.revealRow(root.focusedRowIndex, !root.swapping)
+    }
+
     function _syncIndicator() {
         var target = root._targetYFor(root.focusedRowIndex)
         if (!root.hasTarget) {
@@ -1099,7 +1153,10 @@ Item {
         root._retargetIndicator(target, String(root.focusedRowIndex))
     }
 
-    onFocusedRowIndexChanged: _syncIndicator()
+    onFocusedRowIndexChanged: {
+        _syncIndicator()
+        _revealFocusedRow()
+    }
     onHasTargetChanged: _syncIndicator()
 
     Component.onCompleted: {

@@ -30,6 +30,13 @@ Item {
     readonly property int bandX: 186
     readonly property int rightX: 552
     readonly property int panelW: 732
+    // The SCROLL viewport's arithmetic, as literals and spelled as the arithmetic: five
+    // 28px rows with a 6px gap between them, so a row pitch of 34 and a viewport of
+    // 5 * 34 - 6 = 164. `scrollRange` is the scroll range of a twelve-window workspace
+    // against that viewport: seven rows of content below the viewport's last row.
+    readonly property int rowPitch: 28 + 6
+    readonly property int viewport5: 5 * (28 + 6) - 6
+    readonly property int scrollRange: 7 * (28 + 6)
 
     // A snapshot shaped exactly like WindowHintService's, so a change to the
     // service's contract has to be made here too.
@@ -104,32 +111,62 @@ Item {
         }
 
         // ---- cap -------------------------------------------------------
-        function test_windowRows_capAtTheVisibleLimit() {
+        function test_cappedRows_isStillTheNeighbourCap() {
+            // `cappedRows` survives as the cap on the two columns that do NOT scroll:
+            // they are context, drawn whole, bounded by the viewport. The ACTIVE column
+            // is uncapped - see `test_theActiveColumnIsNotCapped`.
             var many = []
             for (var i = 0; i < Hint.MAX_WINDOW_ROWS + 3; i++)
                 many.push({ windowId: String(i), title: "w" + i, isFocused: false })
             var page = Hint.cappedWindowRows(makeHint({ windows: many }))
-            // The menu owns no scroll surface, so the cap is what keeps the
-            // popup's input region from growing once per extra window.
-            compare(page.rows.length, Hint.MAX_WINDOW_ROWS)
-            compare(page.hidden, 3)
-            compare(Hint.overflowLabel(page.hidden), "+3 more windows")
+            compare(page.rows.length, Hint.MAX_WINDOW_ROWS,
+                "a capped read keeps the viewport's worth")
+            compare(page.hidden, 3, "and reports what is past it")
         }
 
-        function test_windowRows_underTheCapReportNoOverflow() {
+        function test_aShortListHasNothingPastTheViewport() {
             var page = Hint.cappedWindowRows(makeHint())
             compare(page.rows.length, 3)
-            compare(page.hidden, 0)
-            // An empty string lets the renderer bind visibility to the text.
-            compare(Hint.overflowLabel(page.hidden), "")
+            compare(page.hidden, 0, "so there is nothing to scroll")
         }
 
-        function test_overflowLabel_singularisesOneWindow() {
+        function test_theActiveColumnIsNotCapped() {
+            // The change: the workspace whose windows you opened the panel to choose
+            // from is no longer truncated. Every window is a row and the column scrolls
+            // to reach them, so `hidden` is no longer a summary of what was withheld -
+            // it is the scroll range, which is why it is still reported.
             var many = []
-            for (var i = 0; i < Hint.MAX_WINDOW_ROWS + 1; i++)
+            for (var i = 0; i < Hint.MAX_WINDOW_ROWS + 7; i++)
                 many.push({ windowId: String(i), title: "w" + i, isFocused: false })
-            var page = Hint.cappedWindowRows(makeHint({ windows: many }))
-            compare(Hint.overflowLabel(page.hidden), "+1 more window")
+            var hint = makeHint({ windows: many })
+            var columns = Hint.cappedColumns(hint)
+            compare(columns.current.rows.length, Hint.MAX_WINDOW_ROWS + 7,
+                "every window of the active workspace is a row")
+            compare(columns.current.hidden, 7,
+                "and the count past the viewport is still reported, as the scroll range")
+            // The neighbours are NOT uncapped with it: they do not scroll, so a window
+            // past their viewport would simply never be reachable.
+            hint.previousWindows = many
+            hint.nextWindows = many
+            columns = Hint.cappedColumns(hint)
+            compare(columns.previous.rows.length, Hint.MAX_WINDOW_ROWS,
+                "the left neighbour is still capped")
+            compare(columns.next.rows.length, Hint.MAX_WINDOW_ROWS,
+                "and so is the right")
+            // Which means one snapshot can hold twelve windows and still report five for
+            // two of its three columns. Asserted, because a change that uncapped
+            // everything would look right on the active column alone.
+            compare(columns.current.rows.length + columns.previous.rows.length
+                + columns.next.rows.length, 5 + 5 + 12,
+                "twelve windows: five shown per neighbour and twelve in the middle")
+        }
+
+        function test_noColumnIsSummarisedAsText() {
+            // Nothing renders "+N more windows" any more. The function is gone rather
+            // than unused, so a re-introduction has to be a deliberate act that also
+            // revives the wording - which is the point: the old line was a dead end, and
+            // this is what keeps it from creeping back as a label.
+            verify(Hint.overflowLabel === undefined)
         }
 
         function test_emptyWorkspaceIsReadyWithNoRows() {
@@ -141,7 +178,8 @@ Item {
             })
             compare(Hint.ready(empty), true)
             compare(Hint.cappedWindowRows(empty).rows.length, 0)
-            compare(Hint.overflowLabel(Hint.cappedWindowRows(empty).hidden), "")
+            compare(Hint.cappedWindowRows(empty).hidden, 0,
+                "an empty workspace has nothing to scroll either")
         }
 
         // ---- focus target -----------------------------------------------
@@ -201,10 +239,15 @@ Item {
             compare(Object.keys(prev).sort().join(","), "appId,icon,isFocused,title,windowId")
         }
 
-        function test_cappedColumns_capEveryColumnAlike() {
-            // Same cap on all three, or the panel height would be driven by
-            // whichever neighbour happened to be busiest and the three columns
-            // would not read as peers.
+        function test_cappedColumns_capsTheNeighboursAlike() {
+            // The two neighbours get the same cap, or the panel height would be driven
+            // by whichever one happened to be busiest and they would not read as peers.
+            //
+            // The middle is deliberately NOT capped: it is the one that scrolls, so a cap
+            // there would put a wall between the user and the windows they came to pick.
+            // That asymmetry is the change, and it is asserted here as well as in
+            // `test_theActiveColumnIsNotCapped` because this is the test a reader comes
+            // to when asking "why is this one different".
             var many = []
             for (var i = 0; i < 8; i++)
                 many.push({ windowId: "n" + i, title: "n" + i, isFocused: false })
@@ -212,10 +255,11 @@ Item {
                 previousWindows: many, windows: many, nextWindows: many
             }))
             compare(columns.previous.rows.length, Hint.MAX_WINDOW_ROWS)
-            compare(columns.current.rows.length, Hint.MAX_WINDOW_ROWS)
             compare(columns.next.rows.length, Hint.MAX_WINDOW_ROWS)
             compare(columns.previous.hidden, 3)
             compare(columns.next.hidden, 3)
+            compare(columns.current.rows.length, 8,
+                "while the middle keeps all eight and scrolls")
         }
 
         function test_cappedColumns_leaveAMissingNeighbourEmpty() {
@@ -484,6 +528,86 @@ Item {
             compare(Hint.focusedIndexIn(rows), 1)
             compare(Hint.focusedIndexIn([{ isFocused: false }]), -1)
             compare(Hint.focusedIndexIn(null), -1)
+        }
+
+        // ---- the scroll reveal -------------------------------------------
+        // `revealScrollY` is the arithmetic behind "scroll the least that shows the
+        // focused window". Stated against a viewport of five 28px rows with a 6px gap -
+        // a row pitch of 34, so the viewport is 5 * 34 - 6 = 164 - because every number
+        // below is that arithmetic, and reading the row height off the component would
+        // make the suite unable to disagree with it.
+        function test_revealScrollY_leavesAVisibleRowAlone() {
+            // The whole point of "smallest move" rather than "centre it": a row already
+            // in the viewport must not scroll the list at all. Every row of the first
+            // five is on screen at rest, and moving for any of them would be motion the
+            // user did not ask for.
+            for (var index = 0; index < 5; index++) {
+                compare(Hint.revealScrollY(0, index * root.rowPitch, 28, root.viewport5,
+                    root.scrollRange), 0,
+                    "row " + index + " is already visible and stays put")
+            }
+        }
+
+        function test_revealScrollY_scrollsOnlyAsFarAsItMust() {
+            // A row below the viewport: exactly enough to bring its bottom edge to the
+            // viewport's bottom edge, and no further.
+            compare(Hint.revealScrollY(0, 5 * root.rowPitch, 28, root.viewport5, root.scrollRange),
+                5 * root.rowPitch + 28 - root.viewport5, "row 5 scrolls to its own bottom edge")
+            compare(Hint.revealScrollY(0, 8 * root.rowPitch, 28, root.viewport5, root.scrollRange),
+                8 * root.rowPitch + 28 - root.viewport5, "and so does row 8")
+            // A row above the viewport, when the list has been scrolled past it: the
+            // smallest move that shows it is its OWN top edge, not the list's. Scrolling
+            // to the list top instead would be the launcher's centring rule applied
+            // where it does not belong, and would move the panel further than it must on
+            // a workspace where the row was nearly visible already.
+            compare(Hint.revealScrollY(root.scrollRange, 0, 28, root.viewport5,
+                root.scrollRange), 0, "a row above the viewport scrolls back to its top")
+            compare(Hint.revealScrollY(root.scrollRange, 2 * root.rowPitch, 28,
+                root.viewport5, root.scrollRange), 2 * root.rowPitch,
+                "and to the row's own top rather than the list's")
+            // Which is strictly less than snapping home.
+            verify(2 * root.rowPitch < root.scrollRange,
+                "and that is a shorter move than returning to the top would be")
+            // A row straddling the bottom edge is brought in by its own height.
+            compare(Hint.revealScrollY(0, 4 * root.rowPitch + 10, 28, root.viewport5,
+                root.scrollRange), 4 * root.rowPitch + 10 + 28 - root.viewport5,
+                "a row straddling the bottom edge is brought fully in")
+        }
+
+        function test_revealScrollY_neverLeavesTheScrollableRange() {
+            // Clamped at both ends. Without the clamp a reveal near the top could park
+            // the list at a negative offset - showing blank space above the first row -
+            // and one near the bottom could park it past the last.
+            compare(Hint.revealScrollY(-40, 0, 28, root.viewport5, root.scrollRange), 0,
+                "an already-overscrolled list is pulled back to the top")
+            // Past the end rather than near it: an offset inside the range with the row
+            // already on screen is not a case of anything, so this one is beyond
+            // `scrollRange` and has to be pulled back.
+            compare(Hint.revealScrollY(root.scrollRange + 60, 8 * root.rowPitch, 28,
+                root.viewport5, root.scrollRange),
+                root.scrollRange, "and one scrolled past its end is pulled back to it")
+            // A row whose reveal would need more than there is to give.
+            compare(Hint.revealScrollY(0, 40 * root.rowPitch, 28, root.viewport5, root.scrollRange),
+                root.scrollRange, "a row below the last one lands on the end, not past it")
+            // Nothing scrollable: the answer is the top, whatever was asked for.
+            compare(Hint.revealScrollY(0, 5 * root.rowPitch, 28, root.viewport5, 0), 0,
+                "a list that fits does not scroll at all")
+        }
+
+        function test_revealScrollY_toleratesNonsense() {
+            // The strip hands these numbers straight from a layout, and one NaN in there
+            // would put `scrollOffset` at NaN, which propagates into a column's `y` and
+            // takes the whole panel off screen.
+            compare(Hint.revealScrollY(NaN, 0, 28, root.viewport5, root.scrollRange), 0,
+                "a NaN offset")
+            compare(Hint.revealScrollY(0, NaN, 28, root.viewport5, root.scrollRange), 0,
+                "a NaN row")
+            compare(Hint.revealScrollY(0, 0, 0, root.viewport5, root.scrollRange), 0,
+                "a zero-height row")
+            compare(Hint.revealScrollY(0, 0, 28, 0, root.scrollRange), 0,
+                "a zero-height viewport")
+            compare(Hint.revealScrollY(0, 3 * root.rowPitch, 28, root.viewport5, -10), 0,
+                "a negative range")
         }
 
         // ---- swap direction --------------------------------------------
@@ -788,13 +912,26 @@ Item {
             // 0 and 2 are read from opposite frames - 0 only from the leaving one, 2
             // only from the arriving one - 3 is the arriving frame's own next
             // workspace, and 1 is the one both know, read from the arriving frame for
-            // the reason tested above. The cap is the same in every case.
-            for (var position = 0; position <= 3; ++position) {
-                compare(byPosition[position].rows.length, Hint.MAX_WINDOW_ROWS,
-                    "position " + position + " is capped")
-                compare(byPosition[position].hidden, 3,
-                    "position " + position + " and reports the rest")
-            }
+            // the reason tested above.
+            //
+            // Position 2 is the ARRIVING FRAME'S ACTIVE COLUMN - which is the one that
+            // scrolls, and so the one that is not capped. Every other position on the
+            // strip is that frame's neighbour, and stays capped. Asserted per position
+            // rather than in one loop over all four, because the exception is the whole
+            // point: a loop that expected a cap everywhere would be the test that
+            // silently justified truncating the active list.
+            compare(byPosition[0].rows.length, Hint.MAX_WINDOW_ROWS,
+                "position 0, a neighbour of the leaving frame, is capped")
+            compare(byPosition[0].hidden, 3, "and reports the rest")
+            compare(byPosition[1].rows.length, Hint.MAX_WINDOW_ROWS,
+                "position 1, the shared one read as a neighbour, is capped too")
+            compare(byPosition[3].rows.length, Hint.MAX_WINDOW_ROWS,
+                "and position 3, the arriving frame's next workspace")
+            compare(byPosition[3].hidden, 3, "reports the rest as well")
+            compare(byPosition[2].rows.length, 8,
+                "while position 2, the arriving frame's ACTIVE column, keeps all eight")
+            compare(byPosition[2].hidden, 3,
+                "and still reports the three past the viewport, as its scroll range")
         }
 
         // ---- what the menu deliberately does not build -------------------

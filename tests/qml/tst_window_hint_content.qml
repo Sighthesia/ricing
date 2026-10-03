@@ -1967,27 +1967,20 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(settled.y + settled.height / 2, rows[0].height / 2, "centred on the first row")
         }
 
-        function test_underlineHiddenWhenTheFocusedWindowIsPastTheCap() {
-            // The window is real but not on screen, so there is nothing honest
-            // to underline.
+        function test_underlineHiddenWhenNoWindowIsFocused() {
+            // The one case where there is genuinely nothing to underline: no window in
+            // the workspace is focused, so there is no row to point at. Distinct from a
+            // focused window past the viewport, which the scroll now reveals - see
+            // `test_theFocusedWindowIsScrolledIntoView`.
             var many = []
             for (var i = 0; i < 8; i++)
-                many.push({ windowId: String(i), title: "w" + i, icon: "", isFocused: i === 7 })
+                many.push({ windowId: String(i), title: "w" + i, icon: "", isFocused: false })
             body.hint = root.makeHint({ windows: many })
             wait(20)
             verify(!findByName(live(), "windowHintFocusIndicator").visible)
         }
 
-        function test_underlineHiddenWhenNoWindowIsFocused() {
-            body.hint = root.makeHint({
-                windows: [
-                    { windowId: "10", title: "kitty", appId: "kitty", icon: "", isFocused: false },
-                    { windowId: "11", title: "afloat", appId: "kitty", icon: "", isFocused: false }
-                ]
-            })
-            wait(20)
-            verify(!findByName(live(), "windowHintFocusIndicator").visible)
-        }
+
 
         // ---- tap --------------------------------------------------------
         function test_tappingAWindowRowReportsItsId() {
@@ -2031,41 +2024,277 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         }
 
         // ---- overflow and empty states ----------------------------------
-        function test_longWindowListCollapsesToAnOverflowLine() {
+        function test_aLongListIsNotCappedItScrolls() {
+            // The change: every window in the workspace is a row, and the panel is a
+            // viewport over them rather than a list with its tail folded into a summary
+            // line. The old cap showed five of eight and said "+3 more windows", which
+            // is a dead end - there was nothing to do about the three.
             var many = []
             for (var i = 0; i < 8; i++)
                 many.push({ windowId: String(i), title: "w" + i, icon: "", isFocused: false })
             body.hint = root.makeHint({ windows: many })
             wait(20)
-            compare(findAllByName(live(), "windowHintWindowRow").length, 8 - 3)
-            // Every column carries an overflow line instance; only the active
-            // column's has anything to say, so the one with text is read rather
-            // than the first one found.
-            var line = findAllByName(live(), "windowHintOverflow")
-                .filter(function(t) { return t.text !== "" })[0]
-            verify(line !== undefined, "a column has an overflow line")
-            compare(line.text, "+3 more windows")
+            var rows = findAllByName(live(), "windowHintWindowRow")
+            compare(rows.length, 8, "all eight windows are rows, not five")
+            // And nothing stands in for the ones that do not fit.
+            compare(findAllByName(live(), "windowHintOverflow").length, 0,
+                "and there is no overflow line at all")
+            verify(!/more window/.test(shownText()),
+                "no column says anything about windows it is not showing, saw \""
+                    + shownText() + "\"")
         }
 
-        function test_onlyTheActiveColumnCarriesAnOverflowLine() {
-            // The cap applies to the active column, and it is the only one with a
-            // "+N more" line. A neighbour column reporting a cap it does not have
-            // would claim windows that are not being shown, and the strip carries
-            // neighbour columns that are still travelling through the panel.
+        function test_thePanelIsBoundedByTheViewportHoweverLongTheList() {
+            // The reason the cap existed, answered from the other side: the panel's
+            // height - and so the layer-shell input region - must not grow once per
+            // added window. A viewport bounds it; a cap bounded it by throwing rows away.
+            //
+            // Read against the VIEWPORT rather than against a count, so the claim is
+            // about the bound rather than about this particular fixture's arithmetic.
+            var heights = {}
+            for (var count = 2; count <= 12; count += 5) {
+                var many = []
+                for (var i = 0; i < count; i++)
+                    many.push({ windowId: String(i), title: "w" + i, icon: "",
+                        isFocused: false })
+                body.hint = root.makeHint({ windows: many })
+                wait(20)
+                heights[count] = body.implicitHeight
+                // The card block itself, which is what the viewport bounds.
+                verify(body.implicitHeight <= body.viewportHeight
+                        + body.cellPaddingY * 2,
+                    count + " windows: the panel is no taller than the viewport plus its "
+                        + "padding, was " + body.implicitHeight + " against a viewport of "
+                        + body.viewportHeight)
+            }
+            compare(heights[12], heights[7],
+                "and seven windows and twelve windows make the SAME panel, was "
+                    + heights[7] + " and " + heights[12])
+        }
+
+        function test_theActiveColumnIsClippedToTheViewport() {
+            // The clip and the scroll are the same mechanism: the column is a window
+            // onto its rows, offset by `scrollOffset`. Asserted on the real delegate,
+            // because a column that drew all its rows unclipped would push the panel's
+            // height back out and quietly undo the bound above.
             var many = []
-            for (var i = 0; i < 8; i++)
+            for (var i = 0; i < 9; i++)
+                many.push({ windowId: String(i), title: "w" + i, icon: "", isFocused: false })
+            body.hint = root.makeHint({ windows: many })
+            wait(20)
+            var column = columnForPosition(1)
+            verify(column !== null, "the active column is on the strip")
+            compare(column.clip, true, "and it clips")
+            compare(column.height, body.viewportHeight,
+                "to exactly the viewport, was " + column.height + " against "
+                    + body.viewportHeight)
+            verify(column.contentHeight > column.height,
+                "while its content is taller - " + column.contentHeight + " against "
+                    + column.height + " - which is what there is to scroll")
+            compare(strip().maxScrollOffset, column.contentHeight - body.viewportHeight,
+                "and the scroll range is exactly the difference")
+        }
+
+        function test_theWheelScrollsTheActiveColumn() {
+            // The scroll itself, driven through `applyWheel` rather than a synthesised
+            // wheel event: a `WheelHandler` can only be exercised by real pointer events,
+            // which this harness cannot produce, and `applyWheel` is the whole of the
+            // handler's body below the event normalisation.
+            var many = []
+            for (var i = 0; i < 9; i++)
+                many.push({ windowId: String(i), title: "w" + i, icon: "", isFocused: false })
+            body.hint = root.makeHint({ windows: many })
+            wait(20)
+            var range = strip().maxScrollOffset
+            verify(range > 0, "there is something to scroll, " + range + "px")
+
+            // The plain path is only reached OUTSIDE the edge-takeover band, so the
+            // samples start past it: `edgeTakeoverDistance` from whichever end the wheel
+            // is heading towards. Nine rows leaves 4 * 34 = 136px of range, so there is
+            // room to stand off the band at both ends.
+            verify(strip().edgeTakeoverDistance < range,
+                "there is room outside the edge band to test the plain path, range "
+                    + range + " against a band of " + strip().edgeTakeoverDistance)
+            compare(strip().scrollOffset, 0, "it starts at the top")
+            // Down is a LARGER offset - the content moves up under the viewport - and
+            // from clear of the bottom band, because the edge-takeover path claims the
+            // wheel inside it and eases toward a resisted target instead of applying the
+            // delta.
+            strip().scrollOffset = range - strip().edgeTakeoverDistance - 20
+            var from = strip().scrollOffset
+            strip().applyWheel(true, 40)
+            compare(strip().scrollOffset, from + 40,
+                "a wheel down moves it further down the list, was " + strip().scrollOffset
+                    + " from " + from)
+            // Up, from a position clear of the top band.
+            strip().scrollOffset = strip().edgeTakeoverDistance + 20
+            from = strip().scrollOffset
+            strip().applyWheel(false, 40)
+            compare(strip().scrollOffset, from - 40,
+                "and a wheel up moves it up, was " + strip().scrollOffset + " from "
+                    + from)
+        }
+
+        function test_aListThatFitsRefusesTheWheel() {
+            // A workspace whose windows all fit must not swallow the wheel - the wheel
+            // belongs to whatever is behind the popup, and a list that eats it while
+            // having nothing to scroll is a fault the user finds by scrolling something
+            // else.
+            body.hint = root.makeHint()
+            wait(20)
+            compare(strip().maxScrollOffset, 0, "nothing to scroll")
+            strip().applyWheel(true, 120)
+            compare(strip().scrollOffset, 0, "and the wheel changes nothing, was "
+                + strip().scrollOffset)
+        }
+
+        function test_onlyTheActiveColumnScrolls() {
+            // The neighbours are context and are not scrolled: they are capped by the
+            // logic and drawn whole. A wheel that moved them would desynchronise three
+            // columns that read as one frame.
+            var many = []
+            for (var i = 0; i < 9; i++)
                 many.push({ windowId: String(i), title: "w" + i, icon: "", isFocused: false })
             body.hint = root.makeHint({ windows: many, previousWindows: many })
             wait(20)
-            var lines = findAllByName(live(), "windowHintOverflow")
-            var showing = lines.filter(function(l) { return l.visible })
-            compare(showing.length, 1, "one overflow line, on the active column")
-            compare(showing[0].text, "+3 more windows")
-            compare(showing[0].mapToItem(body, 0, 0).x, root.bandX + root.padX,
-                "and it is in the active column, inside its padding, was "
-                    + showing[0].mapToItem(body, 0, 0).x)
-            compare(showing[0].width, root.wideCard,
-                "as wide as the active card, was " + showing[0].width)
+            // Stand off the bottom edge band, or the wheel is claimed by the takeover
+            // path and eased onto its target rather than applied - and take the
+            // neighbours' position THERE too, so the comparison is like for like.
+            strip().scrollOffset = strip().maxScrollOffset
+                - strip().edgeTakeoverDistance - 20
+            var before = []
+            for (var slot = 0; slot < 3; ++slot)
+                before.push(columnDelegates()[slot].y)
+            strip().applyWheel(true, 40)
+            wait(1)
+            var after = []
+            for (slot = 0; slot < 3; ++slot)
+                after.push(columnDelegates()[slot].y)
+            compare(after[1], before[1] - 40,
+                "the active column's content moved up, was " + after[1] + " from "
+                    + before[1])
+            compare(after[0], before[0], "the left neighbour did not")
+            compare(after[2], before[2], "and neither did the right")
+            // And the neighbours are whole rather than windowed: no clip, no offset.
+            var left = columnDelegates()[0]
+            compare(left.clip, false, "a neighbour column does not clip")
+            compare(left.height, left.contentHeight,
+                "and is as tall as its content, was " + left.height)
+        }
+
+        function test_theFocusedWindowIsScrolledIntoView() {
+            // niri moves focus on its own, and a marker pointing at a scrolled-out row
+            // points at nothing. The old behaviour was to hide the marker instead - which
+            // is honest about the row being unreachable but leaves the panel unable to
+            // say which window is focused at all.
+            var many = []
+            for (var i = 0; i < 9; i++)
+                many.push({ windowId: String(i), title: "w" + i, icon: "",
+                    isFocused: i === 8 })
+            body.hint = root.makeHint({ windows: many })
+            // The marker is placed on the snapshot's first frame, before the reveal has
+            // travelled, so its PRESENCE is read before the wait and its POSITION after
+            // it. Reading both afterwards would only ever see the settled state.
+            var indicator = findByName(live(), "windowHintFocusIndicator")
+            verify(indicator.visible,
+                "the marker is on the focused window even though it starts past the "
+                    + "viewport")
+            // The reveal rides the launcher's programmatic scroll - 300ms OutQuint - so
+            // the column is still travelling when the snapshot lands. Past its 300ms
+            // before reading, or this measures a frame of the animation rather than
+            // where it comes to rest.
+            wait(360)
+            verify(strip().scrollOffset > 0,
+                "and the column scrolled to it, was " + strip().scrollOffset)
+            // Inside the viewport, measured on the real row and the real clip. The row is
+            // found by its TITLE - the fixture names each row after its own index - rather
+            // than by asking the component which index it focused, which would only
+            // restate the answer.
+            var row = findAllByName(live(), "windowHintWindowRow").filter(function(r) {
+                return r.modelData.title === "w8"
+            })[0]
+            verify(row !== null, "the focused row is on the strip")
+            var top = row.mapToItem(strip(), 0, 0).y
+            var bottom = top + body.rowHeight
+            verify(top >= -0.5 && bottom <= body.viewportHeight + 0.5,
+                "and it is inside the viewport, " + top + " to " + bottom + " against "
+                    + body.viewportHeight)
+        }
+
+        // Every piece of text on the panel, so a claim about what the panel does NOT say
+        // can be made against the whole surface rather than against one element that was
+        // expected to be absent.
+        function shownText() {
+            var texts = findAllByName(body, "windowHintWindowTitle")
+                .concat(findAllByName(body, "windowHintNeighbourRow"))
+            var out = []
+            for (var i = 0; i < texts.length; ++i) {
+                var t = texts[i]
+                if (t.text !== undefined)
+                    out.push(String(t.text))
+                else if (t.title !== undefined)
+                    out.push(String(t.title))
+            }
+            return out.join(" | ")
+        }
+
+        // The focused row's own delegate, found by which row the shared marker is over.
+        // Walking up from the marker rather than down from the model, so the test cannot
+        // pass by asking the same index the component placed it from.
+        function focusedRowIn(scope) {
+            var frame = findByName(scope, "windowHintFocusFrame")
+            if (!frame)
+                return null
+            var rows = findAllByName(scope, "windowHintWindowRow")
+            var centre = frame.mapToItem(strip(), frame.height / 2, frame.height / 2)
+            for (var i = 0; i < rows.length; ++i) {
+                var here = rows[i].mapToItem(strip(), frame.height / 2, frame.height / 2)
+                if (Math.abs(here.y - centre.y) < 1)
+                    return rows[i]
+            }
+            return null
+        }
+
+        function test_theScrollUsesTheLaunchersContract() {
+            // The numbers, as literals. A scroll that felt different from the launcher's
+            // would be the most obvious inconsistency in the panel, and the only thing
+            // holding the two together is that they agree here - 80px of edge takeover,
+            // 88px of overscroll, the launcher's three durations.
+            compare(strip().edgeTakeoverDistance, 80,
+                "the edge band is the launcher's 80px")
+            compare(strip().overscrollDistance, 88,
+                "and the overscroll rail its 88px")
+            // The rubber band: the further past the bound, the smaller each step. Two
+            // steps of the same size from the bound must move less the second time.
+            var first = strip()._resistedTarget(0, 40, 0)
+            var second = strip()._resistedTarget(first, 40, 0)
+            verify(Math.abs(first - 0) > Math.abs(second - first),
+                "the band resists more the deeper it goes, " + Math.abs(first)
+                    + " then " + Math.abs(second - first))
+            verify(Math.abs(first) <= 40, "and never further than the delta it was given")
+            // And at the bound the first step is undamped - full tension is still zero.
+            compare(strip()._resistedTarget(0, 40, 0), -40,
+                "a step taken exactly at the bound is undamped")
+        }
+
+        function test_theOffsetIsClampedToTheContent() {
+            // A workspace switch replaces the list, and the new one can be shorter than
+            // the offset the old one was scrolled to. Without a clamp the panel would sit
+            // showing blank space below its last row, which is the failure the launcher's
+            // `normalizeViewport` exists for.
+            var many = []
+            for (var i = 0; i < 12; i++)
+                many.push({ windowId: String(i), title: "w" + i, icon: "", isFocused: false })
+            body.hint = root.makeHint({ windows: many })
+            wait(20)
+            strip().scrollOffset = strip().maxScrollOffset
+            verify(strip().scrollOffset > 0, "scrolled to the end of twelve")
+
+            body.hint = root.makeHint()
+            wait(20)
+            compare(strip().maxScrollOffset, 0, "the new workspace has two windows")
+            compare(strip().scrollOffset, 0,
+                "and the offset is clamped back into range, was " + strip().scrollOffset)
         }
 
         function test_anEmptyWorkspaceShowsAPlaceholderNotAHole() {

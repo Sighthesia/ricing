@@ -83,6 +83,25 @@ Item {
     // False while a crossing is in flight: what is under the pointer is either
     // leaving or has not arrived.
     property bool interactive: true
+    // How many rows the active column shows at once. `MAX_WINDOW_ROWS`, and the
+    // panel is sized from the strip rather than from the content, so this is also
+    // what bounds the panel's height - and therefore the layer-shell input region -
+    // however many windows the workspace holds.
+    property int viewportRows: HintLogic.MAX_WINDOW_ROWS
+
+    // How far the ACTIVE column is scrolled, in pixels. Owned here rather than by the
+    // body because the scrolling content is here: the column's own `y` is this offset,
+    // and the body needs it only to place the focus markers against the same scrolled
+    // geometry the rows are drawn in.
+    property real scrollOffset: 0
+    // How far the active column CAN be scrolled: its full content less the viewport.
+    // Zero when it fits, which is what makes a list that fits refuse the wheel.
+    readonly property real maxScrollOffset: Math.max(0,
+        activeColumnContentHeight - viewportHeight)
+
+    readonly property int rowPitch: rowHeight + listSpacing
+    readonly property int viewportHeight: Math.max(0,
+        viewportRows * rowPitch - listSpacing)
 
     signal windowActivated(string windowId)
 
@@ -123,24 +142,60 @@ Item {
             root.columnWidth, root.activeColumnWidth)
     }
 
-    // The tallest column on the strip, read off the live delegates. The panel is
-    // sized from this, so it has to be the real laid-out height rather than a
-    // prediction from the row counts - a column's height includes its overflow line
-    // and its placeholder, and predicting that here would be a second copy of the
-    // layout's rules to drift.
+    // The tallest column on the strip, MEASURED rather than bound.
     //
-    // The loop reads `root.columns`, so re-assigning the list re-evaluates it; that is
-    // the only moment the column heights can change, since the rows themselves do not
-    // animate.
-    readonly property int contentHeight: {
-        var columns = root.columns
+    // This was a `readonly` property whose body looped over `columnRepeater.itemAt(i)`
+    // and read `column.height` off each delegate. QML tracks no dependency through
+    // `itemAt`: the only property the loop touched was `root.columns`, so the whole
+    // expression was evaluated when the list was replaced and then never again, and the
+    // panel was sized from whichever heights the delegates happened to hold at that
+    // instant. A stale read.
+    //
+    // It did no harm until the scroll. The cap made a column's height a function of its
+    // row count, which is available the moment the model is assigned, so a measurement
+    // taken a frame early was the right answer by luck. The viewport makes a column's
+    // height depend on its own laid-out content instead, and the stale answer was a
+    // viewport's worth for a twelve-row column - the panel sized itself for five rows of
+    // a list it was about to draw twelve of.
+    //
+    // So it is written by `remeasureHeight`, called from each column's own
+    // `onHeightChanged` and once after a list replacement. Imperative because a binding
+    // cannot see through `itemAt` at all, and the alternative - predicting the height
+    // from the row count - is the second copy of the layout's rules that the comment
+    // above this one used to warn against.
+    property int contentHeight: 0
+
+    function remeasureHeight() {
         var tallest = 0
         for (var i = 0; i < columnRepeater.count; ++i) {
             var column = columnRepeater.itemAt(i)
             if (column && column.height > tallest)
                 tallest = column.height
         }
-        return tallest
+        // Only on a change: a column's `onHeightChanged` fires during layout, and
+        // writing an unchanged value from there would dirty the binding for nothing.
+        if (tallest !== root.contentHeight)
+            root.contentHeight = tallest
+    }
+
+    onColumnsChanged: Qt.callLater(remeasureHeight)
+
+    // The scroll range, not the panel height, is what decides whether an offset is still
+    // legal - and it is the one that changes when a crossing brings a shorter list.
+    //
+    // Hooked here as well as on `contentHeight` because the two do not move together: a
+    // workspace going from twelve windows to two changes the RANGE from 238 to 0 while
+    // the panel's height happens to be unchanged by the same publish, and a clamp that
+    // only listened for the height would leave the list scrolled 238px past its own
+    // end. It showed as two unrelated faults - a stale offset in one test, and a click
+    // that landed on a row the previous test had scrolled out of the panel in another.
+    onMaxScrollOffsetChanged: clampScroll()
+
+    // The active column's own full height, unclamped. This is what the scroll range is
+    // measured against, so it has to be the content and not the viewport.
+    readonly property int activeColumnContentHeight: {
+        var column = root.activeColumnItem
+        return column ? column.contentHeight : 0
     }
 
     // One delegate per workspace position. Both `x` and `width` are DERIVED from the
@@ -149,6 +204,19 @@ Item {
     // positioner would lay out against a stale width in any case (its pass lands
     // after the frame that created the delegate), and because nothing about the
     // columns then changes again it would never re-lay-out.
+    // The active column's own Column, for the scroll range. Found by asking the
+    // Repeater rather than by keeping a reference: a delegate reference is a binding to
+    // a row that a `Repeater` is free to destroy and rebuild, and a stale one would
+    // measure a column that is no longer on the strip.
+    readonly property Item activeColumnItem: {
+        for (var i = 0; i < columnRepeater.count; ++i) {
+            var column = columnRepeater.itemAt(i)
+            if (column && column.isActiveSlot)
+                return column
+        }
+        return null
+    }
+
     Repeater {
         id: columnRepeater
         model: root.columns
@@ -170,6 +238,21 @@ Item {
             width: root.columnWidthFor(stripColumn.modelData.position)
             spacing: root.listSpacing
             readonly property bool isActiveSlot: stripColumn.index === root.activeSlot
+            // The active column is a VIEWPORT: clipped to the window's height and
+            // scrolled within it. The neighbours are not - they are capped by the logic
+            // and drawn whole, which is why they need neither.
+            clip: stripColumn.isActiveSlot
+            height: stripColumn.isActiveSlot
+                ? Math.min(implicitHeight, root.viewportHeight) : implicitHeight
+            y: stripColumn.isActiveSlot ? -root.scrollOffset : 0
+            // The column's own unclamped height, for the scroll range. A `Column`'s
+            // `height` is the viewport once the clamp above binds, so the range needs
+            // this rather than the height.
+            readonly property int contentHeight: implicitHeight
+            // Announce a resize, because the strip measures its columns through
+            // `itemAt` and has no binding that could see this one. See
+            // `strip.remeasureHeight`.
+            onHeightChanged: root.remeasureHeight()
             // What a column's own content is given: the column less its padding,
             // which is what every row, placeholder and overflow line is laid out in.
             // A property rather than a binding repeated at each use, so the row, the
@@ -345,22 +428,224 @@ Item {
                     || stripColumn.modelData.rows.length === 0
             }
 
-            // Overflow line for the windows the cap left out. Only the active
-            // column has one: a neighbour column states what it has and stops.
-            // Empty when the list fit, so visibility binds straight to the text.
-            Text {
-                objectName: "windowHintOverflow"
-                x: root.cellPaddingX
-                width: stripColumn.cardWidth
-                visible: stripColumn.isActiveSlot && stripColumn.modelData
-                    ? HintLogic.overflowLabel(stripColumn.modelData.hidden) !== ""
-                    : false
-                text: stripColumn.modelData
-                    ? HintLogic.overflowLabel(stripColumn.modelData.hidden) : ""
-                color: LazerTheme.textMuted
-                font.pixelSize: 10
-                horizontalAlignment: Text.AlignHCenter
-            }
         }
+    }
+
+    // --- scrolling the active column ---------------------------------------
+    // The launcher's scroll contract, verbatim where it applies: wheel-driven, with an
+    // edge-takeover band that takes over before the bound and damps into it, a
+    // rubber-band resistance past the bound, and a bounce that settles back.
+    //
+    // `LauncherPage.qml`'s `resultsView` and `LazerSettingsSections.qml` are the two
+    // implementations and they agree on every number below - 80px of takeover, 88px of
+    // overscroll, the same durations and the same eases. Copied rather than re-derived:
+    // this is a list in the same shell with the same pointer, and a scroll that felt
+    // different here would be the most obvious inconsistency in the panel.
+    //
+    // Only the ACTIVE column scrolls. The neighbours are capped by the logic and drawn
+    // whole, so there is nothing to scroll them to - and a wheel that moved them would
+    // desynchronise three columns that are read as one frame.
+    //
+    // `target: null` on the handler: a `WheelHandler` with a target drives that target's
+    // own scroll, and this strip has no `Flickable` to drive - the offset is a plain
+    // property here because the column's `y` is bound to it, so a Flickable would be a
+    // second source of truth for one number.
+    readonly property real edgeTakeoverDistance: 80
+    readonly property real overscrollDistance: 88
+    // True while the edge band is being driven by the wheel, so a wheel that leaves the
+    // band hands the scroll back to the plain path instead of snapping.
+    property bool edgeDriving: false
+    // True while the offset is outside the scrollable range, which is what suppresses
+    // the reveal-on-focus: a row scrolled to under a rubber band is not a row the user
+    // asked to look at.
+    readonly property bool overscrolled: scrollOffset < -0.5
+        || scrollOffset > maxScrollOffset + 0.5
+
+    // Rubber-band resistance, ported from `LauncherPage`'s `_resistedScrollTarget` and
+    // `LazerSettingsSections`' `_resistedTarget`: the further past the bound, the
+    // smaller each additional step becomes, like a spring approaching full tension.
+    function _resistedTarget(current, delta, bound) {
+        const past = Math.max(0, Math.abs(current - bound))
+        const tension = Math.min(1, past / root.overscrollDistance)
+        return current - delta * (1 - tension)
+    }
+
+    function _settleEdge() {
+        edgeDriving = false
+        edgeSettleTimer.stop()
+        settleAnim.to = Math.max(0, Math.min(root.maxScrollOffset, root.scrollOffset))
+        settleAnim.restart()
+    }
+
+    function _cancelEdge() {
+        edgeDriving = false
+        edgeSettleTimer.stop()
+        settleAnim.stop()
+        driveAnim.stop()
+        root.scrollOffset = Math.max(0, Math.min(root.maxScrollOffset, root.scrollOffset))
+    }
+
+    // Keep the offset inside the scrollable range without animating, and without
+    // dragging the reveal into it: this is a correction, not a scroll.
+    function clampScroll() {
+        settleAnim.stop()
+        driveAnim.stop()
+        edgeSettleTimer.stop()
+        revealAnim.stop()
+        edgeDriving = false
+        root.scrollOffset = Math.max(0, Math.min(root.maxScrollOffset, root.scrollOffset))
+    }
+
+    Timer {
+        id: edgeSettleTimer
+        interval: 140
+        repeat: false
+        onTriggered: root._settleEdge()
+    }
+
+    NumberAnimation {
+        id: settleAnim
+        target: root
+        property: "scrollOffset"
+        duration: MotionTokens.reducedMotion ? 0 : 260
+        easing.type: Easing.InOutCubic
+    }
+
+    NumberAnimation {
+        id: driveAnim
+        target: root
+        property: "scrollOffset"
+        duration: MotionTokens.reducedMotion ? 0 : 80
+        easing.type: Easing.OutQuint
+    }
+
+    SequentialAnimation {
+        id: bounceAnim
+        NumberAnimation {
+            id: bounceOut
+            target: root
+            property: "scrollOffset"
+            duration: MotionTokens.reducedMotion ? 0 : 160
+            easing.type: Easing.OutCubic
+        }
+        NumberAnimation {
+            id: bounceBack
+            target: root
+            property: "scrollOffset"
+            duration: MotionTokens.reducedMotion ? 0 : 260
+            easing.type: Easing.InOutCubic
+        }
+    }
+
+    WheelHandler {
+        id: scrollWheel
+        objectName: "windowHintScrollWheel"
+        orientation: Qt.Vertical
+        target: null
+        blocking: false
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: wheel => {
+            let delta = wheel.pixelDelta.y
+            if (delta === 0)
+                delta = wheel.angleDelta.y / 120 * 40
+            if (delta === 0)
+                return
+            root.applyWheel(wheel.angleDelta.y < 0 || wheel.pixelDelta.y < 0,
+                Math.abs(delta))
+        }
+    }
+
+    // One wheel step, `magnitude` in pixels and `scrollingDown` naming the direction.
+    // Split out of `onWheel` so the scroll contract is a FUNCTION the suite can call: a
+    // `WheelHandler` can only be exercised by synthesising real pointer events, which a
+    // QtTest harness cannot do, and a scroll nobody had ever run would be a scroll nobody
+    // had ever seen either. The split is where the EVENT ends and the SCROLL begins.
+    //
+    // The magnitude is unsigned and the direction is the flag, rather than passing the
+    // wheel's own signed delta through: a wheel's `pixelDelta.y` is negative when
+    // scrolling down, so a caller that read "down" from the flag and passed a positive
+    // number would scroll the other way and the mismatch would read as the component
+    // being wrong. One unit here - the flag says which way, the number says how far.
+    function applyWheel(scrollingDown, magnitude) {
+        {
+            const delta = scrollingDown ? -magnitude : magnitude
+            // A crossing replaces the list under the pointer, and a wheel arriving
+            // mid-traverse would scroll a column that is on its way out.
+            if (!root.interactive)
+                return
+            // Nothing to scroll: a workspace whose windows all fit must not swallow the
+            // wheel, because the wheel belongs to whatever is behind the popup.
+            if (root.maxScrollOffset <= 0)
+                return
+            const maximumY = root.maxScrollOffset
+            const nearBottom = scrollingDown
+                && maximumY - root.scrollOffset <= root.edgeTakeoverDistance
+            const nearTop = !scrollingDown && root.scrollOffset <= root.edgeTakeoverDistance
+            if (root.edgeDriving && !nearBottom && !nearTop)
+                root._settleEdge()
+            if (!MotionTokens.reducedMotion && (nearBottom || nearTop)) {
+                // Take over before the bound: chase the delta with a short ease, damped
+                // deeper into the overscroll band so the pull tightens toward the end.
+                edgeDriving = true
+                edgeSettleTimer.restart()
+                settleAnim.stop()
+                let proposed = root.scrollOffset - delta
+                if (proposed < 0)
+                    proposed = root._resistedTarget(root.scrollOffset, delta, 0)
+                else if (proposed > maximumY)
+                    proposed = root._resistedTarget(root.scrollOffset, delta, maximumY)
+                proposed = Math.max(-root.overscrollDistance,
+                    Math.min(maximumY + root.overscrollDistance, proposed))
+                driveAnim.from = root.scrollOffset
+                driveAnim.to = proposed
+                driveAnim.restart()
+                return
+            }
+            if ((!scrollingDown && root.scrollOffset <= 0.5)
+                    || (scrollingDown && root.scrollOffset >= maximumY - 0.5)) {
+                bounceOut.from = root.scrollOffset
+                bounceOut.to = Math.max(-root.overscrollDistance,
+                    Math.min(maximumY + root.overscrollDistance, root.scrollOffset - delta))
+                bounceBack.to = Math.max(0, Math.min(maximumY, bounceOut.to))
+                bounceAnim.restart()
+                return
+            }
+            root.scrollOffset = Math.max(-root.overscrollDistance,
+                Math.min(maximumY + root.overscrollDistance, root.scrollOffset - delta))
+        }
+    }
+
+    // Reveal a row: the smallest scroll that brings it inside the viewport. Called by
+    // the body when the focused window changes, so the marker never points at a row
+    // that is scrolled out of sight.
+    //
+    // Animated on the launcher's programmatic scroll (`scrollTo`): 300ms OutQuint.
+    // Snapped rather than animated while a crossing is in flight or under reduced
+    // motion - a moving target cannot be eased to, and the offset would arrive after
+    // the column it belongs to.
+    function revealRow(index, animated) {
+        if (index < 0 || root.maxScrollOffset <= 0)
+            return
+        const target = HintLogic.revealScrollY(root.scrollOffset,
+            index * root.rowPitch, root.rowHeight, root.viewportHeight,
+            root.maxScrollOffset)
+        if (Math.abs(target - root.scrollOffset) < 0.5)
+            return
+        root._cancelEdge()
+        if (!animated || MotionTokens.reducedMotion || !root.interactive) {
+            root.scrollOffset = target
+            return
+        }
+        revealAnim.from = root.scrollOffset
+        revealAnim.to = target
+        revealAnim.duration = 300
+        revealAnim.restart()
+    }
+
+    NumberAnimation {
+        id: revealAnim
+        target: root
+        property: "scrollOffset"
+        easing.type: Easing.OutQuint
     }
 }

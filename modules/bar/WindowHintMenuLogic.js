@@ -15,9 +15,19 @@
 // already reports which workspace is active, and the list below is countable on
 // screen. Nothing here builds a workspace row for that reason.
 
-// How many window rows the menu shows before it collapses the rest into a
-// "+N more" line. The popup has no scroll surface, and an unbounded list would
-// grow the layer-shell input region once per added window.
+// How many window rows the ACTIVE column shows at once. This is a VIEWPORT
+// height, not a cap on the list: the active column scrolls, so every window in the
+// workspace is reachable and nothing is summarised away.
+//
+// It was a cap - the rest collapsed into a "+N more windows" line - because the panel
+// had no scroll surface and an unbounded list would grow the layer-shell input region
+// once per added window. A viewport answers the same concern from the other side: the
+// panel is this tall no matter how many windows the workspace holds, so the input
+// region is bounded by the viewport rather than by the content.
+//
+// The two neighbour columns still truncate at this many rows, because they do not
+// scroll. They always did, and they never carried the overflow line either - a
+// neighbour states what it has and stops.
 var MAX_WINDOW_ROWS = 5
 
 function _text(value) {
@@ -75,8 +85,9 @@ function windowRows(hint) {
     return rowsFromList(hint ? hint.windows : null)
 }
 
-// Rows plus the count that did not fit, so the "+N more" line is derived from
-// the same cap the renderer uses instead of being recomputed there.
+// Rows plus the count that did not fit. The count is reported so a caller can say
+// whether the list is longer than the viewport without comparing against the cap
+// itself; nothing renders it as text any more.
 function cappedRows(list) {
     var rows = rowsFromList(list)
     if (rows.length <= MAX_WINDOW_ROWS)
@@ -89,7 +100,10 @@ function cappedWindowRows(hint) {
 }
 
 // The three columns the menu lays out: the workspaces either side of the active
-// one, and the active one itself. Each is capped by the same limit so the three
+// one, and the active one itself. The NEIGHBOURS are capped at the viewport height
+// and the ACTIVE column is not, because the active column is the one that scrolls -
+// capping it would put a wall between the user and the windows they came to pick.
+// Each is capped by the same limit so the three
 // read as peers and the panel height is predictable.
 //
 // ALL THREE ALWAYS EXIST, whatever they contain. An earlier version dropped a
@@ -105,7 +119,14 @@ function cappedWindowRows(hint) {
 function cappedColumns(hint) {
     return {
         previous: cappedRows(hint ? hint.previousWindows : null),
-        current: cappedRows(hint ? hint.windows : null),
+        // Every window, uncapped: the active column scrolls to reach them all. `hidden`
+        // still reports how many are past the viewport, which is what tells the renderer
+        // there is anything to scroll - not a summary line, but the scroll contract.
+        current: {
+            rows: rowsFromList(hint ? hint.windows : null),
+            hidden: Math.max(0, rowsFromList(hint ? hint.windows : null).length
+                - MAX_WINDOW_ROWS)
+        },
         next: cappedRows(hint ? hint.nextWindows : null)
     }
 }
@@ -399,9 +420,36 @@ function stripColumns(arriving, leaving, plan) {
     return out
 }
 
-// Overflow line under a capped window list. Empty when everything fit, so the
-// renderer can bind visibility straight to the string.
-function overflowLabel(hidden) {
-    var count = _count(hidden)
-    return count === 0 ? "" : "+" + count + " more " + plural(count, "window", "windows")
+// Where the active column must be scrolled for one row to be visible: the smallest
+// move that brings the row inside the viewport, clamped to the scrollable range.
+//
+// "Smallest move", not "centre it": the launcher centres because it is stepping a
+// selection through a long list under the keyboard, where the next step has to be
+// visible too. Here the scroll exists to reveal a window that niri has already
+// focused, and centring it would move the panel further than it has to - which on a
+// seven-window workspace means scrolling when the row was already on screen.
+//
+// Pure, and the arithmetic the component and the suite both read, so neither holds a
+// private copy of when a row counts as visible.
+function revealScrollY(scrollY, rowTop, rowHeight, viewportHeight, maximumY) {
+    var current = Number(scrollY)
+    if (!isFinite(current))
+        current = 0
+    var top = Number(rowTop)
+    var height = Number(rowHeight)
+    var view = Number(viewportHeight)
+    var limit = Number(maximumY)
+    if (!isFinite(top))
+        return 0
+    if (!isFinite(height) || height <= 0)
+        return Math.max(0, Math.min(isFinite(limit) ? limit : 0, current))
+    if (!isFinite(view) || view <= 0)
+        return 0
+    var target = current
+    if (target > top)
+        target = top
+    else if (target + view < top + height)
+        target = top + height - view
+    var high = isFinite(limit) && limit > 0 ? limit : 0
+    return Math.max(0, Math.min(high, target))
 }
