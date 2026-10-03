@@ -477,7 +477,11 @@ ShellRoot {
     // when the root is asked.
     Timer {
         id: startupFallbackTimer
-        interval: LazerBar.MotionTokens.slow * 10
+        // The boot reveal is a legitimate long step, and nothing reports startup
+        // progress while the circle is growing. The budget therefore covers one
+        // whole reveal on top of the normal stall allowance, so a healthy boot
+        // never trips the watchdog and never gets logged as a degraded one.
+        interval: LazerBar.MotionTokens.slow * 10 + LazerBar.MotionTokens.wallpaperBootReveal
         running: false
         repeat: false
         onTriggered: root.releaseStartupGates("startup-watchdog")

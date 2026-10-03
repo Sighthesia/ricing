@@ -43,6 +43,27 @@ Item {
                    "WallpaperBackground.qml looks truncated")
         }
 
+        // The reveal animation must take both its duration and its curve from the
+        // shared helper rather than deciding inline. An inline literal here is
+        // exactly what the helper exists to prevent: tst_wallpaper_motion_logic
+        // tests the rule, and it can only speak for this file if the file uses it.
+        function test_theRevealAnimationAsksTheSharedHelper() {
+            var body = harness.bodyOf("id: revealAnimation").slice(0, 900)
+            verify(body.length > 0, "revealAnimation must be declared")
+            verify(body.indexOf("MotionLogic.revealDuration(") >= 0,
+                   "the reveal duration must come from the shared helper")
+            verify(body.indexOf("MotionLogic.revealEasing(") >= 0,
+                   "the reveal curve must come from the shared helper")
+            verify(body.indexOf("wallpaperWindow.bootRevealActive") >= 0,
+                   "the two contracts must be told apart by the boot flag")
+            // A hardcoded timing left beside the helper would silently win on
+            // nothing and read as though it were honoured.
+            verify(body.indexOf("duration: MotionTokens.wallpaperSwap") < 0,
+                   "no bare wallpaperSwap duration may sit beside the helper")
+            verify(body.indexOf("Easing.OutCubic") >= 0,
+                   "the live switch keeps its own curve as the helper's fallback")
+        }
+
         // Two fixed slots, not one base image plus a private reveal image: a slot
         // that is re-declared per switch would defeat the whole promotion.
         function test_twoFixedSlotsAreDeclared() {

@@ -816,9 +816,14 @@ Item {
                    root.indexOf("id: startupFallbackTimer") >= 0
                    && root.indexOf("id: startupFallbackTimer") < root.chromeStart
                    && watchdog.indexOf("{ id: startupFallbackTimer") === 0
-                   // The exact budget: long enough for a slow decode plus the
-                   // bar's batches, and token-derived so a retune stays visible.
-                   && watchdog.indexOf("interval: LazerBar.MotionTokens.slow * 10") >= 0
+                   // The exact budget: the normal stall allowance plus one whole
+                   // boot reveal, because nothing reports startup progress while
+                   // the circle is growing. Token-derived so a retune stays
+                   // visible — and the reveal term must be here, or a healthy
+                   // boot trips the watchdog mid-reveal and gets logged degraded.
+                   && watchdog.indexOf(
+                       "interval: LazerBar.MotionTokens.slow * 10"
+                       + " + LazerBar.MotionTokens.wallpaperBootReveal") >= 0
                    // `running` carries only the stop conditions, so the startup
                    // expectation is a gate and never a restart trigger; the
                    // starter timer below is what arms it.

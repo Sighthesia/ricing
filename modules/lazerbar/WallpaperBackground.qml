@@ -7,6 +7,7 @@ import "../../services" as Services
 import "WallpaperReveal.js" as RevealLogic
 import "WallpaperBootLogic.js" as BootLogic
 import "WallpaperSlotLogic.js" as SlotLogic
+import "WallpaperMotionLogic.js" as MotionLogic
 
 // Paint each screen's desktop with the configured wallpaper behind every surface.
 // A switch reveals the incoming wallpaper through a circle that grows from the
@@ -279,8 +280,15 @@ Variants {
                 target: wallpaperWindow
                 property: "revealRadius"
                 to: reveal.coverRadius
-                duration: MotionTokens.wallpaperSwap
-                easing.type: Easing.OutCubic
+                // Two contracts, one animation: the boot open is DymicShell's
+                // slow soft sweep, a live switch stays snappy. The decision is
+                // shared with the test rather than restated here.
+                duration: MotionLogic.revealDuration(wallpaperWindow.bootRevealActive,
+                                                    MotionTokens.wallpaperBootReveal,
+                                                    MotionTokens.wallpaperSwap)
+                easing.type: MotionLogic.revealEasing(
+                    wallpaperWindow.bootRevealActive,
+                    MotionTokens.wallpaperBootRevealEasing, Easing.OutCubic)
 
                 onFinished: {
                     // Read the boot flag before promotion retires this reveal.
