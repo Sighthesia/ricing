@@ -124,7 +124,13 @@ PanelWindow {
     readonly property alias popupItem: popup
     readonly property alias popupContainerItem: popupGeometry
     readonly property alias popupViewportItem: popupViewport
-    readonly property alias contextActions: contextPopupActions
+    // Reads through to the republished handle rather than aliasing it. An alias
+    // target must be an id, and `contextPopupActions` is now an id *inside* the
+    // content slot's Component, which the enclosing scope cannot see - aliasing
+    // it failed the whole config to load with "Invalid alias reference". The
+    // republished property is the same object, one hop further, and stays
+    // defined-null before the first popup instead of undefined.
+    readonly property var contextActions: root.contextPopupActions
 
     // The bodies behind the two slot subtrees - two identities, two action
     // bodies, two context bodies - are the most expensive thing this host
