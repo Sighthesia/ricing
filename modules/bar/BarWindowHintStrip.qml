@@ -6,16 +6,31 @@ import "./WindowHintMenuLogic.js" as HintLogic
 // workspaces, left to right, the active one among them.
 //
 // Instantiated once by the body. A workspace switch is not two copies of this
-// sliding past each other - it is ONE strip, `span + 3` columns wide, travelling
-// by `span` columns so that it begins on the frame being left and ends on the
-// frame arriving. Every workspace position is in the strip exactly once, which is
-// why no window title can be painted twice during the crossing: there is only one
-// place it could be painted from. See `WindowHintMenuLogic.stripPlan`.
+// sliding past each other - it is ONE strip, `span + 3` columns wide, holding
+// every workspace position exactly once, which is why no window title can be
+// painted twice during the crossing: there is only one place it could be painted
+// from. See `WindowHintMenuLogic.stripPlan`.
+//
+// NOTHING HERE IS TRANSLATED. Every column places ITSELF, from
+// `WindowHintMenuLogic.slotX` and `slotWidth`, off one number: how far it is from
+// the workspace the panel is centred on. That number is the body's, it is
+// fractional mid-crossing, and the crossing is nothing more than it running from
+// the workspace being left to the one being moved to - so the arriving column
+// slides in AND widens, the one being left slides out AND narrows, and the band
+// they pass through never moves at all.
+//
+// It was a strip that translated as one object with every column at a uniform
+// `index * columnPitch`, and a uniform pitch is a layout that cannot express a
+// wide middle slot: it has nowhere to put the extra 180px, so the alternative was
+// one card growing over its neighbours' cards. See `slotX` for why this shape
+// cannot overlap at any instant, and why a second switch landing mid-crossing
+// needs no correction at all.
 //
 // The focus highlight and the indicator are NOT here. Focus belongs to the
 // content that is arriving, and the body owns those markers so they can be placed
-// against `activeColumnX` - which moves during a crossing, unlike the columns'
-// slots, which do not.
+// against `activeColumnX` - which is the arriving column's own placement read
+// through the same function its delegate uses, rather than a second guess at where
+// the active slot is.
 //
 // Geometry and vocabulary are passed in rather than measured, so the strip cannot
 // drift from the panel by a pixel, and `columns` is the ordered list the body built
@@ -26,17 +41,28 @@ Item {
 
     // The strip, one entry per workspace position, in order. Each is
     // `{ position, rows, hidden }` as `WindowHintMenuLogic.stripColumns` builds
-    // them.
+    // them. `position` is what the layout below is keyed on - a strip that did not
+    // say which workspace a column was for would have nothing to place it by.
     property var columns: []
     property int columnWidth: HintLogic.COLUMN_WIDTH
-    // Gap between columns, and the pitch it produces.
+    // The active workspace's column is this much wider than a neighbour's, so every
+    // width on this strip is one of two numbers and `slotWidth` is the only thing
+    // that decides between them.
+    property int activeColumnWidth: HintLogic.ACTIVE_COLUMN_WIDTH
+    // Gap between columns, and the pitch two NEIGHBOUR-width columns produce. The
+    // middle slot's pitch is not this: it is the neighbour pitch plus the active
+    // column's extra width, and `rightX` below is where that lands.
     //
     // The columns were flush: one column's right edge was the next one's left edge, so
     // the cards in adjacent columns touched and the three columns read as one block
     // rather than as three workspaces. The bar's workspace widget separates its squares
     // by `inlineGap`, and this is the same token at three times the size.
     property int columnGutter: 0
-    readonly property int columnPitch: columnWidth + columnGutter
+    readonly property int narrowPitch: columnWidth + columnGutter
+    // The right neighbour's left edge: one neighbour, one gutter, the wide middle
+    // column, one gutter. The layout function is handed this rather than deriving
+    // it, so the panel's own arithmetic exists in exactly one place.
+    readonly property real rightX: narrowPitch + activeColumnWidth + columnGutter
     // Padding between the band's edge and the cards inside it, on every side.
     //
     // Horizontal padding inside the cell. `Workspaces.qml` makes its square
@@ -46,9 +72,6 @@ Item {
     // thing it marks. Vertical padding is the body's, since it comes from a different
     // number - see `cellPaddingX` / `cellPaddingY` there.
     property int cellPaddingX: 0
-    // What a column's own content is given: the cell less the padding, which is what
-    // every row, placeholder and overflow line is laid out in.
-    readonly property int cardWidth: Math.max(0, columnWidth - cellPaddingX * 2)
     // Which row of the ACTIVE column holds focus, or -1. The body owns it and places
     // the two shared markers from it; the strip needs it too, because the focused
     // row's tint is the row's own fill and only the row can paint under its content.
@@ -63,13 +86,43 @@ Item {
 
     signal windowActivated(string windowId)
 
-    // Which slot holds the workspace the user is on. Dynamic, and it MOVES during
-    // a crossing: the arriving frame's active column starts off-panel and lands in
-    // the middle. The body reads the same number off the plan it built the strip
-    // from, so the two cannot disagree about which column carries the card fill
-    // and which the focus markers.
+    // Which slot is drawn as CARDS and which as plain labels. The body reads it off
+    // the plan it built the strip from, so the two cannot disagree about which
+    // column carries the card fill.
     property int activeSlot: 1
-    readonly property int activeColumnX: activeSlot * columnPitch
+    // The workspace the focus markers belong to: the arriving frame's active one. A
+    // DIFFERENT column from the one `activeSlot` picks at the start of a crossing -
+    // it is off-panel then, and arrives in the middle.
+    property int activePosition: 0
+    // The workspace the panel is CENTRED on, fractionally. Whole at rest, a real
+    // fraction in the middle of a crossing, and the only thing that moves: every
+    // column here is a pure function of it.
+    property real panelPosition: 0
+
+    // The arriving column's own placement, read through the SAME function its own
+    // delegate uses. It used to be `activeSlot * columnPitch`, a number in the
+    // strip's uniform pitch rather than in the layout - and with a wide middle slot
+    // those are not the same number, so a second guess here would have been a second
+    // chance to be wrong.
+    readonly property real activeColumnX: columnXFor(root.activePosition)
+    readonly property real activeColumnWidthNow: columnWidthFor(root.activePosition)
+    // The focused row's card width: the active column less its own padding. A
+    // function of the clock like the column's x, because the outline drawn around
+    // that row has to be exactly as wide as the row at every instant of a crossing,
+    // not merely at its ends.
+    readonly property real activeCardWidth: Math.max(
+        0, activeColumnWidthNow - cellPaddingX * 2)
+
+    function columnXFor(position) {
+        return HintLogic.slotX(position - root.panelPosition,
+            root.narrowPitch, root.rightX)
+    }
+
+    function columnWidthFor(position) {
+        return HintLogic.slotWidth(position - root.panelPosition,
+            root.columnWidth, root.activeColumnWidth)
+    }
+
     // The tallest column on the strip, read off the live delegates. The panel is
     // sized from this, so it has to be the real laid-out height rather than a
     // prediction from the row counts - a column's height includes its overflow line
@@ -90,13 +143,12 @@ Item {
         return tallest
     }
 
-    // One delegate per workspace position. `x` is DERIVED from the index rather
-    // than accumulated by a `Row`: a positioner's layout lands after the frame that
-    // created the delegate, and a column's width is a binding that can resolve a
-    // beat after the list is replaced, so a positioner would polish against a
-    // stale width and - because nothing about the columns then changes again -
-    // never re-lay-out. Derived x cannot go stale, and a strip that is translated
-    // as one object needs every column to know its own offset from the strip.
+    // One delegate per workspace position. Both `x` and `width` are DERIVED from the
+    // workspace the column is for and the one the panel is centred on - not
+    // accumulated by a `Row`, and not read back from a sibling's geometry. A
+    // positioner would lay out against a stale width in any case (its pass lands
+    // after the frame that created the delegate), and because nothing about the
+    // columns then changes again it would never re-lay-out.
     Repeater {
         id: columnRepeater
         model: root.columns
@@ -110,10 +162,21 @@ Item {
             required property int index
             required property var modelData
 
-            x: stripColumn.index * root.columnPitch
-            width: root.columnWidth
+            // Placed by the layout function. Both numbers move during a crossing
+            // and neither is a transform: the column genuinely travels to a new
+            // place at a new size, which is why the width change comes free here
+            // instead of needing a scale or a second clock.
+            x: root.columnXFor(stripColumn.modelData.position)
+            width: root.columnWidthFor(stripColumn.modelData.position)
             spacing: root.listSpacing
             readonly property bool isActiveSlot: stripColumn.index === root.activeSlot
+            // What a column's own content is given: the column less its padding,
+            // which is what every row, placeholder and overflow line is laid out in.
+            // A property rather than a binding repeated at each use, so the row, the
+            // label, the placeholder and the overflow line cannot be given three
+            // different widths on a frame where the column is mid-resize.
+            readonly property real cardWidth: Math.max(
+                0, stripColumn.width - root.cellPaddingX * 2)
 
             // Window rows: cards in the active column, plain labels either side.
             // Two Repeaters over mutually exclusive models rather than one
@@ -135,7 +198,7 @@ Item {
 
                     objectName: "windowHintWindowRow"
                     x: root.cellPaddingX
-                    width: root.cardWidth
+                    width: stripColumn.cardWidth
                     height: root.rowHeight
                     radius: 6
                     transformOrigin: Item.Center
@@ -257,7 +320,7 @@ Item {
                 BarWindowHintLabel {
                     objectName: "windowHintNeighbourRow"
                     x: root.cellPaddingX
-                    width: root.cardWidth
+                    width: stripColumn.cardWidth
                     // `modelData` / `index` are declared as required properties on
                     // the label, so the delegate model fills them. Binding them here
                     // would point each one at ITSELF.
@@ -276,7 +339,7 @@ Item {
             BarWindowHintEmpty {
                 objectName: "windowHintColumnEmpty"
                 x: root.cellPaddingX
-                width: root.cardWidth
+                width: stripColumn.cardWidth
                 rowHeight: root.rowHeight
                 visible: !stripColumn.modelData
                     || stripColumn.modelData.rows.length === 0
@@ -288,7 +351,7 @@ Item {
             Text {
                 objectName: "windowHintOverflow"
                 x: root.cellPaddingX
-                width: root.cardWidth
+                width: stripColumn.cardWidth
                 visible: stripColumn.isActiveSlot && stripColumn.modelData
                     ? HintLogic.overflowLabel(stripColumn.modelData.hidden) !== ""
                     : false

@@ -11,6 +11,26 @@ Item {
     width: 400
     height: 400
 
+    // The panel's own measurements, as LITERALS, because they are what the layout
+    // function below is checked against and reading them back off `Hint` would let a
+    // change to the function be satisfied by a change to the constants it is measured
+    // against. Spelled out: a neighbour 180, a gutter 6, the active column 360.
+    //
+    //   |<-180-| -6- |<-  360  ->|-6-| <-180-|
+    //   0      186  186        546 552     732
+    //
+    // `PITCH` is two NEIGHBOUR columns and the gutter between them; `BAND_X` is the
+    // wide middle slot's left edge, which is the band's own x; `RIGHT_X` is the right
+    // neighbour's left edge. The layout function is handed the last two rather than
+    // deriving them, so these are the numbers it has to place columns between.
+    readonly property int narrowCol: 180
+    readonly property int gutter: 6
+    readonly property int wideCol: 360
+    readonly property int pitch: 186
+    readonly property int bandX: 186
+    readonly property int rightX: 552
+    readonly property int panelW: 732
+
     // A snapshot shaped exactly like WindowHintService's, so a change to the
     // service's contract has to be made here too.
     function makeHint(overrides) {
@@ -248,11 +268,212 @@ Item {
         }
 
         function test_columnWidthIsAFixedColumnSize() {
-            // The panel's width is this times the column count, and neither varies,
-            // so the two are independent numbers rather than one derived from the
-            // other. That is what makes the panel a fixed frame.
-            compare(Hint.COLUMN_WIDTH, 180)
-            compare(Hint.COLUMN_WIDTH * Hint.COLUMN_COUNT, 540, "a full panel")
+            // A NEIGHBOUR's width is the panel's unit and it does not vary, which is
+            // what makes the panel a fixed frame. It is no longer the whole panel:
+            // the active column is twice this, so `COLUMN_WIDTH * COLUMN_COUNT` is
+            // NOT a full panel any more, and that is the change this suite has to
+            // pin rather than let pass by accident.
+            compare(Hint.COLUMN_WIDTH, root.narrowCol)
+            compare(Hint.ACTIVE_COLUMN_SCALE, 2, "the active column is twice a neighbour's")
+            compare(Hint.ACTIVE_COLUMN_WIDTH, root.wideCol,
+                "which is " + Hint.COLUMN_WIDTH + " * " + Hint.ACTIVE_COLUMN_SCALE)
+            compare(Hint.ACTIVE_COLUMN_WIDTH, Hint.COLUMN_WIDTH * 2,
+                "and the scale is the only thing that turns one into the other")
+            compare(Hint.COLUMN_WIDTH * Hint.COLUMN_COUNT, 540,
+                "three neighbours would be 540, which the panel is not")
+        }
+
+        function test_panelWidth_isTheWideMiddleBetweenTwoNeighbours() {
+            // A neighbour, a gutter, the active column, a gutter, a neighbour - and
+            // the band sits in the middle one, so a panel width computed any other way
+            // leaves the band's right edge a whole gutter out from the surface while
+            // its left edge is exactly `barWidgetGutter` from the other side.
+            compare(Hint.panelWidth(root.narrowCol, root.wideCol, root.gutter), root.panelW)
+            // Spelled out rather than derived from `Hint`, so the layout and the panel
+            // that shows it cannot be changed together and stay consistent by accident.
+            compare(Hint.panelWidth(root.narrowCol, root.wideCol, root.gutter),
+                root.narrowCol + root.gutter + root.wideCol + root.gutter + root.narrowCol,
+                "neighbour, gutter, active, gutter, neighbour")
+            compare(Hint.panelWidth(root.narrowCol, root.wideCol, root.gutter),
+                root.bandX + root.wideCol + root.gutter + root.narrowCol,
+                "which puts the band's right edge one gutter before the panel's")
+            // Two equal columns would be a smaller panel by exactly the active
+            // column's extra width, which is the mistake this is here to catch.
+            verify(Hint.panelWidth(root.narrowCol, root.wideCol, root.gutter)
+                    - Hint.panelWidth(root.narrowCol, root.narrowCol, root.gutter) === root.wideCol - root.narrowCol,
+                "and a panel of three equal columns is short by the difference")
+        }
+
+        // ---- the layout function -----------------------------------------
+        // `slotX` and `slotWidth` answer one question: given a column's distance -
+        // in workspaces, and fractional - from the workspace the panel is centred on,
+        // where is it and how wide is it. The crossing is that distance running from
+        // one workspace to the next, and nothing else moves.
+
+        function test_slotGeometry_putsTheActiveColumnInTheWideMiddleSlot() {
+            compare(Hint.slotX(0, root.pitch, root.rightX), root.bandX,
+                "the active column starts at the band's own x")
+            compare(Hint.slotWidth(0, root.narrowCol, root.wideCol), root.wideCol,
+                "and is the wide column")
+            compare(Hint.slotX(-1, root.pitch, root.rightX), 0,
+                "the left neighbour sits at the panel's left edge")
+            compare(Hint.slotX(1, root.pitch, root.rightX), root.rightX,
+                "the right neighbour one active column further on")
+            compare(Hint.slotWidth(-1, root.narrowCol, root.wideCol), root.narrowCol,
+                "and both neighbours are narrow")
+            compare(Hint.slotWidth(1, root.narrowCol, root.wideCol), root.narrowCol)
+        }
+
+        function test_slotGeometry_widensOnTheWayInAndNarrowsOnTheWayOut() {
+            // The width change the crossing is drawn with. Halfway between two
+            // workspaces, both columns are exactly halfway between the two widths -
+            // which is the arithmetic that makes the pair swap without overlapping.
+            var half = Hint.slotWidth(0.5, root.narrowCol, root.wideCol)
+            compare(half, (root.narrowCol + root.wideCol) / 2,
+                "a column halfway out is halfway between the widths")
+            compare(Hint.slotWidth(0.25, root.narrowCol, root.wideCol),
+                root.narrowCol + (root.wideCol - root.narrowCol) * 0.75,
+                "and a quarter of the way OUT from the active column is three quarters "
+                    + "of the way back to a neighbour's")
+            // Monotone all the way in and all the way out, so a column never grows
+            // and shrinks inside one crossing - which would read as a mistake rather
+            // than as motion. Walking `rel` DOWN towards zero is walking towards the
+            // middle of the panel, so the width climbs; walking it away, it falls.
+            var previous = Hint.slotWidth(1, root.narrowCol, root.wideCol)
+            compare(previous, root.narrowCol, "it starts at a neighbour's width")
+            for (var step = 1; step <= 20; ++step) {
+                var width = Hint.slotWidth(1 - step / 20, root.narrowCol, root.wideCol)
+                verify(width > previous, "still widening at rel " + (1 - step / 20) + ", was " + width)
+                previous = width
+            }
+            compare(previous, root.wideCol, "and it arrives at the active column's width")
+            previous = Hint.slotWidth(0, root.narrowCol, root.wideCol)
+            for (step = 1; step <= 20; ++step) {
+                width = Hint.slotWidth(-step / 20, root.narrowCol, root.wideCol)
+                verify(width < previous, "still narrowing at rel " + (-step / 20) + ", was " + width)
+                previous = width
+            }
+            compare(previous, root.narrowCol, "and it leaves at a neighbour's")
+            compare(Hint.slotWidth(-1, root.narrowCol, root.wideCol), root.narrowCol,
+                "and that is the neighbour's width, from either side")
+        }
+
+        function test_slotGeometry_isContinuousWhereTheSlopeChanges() {
+            // `slotX` and `slotWidth` are piecewise, so a boundary whose two sides
+            // disagreed would be a column that JUMPS as the crossing passes it - the
+            // one thing a crossing described as continuous cannot have. Every
+            // boundary, and both sides of it, because the pieces meet at -1, 0 and 1
+            // and nowhere else.
+            //
+            // Sampled a billionth either side of the boundary and compared against
+            // the boundary's own answer, which is the limit rather than a sample of
+            // it. The tolerance is far tighter than the steepest slope in this layout
+            // (366) can produce at that distance, and far wider than the representation
+            // error of a number this size - so it cannot pass by being vague, and it
+            // is not testing the last bits of a double.
+            var epsilon = 1e-9
+            var tolerance = 1e-6
+            for (var boundary = -4; boundary <= 4; ++boundary) {
+                var atX = Hint.slotX(boundary, root.pitch, root.rightX)
+                verify(Math.abs(Hint.slotX(boundary + epsilon, root.pitch, root.rightX) - atX) < tolerance
+                        && Math.abs(Hint.slotX(boundary - epsilon, root.pitch, root.rightX) - atX) < tolerance,
+                    "x is continuous at rel " + boundary + ", was " + atX)
+                var atW = Hint.slotWidth(boundary, root.narrowCol, root.wideCol)
+                verify(Math.abs(Hint.slotWidth(boundary + epsilon, root.narrowCol, root.wideCol) - atW) < tolerance
+                        && Math.abs(Hint.slotWidth(boundary - epsilon, root.narrowCol, root.wideCol) - atW) < tolerance,
+                    "and so is the width at rel " + boundary + ", was " + atW)
+            }
+        }
+
+        function test_slotGeometry_marchesOffPanelColumnsAtNeighbourWidth() {
+            // A crossing's strip is `span + 3` columns and the panel is three, so up
+            // to three columns are outside the panel at any instant. They are content,
+            // not decoration: they have to keep their own width and keep stepping by
+            // the neighbour pitch, or the run would not be a run and the column that
+            // is on its way IN would arrive at the wrong place.
+            for (var rel = 2; rel <= 6; ++rel) {
+                compare(Hint.slotWidth(rel, root.narrowCol, root.wideCol), root.narrowCol,
+                    "rel " + rel + " is neighbour-width")
+                compare(Hint.slotX(rel, root.pitch, root.rightX),
+                    root.rightX + (rel - 1) * root.pitch,
+                    "and steps on by the neighbour pitch")
+                compare(Hint.slotX(-rel, root.pitch, root.rightX), -(rel - 1) * root.pitch,
+                    "the other way: rel " + (-rel) + " is off to the left")
+                compare(Hint.slotWidth(-rel, root.narrowCol, root.wideCol), root.narrowCol)
+            }
+        }
+
+        function test_theGapBetweenTwoColumnsIsTheGutterAtEveryInstantOfACrossing() {
+            // The property that makes this layout safe rather than merely pretty.
+            //
+            // Both ends of a crossing are contiguous layouts of the same run of
+            // workspaces - column i's right edge is column i+1's left edge less the
+            // gutter - and interpolating each column's OWN x and width between those
+            // two answers keeps them contiguous, because a lerp of differences is the
+            // difference of lerps. So no two cards ever overlap, and the widest bare
+            // strip the panel can show at any instant is one inter-card gap: which is
+            // exactly the guarantee "the panel is never left uncovered" is stated in.
+            //
+            // Swept over every span, both directions, every column of the strip and
+            // forty-one samples along the crossing. One case of it would prove
+            // nothing about the family.
+            var samples = 0
+            for (var span = 1; span <= Hint.MAX_SWITCH_SPAN; ++span) {
+                for (var direction = 0; direction < 2; ++direction) {
+                    var from = direction === 0 ? 2 : 6
+                    var to = direction === 0 ? 2 + span : 6 - span
+                    var plan = Hint.stripPlan(from, to)
+                    for (var step = 0; step <= 40; ++step) {
+                        var q = step / 40
+                        var centre = plan.fromPosition
+                            + (plan.toPosition - plan.fromPosition) * q
+                        var right = 0
+                        for (var slot = 0; slot < plan.slots; ++slot) {
+                            var rel = (plan.base + slot) - centre
+                            var x = Hint.slotX(rel, root.pitch, root.rightX)
+                            var width = Hint.slotWidth(rel, root.narrowCol, root.wideCol)
+                            if (slot > 0)
+                                verify(Math.abs(x - right - root.gutter) < 1e-6,
+                                    "span " + span + " dir " + direction + " q " + q
+                                        + ": slot " + slot + " sits exactly one gutter ("
+                                        + root.gutter + ") from the one before, was "
+                                        + (x - right))
+                            right = x + width
+                            samples++
+                        }
+                    }
+                }
+            }
+            verify(samples > 1000,
+                "and the sweep was wide enough to be worth something, was " + samples)
+        }
+
+        function test_aCrossingNeverOverlapsTwoCards() {
+            // The other half of the same claim, stated as its consequence rather than
+            // as arithmetic: the strip is what it is for, and two cards sharing pixels
+            // during a crossing is the fault the whole geometry was chosen to avoid.
+            // Half a step either side of every boundary of every crossing, which is
+            // where a layout with a discontinuity would show it.
+            for (var span = 1; span <= Hint.MAX_SWITCH_SPAN; ++span) {
+                for (var direction = 0; direction < 2; ++direction) {
+                    var from = direction === 0 ? 2 : 6
+                    var to = direction === 0 ? 2 + span : 6 - span
+                    var plan = Hint.stripPlan(from, to)
+                    for (var half = 0; half <= 40; ++half) {
+                        var centre = from + (to - from) * (half / 40)
+                        var previousRight = -1e9
+                        for (var slot = 0; slot < plan.slots; ++slot) {
+                            var rel = (plan.base + slot) - centre
+                            var x = Hint.slotX(rel, root.pitch, root.rightX)
+                            var width = Hint.slotWidth(rel, root.narrowCol, root.wideCol)
+                            verify(x >= previousRight,
+                                "span " + span + " dir " + direction + " half " + half
+                                    + ": slot " + slot + " does not overlap the one before")
+                            previousRight = x + width
+                        }
+                    }
+                }
+            }
         }
 
         function test_focusedIndexIn_readsARowList() {
@@ -311,32 +532,45 @@ Item {
             }
         }
 
-        function test_stripPlan_putsTheActiveColumnInTheMiddleAtBothEnds() {
-            // The claim the whole crossing rests on, and it is stated as the two
-            // ends rather than as a sign: at progress 0 the workspace being left is
-            // in the panel's middle column, and at progress 1 the workspace being
-            // moved to is. A strip is `span + 3` columns wide and the panel is
-            // three, so "column 1" is not the middle of the strip - it is the middle
-            // of the PANEL, which is what `startColumn` and `endColumn` are for.
+        function test_stripPlan_centresTheActiveWorkspaceAtBothEndsOfTheCrossing() {
+            // The claim the whole crossing rests on, restated for a layout whose
+            // slots have two different widths. There is no strip that translates by a
+            // number of columns any more: every column places itself from how far it
+            // is from the workspace the panel is centred on, so "in the middle" means
+            // "at the band's left edge, at the active column's width".
+            //
+            // Both ends, and from the geometry rather than from a field of the plan -
+            // the plan's own numbers are asserted in the test below, so asserting
+            // them here would only be checking that the plan is its own definition.
             for (var span = 1; span <= Hint.MAX_SWITCH_SPAN; ++span) {
                 for (var direction = 0; direction < 2; ++direction) {
                     var from = direction === 0 ? 1 : 6
                     var to = direction === 0 ? 1 + span : 6 - span
                     var plan = Hint.stripPlan(from, to)
-                    // Slot `s` sits at panel column `s + offset`, so the middle is
-                    // reached when the offset is `1 - s`.
-                    var leavingSlot = from - plan.base
-                    var arrivingSlot = to - plan.base
-                    compare(plan.startColumn, 1 - leavingSlot,
-                        "span " + span + " dir " + direction
-                            + ": starts with the leaving workspace in the middle")
-                    compare(plan.endColumn, 1 - arrivingSlot,
-                        "span " + span + " dir " + direction
-                            + ": and ends with the arriving one there")
-                    compare(leavingSlot + plan.startColumn, 1,
-                        "span " + span + " dir " + direction + ": which is column 1")
-                    compare(arrivingSlot + plan.endColumn, 1,
-                        "span " + span + " dir " + direction + ": at both ends")
+                    var tag = "span " + span + " dir " + direction
+                    // At the start of the leg the workspace being left is the one the
+                    // panel is centred on, so it is in the middle at its full width.
+                    compare(Hint.slotX(from - plan.fromPosition, root.pitch, root.rightX),
+                        root.bandX, tag + ": the workspace being left starts in the middle")
+                    compare(Hint.slotWidth(from - plan.fromPosition, root.narrowCol, root.wideCol),
+                        root.wideCol, tag + ": at the active column's width")
+                    // At the end the arriving one is. No special case for either
+                    // direction, which is the point of keying the layout on the
+                    // workspace rather than on the direction of travel.
+                    compare(Hint.slotX(to - plan.toPosition, root.pitch, root.rightX),
+                        root.bandX, tag + ": and the arriving one ends there")
+                    compare(Hint.slotWidth(to - plan.toPosition, root.narrowCol, root.wideCol),
+                        root.wideCol, tag + ": at the same width")
+                    // And for the whole of the travel before that it is NOT in the
+                    // middle, which is what makes the crossing a crossing: the card
+                    // column arrives from the side rather than changing under the
+                    // reader. Halfway is the widest honest sample of that.
+                    compare(Hint.slotWidth(to - plan.fromPosition, root.narrowCol, root.wideCol),
+                        root.narrowCol,
+                        tag + ": while it is still off to the side it is neighbour-width")
+                    verify(Hint.slotX(to - plan.fromPosition, root.pitch, root.rightX)
+                            !== root.bandX,
+                        tag + ": and not in the middle yet")
                 }
             }
         }
@@ -385,6 +619,13 @@ Item {
                     var plan = Hint.stripPlan(from, to)
                     compare(plan.activeSlot, to - plan.base,
                         "span " + span + " dir " + direction + ": the arriving position's slot")
+                    compare(plan.activePosition, to,
+                        "span " + span + " dir " + direction
+                            + ": and the markers belong to that workspace")
+                    compare(plan.fromPosition, from,
+                        "span " + span + " dir " + direction + ": the leg starts where the panel was")
+                    compare(plan.toPosition, to,
+                        "span " + span + " dir " + direction + ": and ends where it is going")
                     verify(plan.activeSlot >= 0 && plan.activeSlot < plan.slots,
                         "span " + span + " dir " + direction + ": and it is on the strip, was "
                             + plan.activeSlot)
@@ -434,8 +675,9 @@ Item {
             compare(rest.activeSlot, 1, "active in the middle")
             compare(rest.base, 3, "based at the active position's predecessor")
             compare(rest.span, 0, "and nowhere to travel")
-            compare(rest.startColumn, 0, "starting at home")
-            compare(rest.endColumn, 0, "which is where it ends")
+            compare(rest.fromPosition, 4, "the panel is centred on it")
+            compare(rest.toPosition, 4, "at both ends of a crossing that goes nowhere")
+            compare(rest.activePosition, 4, "and the markers are its own")
             // A snapshot with no active workspace yet cannot say where its columns
             // are, and says so rather than inventing a frame.
             compare(Hint.restPlan(null), null)
@@ -553,85 +795,6 @@ Item {
                 compare(byPosition[position].hidden, 3,
                     "position " + position + " and reports the rest")
             }
-        }
-
-        function test_stripReshift_isTheDifferenceBetweenTheTwoBases() {
-            // The mid-crossing re-aim, stated from its two bases. It is NOT a function
-            // of the direction of the move, and the arithmetic is the interesting part:
-            // continuing forwards drops the workspace behind the one now being left and
-            // gains one ahead, so even a same-direction re-aim renumbers the strip.
-            // Only a re-aim landing on the same run of workspaces needs no correction.
-            compare(Hint.stripReshift(Hint.stripPlan(1, 2), Hint.stripPlan(2, 3)), -1,
-                "onwards: the union moved right, so the strip gives back one column")
-            compare(Hint.stripReshift(Hint.stripPlan(1, 2), Hint.stripPlan(2, 0)), 1,
-                "backwards past the origin: the union grew left, so the strip gives one")
-            compare(Hint.stripReshift(Hint.stripPlan(1, 2), Hint.stripPlan(2, 1)), 0,
-                "arriving back at the origin re-uses the same run: no correction")
-            compare(Hint.stripReshift(Hint.stripPlan(4, 2), Hint.stripPlan(2, 4)), 0,
-                "and a mirror-image pair does too")
-            // The sign is the base's, so going back the other way is the negation -
-            // the correction has to be reversible in that sense.
-            var first = Hint.stripPlan(1, 3)
-            var second = Hint.stripPlan(3, 5)
-            compare(Hint.stripReshift(first, second), -Hint.stripReshift(second, first),
-                "and the correction is the opposite in reverse")
-            // No previous plan means no renumbering to correct: a fresh crossing starts
-            // from the resting strip, which has no slots to renumber.
-            compare(Hint.stripReshift(null, second), 0, "nothing to correct from")
-            compare(Hint.stripReshift(first, null), 0, "nor to")
-        }
-
-        function test_stripReshift_holdsEveryColumnStillAcrossAReAim() {
-            // What the correction is FOR, asserted on the arithmetic the component
-            // uses: a column's position on the panel is its slot plus the strip's
-            // offset, and the re-aim changes both - the slot because the strip is
-            // renumbered, the offset because the motion continues from where it is -
-            // so the sum must not change. Swept over every re-aim of every width in
-            // both directions, because the property is about the pair of plans and
-            // there is no reason to trust one case of it.
-            var sweeps = 0
-            for (var span = 1; span <= Hint.MAX_SWITCH_SPAN; ++span) {
-                for (var direction = 0; direction < 2; ++direction) {
-                    var from = direction === 0 ? 2 : 6
-                    var to = direction === 0 ? 2 + span : 6 - span
-                    var first = Hint.stripPlan(from, to)
-                    for (var secondTo = 0; secondTo <= 6; ++secondTo) {
-                        if (secondTo === to)
-                            continue
-                        var second = Hint.stripPlan(to, secondTo)
-                        if (!second)
-                            continue
-                        var reshift = Hint.stripReshift(first, second)
-                        // Mid-crossing: the strip is some way along its own travel and
-                        // the re-aim continues from exactly there, not from the new
-                        // plan's start. 0.4 is the head share, so this is the state the
-                        // strip is in when the fastest part of the crossing is over.
-                        var progress = 0.4
-                        var offset = first.startColumn
-                            + (first.endColumn - first.startColumn) * progress
-                        for (var position = first.base; position < first.base + first.slots; ++position) {
-                            var before = (position - first.base) + offset
-                            var after = (position - second.base) + (offset - reshift)
-                            compare(after, before,
-                                "span " + span + " dir " + direction + " to " + secondTo
-                                    + ": position " + position + " held still")
-                            sweeps++
-                            // And what it would be WITHOUT the correction, so the
-                            // assertion above is about the compensation rather than
-                            // about nothing happening by luck.
-                            if (reshift !== 0) {
-                                var uncorrected = (position - second.base) + offset
-                                verify(uncorrected !== before,
-                                    "span " + span + " dir " + direction + " to " + secondTo
-                                        + ": uncorrected, position " + position
-                                        + " would move by " + reshift + " column(s)")
-                            }
-                        }
-                    }
-                }
-            }
-            verify(sweeps > 100, "and the sweep was wide enough to be worth something, was "
-                + sweeps)
         }
 
         // ---- what the menu deliberately does not build -------------------

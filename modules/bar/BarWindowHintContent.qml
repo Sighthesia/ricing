@@ -6,11 +6,11 @@ import "./WindowHintMenuLogic.js" as HintLogic
 // are on. Rendered inside the bar's popup, so it reuses the popup's surface
 // colors, section fill and shared reveal instead of owning a surface of its own.
 //
-// A workspace switch is a WHOLE-BODY displacement: the strip travels by exactly
-// as many columns as the workspace moved, once, without turning back, and it
-// carries BOTH frames with it. The panel is a three-column window onto the strip;
-// the strip is `span + 3` columns wide, so while it travels there is always a full
-// panel's worth of it under the window and the panel is never less than covered.
+// A workspace switch is a WHOLE-BODY displacement: the crossing travels by exactly
+// as many workspaces as the user moved, once, without turning back, and it carries
+// BOTH frames with it. The panel is a three-column window onto the strip; the strip
+// is `span + 3` columns wide, so while it travels there is always a full panel's
+// worth of it under the window and the panel is never less than covered.
 //
 // Why one strip and not two copies crossing. The panel is a three-column frame of
 // CONSECUTIVE workspaces, so the frame being left and the frame arriving share
@@ -31,8 +31,18 @@ import "./WindowHintMenuLogic.js" as HintLogic
 // Only the arriving copy's content carries the focus highlight and the indicator.
 // Focus belongs to the workspace you are moving to, and a marker on a column
 // still on its way out would blink a second time for a workspace you have already
-// left. Both travel WITH the strip, so the marker and the row it marks cross
-// together.
+// left. Both are placed against the arriving column's own geometry - read through
+// the same layout function the column itself uses - so the marker and the row it
+// marks cross together AND change width together, at every instant of the
+// crossing rather than only at its ends.
+//
+// THE ACTIVE COLUMN IS TWICE AS WIDE AS EITHER NEIGHBOUR, and that is what the
+// crossing is drawn with. The workspace you are ON is the one whose windows you
+// opened the panel to choose from, so it gets the room; the neighbours are context
+// for it. The band is the wide middle slot and never moves, and the two columns
+// either side of it trade places through it - one narrowing on the way out, one
+// widening on the way in - because both are one layout function evaluated at two
+// points along a single workspace's travel. See `HintLogic.slotX`.
 Item {
     id: root
 
@@ -72,17 +82,28 @@ Item {
     property var plan: null
 
     readonly property bool ready: root.shownReady
-    // Three columns of one fixed width, always. The count does not vary with the
-    // content: the active workspace sits in the middle, and it can only stay in the
-    // middle if the frame around it is the same size whatever the neighbours are
-    // running. It also means the panel does not resize under the pointer as the
-    // user moves between an interior workspace and an edge one.
+    // Two column widths, because there are two sizes. A neighbour's is the panel's
+    // unit; the active workspace's is twice it, which is the only asymmetry in the
+    // panel - see `WindowHintMenuLogic.ACTIVE_COLUMN_SCALE` for why it is there.
+    //
+    // Neither varies with the content: the active workspace sits in the middle, and
+    // it can only stay in the middle if the frame around it is the same size whatever
+    // the neighbours are running. It also means the panel does not resize under the
+    // pointer as the user moves between an interior workspace and an edge one.
     readonly property int columnWidth: HintLogic.COLUMN_WIDTH
-    // Gap between the three columns, and the pitch it produces. `inlineGap` is the
-    // bar's workspace widget's own spacing between its squares - see
-    // `BarWindowHintStrip.columnGutter` for why the panel needs one.
+    readonly property int activeColumnWidth: HintLogic.ACTIVE_COLUMN_WIDTH
+    // Gap between the three columns, and the pitch two NEIGHBOUR-width columns
+    // produce. `inlineGap` is the bar's workspace widget's own spacing between its
+    // squares - see `BarWindowHintStrip.columnGutter` for why the panel needs one.
     readonly property int columnGutter: LazerTheme.inlineGap
-    readonly property int columnPitch: columnWidth + columnGutter
+    readonly property int narrowPitch: columnWidth + columnGutter
+    // The panel's own width: a neighbour, a gutter, the wide middle column, a
+    // gutter, a neighbour. Computed by the same function the strip's layout is
+    // measured against, so the band below - which spans that middle column - cannot
+    // land one gutter out from the right edge while its left edge is exactly
+    // `bandInset` from the left.
+    readonly property int panelWidth: HintLogic.panelWidth(
+        columnWidth, activeColumnWidth, columnGutter)
     // Margins, each lifted from the widget rather than chosen here:
     //
     //   band   -> panel edge   `LazerTheme.barWidgetGutter`   3
@@ -125,38 +146,52 @@ Item {
     // keeps rounding for component details, and a full-height column band is a band.
     readonly property int bandRadius: 0
     // How far the band swells at the middle of a crossing, as a share of its size.
-    // 2% is about 3.6px across a 180px column, which reads as a pulse rather than as
-    // a zoom, and stays inside the 6px gutter at either side so it never touches a
-    // neighbour's cards.
+    // 2% of the active column's 360 is 7.2px across - 3.6px a side - which reads as a
+    // pulse rather than as a zoom, and stays inside the 6px gutter at either side so
+    // it never touches a neighbour's cards. The share rather than a pixel count is
+    // what keeps that true: this was written when the band was a 180px column and the
+    // same 2% was 1.8px a side, and a literal would have had to be re-derived every
+    // time the active column's width changed.
     readonly property real bandPulse: 0.02
-    // Where the band sits: the panel's middle column, always.
+    // Where the band sits: the panel's middle column, always, and it is the WIDE one.
     //
-    // The active workspace's column is ALWAYS the panel's middle one - the strip
-    // travels precisely so that the arriving active column lands there. So the band
-    // has no reason to move, and moving it is what broke it twice: glued to the
-    // strip's active SLOT it teleported a whole column at the start of a crossing and
-    // had to slide back (measured: 161px in one frame), and given a clock of its own
-    // it jumped at the end instead, because the body snaps the strip's offset there.
+    // The active workspace's column is ALWAYS the panel's middle one - the crossing
+    // runs precisely so that the arriving active column lands there. So the band has
+    // no reason to move, and moving it is what broke it twice: glued to the strip's
+    // active SLOT it teleported a whole column at the start of a crossing and had to
+    // slide back (measured: 161px in one frame), and given a clock of its own it
+    // jumped at the end instead, because the body snaps the strip's offset there.
     //
     // Anchored to the panel, both jumps are impossible - there is nothing to be out of
-    // step with. The crossing is expressed by the band swelling on the crossing's own
-    // progress, which is a pure function of the one clock.
-    readonly property real bandX: columnPitch
+    // step with. The crossing is expressed by the two columns trading places THROUGH
+    // the band, and by the band swelling on the crossing's own progress, which is a
+    // pure function of the one clock.
+    readonly property real bandX: narrowPitch
     readonly property real bandScale: 1
         + Math.sin(Math.PI * slideProgress) * bandPulse
     readonly property int shownColumnCount: HintLogic.COLUMN_COUNT
-    // Where the strip's travel starts and ends, in pixels, and the offset as a
-    // function of the one clock. Computed rather than animated per layer because
-    // there is one object moving: the strip.
+    // The two ends of the crossing as WORKSPACE POSITIONS, and the position in
+    // between - which is the whole animation.
     //
-    // At progress q the strip's offset is `slideFrom + (slideTo - slideFrom) * q`,
-    // and the plan's start and end are the offsets at which the active workspace
-    // sits in the panel's middle column - at both ends, by construction, so neither
-    // direction needs a case.
-    property real slideFrom: 0
-    property real slideTo: 0
-    readonly property real slideOffset: slideFrom
-        + (slideTo - slideFrom) * slideProgress
+    // Every column on the strip places itself from `panelPosition`: `slotX` and
+    // `slotWidth` ask how far it is from the workspace the panel is centred on. So
+    // one number running from the workspace being left to the one being moved to
+    // slides the arriving column in AND widens it, narrows the one being left as it
+    // goes, and carries the focus markers - they are placed from the same function.
+    // There is no second clock and no transform: the width change is not an effect
+    // layered on the slide, it IS the slide.
+    //
+    // Positions rather than pixels is the load-bearing part. The strip used to travel
+    // by `span * columnPitch` with every column at a uniform pitch, and a switch
+    // landing mid-crossing had to correct that pixel offset by hand (`stripReshift`),
+    // because the new plan renumbered the strip's slots and the offset had to give
+    // back exactly what the renumbering took. Here there are no slots to renumber and
+    // no offset to convert: continuing from wherever the crossing had reached is a
+    // matter of handing `positionFrom` that value. See `_reaimSlide`.
+    property real positionFrom: 0
+    property real positionTo: 0
+    readonly property real panelPosition: positionFrom
+        + (positionTo - positionFrom) * slideProgress
     // How far the strip dims at the middle of the crossing, 0 at either end.
     //
     // A translation has no weight of its own: nothing about the content changes, so
@@ -198,10 +233,6 @@ Item {
     // active column, which is the content the user is being taken to.
     readonly property var activeColumn: root.plan
         ? root.columns[root.plan.activeSlot] : null
-    // The plan's slot count as a width, for the strip. Always derivable: the
-    // resting plan is three columns and a crossing's is its span plus three.
-    readonly property int stripWidth: root.plan
-        ? root.plan.slots * root.columnPitch - root.columnGutter : 0
     readonly property int focusedRowIndex: HintLogic.focusedIndexIn(
         root.activeColumn ? root.activeColumn.rows : null)
     // The indicator, outside the card. `Workspaces.qml` puts its indicator outside the
@@ -377,14 +408,23 @@ Item {
         root.leavingHint = null
         root.swapDirection = 0
         root.plan = null
-        root.slideFrom = 0
-        root.slideTo = 0
+        root.positionFrom = 0
+        root.positionTo = 0
         // A rest plan rather than no plan: the strip still needs to be drawn, and
-        // this is the one that says "three columns, active slot 1, offset 0" - the
-        // same shape the crossing's plan has, so every binding downstream can be
+        // this is the one that says "three columns, active slot 1, centred here" -
+        // the same shape the crossing's plan has, so every binding downstream can be
         // written once. See `HintLogic.restPlan`.
-        root.plan = HintLogic.restPlan(root.hint)
-        root.columns = HintLogic.stripColumns(root.hint, null, root.plan)
+        const rest = HintLogic.restPlan(root.hint)
+        root.plan = rest
+        // At rest the panel is centred on this workspace and both ends of the
+        // crossing are that value, so a crossing started from here begins exactly
+        // where the resting layout was - which is what lets a crossing simply use
+        // its own `fromPosition`, with nothing to compensate.
+        if (rest) {
+            root.positionFrom = rest.fromPosition
+            root.positionTo = rest.toPosition
+        }
+        root.columns = HintLogic.stripColumns(root.hint, null, rest)
         root.shownReady = HintLogic.ready(root.hint)
     }
 
@@ -404,38 +444,36 @@ Item {
         root.plan = plan
         root.columns = HintLogic.stripColumns(root.hint, root.leavingHint, plan)
         root.shownReady = HintLogic.ready(root.hint)
-        root.slideFrom = plan.startColumn * root.columnPitch
-        root.slideTo = plan.endColumn * root.columnPitch
+        root.positionFrom = plan.fromPosition
+        root.positionTo = plan.toPosition
         root.slideProgress = 0
         slideRun.restart()
     }
 
     // A second switch arrived mid-crossing. The strip must CONTINUE from where it
-    // is: re-aiming it to the new plan's own start offset would throw the content
-    // back to the edge of the panel, which is a visible jump rather than a
-    // correction.
+    // is: re-aiming it to the new plan's own start would throw the content back to
+    // the edge of the panel, which is a visible jump rather than a correction.
     //
-    // The compensation is `stripReshift`. A second move in the SAME direction only
-    // extends the union at the right, so the strip's existing slots keep their
-    // numbers and no correction is needed - the new plan's base equals the old
-    // one's and the strip simply continues. A move in the OTHER direction extends
-    // the union at the LEFT, which renumbers every column the strip already holds;
-    // shifting the strip left by exactly that many columns puts the content back
-    // where it was, so the reversal is a re-aim of the motion in progress and not
-    // a rearrangement of what is on screen.
+    // The one thing a re-aim has to preserve is where the crossing had actually
+    // reached, so that is what the new leg starts from. Read from the clock rather
+    // than from the incoming plan's own start, for exactly that reason.
+    //
+    // There is nothing else to correct, and that is the payoff of keying the layout
+    // on workspace positions instead of on a translated strip. Every column used to
+    // sit at `slot + offset`: a new plan renumbered the slots, so `stripReshift` had
+    // to take the difference of the two bases and give it back out of the offset, or
+    // the content jumped sideways by exactly that many columns on the frame the
+    // second switch landed. Now a column's place is a function of its own workspace
+    // and the panel's centre, neither of which the re-aim disturbs - the new leg
+    // simply starts at the position the old one had reached.
     function _reaimSlide(plan) {
-        const reshift = HintLogic.stripReshift(root.plan, plan)
-        // The offset the strip is AT right now, before the plan is replaced. Read
-        // from the clock rather than from the incoming plan, or the reshift is
-        // computed against a position the strip was never in.
-        const here = root.slideFrom
-            + (root.slideTo - root.slideFrom) * root.slideProgress
+        const here = root.panelPosition
         root.plan = plan
         root.columns = HintLogic.stripColumns(root.hint, root.leavingHint, plan)
         root.shownReady = HintLogic.ready(root.hint)
-        root.slideFrom = here - reshift * root.columnPitch
-        root.slideTo = plan.endColumn * root.columnPitch
-        // Restart the clock from the current offset, not from the crossing's own
+        root.positionFrom = here
+        root.positionTo = plan.toPosition
+        // Restart the clock from the current position, not from the crossing's own
         // start: the re-aim is a new traverse over the remaining distance, and
         // beginning it at 0 while the strip is already halfway across would jump.
         root.slideProgress = 0
@@ -464,21 +502,22 @@ Item {
             // The strip has landed with the arriving frame's active column in the
             // middle, so the held frame goes with it and exactly one set of rows
             // stays alive. The strip also narrows to the arriving frame's own three
-            // columns, and the offset returns to 0 to match: the resting plan says
-            // the active column is slot 1, which is the panel's middle column only
-            // at offset 0.
+            // columns, and the panel's centre becomes that workspace outright rather
+            // than a number that happens to have arrived there - the resting plan
+            // says the active column is slot 1, which is the panel's middle column.
             //
-            // Both are needed together. Narrowing the strip while the offset is
-            // still the crossing's end leaves the last two columns of the panel
-            // empty - the strip is three columns wide and sitting one column to the
-            // left, so it covers [0, 2C) and nothing else. Measured on the first
-            // run of this change: the final sample of every forward crossing had an
-            // unreached panel edge for exactly that reason.
+            // Narrowing the strip matters as much as dropping the held frame: a
+            // crossing's strip is `span + 3` columns, and keeping those extra
+            // workspaces painted at rest would show columns the arriving frame's own
+            // three do not describe.
             root.leavingHint = null
-            root.plan = HintLogic.restPlan(root.hint)
-            root.columns = HintLogic.stripColumns(root.hint, null, root.plan)
-            root.slideFrom = 0
-            root.slideTo = 0
+            const rest = HintLogic.restPlan(root.hint)
+            root.plan = rest
+            root.columns = HintLogic.stripColumns(root.hint, null, rest)
+            if (rest) {
+                root.positionFrom = rest.fromPosition
+                root.positionTo = rest.toPosition
+            }
             root.slideProgress = 1
         }
     }
@@ -560,10 +599,11 @@ Item {
         }
     }
 
-    // Three columns, always. The popup measures its geometry from this, so the
-    // host's `window-hint` width reads the body rather than keeping its own number
-    // - and the body reports the same number whether the neighbour workspaces are
-    // busy or empty, so the panel never changes size mid-hold.
+    // Three columns, always, one of them twice as wide. The popup measures its
+    // geometry from this, so the host's `window-hint` width reads the body rather
+    // than keeping its own number - and the body reports the same number whether
+    // the neighbour workspaces are busy or empty, so the panel never changes size
+    // mid-hold.
     //
     // The clip is what keeps the rest of the strip off the surface. A crossing
     // carries `span + 3` columns through a three-column window, so up to three
@@ -571,7 +611,11 @@ Item {
     // would paint outside the popup's own rect - and outside the layer-shell input
     // region the host sized from this body's width.
     clip: true
-    implicitWidth: shownColumnCount * columnPitch - columnGutter
+    // Neighbour, gutter, the wide active column, gutter, neighbour. Not
+    // `3 * narrowPitch - columnGutter`: the active column is twice a neighbour's, and
+    // a panel sized for three equal columns would either crop its own middle slot or
+    // leave the band's right edge a whole column short of the surface.
+    implicitWidth: panelWidth
     // The taller of the two frames while a crossing is in flight, and the strip's
     // own height once it has landed. The empty-workspace placeholder lives inside
     // the columns, so the columns' own height already accounts for it.
@@ -586,20 +630,23 @@ Item {
     width: implicitWidth
     height: implicitHeight
 
-    // The strip. One object, carrying both frames, translated by the one clock. Its
-    // width is the whole run of workspaces; the panel is the three-column window
-    // onto it, and `clip` on the body is what keeps the rest of the run off the
-    // surface.
+    // The strip. One object, carrying both frames, and NOT translated: every column
+    // on it places itself from `panelPosition`, so there is no strip-level offset
+    // that could disagree with them or fall a frame behind them. The panel is the
+    // three-column window onto it, and `clip` on the body is what keeps the rest of
+    // the run off the surface.
     // The active workspace's cell. The bar's `Workspaces.qml` draws that as one
     // rectangle behind the squares - `activeHighlight`, covering the square exactly -
     // and this is the same surface one size up, in the same token, with the same
     // geometry: the cell, whose edges are the panel's edges, with the cards sitting
     // `cellPaddingX` inside it.
     //
-    // A child of the BODY, not of the strip. The strip travels and its active slot
-    // moves; the band does not, because the column you are looking at does not - so
-    // making it a strip child is what put a 161px teleport at the start of every
-    // crossing.
+    // A child of the BODY, and the strip has no motion of its own for it to be out
+    // of step with any more. The band is the wide middle SLOT, and the two columns
+    // trading places through it are placed by `slotX` on either side of it - so the
+    // band is the one thing in the panel that does not move at all. It used to be
+    // glued to the strip's active slot, which is what put a 161px teleport at the
+    // start of every crossing.
     Rectangle {
         id: activeBand
         objectName: "windowHintColumnHighlight"
@@ -608,7 +655,10 @@ Item {
         // band's edge near the panel's edge the way the widget's sits near the bar's.
         y: root.bandInset - root.surfaceInset
         x: root.bandX
-        width: root.columnWidth
+        // The WIDE slot. `panelWidth` is `bandX + this + columnGutter + columnWidth`,
+        // so the band's right edge lands exactly one gutter before the panel's - the
+        // same reach its left edge makes towards the surface.
+        width: root.activeColumnWidth
         // The cell, not the card block: the cards sit `cellPaddingY` inside the band's
         // top and bottom edges, so the band is the block plus that padding on each side.
         height: Math.max(0, strip.contentHeight + cellPaddingY * 2)
@@ -628,18 +678,17 @@ Item {
         id: strip
         objectName: "windowHintStrip"
         parent: root
-        // The strip's own offset. At rest it sits at 0 - the plan's end, with the
-        // active column in the panel's middle - and during a crossing it is
-        // somewhere between the plan's start and end.
-        x: root.slideOffset
+        // Spelled as 0 rather than left implicit, because the absence IS the design.
+        // This used to be the one moving object in the panel, and a reader looking
+        // for the crossing's motion should find it here and be told it is not here.
+        x: 0
         // A padding down from the panel's top edge, and correspondingly shorter than
         // the panel: the strip is the card block, and the padding belongs to the panel
         // around it. Sized from the panel it overran the bottom by a whole padding,
         // which put the band's bottom margin out of step with its top.
         y: root.bandInset - root.surfaceInset + root.cellPaddingY
         height: Math.max(0, root.height - cellPaddingY * 2 + bandOutset * 2)
-        width: root.stripWidth
-        // One object moving, so one dim. With two copies crossing this had to be
+        // One object dimming, so one dim. With two copies crossing this had to be
         // applied to both in lockstep or the seam would show one through the other;
         // with one strip there is no seam, and the value is a pure function of the
         // clock - the same progress always gives the same opacity.
@@ -649,7 +698,14 @@ Item {
         // the card fill and the one the focus markers are placed against are the
         // same column by construction.
         activeSlot: root.plan ? root.plan.activeSlot : 1
+        // The workspace the markers belong to, and the one the panel is centred on.
+        // Two numbers rather than one because they are two different questions at the
+        // START of a crossing: the arriving column is off-panel, and the panel is
+        // still centred on the workspace being left.
+        activePosition: root.plan ? root.plan.activePosition : 0
+        panelPosition: root.panelPosition
         columnWidth: root.columnWidth
+        activeColumnWidth: root.activeColumnWidth
         columnGutter: root.columnGutter
         cellPaddingX: root.cellPaddingX
         // Read from the same `activeColumn` the strip's own columns come from, so the
@@ -677,9 +733,10 @@ Item {
     // here is the outline around it. Exactly one element still carries the tint at a
     // time: the focused row's.
     //
-    // A child of the strip, so it travels with the content it marks. Pinned to the
-    // panel, it would say the focus stayed put while the window list moved - two
-    // different claims about where the current window is.
+    // A child of the strip, and placed from the arriving column's own geometry, so
+    // it travels with the content it marks and resizes with it. Pinned to the panel,
+    // it would say the focus stayed put while the window list moved - two different
+    // claims about where the current window is.
     Rectangle {
         id: focusFrame
         objectName: "windowHintFocusFrame"
@@ -695,12 +752,14 @@ Item {
         enabled: false
 
         // Bounded by the row, not inset: the highlight has to cover exactly the row
-        // it marks, and the row spans its column's full width. Measured from the
-        // active column's own x, so it cannot be drawn over a column that is not
-        // the active one whatever the layout decided.
+        // it marks, and the row spans its column's full width. Both edges are read
+        // from the arriving column's OWN geometry - through the same `slotX` and
+        // `slotWidth` its delegate is placed by - so the outline cannot be drawn
+        // over a column that is not the active one, and it widens with the card
+        // rather than staying the width the card had at the start of the crossing.
         x: strip.activeColumnX + root.cellPaddingX
         y: root.focusedRowTop
-        width: strip.cardWidth
+        width: strip.activeCardWidth
         height: root.rowHeight
         opacity: root.hasTarget ? 1 : 0
 

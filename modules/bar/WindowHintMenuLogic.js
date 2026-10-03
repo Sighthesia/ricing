@@ -110,15 +110,89 @@ function cappedColumns(hint) {
     }
 }
 
-// One column's width. A constant rather than a share of the panel: the panel's
-// width is this times the column count, and the count never varies, so this is
-// simply the panel's unit.
+// A NEIGHBOUR column's width. A constant rather than a share of the panel: the
+// panel's width is this times the column count plus one active column, and
+// neither varies, so this is simply the panel's unit.
 var COLUMN_WIDTH = 180
+
+// How many times wider the ACTIVE workspace's column is than a neighbour's.
+//
+// The one asymmetry in the panel, and it is there because the workspace you are
+// ON is the one whose windows you opened the panel to choose from: its titles get
+// the room, its cards get the band's full width, and the two neighbours are
+// context for it rather than peers of it. Everything else about the three columns
+// - the count, the gutter, every padding - is shared, so the wide one reads as
+// emphasis and not as a different component.
+var ACTIVE_COLUMN_SCALE = 2
+var ACTIVE_COLUMN_WIDTH = COLUMN_WIDTH * ACTIVE_COLUMN_SCALE
 
 // How many columns the panel has, always: the previous workspace, the active one
 // and the next. A constant rather than a count, because the active workspace sits
 // in the middle and can only be the middle if the three slots are a fixed frame.
 var COLUMN_COUNT = 3
+
+// The panel's own width: a neighbour, a gutter, the active column, a gutter, a
+// neighbour. A function rather than a constant so the layout below and the panel
+// that shows it cannot disagree about where the right edge is - the band is placed
+// against this number, and a band one gutter out from the edge is the fault the
+// `barWidgetGutter` reach exists to prevent.
+function panelWidth(columnWidth, activeColumnWidth, gutter) {
+    return 2 * columnWidth + 2 * gutter + activeColumnWidth
+}
+
+// Where a column sits and how wide it is, as ONE function of its distance - in
+// workspaces, and fractional - from the workspace the panel is centred on.
+//
+// `rel` is the whole interface. Zero is the active column, in the wide middle
+// slot; -1 and +1 are the two neighbour slots at their own width; anything
+// further out is off-panel content marching past an edge, still at neighbour
+// width. Between the three slots the answer interpolates, which is the whole
+// width-change effect: a crossing is nothing more than `rel` running from one
+// workspace's value to another's, so the arriving column grows on the way in and
+// the one being left shrinks on the way out - from the same number, on the same
+// clock, with no second animation that could fall out of step with the first.
+//
+// Three properties this shape is chosen for, all of which the alternative - a
+// uniform pitch with one card growing over its neighbours - does not have:
+//
+//   CONTINUITY. Adjacent answers agree at every boundary, so a column never jumps
+//   as `rel` crosses an integer. A piecewise function with matching endpoints is
+//   what makes `rel` safe to animate rather than safe to evaluate.
+//
+//   NO OVERLAP, EVER. Both layouts are contiguous - column i's right edge is
+//   column i+1's left edge less the gutter - and a lerp between two contiguous
+//   layouts of the same run is contiguous too, because a lerp of differences is
+//   the difference of lerps. So the gap between any two adjacent cards is the
+//   gutter at every instant of a crossing, not merely at its ends. That is also
+//   what keeps the panel covered throughout: the panel can never show a gap wider
+//   than one inter-card gap, which is the guarantee the suite states.
+//
+//   RE-AIM FOR FREE. A crossing's two ends are two values of one scalar, so
+//   continuing from wherever the scalar had reached is a matter of remembering
+//   that value - no per-column compensation, no slot renumbering, and nothing to
+//   correct when a second switch lands mid-flight.
+//
+// `narrowPitch` and `rightX` are passed rather than recomputed because they are
+// two of the panel's own measurements; deriving them here as well would be a
+// second copy of the layout's arithmetic, free to drift from the first.
+function slotX(rel, narrowPitch, rightX) {
+    if (rel >= 1)
+        return rightX + (rel - 1) * narrowPitch
+    if (rel <= -1)
+        return (rel + 1) * narrowPitch
+    if (rel >= 0)
+        // Middle to right neighbour: the incoming column, closing on the wide slot.
+        return narrowPitch + rel * (rightX - narrowPitch)
+    // Left neighbour to middle: the outgoing column, leaving it.
+    return narrowPitch * (rel + 1)
+}
+
+function slotWidth(rel, columnWidth, activeColumnWidth) {
+    if (rel >= 1 || rel <= -1)
+        return columnWidth
+    var share = rel >= 0 ? 1 - rel : rel + 1
+    return columnWidth + (activeColumnWidth - columnWidth) * share
+}
 
 // What a neighbour column says when that workspace has no windows. Named here so
 // the label is one string rather than two literals, and so the wording is stated
@@ -198,16 +272,22 @@ var MAX_SWITCH_SPAN = 3
 //   the frame being left  occupies slots 0..2
 //   the frame arriving   occupies slots direction > 0 ? span..span+2 : 0..2
 //
-// and the strip therefore translates by exactly `span` columns, in the direction
-// the workspace went. One copy of each position, so nothing can be painted twice;
-// and the strip is always at least three columns wide while it is moving, so the
-// panel cannot be left uncovered.
+// One copy of each position, so nothing can be painted twice; and the strip is
+// always at least three columns wide while it is moving, so the panel cannot be
+// left uncovered.
 //
-// The start and end are derived from the invariant rather than from the sign of
-// the move: a strip slot is `1 - slot` columns from home when the workspace in
-// that slot is the active one, and the active workspace is in the panel's middle
-// column at BOTH ends of the crossing. That is what makes the arriving frame's
-// active column land in the middle without a special case for either direction.
+// The two ends of the crossing are `fromPosition` and `toPosition` as WORKSPACE
+// POSITIONS, not as pixel offsets, because that is what the layout is written
+// against: `slotX` and `slotWidth` ask how far a column is from the workspace the
+// panel is centred on, so a crossing is a column's answer at `toPosition` and at
+// `fromPosition` and the clock is the share of the way between. The old record
+// carried a start and end COLUMN as well, which was the same two numbers in a
+// third unit - and needed a `stripReshift` correction to convert between the units
+// when a second switch landed mid-flight, because a re-aim renumbers the strip's
+// slots and the pixel offset had to give back exactly what the renumbering took.
+// With the layout keyed on positions there is nothing to convert and nothing to
+// correct: continuing from wherever the crossing had reached is a matter of
+// handing `fromPosition` that value instead of the plan's own.
 function stripPlan(fromPosition, toPosition) {
     var step = _step(fromPosition, toPosition)
     if (step === 0)
@@ -222,14 +302,19 @@ function stripPlan(fromPosition, toPosition) {
         base: base,
         span: span,
         direction: step,
-        // The slot the arriving frame's active workspace occupies. In the panel's
-        // middle column at the end of the crossing, and off-panel for most of the
-        // travel - which is the point: the card column arrives from the far side
-        // rather than changing under the reader.
+        // The slot the arriving frame's active workspace occupies - which slot
+        // decides which column is drawn as cards and which as plain labels, so it
+        // is the content half of the plan. Where that slot is PAINTED is
+        // `slotX(activePosition - panelPosition)` and nothing else; it used to be
+        // `activeSlot * columnPitch`, which only held because every column was the
+        // same width and the whole strip moved together.
         activeSlot: to - base,
-        slots: span + 3,
-        startColumn: 1 - (from - base),
-        endColumn: 1 - (to - base)
+        // The workspace the markers belong to, and the two the crossing runs
+        // between. Equal in a rest plan.
+        activePosition: to,
+        fromPosition: from,
+        toPosition: to,
+        slots: span + 3
     }
 }
 
@@ -237,10 +322,10 @@ function stripPlan(fromPosition, toPosition) {
 // one in the middle, and nowhere to travel.
 //
 // The same record shape as `stripPlan`, deliberately. A crossing's plan and a rest
-// plan are both "which slot is active, how many columns wide, where does the strip
-// sit" - so the component's bindings are written once against one shape instead of
-// branching on whether anything is moving, and a strip built from this is exactly
-// the arriving frame with nothing duplicated beside it.
+// plan are both "which slot is active, how many columns wide, where is the panel
+// centred" - so the component's bindings are written once against one shape
+// instead of branching on whether anything is moving, and a strip built from this
+// is exactly the arriving frame with nothing duplicated beside it.
 function restPlan(hint) {
     var position = Number(hint ? hint.activeWorkspacePosition : -1)
     if (!isFinite(position) || position < 0)
@@ -250,9 +335,10 @@ function restPlan(hint) {
         span: 0,
         direction: 0,
         activeSlot: 1,
-        slots: 3,
-        startColumn: 0,
-        endColumn: 0
+        activePosition: position,
+        fromPosition: position,
+        toPosition: position,
+        slots: 3
     }
 }
 
@@ -311,29 +397,6 @@ function stripColumns(arriving, leaving, plan) {
         })
     }
     return out
-}
-
-// How far a strip has to shift when a crossing in flight is re-aimed at a new
-// destination, in columns. The strip's slots are numbered from its own base, so a
-// new plan with a different base renumbers every column the strip already holds -
-// and without giving the offset back by the same amount, the content on screen
-// would jump sideways by exactly this many columns on the frame the second switch
-// lands.
-//
-// It follows from the two bases, not from the direction of the move, and that is
-// deliberate: a move that continues forwards drops the workspace behind the one now
-// being left and gains one ahead, so its base moves and the correction is not zero.
-// The one case that needs no correction is a re-aim that happens to land on the
-// same base - arriving back at the origin of a crossing, for instance, which
-// re-uses the same run of workspaces.
-//
-// Positive means "shift the strip left by this much", i.e. give back the ground the
-// renumbering took. A column's position on the panel is its slot plus the offset,
-// and the correction is what keeps that sum unchanged across the re-aim.
-function stripReshift(previousPlan, nextPlan) {
-    if (!previousPlan || !nextPlan)
-        return 0
-    return previousPlan.base - nextPlan.base
 }
 
 // Overflow line under a capped window list. Empty when everything fit, so the

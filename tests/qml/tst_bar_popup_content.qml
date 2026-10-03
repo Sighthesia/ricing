@@ -285,32 +285,49 @@ Item {
             var body = findByName(item, "windowHintBody")
             var column = findByName(item, "actionsRoot")
             verify(body !== null, "the hint body should exist")
-            // Three columns of 180 plus the gap between them, plus the content
-            // column's own inset on each side. Without the inset term the surface is
-            // 16px short and the right column is clipped; without the gap term it is
-            // 12px short and the right column is clipped by exactly that much.
-            compare(body.width, 3 * 180 + 2 * 6,
-                "the body is as wide as its three columns and the two gaps, was "
-                    + body.width)
+            // Two neighbours of 180, the active column of 360, and the gap between
+            // each pair - plus the content column's own inset on each side. Without
+            // the inset term the surface is 16px short and the right column is
+            // clipped; without the two gaps it is 12px short and the right column is
+            // clipped by exactly that much.
+            //
+            // The active column is TWICE a neighbour's, so the old `3 * 180 + 2 * 6`
+            // is not merely stale - it is 180px narrower than the panel, and a
+            // surface sized from it would crop the whole right-hand neighbour. Stated
+            // as the five terms rather than as a product so the wide middle is
+            // visible in the expectation.
+            compare(body.width, 180 + 6 + 360 + 6 + 180,
+                "the body is as wide as its two neighbours, the wide active column and "
+                    + "the two gaps, was " + body.width)
             verify(item.implicitWidth >= body.width,
                 "and the surface is at least that wide, was " + item.implicitWidth)
             compare(item.implicitWidth, body.width + item.contentInset * 2,
                 "exactly the body plus the content column's inset")
-            // The strip's columns end inside the content column, which ends inside
-            // the surface. All three of those have to hold or something is cut.
+            // What has to fit inside the content column is the PANEL.
             //
-            // Read off the strip's own width rather than off a named "next column":
-            // the columns are Repeater delegates of one component now, so they share
-            // a name, and the surface question is about the widest of them - which is
-            // what the strip's width says. A strip that was wider than the panel would
-            // paint past the surface here, and the crossing's extra columns are
-            // exactly the case that does.
+            // Read off the panel rather than off the strip's width, and deliberately
+            // so: the strip has no width of its own any more, because every column
+            // places itself from how far it is from the workspace the panel is
+            // centred on. A strip read for a width would report 0 and pass here while
+            // the columns it no longer bounds ran past the surface. At rest the panel
+            // IS the widest thing painted - the active column's right edge is one
+            // gutter before the panel's own - so the panel's extent is the honest
+            // measurement of it.
             var strip = findByName(body, "windowHintStrip")
             verify(strip !== null, "the strip should exist")
-            compare(strip.x, 0, "and it starts at the panel's left edge")
-            compare(strip.width, body.width, "as wide as the panel at rest")
-            verify(strip.x + strip.width <= column.width,
-                "the last column ends inside the content column")
+            compare(strip.x, 0,
+                "and the strip starts at - and stays at - the panel's left edge")
+            verify(body.x + body.width <= column.width,
+                "the panel ends inside the content column, was "
+                    + (body.x + body.width) + " against " + column.width)
+            // Mid-crossing there are `span + 3` columns for a three-column panel, so
+            // spare ones sit outside the panel on purpose, and what keeps them off the
+            // surface is this clip rather than the panel's width. Asserted separately
+            // because a panel that fitted with no clip would paint a crossing's spare
+            // columns over the desktop - which is a different fault from a cropped
+            // right-hand column, and the one a width check cannot see.
+            compare(body.clip, true,
+                "and the crossing's spare columns are clipped, not merely off-panel")
             verify(column.x + column.width <= item.width,
                 "and the content column ends inside the surface")
         }
@@ -331,8 +348,9 @@ Item {
             })
             wait(20)
             var body = findByName(item, "windowHintBody")
-            compare(body.width, 3 * 180 + 2 * 6,
-                "still three columns and their gaps, was " + body.width)
+            compare(body.width, 180 + 6 + 360 + 6 + 180,
+                "still a neighbour, a gutter, the wide active column, a gutter and a "
+                    + "neighbour, was " + body.width)
             compare(item.implicitWidth, body.width + item.contentInset * 2)
             var column = findByName(item, "actionsRoot")
             // The active workspace is still the middle column, read from where the
@@ -348,17 +366,23 @@ Item {
             compare(body.surfaceInset, item.contentInset,
                 "the body is told how far the host insets it")
 
-            // One column, plus the gap between columns, plus the card's horizontal
-            // inset inside the band: the clearance, the indicator's width, and the
-            // clearance again - 8 + 3 + 8.
+            // The WIDE middle slot starts one neighbour and one gutter in - and it is
+            // the neighbours' pitch, not a third of the panel, that puts it there.
+            // Then the card's own horizontal inset inside that slot: the clearance,
+            // the indicator's width, and the clearance again - 8 + 3 + 8.
             compare(wash.x, 180 + 6 + 8 + 3 + 8,
                 "and the active workspace is still the middle one, was " + wash.x)
-            // All three columns fit, so nothing is drawn past the surface.
-            var strip = findByName(body, "windowHintStrip")
-            compare(strip.width, 3 * 180 + 2 * 6,
-                "the strip is three columns and their gaps wide, was " + strip.width)
-            verify(strip.x + strip.width <= column.width,
-                "and the last column still ends inside the content column")
+            compare(wash.width, 360 - 2 * (8 + 3 + 8),
+                "filling the wide slot less its padding, was " + wash.width)
+            // The strip has no width of its own any more - every column places itself
+            // from how far it is from the workspace the panel is centred on - so what
+            // has to fit inside the content column is the PANEL, which is also the
+            // widest thing in it. Measured on the panel rather than on the strip
+            // because a strip measured at zero would have passed while the columns
+            // it no longer bounds ran past the surface.
+            verify(body.x + body.width <= column.width,
+                "and the panel still ends inside the content column, was "
+                    + (body.x + body.width) + " against " + column.width)
         }
 
         function test_volumeExposesSliderAndFakeCallback() {
