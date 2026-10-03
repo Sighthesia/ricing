@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import "../../modules/bar" as Bar
+import "../../modules/bar/WindowHintMenuLogic.js" as Hint
 import "../../modules/lazerbar" as Lazer
 
 // Component contract for the mod-key window hint body: the window list, its
@@ -846,6 +847,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(columnForPosition(3).width, root.wideCol,
                 "backwards, it arrives at the active column's width, was "
                     + columnForPosition(3).width)
+            settleSlide()
         }
 
         function test_theWidthChangeRunsOnTheRealCrossingToo() {
@@ -950,6 +952,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(wrong.length, 0,
                 "every adjacent pair is exactly one gutter (6) apart, was wrong for "
                     + wrong.length + " of " + gaps.length + " joins, e.g. " + wrong[0])
+            settleSlide()
         }
 
         function test_theMarkersFollowTheArrivingColumnAsItWidens() {
@@ -1152,426 +1155,341 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             wait(1)
         }
 
-        // Land a crossing that was driven by hand rather than animated. The animation
-        // was stopped so it could be sampled at exact fractions, which means its
-        // `onFinished` never runs - and that handler is what narrows the strip back to
-        // the arriving frame and releases the held one. The way a crossing actually
-        // lands is a publish that reports no movement, and that commits the arriving
-        // frame outright, so this is that publish rather than a call into the
-        // component's own commit path.
-        function landDrivenSlide(hint) {
-            // Finish the clock before publishing. A publish is only treated as a commit
-            // when nothing is crossing, and at a mid-crossing fraction something still
-            // is - so the no-movement refresh would be taken as new content for the
-            // crossing rather than as its landing.
-            driveSlideTo(1)
-            body.hint = hint
-            wait(20)
+        // --- the crossing displacement ---------------------------------------
+        // On a workspace switch ONE instance of the outline and ONE instance of the bar
+        // descend from ABOVE the panel's top edge onto the focused card of the workspace
+        // being moved to. Always from the top, whichever way the workspace went.
+        //
+        // The marker has its OWN clock: 320ms of `InOutQuad` against the strip's 160ms
+        // of `OutQuad`, so the columns change workspace first and the focus then travels
+        // down onto them. Every test here drives that clock, never `slideProgress`.
+
+        // The two markers, for the displacement tests to read.
+        function outline() {
+            return findByName(body, "windowHintFocusFrame")
         }
 
-        // --- the crossing wrap ----------------------------------------------
-        // On a workspace switch the row marker does not glide from the old row to the
-        // new one. It LEAVES - from the card it is on now, in the direction of the move,
-        // until it is out through the panel's edge and the clip has taken it - and then
-        // comes back in through the OPPOSITE edge onto the focused card of the workspace
-        // being moved to. An upward switch exits through the top and re-enters at the
-        // bottom; a downward one is the mirror.
+        function bar() {
+            return findByName(body, "windowHintFocusIndicator")
+        }
 
-        // Leave the panel at rest, at the workspace it ended on. These tests drive the
-        // crossing's clock by hand, which stops the animation and so never lets its
-        // `onFinished` run - a crossing left in flight is a state the NEXT test inherits,
-        // and a later test that publishes without movement is then (correctly) read as a
-        // refresh for a crossing already under way rather than as a commit.
-        function restAfterWrap(destination) {
+        // The panel's clip edge, in the markers' coordinates. Read off the component
+        // rather than restated as literals, and deliberately: the claim is where the
+        // marker sits RELATIVE to the clip, which holds for any clip, and a suite that
+        // pinned the clip's absolute position would be asserting the theme's padding
+        // numbers instead of the motion.
+        function clipTop() {
+            return -body._stripY
+        }
+
+        // Drive the MARKER's clock to an exact fraction. It is a different clock from
+        // `slideProgress` and a different length, so it needs its own handle - sampling
+        // one does not move the other.
+        function driveMarkerTo(progress) {
+            body.crossingAnimation.stop()
+            body.crossingClock = progress
+            wait(1)
+        }
+
+        // Let the marker run its real animation out, which is the only thing that clears
+        // `_markerCrossing` - it is a clock's flag, not a derived expression, so nothing
+        // else can.
+        function settleMarker() {
+            wait(body.crossingAnimation.duration + 60)
+        }
+
+        // Land a crossing that was driven by hand. `driveSlideTo` and `driveMarkerTo`
+        // stop their animations, so neither `onFinished` ever runs - and each of those is
+        // what clears its own flag. A publish that reports no movement is NOT how this
+        // lands any more. The production path that does finish is `_commitHint`, reached
+        // by a move no strip can carry, so that is what this publishes: at the
+        // destination, from far enough away that the span exceeds `MAX_SWITCH_SPAN` -
+        // AHEAD of it, not behind, because a negative position reports no direction at
+        // all and reads as "nothing moved".
+        function landDrivenSlide(destination) {
             driveSlideTo(1)
+            body.hint = root.framedHint(destination + (Hint.MAX_SWITCH_SPAN + 1),
+                destination)
             body.hint = root.framedHint(destination, destination)
             wait(20)
-            verify(!body.swapping, "the panel is back at rest at " + destination)
-            verify(wrapBar() === null, "and no wrap is left armed")
+            verify(!body.swapping, "the columns have landed at " + destination)
+            verify(!body._markerCrossing, "and so has the marker")
         }
 
-        // Which marker is actually on screen. Both elements exist at once and exactly
-        // one is visible, so this is how a sample says which regime it is looking at
-        // rather than assuming.
-        function shownMarker(name) {
-            var found = findByName(body, name)
-            return found !== null && found.visible ? found : null
-        }
-
-        function wrapBar() {
-            return shownMarker("windowHintSweepIndicator")
-        }
-
-        function restingBar() {
-            return shownMarker("windowHintFocusIndicator")
-        }
-
-        function wrapOutline() {
-            return shownMarker("windowHintSweepFrame")
-        }
-
-        function restingOutline() {
-            return shownMarker("windowHintFocusFrame")
-        }
-
-        // The panel's clip, in the markers' own coordinates. Read off the component
-        // rather than restated as literals, and deliberately: the claim these tests make
-        // is where the marker sits RELATIVE to the clip, which holds for any clip, and a
-        // suite that pinned the clip's absolute position would be asserting the theme's
-        // padding numbers instead of the motion.
-        function clipTop() {
-            return body._visTop
-        }
-
-        function clipBottom() {
-            return body._visBottom
-        }
-
-        // Where a bar of the indicator's own length sits when it is centred on a card.
-        function restingBarTop(rowIndex) {
-            return rowIndex * body.rowPitch + body.rowHeight / 2
-                - body.indicatorLength / 2
-        }
-
-        // Every position the marker takes between two progress values, sampled finely
-        // enough to see it cross an edge. The wrap is two phases with a discontinuity
-        // between them, so "did it ever go out through the top" is a question about the
-        // whole traverse and not about any one sample.
-        // The traverse sampled. The wrap is two linear phases with a corner between
-        // them, and the corner is the one instant the marker is exactly on the clip's
-        // edge - so a sampling can approach it without ever landing on it, and a test
-        // that demanded an exact hit at an edge would be testing where the samples
-        // happened to fall. `closest` below therefore reports how near each edge the
-        // traverse got, and the claims are stated as bounds with the sample step named.
-        //
-        // 121 points: the whole traverse is a few hundred pixels, so a step is around
-        // 2px, which is the tolerance the edge claims use.
-        function sampleAnchor(steps) {
+        // Every position the marker takes between two progress values, and the largest
+        // single step between two of them - because "it moves" and "you can SEE it move"
+        // are different claims, and what separates them is the speed. `steps` is over the
+        // marker's whole clock, so `peakStep` is pixels per `steps`-th of its real
+        // duration.
+        function sampleTop(steps) {
             var seen = []
+            var peak = 0
             for (var i = 0; i <= steps; ++i) {
-                driveSlideTo(i / steps)
-                seen.push(body.sweepAnchor)
+                driveMarkerTo(i / steps)
+                seen.push(body.crossingTop)
+                if (i > 0)
+                    peak = Math.max(peak, Math.abs(body.crossingTop - seen[i - 1]))
             }
-            return seen
+            return { tops: seen, peakStep: peak }
         }
 
-        function extremes(seen) {
-            return {
-                lowest: Math.min.apply(null, seen),
-                highest: Math.max.apply(null, seen)
-            }
-        }
-
-        function test_theWrapStartsOnTheCardItIsLeaving() {
-            // The thing the previous attempt got wrong, and the reason it read as a wipe
-            // rather than as a departure: the marker began at the TOP OF THE COLUMN
-            // rather than on the card it was actually marking, so it never looked like
-            // it was leaving anything.
-            // The leaving frame focuses its THIRD row, not its first. With a first-row
-            // fixture the departing card's top edge IS the top of the column, and a
-            // wrap placed on the column top rather than on the card would look identical
-            // - which is the exact confusion this test exists to rule out.
+        function test_theMarkerStartsOutsideThePanelAndComesDownOntoTheCard() {
+            // The effect. It starts wholly above the panel's top edge - so it slides IN
+            // rather than already being on screen at the edge - and lands on the focused
+            // card, moving down the whole way.
             body.hint = root.tallFramedHint(2, 2, 4, 2)
             wait(20)
-            wait(body.slideDuration + 40)
-            verify(restingBar() !== null, "a marker before the switch")
-
             body.hint = root.tallFramedHint(3, 2, 4, 0)
             wait(20)
-            driveSlideTo(0)
-            compare(body._departingRowIndex, 2,
-                "the row it walks away from is the leaving frame's focused one")
-            // Down from the top of the column, by the two rows above it.
-            compare(body.sweepAnchor, 2 * body.rowPitch,
-                "and at progress 0 the wrap is anchored on THAT card, not on the top of "
-                    + "the column, was " + body.sweepAnchor)
-            compare(wrapBar().y, restingBarTop(2),
-                "so the bar sits on it exactly where the resting bar sat, was "
-                    + wrapBar().y + " against " + restingBarTop(2))
-            compare(wrapOutline().y, 2 * body.rowPitch,
-                "and so does the outline")
-            // A card's height, not a column's: the marker walks off, it does not grow.
-            compare(wrapBar().height, body.indicatorLength,
-                "the bar keeps the indicator's own length, was " + wrapBar().height)
-            compare(wrapOutline().height, body.rowHeight,
-                "and the outline keeps a card's height, was " + wrapOutline().height)
-            restAfterWrap(3)
+            driveMarkerTo(0)
+
+            // Wholly outside, and outside at the TOP rather than the bottom.
+            verify(body.crossingTop + body.rowHeight <= clipTop(),
+                "it starts a whole card above the panel's top edge, so it slides in - "
+                    + body.crossingTop + " against a clip top of " + clipTop())
+            verify(outline().y < 0, "and the outline is off the top too, was "
+                + outline().y)
+            var sample = sampleTop(24)
+            var tops = sample.tops
+            // Strictly DOWN, every step. A marker that rose at any point - even briefly -
+            // would read as two motions rather than one.
+            for (var i = 1; i < tops.length; ++i)
+                verify(tops[i] > tops[i - 1],
+                    "it moves down the whole way, sample " + i + " was " + tops[i]
+                        + " after " + tops[i - 1])
+            driveMarkerTo(1)
+            compare(body.crossingTop, body.focusedRowTop,
+                "landing exactly on the focused card")
         }
 
-        function test_theWrapExitsOneEdgeAndArrivesFromTheOther() {
-            // The wrap itself, both directions. An upward switch must be seen leaving
-            // through the TOP and arriving from the BOTTOM; a downward one the mirror.
-            // Each half is asserted as an edge the marker actually reached, sampled along
-            // the traverse, because the wrap is two phases and any single sample can sit
-            // in the gap between them.
+        function test_theDisplacementIsSlowEnoughToSee() {
+            // The reason the marker has a clock of its own, asserted as a measurement
+            // rather than as a number in the file.
+            //
+            // It was on the strip's clock before: `medium`, 160ms, `Easing.OutQuad`.
+            // The strip crosses 205px of panel in that and it is right for the strip. The
+            // marker travels at most one viewport vertically - and when the focused window
+            // is the first row, only 28px of that is on screen at all. On `OutQuad`, which
+            // covers three quarters of its distance in the first half of its time, 28px is
+            // over in about 30ms. Measured on the old version, the fastest point of the
+            // travel was around 1500px/s, which the eye reads as a jump and not as travel -
+            // which is exactly what it looked like.
+            //
+            // So: the marker's clock must be the LONGER of the two, and it must not front-
+            // load. Both are read off the component, so a retune that undoes either fails
+            // here rather than on screen.
+            compare(body.crossingAnimation.duration, Lazer.MotionTokens.page,
+                "the marker runs on the long clock, was "
+                    + body.crossingAnimation.duration)
+            compare(body.crossingAnimation.easing.type, Easing.InOutQuad,
+                "on a curve that does not front-load, was "
+                    + body.crossingAnimation.easing.type)
+            verify(body.crossingAnimation.duration > body.slideAnimation.duration,
+                "and it outlives the columns, " + body.crossingAnimation.duration
+                    + " against " + body.slideAnimation.duration
+                    + " - the list changes workspace first and the focus then arrives on it")
+
+            // And the measurement itself, on the WORST case: the focused window is the
+            // FIRST row, so almost the whole travel happens above the panel's edge and
+            // only the gap between that edge and the first card - `cellPaddingY`, 15px -
+            // is on screen at all. It is fully outside at the start, and the little that
+            // is visible has to carry the whole effect. Asserted as the exact figure
+            // rather than a threshold, so a change to either number shows up here.
+            body.hint = root.tallFramedHint(2, 2, 4, 2)
+            wait(20)
+            body.hint = root.tallFramedHint(3, 2, 4, 0)
+            wait(20)
+            driveMarkerTo(0)
+            compare(body.focusedRowTop - clipTop(),
+                body.bandInset - body.surfaceInset + body.cellPaddingY,
+                "the whole of the visible travel is the gap between the panel's top edge "
+                    + "and the first card, and nothing else")
+            var frames = Math.max(1, body.crossingAnimation.duration / (1000 / 60))
+            var sample = sampleTop(32)
+            var peakSpeed = sample.peakStep * 32 * 60 / frames
+            verify(peakSpeed < 700,
+                "so even that is a speed the eye can follow - 15px over "
+                    + body.crossingAnimation.duration + "ms, peaking at "
+                    + Math.round(peakSpeed) + "px/s against a 700px/s ceiling")
+
+            // And the case the description is actually about: a focus low in the column,
+            // where the marker genuinely crosses the cards above it on the way down.
+            body.hint = root.tallFramedHint(4, 4, 4, 3)
+            wait(20)
+            body.hint = root.tallFramedHint(3, 4, 4, 3)
+            wait(20)
+            driveMarkerTo(0)
+            var lowOnScreen = body.focusedRowTop - clipTop()
+            verify(lowOnScreen >= body.rowPitch * 3,
+                "a focus on the fourth row puts three whole card pitches of panel "
+                    + "between the marker's start and its landing, was " + lowOnScreen
+                    + " against " + (body.rowPitch * 3))
+            var lowSample = sampleTop(32)
+            verify(lowSample.tops[lowSample.tops.length - 1] > lowSample.tops[0],
+                "and it crosses all of them")
+            settleMarker()
+        }
+
+        function test_theDisplacementComesFromTheTopWhicheverWayTheWorkspaceWent() {
+            // The reference's rule, and the reason for it: one entry side, so the motion
+            // reads as the same gesture every time. Asserted for both directions against
+            // the same start, because a marker that entered from the side it was heading
+            // would pass every test that looked at one direction.
+            var starts = {}
+            var ends = {}
             for (var direction = 0; direction < 2; ++direction) {
                 var from = direction === 0 ? 2 : 4
-                var to = direction === 0 ? 3 : 3
-                var up = direction === 1
-                var label = up ? "upward" : "downward"
-                // Four rows, and the two frames focus DIFFERENT ones: the marker walks
-                // off the third card and lands on the first. Anything less would have it
-                // leaving and arriving on the same card, where the traverse's net
-                // displacement is zero and its direction cannot be read off the ends.
+                var label = direction === 0 ? "forwards" : "backwards"
                 body.hint = root.tallFramedHint(from, from, 4, 2)
                 wait(20)
-                body.hint = root.tallFramedHint(to, from, 4, 0)
+                body.hint = root.tallFramedHint(3, from, 4, 0)
                 wait(20)
-                compare(body._departingRowIndex, 2,
-                    label + ": it walks off the card the leaving frame had focused")
-                compare(body.focusedRowIndex, 0,
-                    label + ": and lands on a different one in the arriving frame")
-
-                var anchors = sampleAnchor(120)
-                var seen = extremes(anchors)
-                // Wholly out through the far edge, on the side the move went: the
-                // marker got its far side past the clip's near edge there.
-                var step = 2
-                var cleared = up
-                    ? seen.lowest + body.rowHeight <= clipTop() + step
-                    : seen.highest >= clipBottom() - step
-                verify(cleared, label + ": it leaves through the "
-                    + (up ? "top" : "bottom") + " of the panel, got to "
-                    + (up ? seen.lowest : seen.highest) + " against "
-                    + (up ? clipTop() : clipBottom()))
-                // And back in from the other side: it started that half from wholly
-                // outside the opposite edge, so the traverse reached past that edge too.
-                var reEntered = up
-                    ? seen.highest >= clipBottom() - step
-                    : seen.lowest + body.rowHeight <= clipTop() + step
-                verify(reEntered, label + ": and comes back in through the "
-                    + (up ? "bottom" : "top"))
-
-                // Both halves travel the SAME way. Read as the direction of the FIRST
-                // step and of the LAST step separately, which is what "one scrolling
-                // gesture" means: a marker that left upwards and then arrived from below
-                // still travelling upwards, rather than one that reversed at the far
-                // edge. A net displacement could not say this - the two cards are at
-                // different heights here, so the net has a sign, but the wrong one could
-                // be a marker that left up and came back DOWN to reach a lower card.
-                var firstStep = anchors[1] - anchors[0]
-                var lastStep = anchors[anchors.length - 1] - anchors[anchors.length - 2]
-                verify(up ? firstStep < 0 : firstStep > 0,
-                    label + ": it sets off " + (up ? "up" : "down") + ", first step "
-                        + firstStep)
-                verify(up ? lastStep < 0 : lastStep > 0,
-                    label + ": and arrives still going " + (up ? "up" : "down")
-                        + ", last step " + lastStep)
-
-                // And it ends on the card of the workspace moved to - a different card
-                // from the one it left, which is the whole point of the gesture.
-                compare(body.sweepAnchor, body.focusedRowTop,
-                    label + ": landing on the arriving frame's focused card, was "
-                        + body.sweepAnchor + " against " + body.focusedRowTop)
-                verify(body.focusedRowTop !== body._departingRowIndex * body.rowPitch,
-                    label + ": which is not the card it left")
-                restAfterWrap(to)
+                driveMarkerTo(0)
+                starts[label] = body.crossingTop
+                driveMarkerTo(1)
+                ends[label] = body.crossingTop
+                settleMarker()
             }
+            compare(starts.forwards, starts.backwards,
+                "both directions start from the same place, above the panel - "
+                    + starts.forwards + " and " + starts.backwards)
+            verify(starts.forwards < clipTop() && starts.backwards < clipTop(),
+                "and that place is above the panel's top edge, not below it")
+            compare(ends.forwards, ends.backwards,
+                "and both land on the same card, " + ends.forwards + " and "
+                    + ends.backwards)
         }
 
-        function test_theWrapExitsThroughTheEdgeTheMoveWentAndArrivesFromTheOther() {
-            // Which edge is which, stated for both directions in one place, because the
-            // failure that matters is a wrap that always leaves the same way - and that
-            // passes any test looking at one direction. Two edges x two directions.
-            //
-            // Sampled across the whole traverse rather than at a chosen progress: at any
-            // single progress a forward switch may legitimately be above the panel (it
-            // has left through the bottom and not yet come back in), so a sample says
-            // nothing about direction on its own.
-            // Each direction is judged on how far the traverse got past each edge,
-            // rather than on whether some sample was exactly on it - see `sampleAnchor`.
-            // A 2px tolerance against a 121-point sweep of a few hundred pixels.
-            var tolerance = 2
-            function edgesSeen(from, to) {
-                body.hint = root.tallFramedHint(from, from, 4, 2)
-                wait(20)
-                body.hint = root.tallFramedHint(to, from, 4, 0)
-                wait(20)
-                var seen = extremes(sampleAnchor(120))
-                settleSlide()
-                return {
-                    above: seen.lowest + body.rowHeight <= clipTop() + tolerance,
-                    below: seen.highest >= clipBottom() - tolerance,
-                    lowest: seen.lowest,
-                    highest: seen.highest
-                }
-            }
-
-            var forwards = edgesSeen(2, 3)
-            verify(forwards.below,
-                "moving to the next workspace goes out through the BOTTOM, reached "
-                    + forwards.highest + " against " + clipBottom())
-            verify(forwards.above,
-                "and comes back in through the TOP, reached " + forwards.lowest)
-            var backwards = edgesSeen(4, 3)
-            verify(backwards.above,
-                "moving to the previous workspace goes out through the TOP, reached "
-                    + backwards.lowest)
-            verify(backwards.below,
-                "and comes back in through the BOTTOM, reached " + backwards.highest)
-        }
-
-        function test_theWrapKeepsTheMarkersTogetherAndApart() {
-            // The bar and the outline are one gesture, so they have to agree about where
-            // the card is: the outline IS the card and the bar is centred on it. Asserted
-            // as a constant relationship at several points, because a wrap that drifted
-            // them apart would still pass every test about either one alone.
-            body.hint = root.tallFramedHint(2, 2, 4)
+        function test_oneInstanceOfEachMarkerAndItIsTheOneThatMoves() {
+            // ONE instance, and it is the one that travels. It was two of each - a
+            // resting element and a crossing-only twin, each hidden while the other
+            // showed - so the visible marker was always a different object from the one
+            // that had been there before. That is a cut wearing a disguise, and the
+            // displacement is only the gesture if the same rectangle does it.
+            compare(findAllByName(body, "windowHintFocusFrame").length, 1,
+                "exactly one focus outline exists")
+            compare(findAllByName(body, "windowHintFocusIndicator").length, 1,
+                "exactly one indicator exists")
+            body.hint = root.tallFramedHint(2, 2, 4, 2)
             wait(20)
-            body.hint = root.tallFramedHint(3, 2, 4)
+            body.hint = root.tallFramedHint(3, 2, 4, 0)
+            wait(20)
+            // The same element, watched across the crossing and held by reference, so a
+            // rebuild underneath it would show up as a different object.
+            var watched = outline()
+            driveMarkerTo(0)
+            var atTop = watched.y
+            driveMarkerTo(1)
+            verify(outline() === watched, "the outline is still the same object")
+            verify(watched.y > atTop,
+                "and it is the object that moved, from " + atTop + " to " + watched.y)
+            var watchedBar = bar()
+            driveMarkerTo(0)
+            var barTop = watchedBar.y
+            driveMarkerTo(1)
+            verify(bar() === watchedBar && watchedBar.y > barTop,
+                "and so is the bar, from " + barTop + " to " + watchedBar.y)
+            settleMarker()
+        }
+
+        function test_theBarAndTheOutlineAreOneGesture() {
+            // The bar is a bar CENTRED on its card, so it sits one `markerOffset` below
+            // the outline at EVERY point of the crossing - not only at rest. Two markers
+            // drifting apart mid-travel would read as two independent things happening.
+            body.hint = root.tallFramedHint(2, 2, 4, 2)
+            wait(20)
+            body.hint = root.tallFramedHint(3, 2, 4, 0)
             wait(20)
             for (var step = 0; step <= 6; ++step) {
-                driveSlideTo(step / 6)
-                var outline = wrapOutline()
-                var bar = wrapBar()
-                compare(bar.y - outline.y, body.sweepBarOffset,
+                driveMarkerTo(step / 6)
+                compare(bar().y - outline().y, body.markerOffset,
                     "at " + (step / 6) + " the bar is centred on the card the outline "
-                        + "draws, was " + (bar.y - outline.y))
-                compare(bar.x, strip().activeColumnX + body.indicatorInset,
+                        + "draws, was " + (bar().y - outline().y))
+                compare(bar().x, strip().activeColumnX + body.indicatorInset,
                     "at " + (step / 6) + " and both sit in the arriving column")
-                compare(outline.x, strip().activeColumnX + body.cellPaddingX,
+                compare(outline().x, strip().activeColumnX + body.cellPaddingX,
                     "at " + (step / 6) + " with the outline on the card's own edge")
             }
-            restAfterWrap(3)
-        }
-
-        function test_theMarkerAppearsOnTheNewWorkspacesRowWhenTheWrapLands() {
-            // The second half of the effect: once the wrap has gone, the marker is a
-            // row-length bar on the focused row of the workspace that was moved TO. Not
-            // on the row it left, and not still walking.
-            for (var direction = 0; direction < 2; ++direction) {
-                var from = direction === 0 ? 2 : 4
-                var to = direction === 0 ? 3 : 3
-                var label = direction === 0 ? "forwards" : "backwards"
-                body.hint = root.framedHint(from, from)
-                wait(20)
-                body.hint = root.framedHint(to, from)
-                wait(20)
-                settleSlide()
-                // Past the tail. The indicator's slow half is deliberately three times
-                // the head's flight, so for a beat after the crossing lands the bar is
-                // still longer than its resting length and contracts into it. Sampling
-                // once and demanding the final number would be asserting the tail does
-                // not exist.
-                wait(body.slideDuration * 2 + 40)
-
-                var after = restingBar()
-                verify(after !== null, label + ": a row marker once it has landed")
-                verify(wrapBar() === null,
-                    label + ": with the wrap gone, not merely hidden behind it")
-                verify(wrapOutline() === null, label + ": and its outline too")
-                compare(after.height, body.indicatorLength,
-                    label + ": at the resting length, was " + after.height)
-                compare(after.x, root.bandX + body.indicatorInset,
-                    label + ": in the panel's wide middle slot, was " + after.x)
-                var frame = restingOutline()
-                verify(frame !== null, label + ": and a row outline")
-                compare(frame.height, body.rowHeight,
-                    label + ": a row tall again, was " + frame.height)
-                // On the ARRIVING workspace's card, which the row titles name: every
-                // workspace's rows are titled after their own position, so the row the
-                // marker is on says which workspace it belongs to.
-                compare(markedWorkspace(), String(to),
-                    label + ": on the workspace that was moved TO")
+            // And the bar keeps its length throughout, rather than also running the
+            // tracker's own head/tail stretch underneath the displacement: two motions on
+            // one marker is what that would be. `crossingTop` moves the bar and nothing
+            // else does while the flag is up.
+            for (step = 0; step <= 4; ++step) {
+                driveMarkerTo(step / 4)
+                compare(bar().height, body.indicatorLength,
+                    "at " + (step / 4) + " the bar keeps the indicator's length, was "
+                        + bar().height + " against " + body.indicatorLength)
             }
+            settleMarker()
+            compare(bar().height, body.indicatorLength,
+                "and it is still that length once it has landed")
         }
 
-        // The workspace a marker is on, read from the position of the card it is
-        // standing on. A marker's own x cannot say: both frames put their active column
-        // in the panel's middle slot, so the only thing that distinguishes the two
-        // workspaces is which set of cards the marker is over.
-        function markedWorkspace() {
-            var marked = restingOutline()
-            if (!marked)
-                return ""
-            var centre = marked.mapToItem(strip(), marked.width / 2, marked.height / 2)
-            var columns = columnDelegates()
-            for (var i = 0; i < columns.length; ++i) {
-                var cardRows = rowsIn(columns[i])
-                if (cardRows.length === 0)
-                    continue
-                var index = Math.max(0, Math.min(cardRows.length - 1, body.focusedRowIndex))
-                var rowCentre = cardRows[index]
-                    .mapToItem(strip(), marked.width / 2, marked.height / 2)
-                if (Math.abs(rowCentre.x - centre.x) < 1
-                        && Math.abs(rowCentre.y - centre.y) < 1)
-                    return String(columns[i].modelData.position)
-            }
-            return ""
-        }
-
-        function test_theWrapRidesTheArrivingColumnAndWidensWithIt() {
-            // The wrap's x comes from the arriving column's own geometry, exactly as the
-            // resting marker's does, so it stays attached to the workspace being moved to
-            // for the whole traverse - and it widens as that column widens rather than
-            // staying the width it had when the crossing began.
-            body.hint = root.framedHint(2, 2)
+        function test_theDisplacementLandsAndStays() {
+            // The landing, and specifically that it STAYS. The two placements of the
+            // marker used to be chosen by a `Behavior`'s `enabled` and a binding in the
+            // same polish, so which of them won at the boundary came down to evaluation
+            // order - and the wrong winner was a second glide, from wherever the crossing
+            // left the marker back down onto the card it had already reached.
+            body.hint = root.tallFramedHint(2, 2, 4, 2)
             wait(20)
-            body.hint = root.framedHint(3, 2)
+            body.hint = root.tallFramedHint(3, 2, 4, 0)
             wait(20)
-            driveSlideTo(0)
-            var startX = wrapBar().x
-            var startWidth = wrapOutline().width
-            // At progress 0 the arriving column is a whole column off to the side, so
-            // the wrap starts out beyond the panel and comes IN - its x FALLS. Asserted
-            // as a fall, because "it ends up nearer the middle" would also be true of a
-            // marker that started in the middle and never moved.
-            verify(startX > body.width - 2 * body.columnWidth,
-                "it starts out beyond the panel's right edge with the arriving column, "
-                    + "was at " + startX + " in a panel of " + body.width)
-            driveSlideTo(0.5)
-            verify(wrapBar().x < startX,
-                "and comes in with it, went " + startX + " to " + wrapBar().x)
-            verify(wrapOutline().width > startWidth,
-                "its outline widens with that column, went " + startWidth + " to "
-                    + wrapOutline().width)
-            compare(wrapBar().x, strip().activeColumnX + body.indicatorInset,
-                "in the arriving column's left padding")
-            compare(wrapOutline().width, strip().activeCardWidth,
-                "and as wide as that column's card")
-            restAfterWrap(3)
+            driveMarkerTo(1)
+            var landed = outline().y
+            settleMarker()
+            // Read immediately: a `fast` or `OutQuint` glide would still be under way,
+            // and so would a whole extra animation.
+            compare(outline().y, landed,
+                "the outline is where the displacement left it, was " + outline().y
+                    + " against " + landed)
+            compare(outline().y, body.focusedRowTop, "which is the focused card")
+            compare(bar().y, body.focusedRowTop + body.markerOffset,
+                "and the bar is centred on the same card")
+            // The strip has already finished by then: the marker's clock is the longer
+            // one, so this is where the second beat of the two-beat effect lives.
+            verify(!body.swapping, "the columns had finished before the marker landed")
+            wait(body.slideDuration + 80)
+            compare(outline().y, landed, "and it is still there, was " + outline().y)
         }
 
-        function test_aReAimDoesNotRestartTheWrap() {
-            // A second switch landing mid-crossing re-aims the traverse, and the wrap has
-            // to carry on through it. Resetting it would put the marker back on the card
-            // it had already left, which reads as a second departure rather than as one
-            // move re-aimed - and it is the specific regression a wrap invites, because a
-            // re-aim restarts the clock the wrap is driven from.
+        function test_aReAimDoesNotRestartTheDisplacement() {
+            // A second switch landing mid-crossing re-aims the traverse, and the marker
+            // has to carry on through it. Resetting it would throw the marker back to the
+            // top of the panel - a second entry, which reads as two crossings rather than
+            // as one move re-aimed. The specific regression a displacement driven off a
+            // clock invites, because a re-aim restarts that clock.
             body.hint = root.framedHint(1, 1)
             wait(20)
             body.hint = root.framedHint(2, 1)
             wait(20)
-            driveSlideTo(0.5)
-            var reached = body.sweepAnchor
-            driveSlideTo(0.5)
-
+            driveMarkerTo(0.5)
+            var reached = body.crossingTop
             body.hint = root.framedHint(3, 2)
-            // No wait: the re-aim resets the crossing's clock to 0 in the same turn as
-            // the publish, so a wait here would let the new leg animate for a frame or
-            // two and the sample would no longer be the instant the question is about.
-            compare(body.sweepAnchor, reached,
-                "the wrap did not jump back onto the card it had left, was "
-                    + body.sweepAnchor + " against " + reached)
+            // No wait: the re-aim restarts the marker's clock to 0 in the same turn as
+            // the publish, so a wait here would let the new leg travel for a frame or two
+            // and the sample would no longer be the instant the question is about.
+            compare(body.crossingTop, reached,
+                "the marker did not go back to the top of the panel, was "
+                    + body.crossingTop + " against " + reached)
             wait(20)
-            verify(wrapBar() !== null, "the wrap is still up after the re-aim")
-            driveSlideTo(0.75)
-            verify(body.sweepAnchor !== reached,
-                "and it is still travelling, went " + reached + " to " + body.sweepAnchor)
-            restAfterWrap(3)
+            verify(body._markerCrossing, "the crossing is still under way")
+            driveMarkerTo(0.75)
+            verify(body.crossingTop > reached,
+                "and it is still travelling down, went " + reached + " to "
+                    + body.crossingTop)
+            landDrivenSlide(3)
         }
 
-        function test_noSwitchMeansNoWrap() {
-            // The wrap must not be reachable without a switch. It is armed by the two
-            // functions that START a crossing, so a refresh on the same workspace, a cold
-            // snapshot and a move too wide to describe all have to leave the panel with
-            // exactly the one marker it always had - and a wrap left armed by a cancelled
-            // crossing would sit over the list for the rest of the hold.
-            verify(wrapBar() === null, "nothing is wrapping at rest")
-            verify(wrapOutline() === null, "and no wrap outline either")
-            verify(restingBar() !== null, "the row marker is the one on screen")
-
-            // A refresh with no movement: the case that must not be taken for a switch.
+        function test_noSwitchMeansNoDisplacement() {
+            // A refresh on the same workspace, a cold snapshot and a move too wide to
+            // describe all commit outright, so none of them may arm a crossing. A flag
+            // left set by a cancelled crossing would park the marker above the panel for
+            // the rest of the hold, which is the worst possible failure for it: the
+            // panel would show no focus mark at all and say nothing about why.
+            verify(!body._markerCrossing, "nothing is crossing at rest")
+            verify(findByName(body, "windowHintFocusFrame").visible,
+                "and the outline is on screen")
             body.hint = root.framedHint(2, 2)
             wait(20)
             body.hint = root.makeHint({
@@ -1582,14 +1500,8 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 nextWindows: [{ windowId: "n", title: "n", icon: "", isFocused: false }]
             })
             wait(20)
-            verify(wrapBar() === null, "a same-workspace refresh arms no wrap")
-            verify(wrapOutline() === null, "nor an outline")
-            verify(restingBar() !== null, "and the row marker is still there")
-
-            // Too far to describe: committed outright, so there is no crossing and
-            // nothing to wrap.
-            body.hint = root.framedHint(2, 2)
-            wait(20)
+            verify(!body._markerCrossing, "a same-workspace refresh arms no crossing")
+            verify(outline().visible, "and the outline is still there")
             body.hint = root.makeHint({
                 activeWorkspacePosition: 8,
                 previousActiveWorkspacePosition: 2,
@@ -1597,59 +1509,50 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 previousWindows: [], nextWindows: []
             })
             wait(20)
-            verify(wrapBar() === null, "a move too wide to describe arms no wrap")
-            verify(restingBar() !== null, "and the row marker is the one on screen")
+            verify(!body._markerCrossing, "a move too wide to describe arms no crossing")
+            verify(outline().visible, "and the outline is still there")
         }
 
-        function test_aSwitchAlwaysLandsTheWrap() {
-            // The wrap is cleared by the commit that ends the crossing. If it were not,
-            // the marker would be left walking over a panel that had stopped moving -
-            // so this is the test that the effect ENDS rather than only that it starts.
-            body.hint = root.tallFramedHint(2, 2, 4)
+        function test_aSwitchAlwaysLandsTheDisplacement() {
+            // The effect ENDS, not only that it starts. `_markerCrossing` is a flag
+            // written by an animation's `onFinished`, and a flag is something that can be
+            // left set - which would leave the marker travelling over a panel that had
+            // long since stopped, forever.
+            body.hint = root.tallFramedHint(2, 2, 4, 2)
             wait(20)
-            body.hint = root.tallFramedHint(3, 2, 4)
+            body.hint = root.tallFramedHint(3, 2, 4, 0)
             wait(20)
-            verify(wrapBar() !== null, "a switch does wrap, which is what this checks")
-            settleSlide()
-            verify(wrapBar() === null, "and it is gone once landed")
-            verify(restingBar() !== null, "with the row marker back")
-            compare(body._departingRowIndex, -1,
-                "and nothing left naming a card to walk away from")
+            verify(body._markerCrossing, "a switch does cross, which is what this checks")
+            settleMarker()
+            verify(!body._markerCrossing, "and the crossing is over once it has landed")
+            verify(outline().visible, "with the outline back on its card")
+            compare(outline().y, body.focusedRowTop, "and on the focused card")
         }
 
-        function test_theWrapNeverCoversTheRowContentItIsMarking() {
-            // The wrap's outline is border-only for the same reason the resting one's is:
-            // a filled shape would veil every icon and title in the column it travels
-            // over. Compared against the value QML normalises `transparent` to, rather
-            // than against the string: a colour property hands back `#00000000`, so an
-            // equality against "transparent" would fail on the representation rather than
-            // on the claim.
-            body.hint = root.tallFramedHint(2, 2, 4)
+        function test_theDisplacementNeverCoversTheRowContentItIsMarking() {
+            // The outline is border-only for the same reason the resting one's was: a
+            // filled shape would veil every icon and title in the column it travels over.
+            // Compared against the value QML normalises `transparent` to, rather than
+            // against the string: a colour property hands back `#00000000`, so an equality
+            // against "transparent" would fail on the representation rather than on the
+            // claim.
+            body.hint = root.tallFramedHint(2, 2, 4, 2)
             wait(20)
-            body.hint = root.tallFramedHint(3, 2, 4)
+            body.hint = root.tallFramedHint(3, 2, 4, 0)
             wait(20)
-            var outline = wrapOutline()
-            verify(outline !== null, "the wrap outline is up")
-            compare(String(outline.color).toLowerCase(), "#00000000",
-                "and fills nothing, so it cannot cover the rows it passes over, was "
-                    + outline.color)
-            // Above the rows in z, which is what makes it a mark on them rather than
-            // something they cover - and inert, so it cannot intercept a tap.
-            compare(outline.z > 0, true, "above the rows")
-            compare(outline.enabled, false, "and inert to input")
-            // The bar is a bar: the indicator's own thickness, at every point of the
-            // traverse rather than only at rest.
+            compare(String(outline().color).toLowerCase(), "#00000000",
+                "it fills nothing, so it cannot cover the rows it passes over, was "
+                    + outline().color)
+            compare(outline().z > 0, true, "above the rows, which is what makes it a mark")
+            compare(outline().enabled, false, "and inert to input")
             for (var step = 0; step <= 4; ++step) {
-                driveSlideTo(step / 4)
-                compare(wrapBar().width, body.indicatorThickness,
-                    "at " + (step / 4) + " the wrap bar keeps the indicator's thickness, "
-                        + "was " + wrapBar().width)
-                compare(wrapBar().height, body.indicatorLength,
-                    "at " + (step / 4) + " and its length")
+                driveMarkerTo(step / 4)
+                compare(bar().width, body.indicatorThickness,
+                    "at " + (step / 4) + " the bar keeps the indicator's thickness, was "
+                        + bar().width)
             }
-            restAfterWrap(3)
+            settleMarker()
         }
-
 
         function test_theWholePanelArrivesInOnePiece() {
             // No row is left behind and none arrives on its own. A switch used to
@@ -1934,6 +1837,13 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         // frame and released the held one.
         function settleSlide() {
             wait(body.slideDuration + 40)
+            // A crossing this suite drove by hand had its animation stopped, so its
+            // `onFinished` never runs and `swapping` - a flag, since it stopped being
+            // `slideProgress < 1` - stays set for good. Waiting cannot clear it. Land it
+            // through the one publish that does reach `_commitHint`, so the next test
+            // starts from a panel at rest rather than inheriting a crossing.
+            if (body.swapping)
+                landDrivenSlide(body.hint.activeWorkspacePosition)
         }
 
         function test_indicatorFollowsAFocusSwitch() {
@@ -3327,16 +3237,18 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(repeatedTitles().length, 0,
                 "and nothing is painted twice mid-crossing: "
                     + repeatedTitles().join(", "))
-            // Landed by the publish a no-movement switch makes - the crossing was
-            // driven, so nothing will run its `onFinished` for us. See
-            // `landDrivenSlide`.
-            landDrivenSlide(root.makeHint({
+            // Landed the way a hand-driven crossing has to be landed: by a publish no
+            // strip could carry, which is the one that reaches `_commitHint` and clears
+            // the flags. See `landDrivenSlide`.
+            landDrivenSlide(3)
+            body.hint = root.makeHint({
                 activeWorkspacePosition: 3,
                 previousActiveWorkspacePosition: 3,
                 previousWindows: [{ windowId: "p1", title: "p1", icon: "", isFocused: false }],
                 nextWindows: [{ windowId: "n1", title: "n1", icon: "", isFocused: false }],
                 windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
-            }))
+            })
+            wait(20)
             compare(body.plan.slots, 3, "and the strip is the arriving frame alone")
             // Landed: each neighbour slot shows what the new snapshot says for it
             // rather than a stale list.
