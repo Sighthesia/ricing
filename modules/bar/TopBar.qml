@@ -5,6 +5,7 @@ import "../lazerbar"
 import "../lazerbar/ScreenCornerMask.js" as CornerMask
 import "../lazerbar/WallpaperBootLogic.js" as BootLogic
 import "./FullscreenBarLogic.js" as RevealLogic
+import "./StartupBarRevealLogic.js" as StartupReveal
 import "../../services" as Services
 
 // Mount the layout-driven bar plus the launcher wave owner per screen.
@@ -110,6 +111,49 @@ Variants {
         // match initialState() and so the first frame is correct before any
         // event arrives.
         property real revealProgress: 1
+        // Startup expansion. Starts slid out, so startup has an arrival rather
+        // than a pop-in, and it is deliberately NOT the state above: outside
+        // fullscreen the auto-hide machine forces `revealed` true on every event
+        // it sees, so a startup expansion stored in that state would be undone by
+        // the next pointer move. The two are independent and combine into one
+        // slide, which is also why neither may collapse the bar on its own.
+        property real startupProgress: 0
+        // One-way latch, so nothing after the slide can un-expand the bar.
+        property bool startupExpanded: false
+        // The only value the slide geometry reads.
+        readonly property real slideProgress: StartupReveal.slideProgress(
+            screenScope.revealProgress, screenScope.startupProgress)
+        // Same motion contract as the auto-hide reveal above — an explicit
+        // NumberAnimation rather than a Behavior, because a Behavior cannot vary
+        // easing by direction and startup is a one-way arrival with no return leg.
+        NumberAnimation {
+            id: startupRevealMotion
+            target: screenScope
+            property: "startupProgress"
+            running: false
+        }
+        // Slide in, once, as soon as this screen's widgets are staged. Per screen
+        // rather than on the root's aggregate readiness, so each bar arrives when
+        // its own content exists instead of waiting for the slowest monitor.
+        function expandAtStartup() {
+            screenScope.startupExpanded = StartupReveal.latchStartup(
+                true, screenScope.startupExpanded)
+            // Reduced motion arrives without travelling, the same way the
+            // auto-hide reveal snaps when there is no distance left to cover.
+            if (MotionTokens.reducedMotion) {
+                startupRevealMotion.stop()
+                screenScope.startupProgress = 1
+                return
+            }
+            if (screenScope.startupProgress > 0.999)
+                return
+            // Reuses the bar's own reveal token and curve rather than
+            // introducing motion this bar does not already own.
+            startupRevealMotion.duration = MotionTokens.slow
+            startupRevealMotion.easing.type = Easing.OutCubic
+            startupRevealMotion.to = 1
+            startupRevealMotion.restart()
+        }
         // Match the hover-popup reveal (see BarPopupHost.setRevealTarget): an
         // explicit NumberAnimation rather than a Behavior, because the popup
         // varies its easing per direction and a Behavior cannot. `onRevealedChanged`
@@ -315,6 +359,12 @@ Variants {
             autoHideEnabled: autoHideEnabled,
             revealed: revealed,
             revealProgress: revealProgress,
+            // The startup side of the same question: a bar that is off screen
+            // because it has not arrived yet looks identical to one the
+            // auto-hide machine collapsed, and only these two fields tell them
+            // apart from outside the process.
+            startupExpanded: startupExpanded,
+            slideProgress: slideProgress,
             pinned: _pinned,
             state: _revealState
         })
@@ -396,8 +446,10 @@ Variants {
         Connections {
             target: barContent
             function onStartupReadyChanged() {
-                if (barContent.startupReady)
-                    root.reportBarReady(screenScope.startupScreenKey)
+                if (!barContent.startupReady)
+                    return
+                root.reportBarReady(screenScope.startupScreenKey)
+                screenScope.expandAtStartup()
             }
         }
 
@@ -481,7 +533,9 @@ Variants {
 
             // Slide the painted bar out of view. Only the inner content moves, so
             // the layer-shell surface, its exclusive zone and its blur region
-            // never resize per frame.
+            // never resize per frame. The offset reads `slideProgress`, the
+            // product of the auto-hide reveal and the startup expansion, so this
+            // is the one place either mechanism can take the bar off screen.
             //
             // No opacity on this container: the bar translates as a solid object
             // and never fades. A bar that dissolves while sliding reads as two
@@ -496,7 +550,7 @@ Variants {
             Item {
                 id: barSlide
                 x: 0
-                y: (1 - screenScope.revealProgress)
+                y: (1 - screenScope.slideProgress)
                         * (screenScope.atTop ? -barSlide.height : barSlide.height)
                 width: parent.width
                 height: parent.height
@@ -633,7 +687,9 @@ Variants {
             Item {
                 id: revealProbe
                 width: barSlide.width
-                height: screenScope.revealed ? barSlide.height : RevealLogic.revealStripHeight
+                height: StartupReveal.claimsFullRegion(screenScope.revealed,
+                                                       screenScope.startupExpanded)
+                        ? barSlide.height : RevealLogic.revealStripHeight
                 y: screenScope.atTop ? 0 : barSlide.height - height
             }
 
