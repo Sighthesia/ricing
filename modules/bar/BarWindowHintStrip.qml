@@ -89,6 +89,11 @@ Item {
     // however many windows the workspace holds.
     property int viewportRows: HintLogic.MAX_WINDOW_ROWS
 
+    // Whether the body's focus marker is mid-journey. One flag, read here for one reason:
+    // the row's focus tint is the only thing left on the marker's path that still
+    // crossfades, and a crossfade there is a flash. See the `Behavior on color` below.
+    property bool markerCrossing: false
+
     // How far the ACTIVE column is scrolled, in pixels. Owned here rather than by the
     // body because the scrolling content is here: the column's own `y` is this offset,
     // and the body needs it only to place the focus markers against the same scrolled
@@ -304,7 +309,28 @@ Item {
                     readonly property alias rowFlashAnimation: rowFlash
                     readonly property alias rowFlashOverlay: rowFlashOverlay
 
-                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                    // Off for the whole of a crossing. Measured, not reasoned: niri's
+                    // second snapshot about 40ms into a switch is often the first that
+                    // carries the new workspace's windows, so the tint arrives then - and
+                    // the arriving frame's rows REPLACE the leaving frame's, which means
+                    // the delegate that becomes the focused row is a RECYCLED one still
+                    // holding its previous colour. With a Behaviour, that recycled delegate
+                    // animates from where it was to the tint, and the card's background
+                    // visibly flushed through an unrelated colour on the way: measured on
+                    // a switch into a workspace whose focus was on row 4, a ~300ms ramp
+                    // from the tint through `#fb2320` to the new tint, while the marker
+                    // was still out of sight above the panel.
+                    //
+                    // Instant is right here rather than merely acceptable: the content is
+                    // already travelling, so a background fade is motion that is not part
+                    // of the gesture, and it lands on the card the marker is about to
+                    // arrive on. At rest - a focus change inside one workspace, with no
+                    // journey under way - the crossfade stays, because there the tint
+                    // arriving IS the event and a short fade reads as intent.
+                    Behavior on color {
+                        enabled: !root.markerCrossing
+                        ColorAnimation { duration: MotionTokens.fast }
+                    }
                     Behavior on scale {
                         enabled: !MotionTokens.reducedMotion
                         NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }

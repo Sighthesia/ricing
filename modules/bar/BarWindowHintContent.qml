@@ -1059,6 +1059,7 @@ Item {
         // One viewport, declared once: the body sizes the panel from it and the strip
         // clips the column to it, so the two cannot be different numbers.
         viewportRows: root.viewportRows
+        markerCrossing: root._markerCrossing
         cellPaddingX: root.cellPaddingX
         // Read from the same `activeColumn` the strip's own columns come from, so the
         // row that tints and the row the outline glides onto are the same row by

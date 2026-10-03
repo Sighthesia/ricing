@@ -1871,6 +1871,53 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 + body.markerOffset, "and the bar lands on it")
         }
 
+        function test_theFocusTintLandsInstantlyWhileACrossingIsRunning() {
+            // The card's own background, which is the focus tint - the shared highlight is
+            // border-only, so the tint IS the row's surface.
+            //
+            // niri's second snapshot about 40ms into a switch is often the first that
+            // carries the new workspace's windows, so that is when the tint arrives. And
+            // the arriving frame's rows REPLACE the leaving frame's, which means the
+            // delegate that becomes the focused row is a RECYCLED one still holding its
+            // previous colour: measured, a ~300ms ramp from the old tint through
+            // `#fb2320` to the new one while the marker was still above the panel. A
+            // flash of the background, on exactly the card the marker was about to land on.
+            body.hint = root.tallFramedHint(2, 2, 8, 1)
+            wait(700)
+            // The switch arrives, but the new workspace's windows have not.
+            var empty = root.framedHint(3, 2)
+            empty.windows = []
+            body.hint = empty
+            wait(20)
+            verify(body._markerCrossing, "the crossing is under way")
+            body.hint = root.tallFramedHint(3, 3, 8, 4)
+            // One frame later. A crossfade would still be at the previous colour, or part
+            // way to somewhere between it and the tint.
+            wait(1)
+            var rows = findAllByName(strip(), "windowHintWindowRow")
+            verify(rows.length >= 5,
+                "the arriving column's cards are all there, " + rows.length)
+            compare(String(rows[4].color), String(Lazer.LazerTheme.settingsSelected),
+                "and the row that is focused is tinted at once rather than fading in, "
+                    + "was " + rows[4].color)
+            verify(body._markerCrossing,
+                "which was still mid-crossing, so this is the journey's doing")
+            settleSlide()
+            settleMarker()
+
+            // At rest the crossfade stays, because there the tint arriving IS the event
+            // and a short fade reads as intent rather than as a glitch.
+            body.hint = root.tallFramedHint(3, 3, 8, 6)
+            wait(1)
+            var resting = findAllByName(strip(), "windowHintWindowRow")
+            verify(String(resting[6].color) !== String(Lazer.LazerTheme.settingsSelected),
+                "while a focus change with no journey under way still crossfades, so the "
+                    + "row keeps its fade where it belongs - was " + resting[6].color)
+            wait(Lazer.MotionTokens.fast + 60)
+            compare(String(resting[6].color), String(Lazer.LazerTheme.settingsSelected),
+                "and settles on the tint")
+        }
+
         function test_theWholePanelArrivesInOnePiece() {
             // No row is left behind and none arrives on its own. A switch used to
             // stagger the three columns in row by row, which meant the panel was
