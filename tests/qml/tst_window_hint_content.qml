@@ -955,11 +955,18 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             settleSlide()
         }
 
-        function test_theMarkersFollowTheArrivingColumnAsItWidens() {
-            // Focus belongs to the workspace being moved to, so the two shared markers
-            // have to travel with THAT column - and change width with it. Pinned to the
-            // panel they would say "the focus stayed put" while the list it marks moved
-            // and widened, which are two different claims about the same instant.
+        function test_theMarkersChangeWidthWithWhicheverColumnTheyAreOn() {
+            // Focus belongs to the card the marker is on, so the two shared markers have
+            // to travel with THAT column - and change width with it. Pinned to the panel
+            // they would say "the focus stayed put" while the list they mark moved and
+            // changed width, which are two different claims about the same instant.
+            //
+            // Sampled on the departure leg, where the column is still MOVING: the card
+            // being left narrows as it goes out, so the outline narrows with it and the
+            // bar slides away with it. The arrival leg has no version of this to check -
+            // it runs after the strip has settled, by design, which is why the marker's
+            // landing is a descent onto a panel that has stopped moving rather than a
+            // chase after content that is still sliding.
             //
             // Sampled at quarters by `driveSlideTo`, so the widths compared below are the
             // exact ones rather than whatever the crossing's curve had reached.
@@ -972,52 +979,52 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var previousBarX = -1
             for (var step = 0; step <= 4; ++step) {
                 driveSlideTo(step / 4)
+                // Stay on the departure leg for all five samples: the marker clock's
+                // corner is at 0.5, and step 3 of the strip's own clock is already past
+                // the point where that lands.
+                driveMarkerTo(0.05 + step / 4 * 0.4)
                 var frame = findByName(strip(), "windowHintFocusFrame")
                 var bar = findByName(strip(), "windowHintFocusIndicator")
-                var arriving = columnForPosition(3)
-                verify(frame !== null && bar !== null && arriving !== null,
-                    "step " + step + ": the markers and the column are all there")
+                var leaving = columnForPosition(2)
+                verify(frame !== null && bar !== null && leaving !== null,
+                    "step " + step + ": the markers and the departing column are all there")
                 // The outline starts one padding inside the column and spans the card:
                 // the column less the padding at each side.
-                compare(frame.x, arriving.x + 19,
+                compare(frame.x, leaving.x + 19,
                     "step " + step + ": the outline starts one padding inside the column")
-                compare(frame.width, arriving.width - 38,
+                compare(frame.width, leaving.width - 38,
                     "step " + step + ": and is exactly as wide as the card, was "
                         + frame.width)
                 // The indicator is measured from the column's own left edge, not the
                 // card's: it lives in the band's padding, beside the card.
-                compare(bar.x, arriving.x + 8,
+                compare(bar.x, leaving.x + 8,
                     "step " + step + ": and the indicator is 8 into the band's padding")
-                compare(bar.x + bar.width, arriving.x + 8 + 3,
+                compare(bar.x + bar.width, leaving.x + 8 + 3,
                     "step " + step + ": one clearance, the bar, one clearance")
                 verify(bar.x + bar.width <= frame.x,
                     "step " + step + ": so it stays outside the outline")
-                // The card it marks really is the arriving workspace's, read off the
-                // live rows rather than off the marker.
-                var rows = findAllByName(arriving, "windowHintWindowRow")
-                verify(rows.length > 0, "step " + step + ": the arriving column has cards")
-                if (rows.length > 0)
-                    compare(frame.x, rows[0].mapToItem(strip(), 0, 0).x,
-                        "step " + step + ": and on the first of them")
-                // Both markers MOVE as the column does, and the outline grows with it.
+                // Both markers MOVE as the column does, and the outline changes with it.
                 if (step > 0) {
-                    verify(frame.width > previousFrameWidth,
-                        "step " + step + ": the outline widens with the card, was "
-                            + frame.width + " from " + previousFrameWidth)
+                    verify(frame.width < previousFrameWidth,
+                        "step " + step + ": the outline narrows with the card it is "
+                            + "leaving, was " + frame.width + " from "
+                            + previousFrameWidth)
                     verify(bar.x < previousBarX,
-                        "step " + step + ": and the indicator slides in with it, was "
+                        "step " + step + ": and the indicator slides out with it, was "
                             + bar.x + " from " + previousBarX)
                 }
                 previousFrameWidth = frame.width
                 previousBarX = bar.x
             }
             settleSlide()
+            settleMarker()
             var landed = findByName(live(), "windowHintFocusFrame")
             compare(landed.x, root.bandX + root.padX,
                 "once landed the outline is inside the wide slot's padding")
             compare(landed.width, root.wideCard,
                 "and spans the active card, was " + landed.width)
         }
+
 
         function test_aReAimContinuesFromWhereTheCrossingHadReached() {
             // Holding mod and arrowing twice quickly lands a second switch while the
@@ -1197,11 +1204,20 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             wait(1)
         }
 
-        // Let the marker run its real animation out, which is the only thing that clears
-        // `_markerCrossing` - it is a clock's flag, not a derived expression, so nothing
-        // else can.
+        // Let the marker land, which is the only thing that clears `_markerCrossing` - it
+        // is a clock's flag, not a derived expression, so nothing else can.
+        //
+        // A crossing this suite drove by hand had its animation stopped, so a bare wait
+        // would leave the flag set for good and hand the next test a marker still halfway
+        // down the panel. Replaying it is how a crossing actually lands, and the
+        // assertions either side read the resting panel regardless.
         function settleMarker() {
+            if (body._markerCrossing) {
+                body.crossingClock = 0
+                body.crossingAnimation.restart()
+            }
             wait(body.crossingAnimation.duration + 60)
+            verify(!body._markerCrossing, "the marker has landed")
         }
 
         // Land a crossing that was driven by hand. `driveSlideTo` and `driveMarkerTo`
@@ -1251,12 +1267,12 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 "with the bar in that column's own padding too")
 
             // Down, the whole way, and out.
-            var sample = sampleTop(0, 0.5, 16)
+            var sample = sampleTop(0, 0.45, 16)
             for (var i = 1; i < sample.length; ++i)
                 verify(sample[i] > sample[i - 1],
                     "it moves down the whole departure, sample " + i + " was " + sample[i]
                         + " after " + sample[i - 1])
-            driveMarkerTo(0.5)
+            driveMarkerTo(0.4999)
             verify(outline().y + body.rowHeight > clipBottom(),
                 "and ends wholly below the panel's bottom edge, so the clip has taken "
                     + "it - " + (outline().y + body.rowHeight) + " against a bottom of "
@@ -1268,14 +1284,21 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // the same geometry, because a departure that mirrored the switch would pass
             // every test that looked at one direction.
             var ends = {}
-            var x = {}
+            var onOwnColumn = {}
             for (var direction = 0; direction < 2; ++direction) {
                 var from = direction === 0 ? 2 : 4
                 var label = direction === 0 ? "forwards" : "backwards"
                 startCrossingOverTwoRows(from, 1, 3, 0)
-                driveMarkerTo(0.5)
+                // The strip first: its column x is read live further down, and a moving
+                // strip means the marker and the column are sampled at two instants.
+                driveSlideTo(0.5)
+                driveMarkerTo(0.49)
                 ends[label] = outline().y
-                x[label] = outline().x
+                // Compared HERE, with the strip held at this crossing's own mid-point:
+                // read afterwards it would be measured against a panel that has settled
+                // three workspaces along.
+                onOwnColumn[label] = outline().x
+                    === strip().columnXFor(from) + body.cellPaddingX
                 settleMarker()
                 landDrivenSlide(3)
                 body.hint = root.tallFramedHint(from, from, 4, 1)
@@ -1286,8 +1309,13 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                     + ends.backwards)
             verify(ends.forwards + body.rowHeight > clipBottom(),
                 "which is below the panel, not above it")
-            compare(x.forwards, x.backwards,
-                "and both leave from the departing column's own x")
+            // Not the same place, and not meant to be: a backward switch's departing
+            // column is on the far side of the panel from a forward switch's. What has to
+            // hold is that each leaves from ITS OWN departing column, which is a different
+            // claim and the one a mirrored departure would fail.
+            verify(onOwnColumn.forwards, "forwards leaves from the column of the "
+                + "workspace it is leaving")
+            verify(onOwnColumn.backwards, "and so does backwards")
         }
 
         function test_theCornerIsWhollyOutsideTheClipOnBothCounts() {
@@ -1402,20 +1430,29 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var watched = outline()
             driveMarkerTo(0)
             var onOld = watched.y
-            driveMarkerTo(0.5)
+            driveMarkerTo(0.45)
             var offPanel = watched.y
             driveMarkerTo(1)
             verify(outline() === watched, "the outline is still the same object")
-            verify(offPanel > onOld && watched.y > offPanel,
-                "and it is the object that moved, off the old card at " + onOld
-                    + ", out of sight at " + offPanel + ", onto the new one at "
-                    + watched.y)
+            // Not monotonic, and deliberately: it goes DOWN out of the panel, jumps back
+            // to above the panel at the corner while it is out of sight on both counts,
+            // and comes down onto the card. What has to hold is that the leg it left on
+            // carried it further down and the leg it arrived on put it on the card.
+            verify(offPanel > onOld,
+                "and it is the object that moved down off the old card, from " + onOld
+                    + " to " + offPanel)
+            compare(watched.y, body.focusedRowTop,
+                "and then down onto the arriving card, at " + watched.y)
             var watchedBar = bar()
             driveMarkerTo(0)
             var barStart = watchedBar.y
-            driveMarkerTo(1)
+            driveMarkerTo(0.45)
             verify(bar() === watchedBar && watchedBar.y > barStart,
-                "and so is the bar, from " + barStart + " to " + watchedBar.y)
+                "and so is the bar, down off the old card from " + barStart + " to "
+                    + watchedBar.y)
+            driveMarkerTo(1)
+            compare(watchedBar.y, body.focusedRowTop + body.markerOffset,
+                "and then onto the arriving one, centred on the same card")
             settleMarker()
         }
 
@@ -3103,80 +3140,130 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 label + ": the destination workspace's own window is on screen")
         }
 
-        function test_onlyTheActiveColumnCarriesTheFocusMarkers() {
-            // Focus belongs to the workspace you are moving to, and the markers
-            // belong to the ARRIVING frame's active column. There is one strip and
-            // one pair of markers, so the claim is that they sit on the column the
-            // plan calls active - not on the panel's middle, which is where that
-            // column is only at the end of the crossing.
-            body.hint = root.makeHint({
-                activeWorkspacePosition: 3,
-                previousActiveWorkspacePosition: 2,
-                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
-            })
-            wait(Math.round(body.slideDuration / 2))
+        // The markers are placed against a column's OWN geometry - inside its padding,
+        // as wide as its card - read off its real delegate rather than off a slot index
+        // times a pitch. The crossing runs on a fractional position, so "slot 2" no
+        // longer names a place and a mid-flight x is not a whole number either; what has
+        // to hold at every instant is the pairing.
+        //
+        // WHICH column depends on which half of the journey the marker is in, and both
+        // halves are real: the departure leg marks the card being left, which is a column
+        // still on the strip and still moving, and the arrival leg marks the card being
+        // moved to. Pinned to the panel's middle instead, the markers would claim the
+        // focus stayed put while the list they mark moved.
+        function assertMarkersOn(workspacePosition, label) {
+            var frame = findByName(strip(), "windowHintFocusFrame")
+            var bar = findByName(strip(), "windowHintFocusIndicator")
+            var column = columnForPosition(workspacePosition)
+            verify(column !== null, label + ": that column is on the strip")
+            if (column === null)
+                return
+            compare(frame.x, column.x + root.padX,
+                label + ": the outline is inside its padding, was " + frame.x)
+            compare(frame.width, column.width - root.padX * 2,
+                label + ": and as wide as its card, was " + frame.width)
+            compare(bar.x, column.x + 8,
+                label + ": the bar is 8 into that column's own padding, was " + bar.x)
+            compare(bar.x + bar.width, column.x + 8 + 3,
+                label + ": one clearance, the bar, one clearance")
+            verify(bar.x + bar.width <= frame.x,
+                label + ": so the bar stays outside the outline")
+            // A column that is not the active slot draws its rows under a different
+            // objectName, and the DEPARTING one never is - so ask for whichever the
+            // column actually has rather than for the active slot's.
+            var rows = findAllByName(column, "windowHintWindowRow")
+            if (rows.length === 0)
+                rows = findAllByName(column, "windowHintNeighbourRow")
+            verify(rows.length > 0, label + ": the column has cards")
+            if (rows.length > 0)
+                compare(frame.x, rows[0].mapToItem(strip(), 0, 0).x,
+                    label + ": and the outline is on one of them")
+        }
+
+        function test_theMarkersAreOnTheDepartingColumnWhileTheyLeaveAndTheArrivingOneAfter() {
+            startCrossingOverTwoRows(2, 1, 3, 0)
             compare(findAllByName(live(), "windowHintFocusFrame").length, 1,
-                "one highlight, mid-crossing")
+                "one highlight")
             compare(findAllByName(live(), "windowHintFocusIndicator").length, 1,
                 "and one indicator")
-            // Mid-crossing the arriving active column is still off to the side, and
-            // the markers are on it rather than pinned to the panel.
-            //
-            // Placed against that column's OWN geometry, read off its real delegate,
-            // rather than against a slot index times a pitch: the crossing runs on a
-            // fractional position, so "slot 2" no longer names a place and a mid-flight
-            // x is not a whole number either. What has to hold at every instant is the
-            // pairing - the markers sit on the column the plan calls arriving, inside
-            // its padding, as wide as its card.
             compare(body.plan.activeSlot, 2, "the arriving column is the last slot")
             compare(body.plan.activePosition, 3, "and it is the arriving workspace's")
-            var frame = findByName(live(), "windowHintFocusFrame")
-            var arriving = columnForPosition(3)
-            verify(arriving !== null, "the arriving column is on the strip")
-            compare(frame.x, arriving.x + root.padX,
-                "and the markers are placed against it, inside its padding, was "
-                    + frame.x + " against " + (arriving.x + root.padX))
-            compare(frame.width, arriving.width - root.padX * 2,
-                "and as wide as its card, was " + frame.width)
-            verify(arriving.x > root.bandX,
-                "which is not in the middle yet, was " + arriving.x)
-            verify(arriving.width > root.narrowCol && arriving.width < root.wideCol,
+
+            // Mid-strip-crossing, and the marker is still on its DEPARTURE leg: it is
+            // leaving the card it was on, so it is on the column that card is in. That
+            // column is off to the side and neither its width nor its x is a whole number
+            // here, which is the point of reading it off the delegate.
+            driveSlideTo(0.5)
+            driveMarkerTo(0.25)
+            var departing = columnForPosition(2)
+            verify(departing !== null, "the departing column is on the strip")
+            verify(departing.x < root.bandX,
+                "which is out to the left of the middle, not in it, was " + departing.x)
+            verify(departing.width > root.narrowCol && departing.width < root.wideCol,
                 "and is neither a neighbour's width nor the active one, was "
-                    + arriving.width)
-            // The panel's wide middle slot is NOT where the markers are mid-crossing -
-            // that was the claim when the strip translated past a fixed column.
-            verify(frame.x !== root.bandX + root.padX,
-                "so they are not pinned to the panel's wide slot")
+                    + departing.width)
+            verify(findByName(strip(), "windowHintFocusFrame").x !== root.bandX + root.padX,
+                "so the marker is not pinned to the panel's wide slot")
+            assertMarkersOn(2, "leaving")
+
+            // The arrival leg, after the strip has settled: the arriving column is the
+            // wide middle one, and the marker is on it.
             settleSlide()
-            // Landed: it is the wide middle column, which is the same claim the resting
-            // panel makes everywhere else.
             compare(body.plan.activeSlot, 1, "at rest the active column is the middle")
-            compare(findByName(live(), "windowHintFocusFrame").x,
-                root.bandX + root.padX,
+            assertMarkersOn(3, "arriving")
+            compare(findByName(live(), "windowHintFocusFrame").x, root.bandX + root.padX,
                 "at rest, inside the wide slot's padding")
         }
 
+
         function test_theMarkersTravelWithTheContentTheyMark() {
-            // The markers are children of the strip, so they cross with the column
-            // they are on. Read in STRIP space, where the marker and the row share a
-            // parent chain, so the assertion is about the pairing rather than about
-            // an absolute position a translation would have to be added to.
-            body.hint = root.makeHint({
-                activeWorkspacePosition: 3,
-                previousActiveWorkspacePosition: 2,
-                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
-            })
-            wait(Math.round(body.slideDuration / 2))
-            var wash = findByName(strip(), "windowHintFocusFrame")
-            var bar = findByName(strip(), "windowHintFocusIndicator")
-            // The row they mark, in the same space.
-            var row = findAllByName(strip(), "windowHintWindowRow")[0]
-            var rowInStrip = row.mapToItem(strip(), 0, 0)
-            compare(wash.x, rowInStrip.x, "the highlight sits on its row mid-crossing")
-            compare(wash.x - (bar.x + bar.width), 8,
-                "and the indicator keeps its 8px clearance outside the outline")
+            // The markers are children of the strip, so they cross with the column they
+            // are on. Read in STRIP space, where the marker and the row share a parent
+            // chain, so the assertion is about the pairing rather than about an absolute
+            // position a translation would have to be added to. Checked on both legs,
+            // because the row each leg marks is a different row in a different column.
+            startCrossingOverTwoRows(2, 1, 3, 0)
+            // `sitOnARowOf` says the marker is horizontally on one of that column's
+            // cards. On the departure leg that is all it can be: the marker is halfway
+            // down out of the panel, so it is no longer on its row's LINE - which is the
+            // whole point of the leg. Only the arrival, which lands, pairs in both axes.
+            function sitOnARowOf(column, label) {
+                var wash = findByName(strip(), "windowHintFocusFrame")
+                var bar = findByName(strip(), "windowHintFocusIndicator")
+                // See `assertMarkersOn`: a non-active slot's rows carry the other name.
+                var rows = findAllByName(column, "windowHintWindowRow")
+                if (rows.length === 0)
+                    rows = findAllByName(column, "windowHintNeighbourRow")
+                var row = rows[0]
+                verify(row !== undefined, label + ": that column has a card")
+                if (row === undefined)
+                    return null
+                var rowInStrip = row.mapToItem(strip(), 0, 0)
+                compare(wash.x, rowInStrip.x,
+                    label + ": the highlight sits on that column's card")
+                compare(wash.x - (bar.x + bar.width), 8,
+                    label + ": and the indicator keeps its 8px clearance outside the "
+                        + "outline")
+                return rowInStrip
+            }
+            driveSlideTo(0.5)
+            driveMarkerTo(0.25)
+            verify(sitOnARowOf(columnForPosition(2), "leaving") !== null,
+                "so the marker is on the departing column while it leaves that column")
             settleSlide()
+            // At the END of the arrival, not partway through it: only once it has landed
+            // is it back on a card's own line rather than above the panel.
+            driveMarkerTo(1)
+            // Before reading, not after: with no crossing left to place it, the outline
+            // is back on its resting expression and the focus glide's own `Behavior` is
+            // free to run, so an immediate read catches it mid-flight.
+            settleMarker()
+            var landed = sitOnARowOf(columnForPosition(3), "arriving")
+            if (landed)
+                compare(findByName(strip(), "windowHintFocusFrame").y, landed.y,
+                    "and on the arriving card's own line, where it lands")
         }
+
 
         function test_theWholeStripTravelsNotJustTheActiveColumn() {
             // The whole run travels as one motion across the panel. If only one column

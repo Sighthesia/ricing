@@ -361,33 +361,34 @@ Item {
     }
 
     // --- the crossing displacement ---------------------------------------
-    // On a workspace switch the row marker does not sit still and does not wrap round
-    // the panel: ONE instance of it starts at the TOP, wholly clipped by the panel's own
-    // edge, and slides DOWN onto the focused card of the workspace being moved to.
+    // On a workspace switch ONE instance of the row marker travels the whole height of
+    // the panel: it leaves the focused card of the workspace being left by sliding DOWN,
+    // is gone once the clip has taken it below the bottom edge, comes back in through
+    // the TOP, and slides down onto the focused card of the workspace being moved to.
     //
-    // Always from the top, whichever way the workspace went. That is the whole of the
-    // reference being followed: the old superisland window hint's title-card focus
-    // rectangle displaced in from one fixed edge onto the focused card on every switch,
-    // never from whichever side the move happened to be on. A fixed entry side means the
-    // motion reads as the same gesture every time, so the direction of the switch is
-    // carried by the content swapping underneath rather than by the marker changing its
-    // mind about where to come from.
+    // Both directions are fixed and neither depends on which way the workspace went.
+    // That is the whole of the reference being followed: the old superisland window
+    // hint's title-card focus rectangle displaced in from one fixed edge onto the focused
+    // card on every switch, never from whichever side the move happened to be on. One
+    // exit side and one entry side mean the journey reads as the same gesture every
+    // time, so the direction of the switch is carried by the content swapping underneath
+    // rather than by the marker changing its mind about where to come from or go to.
     //
     // (That reference is a horizontal capsule row and this is a vertical card column, so
     // there was no code to port - only the rule, which is the part that mattered.)
     //
-    // ONE instance, not one per phase. It was two elements - a resting one and a
-    // crossing-only one, each hidden while the other showed - because `focusFrame.y`
-    // carries a `Behavior` for the focus glide, and a property that is both
+    // ONE instance for the whole journey, corner included. It was two elements - a
+    // resting one and a crossing-only twin, each hidden while the other showed - because
+    // `focusFrame.y` carries a `Behavior` for the focus glide, and a property that is both
     // behaviour-animated and a pure function of a clock is a race whose winner came down
-    // to the order QML evaluated them in. One instance with two placements removes the
-    // race outright, and it is also what the effect is FOR: a single rectangle travelling
-    // is the gesture, and two rectangles taking turns is a cut.
+    // to the order QML evaluated them in. One instance with two placements per leg
+    // removes the race outright, and it is also what the effect is FOR: a single
+    // rectangle travelling is the gesture, and two rectangles taking turns is a cut.
     //
-    // The two placements are chosen by a flag rather than by `crossingClock < 1`, because
-    // they agree on the landing frame - the clock is 1, so `crossingTop` IS
-    // `focusedRowTop` - so flipping the flag changes nothing and there is no frame on
-    // which the two expressions could disagree.
+    // The crossing and resting placements are chosen by a flag rather than by
+    // `crossingClock < 1`, because they agree on the landing frame - the clock is 1, so
+    // `crossingTop` IS `focusedRowTop` - so flipping the flag changes nothing and there is
+    // no frame on which the two expressions could disagree.
     //
     // Everything below is in STRIP coordinates, so the strip's own `y` - the padding
     // between the panel's top edge and the card block - is already applied.
@@ -395,54 +396,89 @@ Item {
     // The panel's top edge in those coordinates, and a whole card above it: where the
     // marker starts. Wholly outside, so it slides IN rather than already being on screen
     // at the edge.
+    // The DEPARTURE leg: the card the marker leaves from, and the point it leaves at.
+    //
+    // The departure is DOWNWARD and it is unconditional - the focus drains out of the
+    // bottom of the panel whichever way the workspace went, and is gone by the time the
+    // clip has taken it. The entry is from above the top and equally unconditional. One
+    // exit side and one entry side mean the journey reads as the same gesture every
+    // time, and the direction of the switch is carried by the content swapping
+    // underneath rather than by the marker changing its mind about where to go.
+    //
+    // Which card it leaves is the DEPARTING frame's own focused row, not the arriving
+    // one's: `focusedRowIndex` is read off the arriving column and is already the new
+    // workspace's by the time anything here runs. Taken from the held frame's windows
+    // rather than from `focusedRowIndex` sampled at that instant, because a binding's
+    // value while its own inputs are being reassigned is not a thing to depend on.
+    property int _departingRowIndex: -1
+    // The panel's bottom edge in those coordinates, and a whole card past it: wholly
+    // clipped, so the departure really is a disappearance rather than a marker parked
+    // on the last row.
+    readonly property real exitTo: root.height - _stripY + rowHeight
+    // A frame with nothing focused has no card to leave from, so the departure leg is
+    // given zero length - the marker starts already off the bottom and the panel shows
+    // the arrival alone. Degenerate rather than special-cased.
+    readonly property real exitFrom: _departingRowIndex < 0 ? exitTo
+        : _departingRowIndex * rowPitch
+    // The panel's top edge in those coordinates, and a whole card above it. The
+    // arrival's own start, for the same reason `exitTo` is the departure's.
     readonly property real crossingFrom: -_stripY - rowHeight
-    // Where it lands: the focused card's own top edge, in the SCROLLED space that
-    // `focusedRowTop` is measured in.
+    // Where the arrival lands: the focused card's own top edge, in the SCROLLED space
+    // that `focusedRowTop` is measured in.
     readonly property real crossingTo: focusedRowTop
-    // The leg's start, captured. A re-aim restarts the marker's clock at 0, so a leg
-    // that began from `crossingFrom` would throw the marker back to the top of the panel
-    // on the frame the second switch landed - while the columns carry on from where they
-    // were. The same compensation `positionFrom` gets, for the same reason.
-    property real _crossingFrom: 0
-    // THE MARKER'S OWN CLOCK, and not the strip's. This is the whole reason the effect
-    // reads at all.
-    //
-    // The strip crosses 205px of panel horizontally in `medium` (160ms), and 160ms is the
-    // right length for that: it is the workspace widget's own active-highlight duration,
-    // and the strip is that widget's columns magnified. The marker travels vertically,
-    // and much less far - at most one viewport, 164px, and only 28px of that is on screen
-    // when the focused window is the first row. On the strip's clock and the strip's
-    // `OutQuad` - which covers three quarters of its distance in the first half of its
-    // time - 28px is over in about 30ms and 164px reads as a flick. Measured, not
-    // guessed: the fastest point of the old version was around 1500px/s, and the eye
-    // reads that as a jump, not as travel.
-    //
-    // So the marker gets its own clock at `MotionTokens.page`, on `Easing.InOutQuad`:
-    // slow off the mark, quick through the middle where it crosses the cards, slow onto
-    // the card. `OutQuad`'s whole character is wrong for this - it front-loads, and what
-    // needs to be watched is the middle.
-    //
-    // A SECOND clock, deliberately, and the two do not pretend to be one. The columns
-    // finish at 160ms and the marker lands at 320ms, which is the order the effect reads
-    // in: the list changes workspace first, and the focus then arrives on it. Collapsing
-    // them into one clock would mean slowing the columns to 320ms, and a 732px
-    // horizontal traverse at that length is a swoosh rather than a change of workspace.
-    //
-    // This is also how the reference being followed did it - the old superisland window
-    // hint gave its focus marker a lead and a trail duration of its own, unrelated to the
-    // workspace move's. Two durations, on purpose, for the same reason.
+
+    // The marker traverses the panel in ONE clock, in two legs: down and out through
+    // the bottom, then in through the top and down onto the card. The corner between
+    // them is the midpoint, and at the midpoint the marker is wholly outside the clip
+    // on both counts - so the discontinuity in its position is never on screen. That is
+    // what lets one element do both halves, and one element is the whole effect: a
+    // single rectangle travelling is the gesture, and two rectangles taking turns is a
+    // cut.
     property real crossingClock: 0
-    // A crossing marker is under way. Its own flag, because its clock ends 160ms after
-    // the strip's: the marker's regime is chosen on THIS, not on `swapping`, which has
-    // already gone false by the time the marker lands. The two placements agree on the
-    // landing frame (`crossingClock` is 1, so `crossingTop` IS `focusedRowTop`), so
-    // clearing this changes nothing the eye can see.
+    // A crossing marker is under way - which is to say, either leg of the journey is.
+    // A FLAG rather than `crossingClock < 1`, and deliberately its own flag rather than
+    // the strip's `swapping`: the two clocks end 160ms apart, so the strip's is already
+    // false while the marker is still descending. It is also the only thing that clears
+    // it - `_commitHint` on a commit that never showed the marker travelling, and this
+    // animation's `onFinished` otherwise - which is why a cancelled crossing has to
+    // reach one of those rather than simply being abandoned.
     property bool _markerCrossing: false
-    readonly property real crossingTop: _crossingFrom
-        + (crossingTo - _crossingFrom) * crossingClock
+    // The leg currently in progress, and how far through it. `InOutQuad` is at its
+    // fastest exactly here, so the marker leaves the bottom edge at speed and re-enters
+    // the top at the same speed: one continuous downward sweep rather than two stops.
+    readonly property bool _onExitLeg: crossingClock < 0.5
+    readonly property real legProgress: _onExitLeg
+        ? crossingClock * 2 : (crossingClock - 0.5) * 2
+    // Where the departure starts on a re-aim, captured. A second switch landing mid-
+    // crossing restarts `crossingClock` at 0, which would put the marker back on the
+    // card it had already left - so the new leg carries on from where the old one had
+    // reached. Only ever needed on the DEPARTURE leg: a re-aim needs the strip's own
+    // 160ms clock still running, and that is the first half of this one.
+    property real _exitFrom: 0
+    readonly property real crossingTop: _onExitLeg
+        ? _exitFrom + (exitTo - _exitFrom) * legProgress
+        : crossingFrom + (crossingTo - crossingFrom) * legProgress
+
+    // The card the marker is on, read LIVE from the strip rather than interpolated. The
+    // departing column slides sideways while the marker leaves it, and the strip's own
+    // placement runs on a different curve from the marker's - so a lerp here would drift
+    // off the card within a few frames, which is worse than the extra machinery of not
+    // interpolating at all.
+    readonly property real _leavingPosition: root.leavingHint
+        ? root.leavingHint.activeWorkspacePosition : strip.activePosition
+    readonly property real markerLeft: _onExitLeg
+        ? strip.columnXFor(_leavingPosition) + cellPaddingX
+        : strip.activeColumnX + cellPaddingX
+    readonly property real markerWidth: Math.max(0, (_onExitLeg
+        ? strip.columnWidthFor(_leavingPosition)
+        : strip.activeColumnWidthNow) - cellPaddingX * 2)
+    // Either frame having a focused row is enough to draw the marker. The departure leg
+    // marks the card being left, which is a row the arriving frame knows nothing about,
+    // so an arriving frame with nothing focused must not make the departure invisible.
+    readonly property bool markerHasTarget: hasTarget || _departingRowIndex >= 0
     // The bar is the same gesture one `markerOffset` lower at every point of it: at rest
     // it is a bar centred on its card, so the offset that puts it there is the offset it
-    // starts with and travels on. One formula, one offset, two elements that cannot
+    // travels with, on both legs. One formula, one offset, two elements that cannot
     // drift apart.
     readonly property real markerOffset: rowHeight / 2 - indicatorLength / 2
     // --- the slide -------------------------------------------------------
@@ -530,7 +566,8 @@ Item {
         // drop it onto a card it had already been told about.
         crossingRun.stop()
         root._markerCrossing = false
-        root._crossingFrom = 0
+        root._departingRowIndex = -1
+        root._exitFrom = 0
         // A rest plan rather than no plan: the strip still needs to be drawn, and
         // this is the one that says "three columns, active slot 1, centred here" -
         // the same shape the crossing's plan has, so every binding downstream can be
@@ -566,9 +603,13 @@ Item {
         root.plan = plan
         root.columns = HintLogic.stripColumns(root.hint, root.leavingHint, plan)
         root.shownReady = HintLogic.ready(root.hint)
-        // Where the marker comes in from: the panel's top, wholly clipped. Set before
-        // either clock starts, so it is already there on the crossing's first frame.
-        root._crossingFrom = root.crossingFrom
+        // The row the marker walks away from, and the place that walk starts. Taken
+        // before either clock starts, so the departure is on screen from the crossing's
+        // first frame - the marker is already sliding off the old card rather than
+        // appearing on the new one and only then leaving.
+        root._departingRowIndex = HintLogic.focusedIndexIn(
+            HintLogic.cappedRows(root.leavingHint ? root.leavingHint.windows : null).rows)
+        root._exitFrom = root.exitFrom
         root._markerCrossing = true
         root.swapping = true
         // Cancel the tracker's trail, here and not only in `_syncIndicator`. The
@@ -608,19 +649,18 @@ Item {
         // the old leg's progress.
         const here = root.panelPosition
         const markerHere = root.crossingTop
+        // Read before the hint changes over, and deliberately NOT recaptured from the new
+        // frame's focused row: the marker is mid-DEPARTURE, so the row it is on is the one
+        // it has not reached yet. What it continues from is where it has got to. Only the
+        // departure leg can be re-aimed - a re-aim needs the strip's clock still running,
+        // and that is the first half of the marker's.
+        root._exitFrom = markerHere
         root.plan = plan
         root.columns = HintLogic.stripColumns(root.hint, root.leavingHint, plan)
         root.shownReady = HintLogic.ready(root.hint)
         root.swapping = true
-        // The same compensation the content gets, for the same reason. Without it the
-        // clock's reset to 0 throws the marker back to the top of the panel on this
-        // frame while the columns carry on from where they were - the marker arriving at
-        // the new card by way of a second entry, which reads as two crossings rather
-        // than as one move re-aimed.
-        root._crossingFrom = markerHere
-        // Already true on a re-aim, and deliberately not reset: the marker is mid-travel
-        // and carries on through the second switch rather than entering from the top of
-        // the panel a second time.
+        // Already true on a re-aim, and deliberately not reset: the marker carries on
+        // down through the second switch rather than restarting its journey.
         root._markerCrossing = true
         // As in `_startSlide`: the publish that re-aims this leg is what moved the focus,
         // so the tracker may already be trailing. Cancel it, or the bar carries two
@@ -636,10 +676,13 @@ Item {
         crossingRun.restart()
     }
 
-    // The marker's clock. Runs AFTER the strip's - 320ms against 160ms - so by the time
-    // it lands, `slideRun.onFinished` has already narrowed the strip to the arriving
-    // frame's own three columns, and the marker descends onto a panel that has stopped
-    // moving rather than chasing content that is still sliding.
+    // The marker's clock: 320ms, twice the strip's, and it carries BOTH legs. The
+    // departure takes the first half - the same length as the column traverse and on the
+    // same footing, so the marker leaving the old card reads as part of that gesture
+    // rather than as a second event - and the corner falls exactly on the frame
+    // `slideRun.onFinished` narrows the strip. The arrival then has the second half to
+    // itself, landing on a panel that has stopped moving rather than chasing content that
+    // is still sliding. Adding the departure cost the journey no extra time at all.
     NumberAnimation {
         id: crossingRun
         target: root
@@ -656,7 +699,8 @@ Item {
             // finished.
             root._snapIndicator(root._targetYFor(root.focusedRowIndex))
             root._markerCrossing = false
-            root._crossingFrom = 0
+            root._departingRowIndex = -1
+            root._exitFrom = 0
         }
     }
 
@@ -700,7 +744,8 @@ Item {
             }
             root.slideProgress = 1
             // The strip's flag only. The marker's clock runs 160ms BEYOND this handler,
-            // and its state - `_markerCrossing` and the captured `_crossingFrom` - belongs
+            // and its state - `_markerCrossing`, `_departingRowIndex` and the captured
+            // `_exitFrom` - belongs
             // to `crossingRun.onFinished`. Clearing it here would have reset the captured
             // start to zero while the marker was still two thirds of the way down, which
             // throws it most of the way back up the panel on the frame the columns settle.
@@ -984,13 +1029,15 @@ Item {
         // delegate is placed by - so the outline cannot be drawn over a column that is
         // not the active one, and it widens with the card rather than staying the width
         // the card had at the start of the crossing.
-        x: strip.activeColumnX + root.cellPaddingX
-        // The two placements, and they agree on the landing frame. During a crossing it
-        // is displacing down from the panel's top; at rest it is the card's own outline.
+        // The card it marks, which is the DEPARTING card for the first half of a
+        // crossing and the arriving one for the second - so the outline is on the window
+        // it left from while it leaves, and on the one it arrives at when it lands.
+        x: root._markerCrossing ? root.markerLeft
+            : strip.activeColumnX + root.cellPaddingX
         y: root._markerCrossing ? root.crossingTop : root.focusedRowTop
-        width: strip.activeCardWidth
+        width: root._markerCrossing ? root.markerWidth : strip.activeCardWidth
         height: root.rowHeight
-        opacity: root.hasTarget ? 1 : 0
+        opacity: root.markerHasTarget ? 1 : 0
 
         Behavior on opacity {
             enabled: !MotionTokens.reducedMotion
@@ -1036,18 +1083,23 @@ Item {
         z: 6
 
         width: root.indicatorThickness
-        height: root._barLength
         radius: LazerTheme.barIndicatorRadius
         color: LazerTheme.osuGreen
-        // Measured from the active column's own left edge - the band's edge, not the
-        // card's - so the bar and the outline it marks always move together.
-        x: strip.activeColumnX + root.indicatorInset
+        // Measured from the column's own left edge - the band's edge, not the card's - so
+        // the bar and the outline it marks always move together, and on the DEPARTING
+        // column for the departure leg exactly as the outline is.
+        x: (root._markerCrossing ? root.markerLeft - root.cellPaddingX
+            : strip.activeColumnX) + root.indicatorInset
         // One `markerOffset` below the outline at every point of the crossing, so the bar
         // stays centred on the card it is marking while it travels - and lands on exactly
         // where the resting bar would have been.
         y: root._markerCrossing ? root.crossingTop + root.markerOffset : root._barTop
-        visible: root.hasTarget
-        opacity: root.hasTarget ? 1 : 0
+        // The bar's LENGTH is the resting one throughout. The tracker's stretch is the
+        // focus moving within one workspace; here the bar is being carried, and a length
+        // that changed underneath the travel would be a second motion on one marker.
+        height: root._markerCrossing ? root.indicatorLength : root._barLength
+        visible: root.markerHasTarget
+        opacity: root.markerHasTarget ? 1 : 0
 
         // Switch blink: the same tinted-glow blink the workspace indicator plays
         // per genuine target switch.
