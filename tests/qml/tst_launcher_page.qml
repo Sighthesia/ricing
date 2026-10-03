@@ -90,6 +90,7 @@ Item {
             // A lens left behind by a previous test would silently filter
             // this one's results.
             s.category = ""
+            s.loadingMore = false
         }
 
         function openWithResults(items) {
@@ -520,6 +521,50 @@ Item {
             tryCompare(svc(), "category", "")
             compare(page.categoryChips.length, 7)
             compare(page.categoryChips[1].id, "text")
+        }
+
+        // --- progressive loading ---
+
+        function test_settledListShowsNoFooter() {
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+            verify(!page.listFooterItem.visible)
+            compare(page.listFooterItem.height, 0)
+        }
+
+        function test_footerMarksTheNotYetArrivedTail() {
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+
+            // First batch landed: the rows own the surface and the spinner
+            // moves to the tail, so nothing above the list shifts.
+            svc().loadingMore = true
+            tryVerify(function() { return page.listFooterItem.visible }, 300)
+            compare(page.loadingState.visible, false)
+            compare(page.resultsView.visible, true)
+            // It sits directly under the rows it will be replaced by. The row height
+            // animates in, so the check allows the one-pixel band an
+            // in-flight layout pass can leave it at.
+            var row = page.resultAt(0)
+            var settled = row.rowHeight + row.listGap
+            tryVerify(function() {
+                var tail = page.listFooterItem.y
+                return tail >= settled - 1 && tail <= settled + 1
+            }, 1000)
+            verify(page.listFooterItem.y > 0)
+
+            svc().loadingMore = false
+            tryVerify(function() { return !page.listFooterItem.visible }, 300)
+            compare(page.listFooterItem.height, 0)
+        }
+
+        function test_streamingListNeverFlashesTheEmptyState() {
+            openWithResults([])
+            compare(svc().results.length, 0)
+            // A stream that has not answered yet must not claim "no results".
+            svc().loadingMore = true
+            tryVerify(function() { return !page.emptyState.visible }, 300)
+
+            svc().loadingMore = false
+            tryVerify(function() { return page.emptyState.visible }, 300)
         }
 
         // --- pointer activation ---

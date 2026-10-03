@@ -86,6 +86,14 @@ QtObject {
     property var displayPool: []
     property string _pooledMode: ""
 
+    // True while the current refresh is still streaming batches. The first
+    // batch ends the loading state and paints; the rest append behind a
+    // footer spinner, which is what "front to back" loading looks like.
+    property bool loadingMore: false
+    // Set while a refresh is mid-stream, so a following batch appends to the
+    // pool instead of replacing it. Cleared when the stream completes.
+    property bool _streamActive: false
+
     // Monotonic guard: only the newest dispatched refresh, or the session
     // alive when execution started, may commit state.
     property int _refreshToken: 0
@@ -144,8 +152,18 @@ QtObject {
         if (!root.visible || LauncherLogic.parseQuery(root.query).mode !== "clipboard")
             return
         var adapter = _adapterFor("clipboard")
-        adapter.refresh("", "clipboard", function(outcome) {
-            if (!outcome || !Array.isArray(outcome) || !root.displayPool.length)
+        // The metadata merge needs every row, not just the first batch, so it
+        // accumulates the stream before touching the pool.
+        var batches = []
+        adapter.refresh("", "clipboard", function(outcome, complete) {
+            if (Array.isArray(outcome))
+                batches.push(outcome)
+            if (complete === false)
+                return
+            var rows = []
+            for (var b = 0; b < batches.length; b++)
+                rows = rows.concat(batches[b])
+            if (!rows.length || !root.displayPool.length)
                 return
             var keptById = ({})
             for (var keptIndex = 0; keptIndex < root.displayPool.length; keptIndex++) {
@@ -154,8 +172,8 @@ QtObject {
                     keptById[String(kept.id)] = kept
             }
             var merged = false
-            for (var freshIndex = 0; freshIndex < outcome.length; freshIndex++) {
-                var fresh = outcome[freshIndex]
+            for (var freshIndex = 0; freshIndex < rows.length; freshIndex++) {
+                var fresh = rows[freshIndex]
                 if (!fresh)
                     continue
                 var target = keptById[String(fresh.id)]
@@ -219,6 +237,8 @@ QtObject {
         // wins, and nothing is rebuilt at all.
         root.results = LauncherLogic.filterResults(root.displayPool, "", root.category)
         root.loading = false
+        root.loadingMore = false
+        root._streamActive = false
         root.error = ""
         root.selectedIndex = -1
         root._executionInFlight = false
@@ -238,11 +258,19 @@ QtObject {
             return
         var adapter = _adapterFor("apps")
         root._appsPrimeInFlight = true
-        adapter.refresh("", "apps", function(outcome) {
-            root._appsPrimeInFlight = false
-            if (root.visible || !Array.isArray(outcome))
+        var collected = []
+        var answered = false
+        adapter.refresh("", "apps", function(outcome, complete) {
+            if (outcome && Array.isArray(outcome)) {
+                collected = collected.concat(outcome)
+                answered = true
+            }
+            if (complete === false)
                 return
-            var sorted = LauncherLogic.sortResults(outcome)
+            root._appsPrimeInFlight = false
+            if (root.visible || !answered)
+                return
+            var sorted = LauncherLogic.sortResults(collected)
             root.displayPool = sorted
             root._pooledMode = "apps"
             root.results = LauncherLogic.filterResults(sorted, "", root.category)
@@ -314,27 +342,43 @@ QtObject {
                 && root.displayPool.length > 0 && root.results && root.results.length > 0
         root.loading = !hasStaleRows
         root.error = ""
-        adapter.refresh("", parsed.mode, function(outcome) {
-            root._completeRefresh(token, outcome, parsed.mode, parsed.text)
+        root.loadingMore = false
+        root._streamActive = false
+        adapter.refresh("", parsed.mode, function(outcome, complete) {
+            root._applyBatch(token, outcome, complete !== false, parsed.mode, parsed.text)
         })
     }
 
-    // Commits a finished refresh only while it is still the newest request.
-    // Stale completions are dropped so they cannot replace newer query or
-    // mode state, leaving the newer attempt's loading/error display intact.
-    function _completeRefresh(token, outcome, pooledMode, requestText) {
+    // Commits one batch of a refresh while it is still the newest request.
+    // Batches arrive in their final order (the adapters pre-sort the source),
+    // so the first one replaces the pool and every later one appends: no
+    // reshuffle, no rebuilt delegates, and the head of the list is usable
+    // while the tail is still streaming.
+    function _applyBatch(token, outcome, complete, pooledMode, requestText) {
         if (token !== _refreshToken)
             return
-        root.loading = false
         if (outcome && !Array.isArray(outcome)) {
+            // A failure is terminal whatever the adapter claimed about the
+            // rest of the stream.
+            root._streamActive = false
+            root.loadingMore = false
+            root.loading = false
             root.error = _messageOr(outcome.error, "data source failed")
             return
         }
+        var batch = outcome || []
+        var appending = root._streamActive
+        root._streamActive = !complete
+        root.loadingMore = !complete
+        // Any batch means data arrived: the full loading state only covers
+        // the wait before the very first one.
+        root.loading = false
         root.error = ""
         // Keep the pooled array (and its live delegates) when a pull returns
         // the same ordered ids, so redundant refreshes never rebuild the list.
-        var sorted = LauncherLogic.sortResults(outcome || [])
-        var poolStable = LauncherLogic.poolMatches(sorted, root.displayPool)
+        var sorted = appending ? root.displayPool.concat(batch)
+                                : (complete ? LauncherLogic.sortResults(batch) : batch)
+        var poolStable = appending ? false : LauncherLogic.poolMatches(sorted, root.displayPool)
         var previous = root.results
         if (!poolStable)
             root.displayPool = sorted
@@ -344,9 +388,14 @@ QtObject {
         // source after a reopen.
         root._pooledMode = pooledMode
         var filtered = LauncherLogic.filterResults(root.displayPool, requestText, root.category)
-        root.selectedIndex = requestText.length > 0
-                ? LauncherLogic.refilterSelection(previous, root.selectedIndex, filtered)
-                : LauncherLogic.clampSelection(0, filtered.length)
+        // A first batch is a fresh commit and starts at the top like any
+        // other; a batch that only appends keeps the row the user is on, and
+        // falls back to clamping the old index when that row is gone.
+        root.selectedIndex = appending
+                ? LauncherLogic.preservedSelection(previous, root.selectedIndex, filtered)
+                : (requestText.length > 0
+                   ? LauncherLogic.refilterSelection(previous, root.selectedIndex, filtered)
+                   : LauncherLogic.clampSelection(0, filtered.length))
         // Same array-identity guard as the pooled path: unchanged ids must
         // not reassign results or the surface replays its refill animation.
         root.results = LauncherLogic.poolMatches(previous, filtered)
@@ -359,6 +408,9 @@ QtObject {
     // sessions ride the normal force-pull commit (loading/error/cascade
     // semantics); closed sessions swap only the pooled array so the next
     // open starts from fresh data without touching visible state.
+    //
+    // Neither idle path streams: nothing is on screen to paint progressively,
+    // and a background swap wants one atomic compare-and-set.
     function revalidatePool() {
         if (root.visible) {
             if (root.mode === "apps")
@@ -374,14 +426,22 @@ QtObject {
             return
         var adapter = root._adapterFor("apps")
         var token = ++_refreshToken
-        adapter.refresh("", "apps", function(outcome) {
+        var collected = []
+        var answered = false
+        adapter.refresh("", "apps", function(outcome, complete) {
             if (token !== _refreshToken)
+                return
+            if (Array.isArray(outcome)) {
+                collected = collected.concat(outcome)
+                answered = true
+            }
+            if (complete === false)
                 return
             // While closed there is no error surface; keep the stale pool
             // rather than dropping it on a transient source failure.
-            if (!outcome || !Array.isArray(outcome))
+            if (!answered)
                 return
-            var sorted = LauncherLogic.sortResults(outcome)
+            var sorted = LauncherLogic.sortResults(collected)
             if (!LauncherLogic.poolMatches(sorted, root.displayPool))
                 root.displayPool = sorted
         })

@@ -227,9 +227,6 @@ Item {
         id: launcherPageComponent
         LauncherPage {
             session: root.session
-            // Production sessions (LauncherService) expose the desktop-entry
-            // scan state; embedded test sessions leave it undefined.
-            appsIndexing: !!root.session && root.session.appsIndexing === true
             onExitFlingRequested: spec => root.spawnExitCard(spec)
         }
     }

@@ -81,7 +81,13 @@ Item {
         }
 
         function resolveRefresh(adapter, index, outcome) {
-            adapter.pendingRefreshes[index](outcome)
+            adapter.pendingRefreshes[index](outcome, true)
+        }
+
+        // Delivers one batch of a streaming refresh; complete defaults to the
+        // final batch, matching the adapter contract.
+        function resolveBatch(adapter, index, outcome, complete) {
+            adapter.pendingRefreshes[index](outcome, complete === undefined ? true : complete)
         }
 
         function resolveExecute(adapter, index, outcome) {
@@ -112,6 +118,8 @@ Item {
             svc().displayPool = []
             svc().category = ""
             svc()._metadataRefreshPending = false
+            svc().loadingMore = false
+            svc()._streamActive = false
             if (_clipboardStub) {
                 _clipboardStub.destroy()
                 _clipboardStub = null
@@ -877,6 +885,134 @@ Item {
             wait(0)
             compare(svc().mode, "shortcuts")
             compare(svc().query, ">key ")
+        }
+
+        // --- streaming batches ---
+
+        function test_firstBatchPaintsAndTheRestStreamBehindIt() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+            svc().open()
+            wait(0)
+            compare(svc().loading, true)
+
+            // Nothing is on screen yet, so the full loading state owns the
+            // surface until the first batch lands.
+            resolveBatch(apps, 0, [makeItem("a", "Alpha", 0, 0)], false)
+            compare(svc().loading, false)
+            compare(svc().loadingMore, true)
+            compare(svc().results.length, 1)
+            // Navigation works while the tail is still streaming.
+            compare(svc().interactive, true)
+
+            var pool = svc().displayPool
+            resolveBatch(apps, 0, [makeItem("b", "Beta", 0, 0)], false)
+            resolveBatch(apps, 0, [makeItem("c", "Gamma", 0, 0)], true)
+
+            compare(svc().loadingMore, false)
+            compare(svc().results.length, 3)
+            // Appending must not replace the pooled array wholesale, or every
+            // live delegate would be rebuilt on each batch.
+            verify(svc().displayPool !== pool)
+            verify(svc().displayPool.length === 3)
+            compare(svc().results[2].id, "c")
+        }
+
+        function test_appendedBatchKeepsTheSelectedRow() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+            svc().open()
+            wait(0)
+            resolveBatch(apps, 0, [makeItem("a", "Alpha", 0, 0),
+                                   makeItem("b", "Beta", 0, 0)], false)
+            svc().selectNext()
+            compare(svc().selectedIndex, 1)
+
+            // The user is on Beta when the next batch lands; the row must not
+            // move out from under the highlight.
+            resolveBatch(apps, 0, [makeItem("c", "Gamma", 0, 0)], true)
+            compare(svc().selectedIndex, 1)
+            compare(svc().results[1].id, "b")
+        }
+
+        function test_staleBatchFromASupersededRefreshIsDropped() {
+            var apps = makeManualAdapter()
+            var other = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+            svc().open()
+            wait(0)
+
+            // A force pull supersedes the first refresh; the old stream's late
+            // batch must not land on top of the new state.
+            svc().refresh(true)
+            wait(0)
+            svc()._adapters = { apps: other }
+            svc().refresh(true)
+            wait(0)
+            resolveBatch(other, 0, [makeItem("new", "New", 0, 0)], true)
+            compare(svc().results.length, 1)
+            compare(svc().results[0].id, "new")
+
+            resolveBatch(apps, 0, [makeItem("stale", "Stale", 0, 0)], true)
+            compare(svc().results.length, 1)
+            compare(svc().results[0].id, "new")
+            compare(svc().loadingMore, false)
+        }
+
+        function test_errorAfterTheFirstBatchEndsTheStream() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+            svc().open()
+            wait(0)
+            resolveBatch(apps, 0, [makeItem("a", "Alpha", 0, 0)], false)
+            compare(svc().loadingMore, true)
+
+            resolveBatch(apps, 0, { error: "boom" }, true)
+            compare(svc().loadingMore, false)
+            compare(svc().loading, false)
+            compare(svc().error, "boom")
+            // The rows that did arrive stay: the failure is about the tail.
+            compare(svc().results.length, 1)
+        }
+
+        function test_closeClearsAnInFlightStream() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+            svc().open()
+            wait(0)
+            resolveBatch(apps, 0, [makeItem("a", "Alpha", 0, 0)], false)
+            compare(svc().loadingMore, true)
+
+            svc().close()
+            compare(svc().loadingMore, false)
+            // A batch that lands after the close must not resurrect the state.
+            resolveBatch(apps, 0, [makeItem("b", "Beta", 0, 0)], true)
+            compare(svc().results.length, 1)
+        }
+
+        function test_primeAppsWaitsForTheWholeStream() {
+            // The idle pool builder has nothing to paint, so it must collect
+            // every batch before swapping the pool in one go.
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+            svc().primeApps()
+            resolveBatch(apps, 0, [makeItem("a", "Alpha", 0, 0)], false)
+            compare(svc().displayPool.length, 0)
+            resolveBatch(apps, 0, [makeItem("b", "Beta", 0, 0)], true)
+            compare(svc().displayPool.length, 2)
+            compare(svc().results.length, 2)
+        }
+
+        function test_primeAppsKeepsThePoolOnSourceError() {
+            // A failed source must not be mistaken for "the app list is
+            // empty": the kept pool survives an errored prime.
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+            svc().displayPool = [makeItem("a", "Alpha", 0, 0)]
+            svc()._pooledMode = "apps"
+            svc().primeApps()
+            resolveRefresh(apps, 0, { error: "boom" })
+            compare(svc().displayPool.length, 1)
         }
 
         // --- category lens ---

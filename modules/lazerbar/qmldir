@@ -59,6 +59,7 @@ FullscreenSidebar 1.0 FullscreenSidebar.qml
 LauncherPage 1.0 LauncherPage.qml
 LauncherCategoryBar 1.0 LauncherCategoryBar.qml
 LauncherCategoryChip 1.0 LauncherCategoryChip.qml
+LauncherListFooter 1.0 LauncherListFooter.qml
 LauncherResultRow 1.0 LauncherResultRow.qml
 LauncherExitCard 1.0 LauncherExitCard.qml
 LazerSplitSurface 1.0 LazerSplitSurface.qml

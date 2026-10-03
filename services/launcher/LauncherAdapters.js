@@ -39,6 +39,115 @@ function pad2(value) {
     return text.length < 2 ? "0" + text : text
 }
 
+// ---- Progressive delivery ----
+// A refresh may hand its result set over in several batches instead of one
+// array: `done(items, complete)` is called with the first batch synchronously
+// and with each following batch from `schedule`, so the surface paints the
+// head of the list immediately and the tail streams in behind a spinner
+// rather than blocking on the whole mapping.
+//
+// Two rules make that safe, and both live here rather than in the session:
+//  1. ARRIVAL ORDER IS FINAL ORDER. The source is pre-sorted with the same
+//     key LauncherLogic.sortResults would use, so appending a batch never
+//     reshuffles what is already on screen.
+//  2. `schedule` is injected. Production hands a per-frame stepper so no
+//     frame is blown; tests hand a synchronous one, so a fixture refresh
+//     still delivers every batch inside the refresh() call.
+//
+// Streams do not cancel each other. A superseded batch is already dropped by
+// the session's refresh token, and a cancel would starve the concurrent
+// read-only pulls (the clipboard metadata merge runs one while the visible
+// list is still streaming). Every state a stream touches - cursor, needle -
+// therefore belongs to its own closure rather than to the adapter.
+
+// Chunk sizes chosen so one batch stays a couple of milliseconds of mapping
+// even for the widest sets (clipboard history runs to ~750 rows).
+var appChunkSize = 48
+var clipboardChunkSize = 64
+var shortcutChunkSize = 96
+
+// Streams a mapped result set to `done` in chunks. `make` maps one source
+// entry to a result (or null to skip it). `matches` filters by the refresh
+// needle. Returns once the last batch has been handed over.
+function createChunkStream(options) {
+    var source = options.source || []
+    var make = options.make
+    var matches = typeof options.matches === "function" ? options.matches : null
+    var schedule = typeof options.schedule === "function" ? options.schedule : null
+    var chunkSize = Math.max(1, toCount(options.chunkSize) || 32)
+    var done = options.done
+    var index = 0
+
+    // Returns true once the source is exhausted.
+    function step() {
+        if (typeof done !== "function")
+            return true
+        var batch = []
+        var scanned = 0
+        while (index < source.length && scanned < chunkSize) {
+            var raw = source[index]
+            index++
+            scanned++
+            if (!raw)
+                continue
+            if (matches && !matches(raw))
+                continue
+            var item = make(raw)
+            if (item)
+                batch.push(item)
+        }
+        var complete = index >= source.length
+        // The final batch always reports, even when empty: an exhausted
+        // source with no matches is the legitimate "nothing to show" answer
+        // and the session must not wait for a batch that never comes.
+        if (batch.length > 0 || complete)
+            done(batch, complete)
+        return complete
+    }
+
+    var finished = step()
+    if (!finished && schedule) {
+        // Later turns come from the scheduler; this call returns with only the
+        // first batch delivered, which is the whole point.
+        schedule(function next() {
+            if (!step())
+                schedule(next)
+        })
+        return
+    }
+    // No scheduler means no later turn to come back on - the caller asked for
+    // a plain refresh and would otherwise only ever see the first batch.
+    while (!finished)
+        finished = step()
+}
+
+// Sorts a copy of the source with the exact key sortResults uses, so the
+// streamed batches arrive in final order. `weightOf`, `usedAtOf` and
+// `nameOf` read the raw source entry, which is what keeps the sort free of
+// the mapping work this pipeline exists to spread out.
+function sortSourceForStreaming(source, weightOf, usedAtOf, nameOf) {
+    var sorted = source.slice()
+    sorted.sort(function (left, right) {
+        var byWeight = toCount(weightOf(right)) - toCount(weightOf(left))
+        if (byWeight !== 0)
+            return byWeight
+        var byRecent = toCount(usedAtOf(right)) - toCount(usedAtOf(left))
+        if (byRecent !== 0)
+            return byRecent
+        var leftName = nameOf(left)
+        var rightName = nameOf(right)
+        var byName = String(leftName).localeCompare(String(rightName))
+        if (byName !== 0)
+            return byName
+        return String(identifier(left)).localeCompare(String(identifier(right)))
+    })
+    return sorted
+}
+
+function identifier(raw) {
+    return raw == null || raw.id == null ? "" : String(raw.id)
+}
+
 // ---- Applications ----
 
 function directIconPath(icon) {
@@ -147,6 +256,7 @@ function createAppsAdapter(config) {
     var commands = Array.isArray(config.commands) ? config.commands : []
     var actionRunner = typeof config.actionRunner === "function" ? config.actionRunner : null
     var ipcHelperPath = config.ipcHelperPath == null ? "" : String(config.ipcHelperPath)
+    var schedule = typeof config.schedule === "function" ? config.schedule : null
 
     // Icon resolution hits the icon theme (a synchronous filesystem-backed
     // lookup per name); cache by raw icon name so repeated pool pulls -
@@ -188,6 +298,46 @@ function createAppsAdapter(config) {
         return null
     }
 
+    // Everything the stream maps, in the order sortResults would rank it:
+    // the hidden and built-in command rows ride the same batch run so they
+    // land with the applications instead of trailing the whole list.
+    function streamSource() {
+        var values = entryValues() || []
+        var entries = []
+        for (var index = 0; index < values.length; index++) {
+            var entry = values[index]
+            if (entry && !entry.noDisplay)
+                entries.push(entry)
+        }
+        var apps = sortSourceForStreaming(entries,
+            function(entry) {
+                var appId = String(entry.id == null ? "" : entry.id)
+                return launchCounts && typeof launchCounts.getLaunchCount === "function"
+                       ? launchCounts.getLaunchCount(appId) : 0
+            },
+            function(entry) {
+                var appId = String(entry.id == null ? "" : entry.id)
+                return launchCounts && typeof launchCounts.getLastLaunchAt === "function"
+                       ? launchCounts.getLastLaunchAt(appId) : 0
+            },
+            // Mirrors appItem's displayName, including the id fallback for a
+            // broken .desktop, so the pre-sort cannot disagree with it.
+            function(entry) { return normalizeText(entry.name) || String(entry.id == null ? "" : entry.id) })
+        var ordered = apps.slice()
+        for (var commandIndex = 0; commandIndex < commands.length; commandIndex++) {
+            var command = commands[commandIndex]
+            if (command)
+                ordered.push({ isCommand: true, index: commandIndex, command: command })
+        }
+        return ordered
+    }
+
+    function mapStreamed(raw) {
+        if (raw.isCommand)
+            return commandItem(raw.command, raw.index)
+        return appItem(raw, launchCounts, cachedIcon, categoryResolver)
+    }
+
     return {
         refresh: function(queryText, modeName, done) {
             if (typeof done !== "function")
@@ -197,23 +347,22 @@ function createAppsAdapter(config) {
                 done({ error: "application source unavailable" })
                 return
             }
+            // The needle lives in this refresh's closure: a concurrent refresh
+            // must not retarget a stream that is still delivering.
             var needle = normalizeText(queryText).toLowerCase()
-            var out = []
-            for (var index = 0; index < values.length; index++) {
-                var entry = values[index]
-                if (!entry || entry.noDisplay)
-                    continue
-                if (!appMatches(entry, needle))
-                    continue
-                out.push(appItem(entry, launchCounts, cachedIcon, categoryResolver))
-            }
-            for (var commandIndex = 0; commandIndex < commands.length; commandIndex++) {
-                var candidate = commands[commandIndex]
-                if (!candidate || !commandMatches(candidate, needle))
-                    continue
-                out.push(commandItem(candidate, commandIndex))
-            }
-            done(out)
+            createChunkStream({
+                source: streamSource(),
+                make: mapStreamed,
+                matches: function(raw) {
+                    if (!needle)
+                        return true
+                    return raw.isCommand ? commandMatches(raw.command, needle)
+                                         : appMatches(raw, needle)
+                },
+                schedule: schedule,
+                chunkSize: appChunkSize,
+                done: done
+            })
         },
 
         execute: function(item, done) {
@@ -579,17 +728,20 @@ function clipboardItem(raw, categoryResolver) {
     }
 }
 
-function mapClipboardItems(items, needle, categoryResolver) {
-    var out = []
-    for (var index = 0; index < items.length; index++) {
-        var raw = items[index]
-        if (!raw)
-            continue
-        if (needle && !containsNormalized(raw.preview, needle))
-            continue
-        out.push(clipboardItem(raw, categoryResolver))
-    }
-    return out
+// Clipboard rows carry no usage weight, so sortResults ranks them by
+// first-seen time alone; the pre-sort therefore only has to order by that
+// timestamp to keep arrival order equal to final order. The exact ties that
+// sortResults would break by title are two copies inside the same
+// millisecond, and the batch they land in is still the same batch.
+function clipboardStreamSource(items) {
+    var source = []
+    for (var index = 0; index < items.length; index++)
+        if (items[index])
+            source.push(items[index])
+    return sortSourceForStreaming(source,
+        function() { return 0 },
+        function(raw) { return toCount(raw.firstSeenMs) },
+        function() { return "" })
 }
 
 // Cliphist-backed clipboard history: write-back copies the selected entry;
@@ -599,6 +751,7 @@ function createClipboardAdapter(config) {
     config = config || {}
     var backend = config.clipboardBackend || null
     var categoryResolver = typeof config.categoryResolver === "function" ? config.categoryResolver : null
+    var schedule = typeof config.schedule === "function" ? config.schedule : null
     var waiting = null
     var completionHandler = null
     var availabilityHandler = null
@@ -611,8 +764,22 @@ function createClipboardAdapter(config) {
         var pending = waiting
         waiting = null
         if (pending)
-            pending.done(mapClipboardItems(Array.isArray(backend.items) ? backend.items : [],
-                                           pending.needle, categoryResolver))
+            stream(pending.needle, pending.done)
+    }
+
+    // Streams the history the backend already holds: the first batch paints in
+    // this same turn and the rest follows one frame apart.
+    function stream(needle, done) {
+        createChunkStream({
+            source: clipboardStreamSource(Array.isArray(backend.items) ? backend.items : []),
+            make: function(raw) { return clipboardItem(raw, categoryResolver) },
+            matches: function(raw) {
+                return !needle || containsNormalized(raw.preview, needle)
+            },
+            schedule: schedule,
+            chunkSize: clipboardChunkSize,
+            done: done
+        })
     }
 
     // During the startup probe the service is not yet marked available.
@@ -659,7 +826,7 @@ function createClipboardAdapter(config) {
                           && isSignal(backend, "listCompleted")
                           && typeof backend.list === "function"
             if (items.length > 0 || !canWait) {
-                done(mapClipboardItems(items, needle, categoryResolver))
+                stream(needle, done)
                 return
             }
             // list() is a documented no-op until the backend's startup caches
@@ -669,7 +836,7 @@ function createClipboardAdapter(config) {
             // backend is ready. Backends without the seam (test doubles) keep
             // the previous waiting behavior.
             if (backend._firstSeenCacheReady === false) {
-                done(mapClipboardItems(items, needle, categoryResolver))
+                stream(needle, done)
                 return
             }
             waiting = { needle: needle, done: done }
@@ -746,14 +913,19 @@ function shortcutItem(row, index) {
     }
 }
 
-function mapShortcutItems(rows, needle) {
-    var out = []
-    for (var index = 0; index < rows.length; index++) {
-        if (!shortcutMatches(rows[index], needle))
-            continue
-        out.push(shortcutItem(rows[index], index))
-    }
-    return out
+// Binds carry no usage weight, so sortResults ranks them alphabetically by
+// label; ordering the raw rows that way first lets the batches stream in
+// their final order.
+function shortcutStreamSource(rows) {
+    var source = []
+    for (var index = 0; index < rows.length; index++)
+        if (rows[index])
+            source.push({ row: rows[index], index: index,
+                      id: rows[index].entryId == null ? "" : String(rows[index].entryId) })
+    return sortSourceForStreaming(source,
+        function() { return 0 },
+        function() { return 0 },
+        function(raw) { return raw.row.label == null ? "" : String(raw.row.label) })
 }
 
 // Splits a kdl action body into argv tokens, honoring double-quoted strings
@@ -825,6 +997,18 @@ function createShortcutsAdapter(config) {
     var backend = config.shortcutsBackend || null
     var actionRunner = typeof config.actionRunner === "function" ? config.actionRunner : null
     var ipcHelperPath = config.ipcHelperPath == null ? "" : String(config.ipcHelperPath)
+    var schedule = typeof config.schedule === "function" ? config.schedule : null
+
+    function stream(needle, done) {
+        createChunkStream({
+            source: shortcutStreamSource(modelRows(backend.shortcutsModel)),
+            make: function(raw) { return shortcutItem(raw.row, raw.index) },
+            matches: function(raw) { return shortcutMatches(raw.row, needle) },
+            schedule: schedule,
+            chunkSize: shortcutChunkSize,
+            done: done
+        })
+    }
 
     function evaluate(needle, done) {
         var rows = modelRows(backend.shortcutsModel)
@@ -832,7 +1016,7 @@ function createShortcutsAdapter(config) {
             done({ error: String(backend.errorText) })
             return
         }
-        done(mapShortcutItems(rows, needle))
+        stream(needle, done)
     }
 
     return {
@@ -904,16 +1088,19 @@ function createAdapters(config) {
             categoryResolver: config.appCategoryResolver || null,
             commands: config.commands,
             actionRunner: config.actionRunner,
-            ipcHelperPath: config.ipcHelperPath
+            ipcHelperPath: config.ipcHelperPath,
+            schedule: config.schedule
         }),
         clipboard: createClipboardAdapter({
             clipboardBackend: config.clipboardBackend || null,
-            categoryResolver: config.clipCategoryResolver || null
+            categoryResolver: config.clipCategoryResolver || null,
+            schedule: config.schedule
         }),
         shortcuts: createShortcutsAdapter({
             shortcutsBackend: config.shortcutsBackend || null,
             actionRunner: config.actionRunner || null,
-            ipcHelperPath: config.ipcHelperPath || ""
+            ipcHelperPath: config.ipcHelperPath || "",
+            schedule: config.schedule
         })
     }
 }

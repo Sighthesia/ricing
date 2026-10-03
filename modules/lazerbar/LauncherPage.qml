@@ -94,6 +94,8 @@ Item {
     readonly property alias searchField: searchSurface
     // Chip rail handle for probes and tests (chipAt resolves one chip).
     readonly property alias categoryBarItem: categoryBar
+    // Spinner row marking the tail that has not streamed in yet.
+    readonly property alias listFooterItem: listFooter
     // Result access for tests and shell wiring.
     readonly property alias resultsView: resultsView
     readonly property int resultCount: resultsView.resultCount
@@ -107,12 +109,11 @@ Item {
     readonly property alias previewTextItem: paneText
     readonly property alias previewImageItem: paneImage
 
-    // Injected by the production surface from LauncherService.appsIndexing;
-    // standalone/test sessions simply leave it false.
-    property bool appsIndexing: false
-    readonly property bool showIndexNotice: appsIndexing
-                                            && root.session && root.session.visible
-                                            && root.activeMode === "apps"
+    // True while the session is still streaming batches. The list shows what
+    // has arrived and the footer shows what has not, so this replaces the
+    // old "indexing applications" notice.
+    readonly property bool streamingResults: root.session && root.session.visible
+                                   && root.session.loadingMore === true
 
     implicitWidth: 400
     implicitHeight: 300
@@ -344,8 +345,12 @@ Item {
                                            && root.session.loading && !root.session.error
     readonly property bool sessionError: root.session && root.session.visible
                                          && !root.session.loading && !!root.session.error
+    // A stream that has only delivered its first batch has not answered yet:
+    // reporting "No results" then would flash a wrong answer at a list that
+    // is still arriving.
     readonly property bool sessionEmpty: root.session && root.session.visible
                                          && !root.session.loading
+                                         && !root.streamingResults
                                          && !root.session.error
                                          && (!root.session.results || root.session.results.length === 0)
     readonly property bool stateVisible: sessionLoading || sessionError || sessionEmpty
@@ -1042,44 +1047,22 @@ Item {
         }
     }
 
-    // Slim indexing notice between the query surface and the results; explains
-    // why a freshly opened session may miss applications for a few seconds.
-    Rectangle {
-        id: indexNotice
-        anchors.top: categoryBar.visible ? categoryBar.bottom : searchSurface.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: visible ? 26 : 0
-        visible: root.showIndexNotice
-        color: LazerTheme.settingsRail
-
-        Text {
-            anchors.left: parent.left
-            anchors.leftMargin: 12
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Indexing applications…"
-            color: LazerTheme.textMuted
-            font.pixelSize: 11
-            font.italic: true
-        }
-    }
-
-    // Same edge-anchored chain as the notice above: an anchor line must name an
-    // item's edge, never the item itself.
+    // The list starts under the query surface; the tail that has not arrived yet
+    // is drawn inside the viewport as a footer row, so nothing above the list
+    // has to move while a refresh streams in.
     Flickable {
         id: resultsView
-        anchors.top: indexNotice.visible ? indexNotice.bottom
-                                   : (categoryBar.visible ? categoryBar.bottom : searchSurface.bottom)
+        anchors.top: categoryBar.visible ? categoryBar.bottom : searchSurface.bottom
         anchors.left: parent.left
         anchors.right: previewPane.visible ? previewPane.left : parent.right
         anchors.bottom: parent.bottom
-        anchors.topMargin: indexNotice.visible ? 4 : 12
+        anchors.topMargin: 12
         anchors.leftMargin: 8
         anchors.rightMargin: previewPane.visible ? 12 : 8
         clip: true
         visible: !root.sessionLoading && !root.sessionError
         contentWidth: width
-        contentHeight: resultsColumn.height
+        contentHeight: resultsColumn.height + listFooter.height
         onContentHeightChanged: syncSelectionFrame()
         boundsBehavior: Flickable.StopAtBounds
         onContentYChanged: {
@@ -1352,7 +1335,18 @@ Item {
                 }
             }
         }
-    
+
+        // Tail of the list: the not-yet-arrived region, marked by the shared
+        // loading ring. Sits directly under the rows so a batch landing
+        // extends the list downward instead of moving anything above it.
+        LauncherListFooter {
+            id: listFooter
+            objectName: "launcherListFooter"
+            y: resultsColumn.height
+            width: resultsView.width - 8
+            loadingMore: root.streamingResults
+        }
+
         // One shared focus frame for the whole list: glides between rows
         // like the settings sidebar's shared indicator instead of every row
         // showing/hiding its own.

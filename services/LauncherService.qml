@@ -14,6 +14,37 @@ import "launcher/LauncherCategories.js" as LauncherCategories
 Singleton {
     id: root
 
+    // Gap between result batches. Short enough that the tail of a 750-row
+    // history lands within a few frames of the head, long enough that the
+    // list actually paints between batches instead of growing behind a
+    // stalled frame. Not a motion token: this paces a data pipeline, not an
+    // animation.
+    readonly property int batchInterval: 8
+    // One step per tick, queued rather than replaced: a visible list and a
+    // background read (the clipboard metadata merge) can stream at the same
+    // time, and a shared slot would starve whichever arrived second.
+    property var _batchQueue: []
+    Timer {
+        id: batchTimer
+        interval: root.batchInterval
+        repeat: false
+        onTriggered: {
+            var step = root._batchQueue.shift()
+            if (typeof step === "function")
+                step()
+            if (root._batchQueue.length > 0)
+                batchTimer.restart()
+        }
+    }
+
+    // Batch scheduler handed to the adapters: they call done() with the first
+    // slice synchronously and hand the rest here, so one mapping batch per
+    // frame and no frame is ever blown by the whole set at once.
+    function _scheduleBatch(step) {
+        _batchQueue.push(step)
+        batchTimer.restart()
+    }
+
     // Production data-source adapters installed on the session seam: real
     // desktop-entry applications, cliphist clipboard history, and niri
     // shortcut binds. Unavailable sources resolve to explicit errors.
@@ -30,6 +61,7 @@ Singleton {
         appCategoryResolver: LauncherCategories.appCategoryOf,
         clipCategoryResolver: LauncherCategories.clipCategoryOf,
         commands: LauncherAdapters.builtinCommands(),
+        schedule: function(step) { root._scheduleBatch(step) },
         ipcHelperPath: Quickshell.shellDir + "/scripts/afloat-ipc",
         actionRunner: root._runShortcutAction
     })
@@ -38,32 +70,26 @@ Singleton {
     // binding keeps the scan materialized so launcher queries see entries.
     readonly property int _desktopEntryCount: DesktopEntries.applications.values.length
 
-    // Re-query apps when entries arrive while the launcher is already open,
-    // so an early open cannot strand the user on an empty result set. The
-    // scan reports every entry individually; coalesce the storm into one
-    // refresh instead of committing a growing pool per entry.
-    // Re-pool apps when entries arrive: an open launcher sees the newer set
-    // through the force-pull commit, and a closed one refreshes its kept
-    // pool in the background so the next open never re-pulls on the spot.
+    // The scan reports every entry individually, so it is coalesced into
+    // pulls instead of one per entry. The leading-edge pass matters most: it
+    // puts the first apps on screen within a frame or two of the scan
+    // starting, and the trailing pass settles the remainder behind it.
+    Timer {
+        id: entryScanLeadingTimer
+        interval: 120
+        repeat: false
+        onTriggered: session.revalidatePool()
+    }
     Timer {
         id: entryScanRefreshTimer
         interval: 400
         repeat: false
         onTriggered: session.revalidatePool()
     }
-
-    // True while the desktop-entry scan is still adding entries (quiet for
-    // 1.5s); the launcher surface shows an indexing notice so early searches
-    // explain why applications may land a few seconds late.
-    readonly property bool appsIndexing: entryScanSettleTimer.running
-    Timer {
-        id: entryScanSettleTimer
-        interval: 1500
-        repeat: false
-    }
     on_DesktopEntryCountChanged: {
+        if (!entryScanLeadingTimer.running)
+            entryScanLeadingTimer.restart()
         entryScanRefreshTimer.restart()
-        entryScanSettleTimer.restart()
         if (!session.visible && session.displayPool.length === 0)
             session.primeApps()
     }
@@ -116,6 +142,9 @@ Singleton {
     // Stable per-mode pool the surface renders; text filtering is local.
     property alias displayPool: session.displayPool
     readonly property alias loading: session.loading
+    // True while result batches are still streaming in behind the footer
+    // spinner; the first batch has already cleared `loading`.
+    readonly property alias loadingMore: session.loadingMore
     readonly property alias error: session.error
     readonly property alias selectedIndex: session.selectedIndex
 

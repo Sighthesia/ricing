@@ -127,6 +127,43 @@ Item {
             return entry
         }
 
+        // Adapters deliver rows in ranked order, so a formatting test must not read
+        // them by position: look them up by id instead.
+        function byId(items) {
+            var map = ({})
+            for (var index = 0; index < items.length; index++)
+                map[String(items[index].id)] = items[index]
+            return map
+        }
+
+        function ids(items) {
+            var out = []
+            for (var index = 0; index < items.length; index++)
+                out.push(String(items[index].id))
+            return out
+        }
+
+        // Collects every batch a refresh streams out. `schedule` is
+        // synchronous here, so one refresh() call still delivers all of them.
+        function collectingRefresh(adapter, mode, query) {
+            var batches = []
+            adapter.refresh(query || "", mode || "apps", function(items, complete) {
+                batches.push({ items: items, complete: complete })
+            })
+            return batches
+        }
+
+        // Drains a scheduler queue after refresh() returns, the way the
+        // production frame stepper would. Draining inside the completion
+        // callback cannot work: the step is only queued after the callback
+        // returns.
+        function drain(queue, limit) {
+            var guard = 0
+            while (queue.length && guard++ < (limit || 40))
+                queue.shift()()
+            return guard
+        }
+
         function makeLaunchCounts(initial) {
             var counts = { map: initial || {}, recorded: [] }
             counts.getLaunchCount = function(id) { return this.map[id] || 0 }
@@ -569,14 +606,12 @@ Item {
                 clipCategoryResolver: function(raw) { return raw.isImage ? "image" : "text" }
             })
 
-            var outcome = "pending"
-            adapters.clipboard.refresh("", "clipboard", function(result) { outcome = result })
-
-            compare(outcome.length, 2)
-            compare(outcome[0].id, "1")
-            compare(outcome[0].category, "text")
-            compare(outcome[1].id, "2")
-            compare(outcome[1].category, "image")
+            var batches = collectingRefresh(adapters.clipboard, "clipboard")
+            verify(batches.length === 1)
+            var rows = byId(batches[0].items)
+            compare(Object.keys(rows).length, 2)
+            compare(rows["1"].category, "text")
+            compare(rows["2"].category, "image")
         }
 
         function test_clipboardAdapterDefaultsToTextWithoutAClassifier() {
@@ -586,13 +621,12 @@ Item {
             ]
             var adapters = LauncherAdapters.createAdapters({ clipboardBackend: clipBackend })
 
-            var outcome = "pending"
-            adapters.clipboard.refresh("", "clipboard", function(result) { outcome = result })
-
-            compare(outcome[0].category, "text")
+            var batches = collectingRefresh(adapters.clipboard, "clipboard")
+            var rows = byId(batches[0].items)
+            compare(rows["1"].category, "text")
             // An image row keeps its own bucket even with no classifier: it is
             // the one kind the raw entry already states.
-            compare(outcome[1].category, "image")
+            compare(rows["2"].category, "image")
         }
 
         // --- clipboard ---
@@ -627,13 +661,13 @@ Item {
                 { id: "long", preview: "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890", textCharCount: 2500, metadataReady: true, mime: "text/plain", isImage: false, firstSeenMs: 1700000200000 }
             ])
 
-            var outcome = null
-            adapters.clipboard.refresh("", "clipboard", function(result) { outcome = result })
-            compare(outcome.length, 2)
-            verify(outcome[0].description.indexOf("1234 characters") >= 0)
-            verify(outcome[1].description.indexOf("2500 characters") >= 0)
-            verify(outcome[1].description.indexOf("Long text") < 0)
-            verify(outcome[0].description.indexOf("copied") >= 0)
+            var batches = collectingRefresh(adapters.clipboard, "clipboard")
+            var rows = byId(batches[0].items)
+            compare(Object.keys(rows).length, 2)
+            verify(rows["short"].description.indexOf("1234 characters") >= 0)
+            verify(rows["long"].description.indexOf("2500 characters") >= 0)
+            verify(rows["long"].description.indexOf("Long text") < 0)
+            verify(rows["short"].description.indexOf("copied") >= 0)
         }
 
         function test_clipboardAdapterFormatsImageMetadataAndFallsBackToMime() {
@@ -662,17 +696,16 @@ Item {
                 { id: "bad-image", preview: "[[ binary data unavailable ]]", mime: "image/jpeg", isImage: true, firstSeenMs: 1700000200000 },
                 { id: "preview-image", preview: "[[ binary data 37 KiB png 712x522 ]]", mime: "image/png", isImage: true, firstSeenMs: 1700000300000 }
             ])
-            var outcome = null
-            adapters.clipboard.refresh("", "clipboard", function(result) { outcome = result })
-
-            compare(outcome[0].displayName, "[Image] 1705x905")
-            verify(outcome[0].description.indexOf("png") >= 0)
-            verify(outcome[0].description.indexOf("482.3 KB") >= 0)
-            verify(outcome[0].description.indexOf("copied") >= 0)
-            verify(outcome[1].description.indexOf("image/jpeg") >= 0)
-            verify(outcome[1].description.indexOf("unavailable") < 0)
-            compare(outcome[2].displayName, "[Image] 712x522")
-            verify(outcome[2].description.indexOf("37.9 KB") >= 0)
+            var batches = collectingRefresh(adapters.clipboard, "clipboard")
+            var rows = byId(batches[0].items)
+            compare(rows["image"].displayName, "[Image] 1705x905")
+            verify(rows["image"].description.indexOf("png") >= 0)
+            verify(rows["image"].description.indexOf("482.3 KB") >= 0)
+            verify(rows["image"].description.indexOf("copied") >= 0)
+            verify(rows["bad-image"].description.indexOf("image/jpeg") >= 0)
+            verify(rows["bad-image"].description.indexOf("unavailable") < 0)
+            compare(rows["preview-image"].displayName, "[Image] 712x522")
+            verify(rows["preview-image"].description.indexOf("37.9 KB") >= 0)
         }
 
         function test_clipboardAdapterAppliesPersistentMetadataWithoutRecounting() {
@@ -912,6 +945,208 @@ Item {
                     "item-" + (LauncherAdapters.clipboardCopySeedLimit + 3))
         }
 
+        // --- progressive delivery ---
+
+        function test_appsAdapterStreamsBatchesInRankedOrder() {
+            // 120 entries with descending launch counts, delivered through a
+            // synchronous stepper: one refresh() call still emits every batch,
+            // and the batch boundaries follow the chunk size, not the set.
+            var entries = []
+            for (var index = 0; index < 120; index++)
+                entries.push(makeAppEntry("app" + index, "App " + index, ""))
+            var counts = { map: ({}) }
+            for (var c = 0; c < 120; c++)
+                counts.map["app" + c] = 120 - c
+            counts.getLaunchCount = function(id) { return this.map[id] || 0 }
+            counts.recordLaunch = function() {}
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource(entries),
+                launchCounts: counts,
+                // Collect every scheduled step instead of running it at once,
+                // which is what the production frame stepper does.
+                schedule: function(step) { pending.push(step) }
+            })
+
+            var batches = []
+            var pending = []
+            adapters.apps.refresh("", "apps", function(items, complete) {
+                batches.push({ items: items, complete: complete })
+            })
+
+            // The first batch is handed over synchronously; the rest wait for
+            // the scheduler, so the caller paints before the set is mapped.
+            verify(batches.length === 1)
+            compare(batches[0].complete, false)
+            compare(batches[0].items.length, 48)
+            compare(batches[0].items[0].id, "app0")
+
+            var guard = 0
+            while (pending.length && guard++ < 20) {
+                var step = pending.shift()
+                step()
+            }
+            verify(batches.length >= 3)
+            // Only the last batch reports completion.
+            compare(batches[batches.length - 1].complete, true)
+            for (var b = 0; b < batches.length - 1; b++)
+                compare(batches[b].complete, false)
+
+            // Concatenated batches are the ranked whole: launch-count
+            // descending, and never re-sorted after the fact.
+            var joined = []
+            for (var j = 0; j < batches.length; j++)
+                joined = joined.concat(batches[j].items)
+            compare(joined.length, 120)
+            var sortedOk = true
+            for (var k = 1; k < joined.length; k++) {
+                if (joined[k - 1].favoriteWeight < joined[k].favoriteWeight)
+                    sortedOk = false
+            }
+            verify(sortedOk, "batches must arrive in ranked order")
+        }
+
+        function test_appsAdapterStreamedResultMatchesTheOneShotResult() {
+            var entries = []
+            for (var index = 0; index < 30; index++)
+                entries.push(makeAppEntry("app" + index, "App " + index, "",
+                                          { categories: index % 2 ? ["Game"] : ["Network"] }))
+            var streamed = []
+            var pending = []
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource(entries),
+                schedule: function(step) { pending.push(step) }
+            })
+            adapters.apps.refresh("", "apps", function(items) {
+                streamed = streamed.concat(items)
+            })
+            drain(pending)
+            var oneShot = null
+            var plain = LauncherAdapters.createAdapters({ appsSource: makeAppsSource(entries) })
+            plain.apps.refresh("", "apps", function(items) { oneShot = items })
+
+            compare(ids(streamed), ids(oneShot))
+        }
+
+        function test_streamedQueryFiltersEveryBatch() {
+            // The needle applies to the whole stream, not just its first
+            // batch: a match in the tail still has to arrive.
+            var entries = []
+            for (var index = 0; index < 100; index++)
+                entries.push(makeAppEntry("app" + index,
+                                           index === 90 ? "Needle app" : "App " + index, ""))
+            var pending = []
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource(entries),
+                schedule: function(step) { pending.push(step) }
+            })
+            var found = []
+            adapters.apps.refresh("needle", "apps", function(items) {
+                found = found.concat(items)
+            })
+            drain(pending)
+            compare(ids(found), ["app90"])
+        }
+
+        function test_concurrentStreamsBothFinishInsteadOfStarving() {
+            // A background read (the clipboard metadata merge) streams while
+            // the visible list is still streaming. Neither may be cancelled
+            // or dropped: each keeps its own cursor and its own needle.
+            var rows = []
+            for (var index = 0; index < 200; index++) {
+                rows.push({
+                    id: String(index),
+                    preview: index === 150 ? "needle row" : "row " + index,
+                    mime: "text/plain",
+                    isImage: false,
+                    firstSeenMs: 1700000000000 + index
+                })
+            }
+            clipBackend.items = rows
+            var pending = []
+            var adapters = LauncherAdapters.createAdapters({
+                clipboardBackend: clipBackend,
+                schedule: function(step) { pending.push(step) }
+            })
+
+            var visible = []
+            var needleRun = []
+            adapters.clipboard.refresh("", "clipboard", function(items) {
+                visible = visible.concat(items)
+            })
+            adapters.clipboard.refresh("needle", "clipboard", function(items) {
+                needleRun = needleRun.concat(items)
+            })
+            drain(pending)
+
+            // The second refresh did not retarget the first: the unfiltered
+            // run still sees everything, the filtered one only its match.
+            compare(visible.length, 200)
+            compare(ids(needleRun), ["150"])
+        }
+
+        function test_withoutASchedulerTheWholeSetArrivesSynchronously() {
+            // A caller that injects no scheduler asked for a plain refresh: it
+            // must receive every row, not just the first chunk. The batches
+            // still arrive one call at a time - there is simply no later turn
+            // to hand the rest to.
+            var entries = []
+            for (var index = 0; index < 100; index++)
+                entries.push(makeAppEntry("app" + index, "App " + index, ""))
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource(entries)
+            })
+            var collected = []
+            var completions = []
+            adapters.apps.refresh("", "apps", function(items, complete) {
+                collected = collected.concat(items)
+                completions.push(complete)
+            })
+            compare(collected.length, 100)
+            verify(completions.length >= 2)
+            compare(completions[completions.length - 1], true)
+            for (var c = 0; c < completions.length - 1; c++)
+                compare(completions[c], false)
+        }
+
+        function test_emptyStreamStillReportsCompletion() {
+            // An exhausted source with no matches is a real answer, not a
+            // silent hang: exactly one batch, empty, complete.
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource([makeAppEntry("alpha", "Alpha", "")])
+            })
+            var batches = collectingRefresh(adapters.apps, "apps", "no-such-app")
+            compare(batches.length, 1)
+            compare(batches[0].items.length, 0)
+            compare(batches[0].complete, true)
+        }
+
+        function test_clipboardAdapterStreamsHistoryByRecency() {
+            clipBackend.items = []
+            for (var index = 0; index < 150; index++) {
+                clipBackend.items.push({
+                    id: String(index),
+                    preview: "entry " + index,
+                    mime: "text/plain",
+                    isImage: false,
+                    firstSeenMs: 1700000000000 + index
+                })
+            }
+            var pending = []
+            var adapters = LauncherAdapters.createAdapters({
+                clipboardBackend: clipBackend,
+                schedule: function(step) { pending.push(step) }
+            })
+            var joined = []
+            adapters.clipboard.refresh("", "clipboard", function(items) {
+                joined = joined.concat(items)
+            })
+            drain(pending)
+            compare(joined.length, 150)
+            // Newest first, which is what the pool shows while it streams.
+            compare(joined[0].id, "149")
+            compare(joined[149].id, "0")
+        }
+
         // --- shortcuts ---
 
         function makeShortcutRow(entryId, label, sequence, detail, actionId, managedByShell) {
@@ -952,10 +1187,15 @@ Item {
             compare(calls.length, 1)
             verify(Array.isArray(calls[0]))
             compare(calls[0].length, 2)
-            compare(calls[0][0].id, "s1")
-            compare(calls[0][0].displayName, "Open terminal")
-            compare(calls[0][0].keySequence, "Super+Return")
-            compare(calls[0][1].managedByShell, true)
+            // Ranked delivery: binds have no usage weight, so they arrive
+            // alphabetically by label ("Launcher: afloat" before "Open
+            // terminal"), which is also the order the pool keeps them in.
+            compare(calls[0][0].id, "s2")
+            compare(calls[0][0].displayName, "Launcher: afloat")
+            compare(calls[0][0].managedByShell, true)
+            compare(calls[0][1].id, "s1")
+            compare(calls[0][1].displayName, "Open terminal")
+            compare(calls[0][1].keySequence, "Super+Return")
         }
 
         function test_shortcutsAdapterFiltersByLabelSequenceAndDetail() {
