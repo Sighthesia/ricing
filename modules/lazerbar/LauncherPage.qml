@@ -151,6 +151,7 @@ Item {
             } else {
                 root.cancelEntranceWave()
                 entranceSettle.stop()
+                entranceWatchdog.stop()
                 root._firstFillPending = false
                 // Pointer preview dies with the surface so a reopen starts
                 // from the focused row instead of a stale hover.
@@ -358,9 +359,30 @@ Item {
     // Entrance wave, mirroring LazerSettingsSections.playEntranceWave:
     // hold every row instantly, release top-to-bottom on 18ms slots from a
     // 120ms base, and hold scrolling until the reveal transitions land.
-    readonly property bool entranceBusy: _anyRowHeld() || entranceSettle.running
+    // Two gates, deliberately different:
+    //  - rowsAnimatingIn is a row still travelling in. Scrolling fights that,
+    //    so it is what blocks the wheel, and it clears the moment the last
+    //    row lands. Gating the wheel on the settle timer instead left the
+    //    list refusing input for hundreds of milliseconds after the rows had
+    //    already settled.
+    //  - entranceBusy also covers the settle timer, which exists to hold a
+    //    deferred scroll until the wave has reshaped the layout.
+    readonly property bool rowsAnimatingIn: _anyRowHeld()
+    readonly property bool entranceBusy: rowsAnimatingIn || entranceSettle.running
     readonly property int entranceBaseDelay: 120
     readonly property int entranceSlotInterval: 18
+
+    // The settle window measures the tail AFTER the last row lands, exactly
+    // like LazerSettingsSections.onEntranceWaveActiveChanged. Starting it
+    // together with the wave (as this page used to) made it outlast the rows
+    // by the whole stagger, so the viewport stayed non-interactive long after
+    // the list had stopped moving.
+    onRowsAnimatingInChanged: {
+        if (root.rowsAnimatingIn)
+            entranceSettle.stop()
+        else
+            entranceSettle.restart()
+    }
 
     property int _deferredScrollIndex: -1
     property bool _firstFillPending: false
@@ -376,6 +398,22 @@ Item {
                 root._deferredScrollIndex = -1
                 resultsView.scrollTo(deferred)
             }
+        }
+    }
+
+    // Backstop for the entrance gate. A held row keeps the wheel off
+    // (entranceBusy disables the viewport), so a wave that never completes -
+    // a delegate whose reveal timer was superseded, a commit that raced the
+    // Repeater - must not cost the list its scrolling for the rest of the
+    // session. Well past the longest wave the page can play.
+    Timer {
+        id: entranceWatchdog
+        interval: 2000
+        repeat: false
+        onTriggered: {
+            entranceSettle.stop()
+            root.cancelEntranceWave()
+            root._deferredScrollIndex = -1
         }
     }
 
@@ -416,7 +454,7 @@ Item {
             slot++
         }
         if (slot > 0)
-            entranceSettle.restart()
+            entranceWatchdog.restart()
     }
 
     // Cancel an unfinished wave, restoring every row instantly.
@@ -452,7 +490,7 @@ Item {
             revealed++
         }
         if (revealed > 0)
-            entranceSettle.restart()
+            entranceWatchdog.restart()
     }
 
     // Coalesce the commit choreography across the display-pool and results
@@ -535,11 +573,24 @@ Item {
                 }
             }
         }
-        root._lastRowIds = ids
+        // A commit that runs before the Repeater has materialized this
+        // window's rows must not write the id bookkeeping. Doing so makes the
+        // NEXT commit read as "unchanged" and skip the choreography, leaving
+        // every delegate it is about to build standing at its initial held
+        // geometry - and a held row is what keeps the wheel off, so the list
+        // would stop scrolling for the rest of the session.
         if (resultsView.resultCount <= 0)
             return
-        if (sameIds)
+        // An unchanged id list is a rebuilt window, not new data: the fresh
+        // delegates go back where they belong and the survivors are left
+        // exactly as they are. No wave, no re-hold - re-releasing a settled
+        // list would snap its transitions and kill the fold/glide.
+        if (sameIds) {
+            if (freshRows.length > 0)
+                root._releaseAllRowsInstantly()
             return
+        }
+        root._lastRowIds = ids
         if (root._firstFillPending) {
             root._firstFillPending = false
             if (resultsView.resultCount > root.largeListWaveThreshold
@@ -559,7 +610,11 @@ Item {
             for (var g = 0; g < freshRows.length; g++) {
                 var grown = freshRows[g]
                 var grownId = grown.result ? String(grown.result.id) : ""
-                if (prevSet[grownId] === true || grown.hidden === true)
+                // Rows the user cannot see have nothing to reveal: a
+                // window growth materializes them below the fold, and
+                // holding them would block the wheel for the delay.
+                var belowFold = grown.y > resultsView.height
+                if (prevSet[grownId] === true || grown.hidden === true || belowFold)
                     grown.releaseInstantly()
                 else
                     grown.holdInstantly()
@@ -1070,7 +1125,9 @@ Item {
                 extendResultWindow()
         }
         flickDeceleration: 2000
-        interactive: !root.entranceBusy
+        // A row still revealing is what scrolling would fight; the
+        // settle timer alone must not keep the wheel off.
+        interactive: !root.rowsAnimatingIn
 
         readonly property int resultCount: resultsRepeater.count
 
@@ -1117,8 +1174,13 @@ Item {
         // end so long histories browse without a hard cap.
         function extendResultWindow() {
             var pool = root.session ? root.session.displayPool : null
-            if (pool && pool.length > root._resultWindowLimit)
-                root._resultWindowExtra += root.resultWindowStep
+            if (!pool || pool.length <= root._resultWindowLimit)
+                return
+            root._resultWindowExtra += root.resultWindowStep
+            // New delegates arrive in their held geometry, so the window has
+            // to run the commit that releases them - otherwise rows nobody
+            // ever released keep the viewport non-interactive.
+            root._scheduleRowsCommit()
         }
 
         function positionToSelection() {
@@ -1250,7 +1312,7 @@ Item {
             blocking: false
             acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
             onWheel: wheel => {
-                if (root.entranceBusy)
+                if (root.rowsAnimatingIn)
                     return
                 var scrollingDown = wheel.angleDelta.y < 0 || wheel.pixelDelta.y < 0
                 var delta = wheel.pixelDelta.y

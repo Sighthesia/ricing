@@ -523,7 +523,130 @@ Item {
             compare(page.categoryChips[1].id, "text")
         }
 
-        // --- progressive loading ---
+        // --- the list must never stop accepting the wheel ---
+
+function test_streamedFirstFillLeavesTheViewportScrollable() {
+    // A refresh that streams its rows in batches is the production shape, and
+        // its first batch is what ends the loading state. If that first commit
+        // does not release the delegates it built, every row stays held and the
+        // viewport stays non-interactive: the list then refuses the wheel for
+        // the rest of the session.
+        var items = []
+        for (var i = 0; i < 140; i++)
+            items.push(makeItem("item" + i, "Item " + i, 0, 140 - i))
+        var apps = makeManualAdapter()
+        svc()._adapters = ({ apps: apps })
+        svc().open()
+        wait(0)
+
+        // 48-row batches, the size the apps adapter streams, resolved one turn
+        // apart exactly like the production frame stepper.
+        var batches = []
+        for (var b = 0; b < items.length; b += 48)
+            batches.push(items.slice(b, b + 48))
+        apps.pendingRefreshes[0](batches[0], false)
+        for (var n = 1; n < batches.length; n++) {
+            wait(0)
+            apps.pendingRefreshes[0](batches[n], n === batches.length - 1)
+        }
+
+        tryVerify(function() { return page.session.loadingMore === false }, 3000)
+        verify(page.resultCount > 48)
+        // Nothing is left travelling in once the stream ends...
+        tryVerify(function() { return !page.rowsAnimatingIn }, 3000)
+        // ...and the selection-driven scroll has landed before the wheel does:
+        // it animates for 300ms and would otherwise be read as a dead wheel.
+        wait(500)
+        // ...and the wheel works on this very first open.
+        verify(page.resultsView.interactive)
+        var view = page.resultsView
+        tryVerify(function() { return view.contentHeight > view.height }, 2000)
+        // Wheel from mid-list: the first and last 80px are the edge-takeover
+        // bands, where a notch is spent on the rubber band, not on travel.
+        view.contentY = Math.max(0, (view.contentHeight - view.height) / 2)
+        wait(30)
+        var before = view.contentY
+        verify(before > 100, "must be parked mid-list, was " + before)
+        mouseWheel(view, view.width / 2, view.height / 2, 0, -120, 0, 0)
+        tryVerify(function() { return view.contentY > before }, 1000)
+    }
+
+    function test_windowGrowthReleasesItsNewRowsAndKeepsScrolling() {
+        // Growing the materialized window builds fresh delegates. Nothing
+        // releases them but the commit that growth schedules, and a held row is
+        // what disables the viewport - so scrolling deep must not be what kills
+        // scrolling.
+        var items = []
+        for (var i = 0; i < 200; i++)
+            items.push(makeItem("item" + i, "Item " + i, 0, 200 - i))
+        openWithResults(items)
+        tryVerify(function() { return page.resultCount === 96 }, 2000)
+        tryVerify(function() { return !page.rowsAnimatingIn }, 3000)
+
+        var view = page.resultsView
+        // Parking at the end is what triggers the growth in production.
+        view.contentY = Math.max(0, view.contentHeight - view.height)
+        tryVerify(function() { return page.resultCount > 96 }, 2000)
+        tryVerify(function() { return !page.rowsAnimatingIn }, 3000)
+        verify(page.resultsView.interactive)
+
+        view.contentY = Math.max(0, (view.contentHeight - view.height) / 2)
+        wait(30)
+        var before = view.contentY
+        verify(before > 100, "must be parked mid-list, was " + before)
+        mouseWheel(view, view.width / 2, view.height / 2, 0, -120, 0, 0)
+        tryVerify(function() { return view.contentY > before }, 1000)
+    }
+
+    function test_reopenKeepsScrollingAfterAnIdenticalCommit() {
+        // Reopening onto a settled pool re-commits the same ids. That commit
+        // must leave the rows alone - and must not leave them held either.
+        var items = []
+        for (var i = 0; i < 40; i++)
+            items.push(makeItem("item" + i, "Item " + i, 0, 40 - i))
+        openWithResults(items)
+        tryVerify(function() { return !page.rowsAnimatingIn }, 3000)
+        wait(500)
+        svc().close()
+        wait(60)
+        svc().open()
+        wait(500)
+        tryVerify(function() { return !page.rowsAnimatingIn }, 3000)
+        verify(page.resultsView.interactive)
+        var view = page.resultsView
+        view.contentY = Math.max(0, (view.contentHeight - view.height) / 2)
+        wait(30)
+        var before = view.contentY
+        verify(before > 100, "must be parked mid-list, was " + before)
+        mouseWheel(view, view.width / 2, view.height / 2, 0, -120, 0, 0)
+        tryVerify(function() { return view.contentY > before }, 1000)
+    }
+
+    function test_aCommitThatOutrunsItsRowsDoesNotStrandThem() {
+        // Regression. The commit bookkeeping must never advance past the rows it
+        // can actually see. A commit that runs before the Repeater has built
+        // the window used to write those ids anyway, so the next real commit
+        // read as "unchanged", skipped the release, and left every freshly
+        // built delegate held - which is what silently killed the wheel.
+        var items = []
+        for (var i = 0; i < 200; i++)
+            items.push(makeItem("item" + i, "Item " + i, 0, 200 - i))
+        openWithResults(items)
+        tryVerify(function() { return page.resultCount === 96 }, 2000)
+        tryVerify(function() { return !page.rowsAnimatingIn }, 3000)
+
+        // Grow the window and commit in the same turn, before the Repeater can
+        // build the new rows.
+        page._resultWindowExtra = 120
+        page._holdAndScheduleReleases()
+
+        tryVerify(function() { return page.resultCount === 200 }, 2000)
+        // The delegates the growth built must be released, not stranded.
+        tryVerify(function() { return !page.rowsAnimatingIn }, 3000)
+        verify(page.resultsView.interactive)
+    }
+
+    // --- progressive loading ---
 
         function test_settledListShowsNoFooter() {
             openWithResults([makeItem("a", "Alpha", 0, 0)])
