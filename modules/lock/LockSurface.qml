@@ -104,8 +104,8 @@ WlSessionLockSurface {
     property bool startupWaveStarted: false
     signal startupWaveStartedSignal()
 
-    // The surface starts with the selected theme surface until the bands sweep
-    // and unveil the wallpaper.
+    // The surface itself commits no colour; the backdrop paints its first frame
+    // (the theme floor, the wallpaper and the wave) as an opaque surface.
     color: "transparent"
 
     // Prepare the surface for its entry: snapshot the theme, reset the
@@ -332,8 +332,8 @@ WlSessionLockSurface {
     }
 
     // Keep the screenshot visible for at least one settled frame before the mask
-    // starts. If capture fails, the opaque floor still starts the reveal after a
-    // bounded wait rather than exposing the desktop immediately.
+    // starts. If capture fails, the opaque wallpaper layer still starts the reveal
+    // after a bounded wait rather than exposing the desktop immediately.
     Timer {
         id: revealStartTimer
         interval: 250

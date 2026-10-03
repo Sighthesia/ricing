@@ -88,14 +88,29 @@ Item {
     }
 
     // The session-start lock: no capture at all, so the wave opens straight onto
-    // the desktop.
+    // the wallpaper. Its wallpaper is *green* on purpose: the sentinel desktop
+    // behind every instance is blue, and a blue wallpaper could not be told apart
+    // from a backdrop that painted nothing at all. Green is unambiguous — blue
+    // sentinel, themed plate and the pink bands are each their own colour.
     Component {
         id: capturelessBackdrop
         LockBackdrop {
             width: 320
             height: 240
             captureExpected: false
-            wallpaperSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="blue"/></svg>')
+            wallpaperSource: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="lime"/></svg>')
+        }
+    }
+
+    // A session-start lock with no wallpaper at all. There is nothing to unveil
+    // here, so the themed floor is all there is — and it has to be opaque, because
+    // the desktop must not show through a lock surface's first frame.
+    Component {
+        id: bareCapturelessBackdrop
+        LockBackdrop {
+            width: 320
+            height: 240
+            captureExpected: false
         }
     }
 
@@ -134,19 +149,50 @@ Item {
         function isThemeDark(c) { return c.r < 0.2 && c.g < 0.2 && c.b < 0.2 }
         function isThemeLight(c) { return c.r > 0.8 && c.g > 0.8 && c.b > 0.8 }
         function isWallpaperBlue(c) { return c.b > 0.9 && c.r < 0.1 && c.g < 0.1 }
+        function isWallpaperLime(c) { return c.g > 0.9 && c.r < 0.1 && c.b < 0.1 }
         function isScreenshotRed(c) { return c.r > 0.9 && c.g < 0.1 && c.b < 0.1 }
+
+        // One sampling grid for every pixel assertion, so "how much of the surface
+        // is X" is measured the same way in each test.
+        function forEachSample(image, body) {
+            for (var x = 8; x < 320; x += 8)
+                for (var y = 0; y < 240; y += 8)
+                    body(image.pixel(x, y))
+        }
+
+        function countWhere(image, matches) {
+            var total = 0
+            forEachSample(image, function (c) {
+                if (matches(c))
+                    ++total
+            })
+            return total
+        }
+
+        function sampleCount(image) {
+            var total = 0
+            forEachSample(image, function () { ++total })
+            return total
+        }
+
+        // The themed floor: white in the light scheme, near-black in the dark one.
+        // This is the flat plate a session-start lock must never show.
+        function plateArea(image) {
+            return countWhere(image, function (c) {
+                return isThemeLight(c) || isThemeDark(c)
+            })
+        }
 
         // Pixels that are neither the pre-lock screenshot nor the wallpaper carry
         // wave bands or the themed floor; their count measures how much is on
         // screen.
         function bandArea(image) {
             var bands = 0
-            for (var x = 8; x < 320; x += 8)
-                for (var y = 0; y < 240; y += 8) {
-                    var c = image.pixel(x, y)
-                    if (!isScreenshotRed(c) && !isWallpaperBlue(c))
-                        ++bands
-                }
+            forEachSample(image, function (c) {
+                if (!isScreenshotRed(c) && !isWallpaperBlue(c) && !isWallpaperLime(c)
+                        && !isThemeDark(c) && !isThemeLight(c))
+                    ++bands
+            })
             return bands
         }
 
@@ -234,7 +280,9 @@ Item {
             }
         }
 
-        function test_themedFloorOnlyShowsWithoutAScreenshot() {
+        // A manual lock keeps its capture as the base: the light scheme's floor is
+        // underneath an opaque screenshot and never tints it.
+        function test_manualLockStillShowsItsCaptureAsTheBase() {
             var item = instanceFor(lightBackdrop)
             verify(item !== null)
             tryCompare(item, "imagesReady", true)
@@ -242,12 +290,18 @@ Item {
             wait(80)
             var closed = grabImage(item)
             compare(closed.pixel(160, 10), "#ff0000", "light scheme still uses the screenshot")
+            compare(closed.pixel(160, 230), "#ff0000", "screenshot covers the floor")
             item.progress = 1
             wait(120)
-            verify(isWallpaperBlue(grabImage(item).pixel(160, 230)), "wallpaper remains revealed")
+            var settled = grabImage(item)
+            verify(isWallpaperBlue(settled.pixel(160, 230)), "wallpaper remains revealed")
+            verify(isWallpaperBlue(settled.pixel(160, 10)), "wallpaper remains revealed")
         }
 
-        function test_missingSnapshotFallsBackToTheThemedFloor() {
+        // The floor is still the fallback base: with no capture *and* no wallpaper
+        // there is nothing else to show, so the theme surface holds the surface —
+        // and it must be opaque, since the desktop may not show through.
+        function test_missingSnapshotAndWallpaperFallBackToTheThemedFloor() {
             var item = instanceFor(coldBackdrop)
             verify(item !== null)
             item.progress = 0
@@ -265,6 +319,87 @@ Item {
             verify(isThemeLight(lightClosed.pixel(160, 230)), "light floor without a capture")
         }
 
+        // The regression this whole change exists for: a session-start lock used to
+        // fill the whole surface with the themed floor (white in the light scheme)
+        // and sweep it away, so engaging the lock showed a flat plate and the bands
+        // travelled over nothing. The wallpaper layer is the base from the first
+        // frame instead.
+        //
+        // The sentinel desktop behind this instance is blue and the wallpaper here
+        // is lime, so each of the three possible answers is its own colour: the
+        // plate (theme white/dark), the wallpaper (lime), or a surface that painted
+        // nothing at all (blue). That is what makes these assertions non-vacuous —
+        // they cannot pass on a backdrop that shows neither the wallpaper nor an
+        // opaque floor.
+        function test_capturelessRequestNeverShowsAFlatPlate() {
+            var item = instanceFor(capturelessBackdrop)
+            verify(item !== null)
+            tryCompare(item, "imagesReady", true)
+
+            var stages = [0, 0.35, 0.65, 1]
+            for (var i = 0; i < stages.length; ++i) {
+                var stage = stages[i]
+                item.progress = stage
+                wait(120)
+                var image = grabImage(item)
+                var total = sampleCount(image)
+                // Not one sampled pixel may be the themed floor, at any point in
+                // the sweep: this is the flat plate, and it must never be on screen.
+                compare(plateArea(image), 0, "no themed plate at " + stage)
+                // Nor may the sentinel desktop show through: whatever the wave is
+                // doing, the surface stays opaque.
+                verify(isWallpaperLime(image.pixel(160, 230)), "opaque surface at " + stage)
+                verify(!isWallpaperBlue(image.pixel(160, 230)),
+                       "the desktop never shows through at " + stage)
+                // The surface is either wallpaper or bands — nothing else.
+                compare(countWhere(image, function (c) {
+                    return isWallpaperLime(c) || isScreenshotRed(c)
+                }) + bandArea(image), total, "only wallpaper and bands at " + stage)
+            }
+        }
+
+        // The floor must not sweep back over the wallpaper on the way out either:
+        // a lock that engages by revealing wallpaper has to unlock onto it.
+        function test_capturelessExitNeverSweepsThePlateBack() {
+            var item = instanceFor(capturelessBackdrop)
+            verify(item !== null)
+            tryCompare(item, "imagesReady", true)
+
+            var stages = [1, 0.65, 0.35, 0]
+            for (var i = 0; i < stages.length; ++i) {
+                var stage = stages[i]
+                item.progress = stage
+                wait(120)
+                var image = grabImage(item)
+                compare(plateArea(image), 0, "no themed plate while exiting at " + stage)
+                verify(isWallpaperLime(image.pixel(160, 230)),
+                       "the wallpaper is still the base at " + stage)
+                verify(!isWallpaperBlue(image.pixel(160, 10)),
+                       "the desktop never shows through at " + stage)
+            }
+        }
+
+        // A session-start lock with no wallpaper at all still has to hold an
+        // opaque surface: the floor is the only base left, and a lock may not
+        // expose the desktop before its first commit.
+        function test_capturelessRequestWithoutWallpaperStaysOpaque() {
+            var item = instanceFor(bareCapturelessBackdrop)
+            verify(item !== null)
+            item.progress = 0
+            wait(80)
+            var closed = grabImage(item)
+            verify(isThemeDark(closed.pixel(160, 10)), "dark floor without a wallpaper")
+            verify(isThemeDark(closed.pixel(160, 230)), "dark floor without a wallpaper")
+
+            var light = instanceFor(bareCapturelessBackdrop, { lightScheme: true })
+            verify(light !== null)
+            light.progress = 0
+            wait(80)
+            var lightClosed = grabImage(light)
+            verify(isThemeLight(lightClosed.pixel(160, 10)), "light floor without a wallpaper")
+            verify(isThemeLight(lightClosed.pixel(160, 230)), "light floor without a wallpaper")
+        }
+
         // A request that expects no capture must not be gated on an image that
         // will never arrive: the surface waits for `imagesReady` and falls back
         // to its bounded wait, so an always-false gate would hold the reveal.
@@ -273,24 +408,33 @@ Item {
             verify(item !== null)
             tryCompare(item, "imagesReady", true)
 
-            // Before the sweep the themed floor is all there is to show.
+            // Before the sweep there is no capture and no plate: the wallpaper is
+            // already the whole surface, and the pink bands have not started.
             item.progress = 0
             wait(80)
             var closed = grabImage(item)
-            // Ahead of the sweep the whole surface is still the opaque floor, so
-            // the sentinel desktop behind it must not show anywhere — that is what
-            // keeps a lock from exposing the desktop before its first frame.
-            verify(!isWallpaperBlue(closed.pixel(160, 10)), "floor ahead of the sweep")
-            verify(!isWallpaperBlue(closed.pixel(160, 230)), "floor ahead of the sweep")
-            compare(closed.pixel(160, 10), closed.pixel(160, 230),
-                   "the floor is one flat surface ahead of the sweep")
+            compare(bandArea(closed), 0, "no bands before the sweep")
+            compare(plateArea(closed), 0, "no plate before the sweep")
+            verify(isWallpaperLime(closed.pixel(160, 10)), "wallpaper ahead of the sweep")
+            verify(isWallpaperLime(closed.pixel(160, 230)), "wallpaper ahead of the sweep")
+
+            // Mid-sweep the bands still cross the surface — the wave has to read
+            // as a wave, not as a fade — while the wallpaper is what they travel
+            // over and what shows where they have passed.
+            item.progress = 0.65
+            wait(120)
+            var sweeping = grabImage(item)
+            verify(bandArea(sweeping) > 0, "the bands still sweep")
+            verify(isWallpaperLime(sweeping.pixel(160, 230)), "wallpaper behind the bands")
+            compare(plateArea(sweeping), 0, "no plate mid-sweep")
 
             item.progress = 1
             wait(120)
             var settled = grabImage(item)
             compare(bandArea(settled), 0, "no bands left at rest")
-            verify(isWallpaperBlue(settled.pixel(160, 10)), "wallpaper unveiled")
-            verify(isWallpaperBlue(settled.pixel(160, 230)), "wallpaper unveiled")
+            compare(plateArea(settled), 0, "no plate at rest")
+            verify(isWallpaperLime(settled.pixel(160, 10)), "wallpaper unveiled")
+            verify(isWallpaperLime(settled.pixel(160, 230)), "wallpaper unveiled")
         }
 
         // The wallpaper layer must decode synchronously.

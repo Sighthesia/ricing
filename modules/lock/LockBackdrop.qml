@@ -4,32 +4,34 @@ import QtQuick
 import "../lazerbar" as Lazer
 import "../lazerbar/WallpaperSlotLogic.js" as SlotLogic
 
-// Edge-trailing reveal: the pink bands sweep whatever opaque base this request
-// brought, and behind them the desktop itself is unveiled. Three zones stay
-// visible mid-sweep — base ahead, pink bands, desktop behind — so the wave reads
-// as unveiling the desktop instead of washing then covering.
+// Edge-trailing reveal: the pink bands sweep whatever base this request brought,
+// and behind them the wallpaper is unveiled. Mid-sweep three zones stay visible —
+// base ahead, pink bands, wallpaper behind — so the wave reads as unveiling the
+// wallpaper instead of washing then covering.
 //
-// There is deliberately no wallpaper layer here. The desktop is already painted
-// behind this surface — the wallpaper window is settled before a session-start
-// lock waves — so the region the wave opens is simply left transparent and the
-// real wallpaper shows through. Painting a second copy of the wallpaper here was
-// both redundant (a full-screen decode of a file already resident behind the
-// lock) and broken: an `Image` on a `WlSessionLockSurface` reports Ready with
-// correct geometry and the mask fully open, and still never reaches the screen.
-// Same surface, same symptom the Repeater-delegate trap in this shell already
-// documents. Nothing here decodes an image any more, so that failure cannot
-// recur, and the wave cannot open on a flat plate because there is no plate left
-// to open on.
+// Only two things are ever in front of the wallpaper, and neither of them is a
+// flat plate: a pre-lock capture, which only a manual lock brings, and the four
+// bands. A session-start lock brings no capture (there is no finished desktop to
+// photograph), so its base is the wallpaper itself and the wave reveals nothing
+// but wallpaper — on the way in and on the way out.
+//
+// The themed floor still exists and is still painted from the first frame, but
+// it sits *under* the wallpaper layer rather than inside the reveal clip. That
+// ordering is what makes it free: a session-lock surface must commit an opaque
+// first frame and cannot rely on the wallpaper's decode having landed by then, so
+// the floor cannot be conditional — but an opaque wallpaper hides it, so it costs
+// nothing visually, and it is still the base whenever there is no wallpaper to
+// show or the wallpaper failed to decode.
 Item {
     id: root
     property url snapshotSource: ""
     property url wallpaperSource: ""
     // Whether this request expects a capture at all. The session-start lock
     // deliberately has none: there is no settled desktop to photograph, so the
-    // wave opens straight onto the live desktop. Waiting on that empty slot as if
+    // wave opens straight onto the wallpaper. Waiting on that empty slot as if
     // it were a pending image would burn the whole bounded grace window before the
     // lock screen ever appeared. A capture that *was* expected and failed still
-    // gets the same bounded wait, and then opens onto the desktop too.
+    // gets the same bounded wait, and then opens onto the wallpaper too.
     property bool captureExpected: true
     property real progress: 0
     // Device pixel ratio the wallpaper layer decodes for, supplied by the lock
@@ -39,8 +41,12 @@ Item {
     property real decodeRatio: 1
     property bool lightScheme: Lazer.LazerTheme.lightScheme
     property color surfaceColorOverride: "transparent"
-    // Mask delay in progress units: wide enough for a full pink zone, short
-    // enough that the desktop arrives while the bands still sweep.
+    // Mask delay in progress units: wide enough for a full pink zone to establish
+    // itself as a travelling wave, short enough that the wallpaper and the lock
+    // controls arrive while the bands still sweep. It no longer serves to hold a
+    // flat plate on screen — nothing opaque sits in front of the wallpaper any
+    // more — so all it decides now is how much of the sweep the bands own before
+    // the trailing mask starts eating them from below.
     readonly property real maskDelay: 0.3
     readonly property real maskProgress: Math.max(0, Math.min(1, (root.progress - root.maskDelay) / (1 - root.maskDelay)))
     readonly property bool snapshotReady: !root.captureExpected
@@ -62,6 +68,22 @@ Item {
             : (root.lightScheme ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.bgDark)
     default property alias content: foregroundBody.data
 
+    // The guaranteed-opaque floor, painted under the wallpaper layer and under
+    // everything else. A session-lock surface may not show the desktop before it
+    // has committed a frame, and this layer's decode is not guaranteed to have
+    // landed by then — hence the sequencing fix that made it synchronous — so the
+    // floor is unconditional and full-screen. Being underneath is what makes it
+    // free: an opaque wallpaper covers it, so it never becomes a plate over the
+    // wallpaper, and it still shows through whenever there is no wallpaper at all
+    // or the wallpaper failed to decode.
+    Rectangle {
+        id: baseRect
+        anchors.fill: parent
+        // The theme surface, as the floor has always been.
+        color: root.surfaceColor
+        Behavior on color { ColorAnimation { duration: Lazer.MotionTokens.fast } }
+    }
+
     // The wallpaper, full screen and unclipped: this is what the wave unveils, and
     // it has to be painted here rather than left to the desktop behind. The
     // desktop is not a dependable answer on this surface — a session lock covers
@@ -75,8 +97,9 @@ Item {
     // whatever is underneath for the rest of its life. The sibling `screenshot`
     // has always worked on the same surface, and it is synchronous. A full-screen
     // decode here is the cost `asynchronous: true` exists to avoid, but paying it
-    // is what makes the layer visible at all — and it happens while the opaque
-    // floor still covers the screen, so it is never on a visible frame.
+    // is what makes the layer visible at all — and it is paid while the opaque
+    // floor still backs this surface, so it is never the only thing standing
+    // between the lock and the desktop.
     Image {
         id: wallpaperBody
         anchors.fill: parent
@@ -89,13 +112,13 @@ Item {
         sourceSize: root.wallpaperDecodeSize
     }
 
-    // Everything the wave has not opened yet: the themed floor, the pre-lock
-    // capture, and the four bands sweeping across them. Clipped to the region
-    // above the mask, so it is cut away from the bottom as the wave passes and
-    // the wallpaper underneath takes over. The floor is opaque from the first
-    // frame and only for as long as it covers the whole surface, which is what
-    // keeps a session lock from showing anything before it has committed its
-    // first frame.
+    // Everything the wave has not opened yet: the pre-lock capture, and the four
+    // bands sweeping across it. Clipped to the region above the mask, so it is cut
+    // away from the bottom as the wave passes and the wallpaper underneath takes
+    // over — which is also what leaves the final frame as the wallpaper alone, no
+    // band resting on it. The themed floor is not in here any more: with the
+    // floor under the wallpaper, a request that brought no capture has nothing to
+    // sweep across but the wallpaper, and one that did brings its capture.
     Item {
         id: coveredBase
         anchors.left: parent.left
@@ -105,21 +128,10 @@ Item {
         clip: true
         visible: height > 0.5
 
-        Rectangle {
-            id: baseRect
-            anchors.fill: parent
-            // Paint a deterministic theme surface until the wave opens the
-            // desktop. A session-start lock has no capture, so this is the whole
-            // screen until the mask reaches it.
-            color: root.surfaceColor
-            Behavior on color { ColorAnimation { duration: Lazer.MotionTokens.fast } }
-        }
-
-        // The pre-lock capture is the base the wave sweeps across; the themed
-        // floor only shows through when a screen produced no capture. It sits
-        // inside the same clip as the floor, because the mask has to cut *both*
-        // away — a capture left outside would sit on top of the opened region and
-        // hide the desktop for the rest of the sweep.
+        // The pre-lock capture is the base the wave sweeps across. It sits inside
+        // this clip because the mask has to cut it away — a capture left outside
+        // would sit on top of the opened region and hide the wallpaper for the
+        // rest of the sweep.
         Image {
             id: screenshot
             anchors.fill: parent
@@ -130,9 +142,10 @@ Item {
         }
 
         // Keep the four lock-surface wave layers static: WlSessionLockSurface does
-        // not reliably render dynamically created visual delegates. They also sit
-        // above the floor, which a full-width opaque body would otherwise hide for
-        // the life of the surface.
+        // not reliably render dynamically created visual delegates. They sit above
+        // the capture and the wallpaper, which is what lets them read as a wave
+        // sweeping *something* — the capture for a manual lock, the wallpaper for
+        // a session-start lock.
         Lazer.FullscreenWave {
             anchors.fill: parent
             progress: root.progress
@@ -165,8 +178,8 @@ Item {
 
     // The opened region: the same geometry the reveal always had, because it is
     // the same reveal. It carries the lock controls so they arrive with the
-    // desktop rather than sitting over the floor, and it holds nothing else — the
-    // desktop behind this surface is what the wave has uncovered.
+    // wallpaper rather than sitting over the floor, and it holds nothing else —
+    // the wallpaper underneath is what the wave has uncovered.
     Item {
         id: openedRegion
         anchors.left: parent.left
@@ -176,7 +189,7 @@ Item {
         clip: true
         visible: height > 0.5
 
-        // Keep lock controls in the same layer as the desktop they sit on.
+        // Keep lock controls in the same layer as the wallpaper they sit on.
         Item {
             id: foregroundBody
             width: root.width
