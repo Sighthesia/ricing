@@ -556,6 +556,7 @@ Item {
     function _replaceArriving() {
         root.columns = HintLogic.stripColumns(root.hint, root.leavingHint, root.plan)
         root.shownReady = HintLogic.ready(root.hint)
+
     }
 
     // Hold what is on screen, extend the strip to carry the new frame alongside
@@ -1132,8 +1133,25 @@ Item {
             // No target: the bar is hidden, so it must not be left mid-trail either
             // - a trail still in flight when the next target arrives would stretch
             // out of the wrong place.
+            //
+            // Snap to the resting position for NO row rather than to
+            // `_targetYFor(-1)`. That expression is `index * rowPitch + ...`, so an
+            // index of -1 hands back a negative offset roughly one row above the
+            // panel's top: a real coordinate, which the next target's `Behavior`
+            // then animates FROM. The bar is invisible, so the flight was not
+            // visible when it happened - but it was a flight, and it arrived at the
+            // right row only after `MotionTokens.slow * 2` of tail travel. That is
+            // the flash on arriving at a workspace whose focused row is not where
+            // the previous one was.
+            //
+            // Zero is the honest "resting, nowhere" value: it is where
+            // `_snapIndicator` puts the marker before its first placement, and a
+            // bar that has no row to sit on has no business anywhere else. Retarget
+            // from here and the first real target still travels, which is the
+            // dual-speed stretch doing its job, rather than arriving pre-stretched
+            // from a coordinate that never named a row.
             root._pendingTop = -1
-            root._snapIndicator(target)
+            root._snapIndicator(root.hasTarget ? target : 0)
             return
         }
         // First placement snaps: there is nothing on screen to travel from.

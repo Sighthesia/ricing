@@ -1157,12 +1157,14 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
 
         // --- the crossing displacement ---------------------------------------
         // On a workspace switch ONE instance of the outline and ONE instance of the bar
-        // descend from ABOVE the panel's top edge onto the focused card of the workspace
-        // being moved to. Always from the top, whichever way the workspace went.
+        // travel the whole height of the panel in two legs: down off the focused card of
+        // the workspace being left and out through the bottom edge, then in through the
+        // top and down onto the focused card of the one being moved to. Both directions
+        // fixed; neither depends on which way the workspace went.
         //
-        // The marker has its OWN clock: 320ms of `InOutQuad` against the strip's 160ms
-        // of `OutQuad`, so the columns change workspace first and the focus then travels
-        // down onto them. Every test here drives that clock, never `slideProgress`.
+        // One clock, 320ms, split at the midpoint. The corner is the midpoint, and at the
+        // midpoint the marker is wholly outside the clip on both counts - which is what
+        // lets it be one element rather than two.
 
         // The two markers, for the displacement tests to read.
         function outline() {
@@ -1173,13 +1175,17 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             return findByName(body, "windowHintFocusIndicator")
         }
 
-        // The panel's clip edge, in the markers' coordinates. Read off the component
-        // rather than restated as literals, and deliberately: the claim is where the
-        // marker sits RELATIVE to the clip, which holds for any clip, and a suite that
-        // pinned the clip's absolute position would be asserting the theme's padding
-        // numbers instead of the motion.
+        // The panel's clip, in the markers' coordinates. Read off the component rather
+        // than restated as literals, and deliberately: the claim is where the marker sits
+        // RELATIVE to the clip, which holds for any clip, and a suite that pinned the
+        // clip's absolute position would be asserting the theme's padding numbers
+        // instead of the motion.
         function clipTop() {
             return -body._stripY
+        }
+
+        function clipBottom() {
+            return body.height - body._stripY
         }
 
         // Drive the MARKER's clock to an exact fraction. It is a different clock from
@@ -1216,68 +1222,156 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             verify(!body._markerCrossing, "and so has the marker")
         }
 
-        // Every position the marker takes between two progress values, and the largest
-        // single step between two of them - because "it moves" and "you can SEE it move"
-        // are different claims, and what separates them is the speed. `steps` is over the
-        // marker's whole clock, so `peakStep` is pixels per `steps`-th of its real
-        // duration.
-        function sampleTop(steps) {
-            var seen = []
-            var peak = 0
-            for (var i = 0; i <= steps; ++i) {
-                driveMarkerTo(i / steps)
-                seen.push(body.crossingTop)
-                if (i > 0)
-                    peak = Math.max(peak, Math.abs(body.crossingTop - seen[i - 1]))
-            }
-            return { tops: seen, peakStep: peak }
+        // Put a crossing in flight with a DIFFERENT focused row on each side, which is
+        // what makes the two legs distinguishable: a departure that re-aims on the same
+        // row as the arrival would have zero net displacement and no direction to read.
+        function startCrossingOverTwoRows(fromWorkspace, focusLeaving, toWorkspace,
+            focusArriving) {
+            body.hint = root.tallFramedHint(fromWorkspace, fromWorkspace, 4, focusLeaving)
+            wait(20)
+            body.hint = root.tallFramedHint(toWorkspace, fromWorkspace, 4, focusArriving)
+            wait(20)
+            verify(body._markerCrossing, "the marker is travelling")
         }
 
-        function test_theMarkerStartsOutsideThePanelAndComesDownOntoTheCard() {
-            // The effect. It starts wholly above the panel's top edge - so it slides IN
-            // rather than already being on screen at the edge - and lands on the focused
-            // card, moving down the whole way.
-            body.hint = root.tallFramedHint(2, 2, 4, 2)
-            wait(20)
-            body.hint = root.tallFramedHint(3, 2, 4, 0)
-            wait(20)
+        function test_theMarkerLeavesTheOldCardDownwardAndOutThroughTheBottom() {
+            // The half that was missing. It starts ON the focused card of the workspace
+            // being left - not in the panel's middle, which is where the arriving card is
+            // going to be - and slides down until the clip has taken it entirely.
+            startCrossingOverTwoRows(2, 2, 3, 0)
             driveMarkerTo(0)
+            // The departing card's own top edge, and the departing column's own x.
+            compare(outline().y, 2 * body.rowPitch,
+                "it starts on the focused card of the workspace being left, was "
+                    + outline().y + " against row 2")
+            compare(outline().x, strip().columnXFor(2) + body.cellPaddingX,
+                "and on the DEPARTING column, not the arriving one, was " + outline().x)
+            compare(bar().x,
+                strip().columnXFor(2) + body.indicatorInset,
+                "with the bar in that column's own padding too")
 
-            // Wholly outside, and outside at the TOP rather than the bottom.
-            verify(body.crossingTop + body.rowHeight <= clipTop(),
-                "it starts a whole card above the panel's top edge, so it slides in - "
-                    + body.crossingTop + " against a clip top of " + clipTop())
-            verify(outline().y < 0, "and the outline is off the top too, was "
-                + outline().y)
-            var sample = sampleTop(24)
-            var tops = sample.tops
-            // Strictly DOWN, every step. A marker that rose at any point - even briefly -
-            // would read as two motions rather than one.
-            for (var i = 1; i < tops.length; ++i)
-                verify(tops[i] > tops[i - 1],
-                    "it moves down the whole way, sample " + i + " was " + tops[i]
-                        + " after " + tops[i - 1])
+            // Down, the whole way, and out.
+            var sample = sampleTop(0, 0.5, 16)
+            for (var i = 1; i < sample.length; ++i)
+                verify(sample[i] > sample[i - 1],
+                    "it moves down the whole departure, sample " + i + " was " + sample[i]
+                        + " after " + sample[i - 1])
+            driveMarkerTo(0.5)
+            verify(outline().y + body.rowHeight > clipBottom(),
+                "and ends wholly below the panel's bottom edge, so the clip has taken "
+                    + "it - " + (outline().y + body.rowHeight) + " against a bottom of "
+                    + clipBottom())
+        }
+
+        function test_theDepartureIsDownwardWhicheverWayTheWorkspaceWent() {
+            // Both directions fixed. Asserted for a forward and a backward switch against
+            // the same geometry, because a departure that mirrored the switch would pass
+            // every test that looked at one direction.
+            var ends = {}
+            var x = {}
+            for (var direction = 0; direction < 2; ++direction) {
+                var from = direction === 0 ? 2 : 4
+                var label = direction === 0 ? "forwards" : "backwards"
+                startCrossingOverTwoRows(from, 1, 3, 0)
+                driveMarkerTo(0.5)
+                ends[label] = outline().y
+                x[label] = outline().x
+                settleMarker()
+                landDrivenSlide(3)
+                body.hint = root.tallFramedHint(from, from, 4, 1)
+                wait(20)
+            }
+            compare(ends.forwards, ends.backwards,
+                "both leave through the same place, " + ends.forwards + " and "
+                    + ends.backwards)
+            verify(ends.forwards + body.rowHeight > clipBottom(),
+                "which is below the panel, not above it")
+            compare(x.forwards, x.backwards,
+                "and both leave from the departing column's own x")
+        }
+
+        function test_theCornerIsWhollyOutsideTheClipOnBothCounts() {
+            // What lets ONE element do both legs. At the midpoint the marker's position
+            // jumps from below the panel's bottom edge to above its top edge, and the
+            // only thing standing between that jump and the screen is that both ends of
+            // it are outside the clip. Asserted on both counts at the exact frame.
+            startCrossingOverTwoRows(2, 2, 3, 0)
+            driveMarkerTo(0.4999)
+            verify(outline().y + body.rowHeight > clipBottom(),
+                "just before the corner it is already below the panel, was "
+                    + outline().y)
+            driveMarkerTo(0.5)
+            verify(outline().y + body.rowHeight <= clipTop(),
+                "and at the corner it is above the panel, was " + outline().y
+                    + " against a clip top of " + clipTop())
+            verify(!outline().visible || outline().opacity === 0
+                || (outline().y + body.rowHeight <= clipTop()),
+                "so nothing of it is on screen at the frame it changes sides")
+            driveMarkerTo(1)
+            compare(body.crossingTop, body.focusedRowTop,
+                "and the arrival still lands exactly on the focused card")
+        }
+
+        function test_theMarkerArrivesFromTheTopOntoTheCard() {
+            // The half that was already right, kept: from above the panel's top edge,
+            // wholly clipped, down onto the focused card, moving down the whole way.
+            startCrossingOverTwoRows(2, 2, 3, 3)
+            driveMarkerTo(0.5)
+            verify(outline().y + body.rowHeight <= clipTop(),
+                "the arrival starts wholly above the panel's top edge, so it slides in - "
+                    + outline().y + " against a clip top of " + clipTop())
+            var sample = sampleTop(0.5, 1, 16)
+            for (var i = 1; i < sample.length; ++i)
+                verify(sample[i] > sample[i - 1],
+                    "it moves down the whole arrival, sample " + i + " was " + sample[i]
+                        + " after " + sample[i - 1])
             driveMarkerTo(1)
             compare(body.crossingTop, body.focusedRowTop,
                 "landing exactly on the focused card")
+            compare(outline().x, strip().activeColumnX + body.cellPaddingX,
+                "which is the ARRIVING column's card, was " + outline().x)
         }
 
-        function test_theDisplacementIsSlowEnoughToSee() {
-            // The reason the marker has a clock of its own, asserted as a measurement
-            // rather than as a number in the file.
+        function test_aFrameWithNothingFocusedHasNoDepartureLegToShow() {
+            // A workspace can be left with no window focused in it. There is no card to
+            // slide off, so the departure leg is given zero length - the marker starts
+            // already off the bottom, the corner happens at once, and what the panel
+            // shows is the arrival alone. Asserted so the degenerate case cannot quietly
+            // become a marker sliding out of an arbitrary row.
+            body.hint = root.tallFramedHint(2, 2, 4, -1)
+            wait(20)
+            body.hint = root.tallFramedHint(3, 2, 4, 0)
+            wait(20)
+            verify(body._markerCrossing, "the marker is travelling")
+            compare(body._departingRowIndex, -1,
+                "the workspace being left had nothing focused")
+            driveMarkerTo(0)
+            verify(body.crossingTop + body.rowHeight > clipBottom(),
+                "so the marker starts already out of sight below the panel, was "
+                    + body.crossingTop)
+            driveMarkerTo(0.25)
+            verify(body.crossingTop + body.rowHeight > clipBottom(),
+                "and is still out of sight a quarter of the way in")
+            settleMarker()
+            compare(outline().y, body.focusedRowTop, "and it lands on the arriving card")
+        }
+
+        function test_theJourneyRunsOnOneClockAtTheLengthThatReads() {
+            // Why the marker has a clock of its own, asserted as a measurement rather than
+            // as a number in the file.
             //
-            // It was on the strip's clock before: `medium`, 160ms, `Easing.OutQuad`.
-            // The strip crosses 205px of panel in that and it is right for the strip. The
-            // marker travels at most one viewport vertically - and when the focused window
-            // is the first row, only 28px of that is on screen at all. On `OutQuad`, which
-            // covers three quarters of its distance in the first half of its time, 28px is
-            // over in about 30ms. Measured on the old version, the fastest point of the
-            // travel was around 1500px/s, which the eye reads as a jump and not as travel -
-            // which is exactly what it looked like.
+            // It was on the strip's clock before: `medium`, 160ms, `Easing.OutQuad`. The
+            // strip crosses 205px of panel in that and it is right for the strip. The
+            // marker travels at most one viewport vertically, and when the focused window
+            // is the first row only the panel's own top padding - 15px - is on screen at
+            // all. On `OutQuad`, which covers three quarters of its distance in the first
+            // half of its time, 15px is over in about 30ms and 164px read at roughly
+            // 1500px/s, which the eye takes as a jump rather than as travel.
             //
-            // So: the marker's clock must be the LONGER of the two, and it must not front-
-            // load. Both are read off the component, so a retune that undoes either fails
-            // here rather than on screen.
+            // And the journey is BOTH legs now, on the same clock: the departure rides
+            // along with the column traverse for the first half - the same speed, so the
+            // two read as one gesture - and the arrival has the second half to itself.
+            // Adding the departure did not make the marker slower, which is the point.
             compare(body.crossingAnimation.duration, Lazer.MotionTokens.page,
                 "the marker runs on the long clock, was "
                     + body.crossingAnimation.duration)
@@ -1286,208 +1380,131 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                     + body.crossingAnimation.easing.type)
             verify(body.crossingAnimation.duration > body.slideAnimation.duration,
                 "and it outlives the columns, " + body.crossingAnimation.duration
-                    + " against " + body.slideAnimation.duration
-                    + " - the list changes workspace first and the focus then arrives on it")
-
-            // And the measurement itself, on the WORST case: the focused window is the
-            // FIRST row, so almost the whole travel happens above the panel's edge and
-            // only the gap between that edge and the first card - `cellPaddingY`, 15px -
-            // is on screen at all. It is fully outside at the start, and the little that
-            // is visible has to carry the whole effect. Asserted as the exact figure
-            // rather than a threshold, so a change to either number shows up here.
-            body.hint = root.tallFramedHint(2, 2, 4, 2)
-            wait(20)
-            body.hint = root.tallFramedHint(3, 2, 4, 0)
-            wait(20)
-            driveMarkerTo(0)
-            compare(body.focusedRowTop - clipTop(),
-                body.bandInset - body.surfaceInset + body.cellPaddingY,
-                "the whole of the visible travel is the gap between the panel's top edge "
-                    + "and the first card, and nothing else")
-            var frames = Math.max(1, body.crossingAnimation.duration / (1000 / 60))
-            var sample = sampleTop(32)
-            var peakSpeed = sample.peakStep * 32 * 60 / frames
-            verify(peakSpeed < 700,
-                "so even that is a speed the eye can follow - 15px over "
-                    + body.crossingAnimation.duration + "ms, peaking at "
-                    + Math.round(peakSpeed) + "px/s against a 700px/s ceiling")
-
-            // And the case the description is actually about: a focus low in the column,
-            // where the marker genuinely crosses the cards above it on the way down.
-            body.hint = root.tallFramedHint(4, 4, 4, 3)
-            wait(20)
-            body.hint = root.tallFramedHint(3, 4, 4, 3)
-            wait(20)
-            driveMarkerTo(0)
-            var lowOnScreen = body.focusedRowTop - clipTop()
-            verify(lowOnScreen >= body.rowPitch * 3,
-                "a focus on the fourth row puts three whole card pitches of panel "
-                    + "between the marker's start and its landing, was " + lowOnScreen
-                    + " against " + (body.rowPitch * 3))
-            var lowSample = sampleTop(32)
-            verify(lowSample.tops[lowSample.tops.length - 1] > lowSample.tops[0],
-                "and it crosses all of them")
-            settleMarker()
-        }
-
-        function test_theDisplacementComesFromTheTopWhicheverWayTheWorkspaceWent() {
-            // The reference's rule, and the reason for it: one entry side, so the motion
-            // reads as the same gesture every time. Asserted for both directions against
-            // the same start, because a marker that entered from the side it was heading
-            // would pass every test that looked at one direction.
-            var starts = {}
-            var ends = {}
-            for (var direction = 0; direction < 2; ++direction) {
-                var from = direction === 0 ? 2 : 4
-                var label = direction === 0 ? "forwards" : "backwards"
-                body.hint = root.tallFramedHint(from, from, 4, 2)
-                wait(20)
-                body.hint = root.tallFramedHint(3, from, 4, 0)
-                wait(20)
-                driveMarkerTo(0)
-                starts[label] = body.crossingTop
-                driveMarkerTo(1)
-                ends[label] = body.crossingTop
-                settleMarker()
-            }
-            compare(starts.forwards, starts.backwards,
-                "both directions start from the same place, above the panel - "
-                    + starts.forwards + " and " + starts.backwards)
-            verify(starts.forwards < clipTop() && starts.backwards < clipTop(),
-                "and that place is above the panel's top edge, not below it")
-            compare(ends.forwards, ends.backwards,
-                "and both land on the same card, " + ends.forwards + " and "
-                    + ends.backwards)
+                    + " against " + body.slideAnimation.duration)
+            compare(body.crossingAnimation.duration, Lazer.MotionTokens.page,
+                "which is exactly twice the strip's, so the corner lands on the frame "
+                    + "the columns settle - one number, not a second one")
         }
 
         function test_oneInstanceOfEachMarkerAndItIsTheOneThatMoves() {
-            // ONE instance, and it is the one that travels. It was two of each - a
-            // resting element and a crossing-only twin, each hidden while the other
-            // showed - so the visible marker was always a different object from the one
-            // that had been there before. That is a cut wearing a disguise, and the
-            // displacement is only the gesture if the same rectangle does it.
+            // ONE instance, and it is the one that travels the whole journey. It was two
+            // of each - a resting element and a crossing-only twin, each hidden while the
+            // other showed - so the visible marker was always a different object from the
+            // one that had been there before. That is a cut wearing a disguise, and the
+            // displacement is only the gesture if the same rectangle does all of it.
             compare(findAllByName(body, "windowHintFocusFrame").length, 1,
                 "exactly one focus outline exists")
             compare(findAllByName(body, "windowHintFocusIndicator").length, 1,
                 "exactly one indicator exists")
-            body.hint = root.tallFramedHint(2, 2, 4, 2)
-            wait(20)
-            body.hint = root.tallFramedHint(3, 2, 4, 0)
-            wait(20)
-            // The same element, watched across the crossing and held by reference, so a
-            // rebuild underneath it would show up as a different object.
+            startCrossingOverTwoRows(2, 2, 3, 0)
+            // Held by reference across the corner, so a rebuild underneath it would show
+            // up as a different object.
             var watched = outline()
             driveMarkerTo(0)
-            var atTop = watched.y
+            var onOld = watched.y
+            driveMarkerTo(0.5)
+            var offPanel = watched.y
             driveMarkerTo(1)
             verify(outline() === watched, "the outline is still the same object")
-            verify(watched.y > atTop,
-                "and it is the object that moved, from " + atTop + " to " + watched.y)
+            verify(offPanel > onOld && watched.y > offPanel,
+                "and it is the object that moved, off the old card at " + onOld
+                    + ", out of sight at " + offPanel + ", onto the new one at "
+                    + watched.y)
             var watchedBar = bar()
             driveMarkerTo(0)
-            var barTop = watchedBar.y
+            var barStart = watchedBar.y
             driveMarkerTo(1)
-            verify(bar() === watchedBar && watchedBar.y > barTop,
-                "and so is the bar, from " + barTop + " to " + watchedBar.y)
+            verify(bar() === watchedBar && watchedBar.y > barStart,
+                "and so is the bar, from " + barStart + " to " + watchedBar.y)
             settleMarker()
         }
 
         function test_theBarAndTheOutlineAreOneGesture() {
             // The bar is a bar CENTRED on its card, so it sits one `markerOffset` below
-            // the outline at EVERY point of the crossing - not only at rest. Two markers
+            // the outline at EVERY point of the journey - not only at rest. Two markers
             // drifting apart mid-travel would read as two independent things happening.
-            body.hint = root.tallFramedHint(2, 2, 4, 2)
-            wait(20)
-            body.hint = root.tallFramedHint(3, 2, 4, 0)
-            wait(20)
-            for (var step = 0; step <= 6; ++step) {
-                driveMarkerTo(step / 6)
+            startCrossingOverTwoRows(2, 2, 3, 0)
+            for (var step = 0; step <= 8; ++step) {
+                var at = step / 8
+                driveMarkerTo(at)
                 compare(bar().y - outline().y, body.markerOffset,
-                    "at " + (step / 6) + " the bar is centred on the card the outline "
-                        + "draws, was " + (bar().y - outline().y))
-                compare(bar().x, strip().activeColumnX + body.indicatorInset,
-                    "at " + (step / 6) + " and both sit in the arriving column")
-                compare(outline().x, strip().activeColumnX + body.cellPaddingX,
-                    "at " + (step / 6) + " with the outline on the card's own edge")
-            }
-            // And the bar keeps its length throughout, rather than also running the
-            // tracker's own head/tail stretch underneath the displacement: two motions on
-            // one marker is what that would be. `crossingTop` moves the bar and nothing
-            // else does while the flag is up.
-            for (step = 0; step <= 4; ++step) {
-                driveMarkerTo(step / 4)
+                    "at " + at + " the bar is centred on the card the outline draws, was "
+                        + (bar().y - outline().y))
+                compare(bar().width, body.indicatorThickness,
+                    "at " + at + " the bar keeps the indicator's thickness, was "
+                        + bar().width)
+                // The tracker's stretch is the focus moving within one workspace. Here the
+                // bar is being carried, so a length that changed underneath the travel
+                // would be a second motion on one marker.
                 compare(bar().height, body.indicatorLength,
-                    "at " + (step / 4) + " the bar keeps the indicator's length, was "
-                        + bar().height + " against " + body.indicatorLength)
+                    "at " + at + " and the bar keeps its resting length, was "
+                        + bar().height)
+                compare(bar().x, outline().x - body.cellPaddingX + body.indicatorInset,
+                    "at " + at + " and the bar is in that card's column's padding")
             }
             settleMarker()
             compare(bar().height, body.indicatorLength,
                 "and it is still that length once it has landed")
         }
 
-        function test_theDisplacementLandsAndStays() {
+        function test_theJourneyLandsAndStays() {
             // The landing, and specifically that it STAYS. The two placements of the
             // marker used to be chosen by a `Behavior`'s `enabled` and a binding in the
             // same polish, so which of them won at the boundary came down to evaluation
             // order - and the wrong winner was a second glide, from wherever the crossing
             // left the marker back down onto the card it had already reached.
-            body.hint = root.tallFramedHint(2, 2, 4, 2)
-            wait(20)
-            body.hint = root.tallFramedHint(3, 2, 4, 0)
-            wait(20)
+            startCrossingOverTwoRows(2, 2, 3, 0)
             driveMarkerTo(1)
             var landed = outline().y
             settleMarker()
             // Read immediately: a `fast` or `OutQuint` glide would still be under way,
             // and so would a whole extra animation.
             compare(outline().y, landed,
-                "the outline is where the displacement left it, was " + outline().y
+                "the outline is where the journey left it, was " + outline().y
                     + " against " + landed)
             compare(outline().y, body.focusedRowTop, "which is the focused card")
             compare(bar().y, body.focusedRowTop + body.markerOffset,
                 "and the bar is centred on the same card")
-            // The strip has already finished by then: the marker's clock is the longer
-            // one, so this is where the second beat of the two-beat effect lives.
-            verify(!body.swapping, "the columns had finished before the marker landed")
             wait(body.slideDuration + 80)
             compare(outline().y, landed, "and it is still there, was " + outline().y)
         }
 
-        function test_aReAimDoesNotRestartTheDisplacement() {
+        function test_aReAimDoesNotRestartTheJourney() {
             // A second switch landing mid-crossing re-aims the traverse, and the marker
-            // has to carry on through it. Resetting it would throw the marker back to the
-            // top of the panel - a second entry, which reads as two crossings rather than
-            // as one move re-aimed. The specific regression a displacement driven off a
-            // clock invites, because a re-aim restarts that clock.
+            // has to carry on through it. Resetting it would throw the marker back onto
+            // the card it had already left - a second departure, which reads as two
+            // crossings rather than as one move re-aimed. And a re-aim can only ever land
+            // on the DEPARTURE leg, because it needs the strip's 160ms clock still
+            // running and that is the first half of the marker's.
             body.hint = root.framedHint(1, 1)
             wait(20)
             body.hint = root.framedHint(2, 1)
             wait(20)
-            driveMarkerTo(0.5)
+            driveMarkerTo(0.3)
             var reached = body.crossingTop
             body.hint = root.framedHint(3, 2)
             // No wait: the re-aim restarts the marker's clock to 0 in the same turn as
             // the publish, so a wait here would let the new leg travel for a frame or two
             // and the sample would no longer be the instant the question is about.
             compare(body.crossingTop, reached,
-                "the marker did not go back to the top of the panel, was "
+                "the marker did not go back to the card it had left, was "
                     + body.crossingTop + " against " + reached)
             wait(20)
-            verify(body._markerCrossing, "the crossing is still under way")
-            driveMarkerTo(0.75)
+            verify(body._markerCrossing, "the journey is still under way")
+            driveMarkerTo(0.45)
             verify(body.crossingTop > reached,
                 "and it is still travelling down, went " + reached + " to "
                     + body.crossingTop)
             landDrivenSlide(3)
         }
 
-        function test_noSwitchMeansNoDisplacement() {
+        function test_noSwitchMeansNoJourney() {
             // A refresh on the same workspace, a cold snapshot and a move too wide to
             // describe all commit outright, so none of them may arm a crossing. A flag
-            // left set by a cancelled crossing would park the marker above the panel for
-            // the rest of the hold, which is the worst possible failure for it: the
-            // panel would show no focus mark at all and say nothing about why.
-            verify(!body._markerCrossing, "nothing is crossing at rest")
+            // left set by a cancelled crossing would send the marker out through the
+            // bottom and never bring it back, which is the worst possible failure for it:
+            // the panel would show no focus mark at all and say nothing about why.
+            verify(!body._markerCrossing, "nothing is travelling at rest")
             verify(findByName(body, "windowHintFocusFrame").visible,
                 "and the outline is on screen")
             body.hint = root.framedHint(2, 2)
@@ -1513,33 +1530,28 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             verify(outline().visible, "and the outline is still there")
         }
 
-        function test_aSwitchAlwaysLandsTheDisplacement() {
-            // The effect ENDS, not only that it starts. `_markerCrossing` is a flag
+        function test_aSwitchAlwaysLandsTheJourney() {
+            // The journey ENDS, not only that it starts. `_markerCrossing` is a flag
             // written by an animation's `onFinished`, and a flag is something that can be
             // left set - which would leave the marker travelling over a panel that had
             // long since stopped, forever.
-            body.hint = root.tallFramedHint(2, 2, 4, 2)
-            wait(20)
-            body.hint = root.tallFramedHint(3, 2, 4, 0)
-            wait(20)
-            verify(body._markerCrossing, "a switch does cross, which is what this checks")
+            startCrossingOverTwoRows(2, 2, 3, 0)
             settleMarker()
-            verify(!body._markerCrossing, "and the crossing is over once it has landed")
+            verify(!body._markerCrossing, "the crossing is over once it has landed")
             verify(outline().visible, "with the outline back on its card")
             compare(outline().y, body.focusedRowTop, "and on the focused card")
+            compare(outline().x, strip().activeColumnX + body.cellPaddingX,
+                "and in the active column")
         }
 
-        function test_theDisplacementNeverCoversTheRowContentItIsMarking() {
+        function test_theJourneyNeverCoversTheRowContentItIsMarking() {
             // The outline is border-only for the same reason the resting one's was: a
-            // filled shape would veil every icon and title in the column it travels over.
-            // Compared against the value QML normalises `transparent` to, rather than
-            // against the string: a colour property hands back `#00000000`, so an equality
-            // against "transparent" would fail on the representation rather than on the
-            // claim.
-            body.hint = root.tallFramedHint(2, 2, 4, 2)
-            wait(20)
-            body.hint = root.tallFramedHint(3, 2, 4, 0)
-            wait(20)
+            // filled shape would veil every icon and title in the columns it travels
+            // over. Compared against the value QML normalises `transparent` to, rather
+            // than against the string: a colour property hands back `#00000000`, so an
+            // equality against "transparent" would fail on the representation rather than
+            // on the claim.
+            startCrossingOverTwoRows(2, 2, 3, 0)
             compare(String(outline().color).toLowerCase(), "#00000000",
                 "it fills nothing, so it cannot cover the rows it passes over, was "
                     + outline().color)
@@ -1547,11 +1559,22 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(outline().enabled, false, "and inert to input")
             for (var step = 0; step <= 4; ++step) {
                 driveMarkerTo(step / 4)
-                compare(bar().width, body.indicatorThickness,
-                    "at " + (step / 4) + " the bar keeps the indicator's thickness, was "
-                        + bar().width)
+                compare(outline().height, body.rowHeight,
+                    "at " + (step / 4) + " the outline keeps the card's height, was "
+                        + outline().height)
             }
             settleMarker()
+        }
+
+        // Every position the marker takes between two progress values. One entry per
+        // sample, so `sample[i] > sample[i - 1]` is "it moved DOWN" and nothing else.
+        function sampleTop(from, to, steps) {
+            var seen = []
+            for (var i = 0; i <= steps; ++i) {
+                driveMarkerTo(from + (to - from) * (i / steps))
+                seen.push(body.crossingTop)
+            }
+            return seen
         }
 
         function test_theWholePanelArrivesInOnePiece() {
@@ -3461,6 +3484,80 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var frame = findByName(live(), "windowHintFocusFrame")
             compare(frame.y, 0, "highlight sits on the only row")
             compare(frame.height, rows[0].height)
+        }
+
+        // An empty workspace has no focused window, so the indicator has no row to
+        // mark. Two things must hold, and the second is the one that used to fail.
+        //
+        // The obvious half is that nothing is drawn - `hasTarget` already covers
+        // that, and it did before this test existed.
+        //
+        // The half that broke is the marker's RESTING POSITION. With no row, the
+        // sync used to snap head and tail to `_targetYFor(-1)`, and that expression
+        // is `index * rowPitch + rowHeight / 2 - indicatorLength / 2`, so -1 returns
+        // roughly one row ABOVE the panel's top: a real coordinate, naming no row.
+        // The bar was invisible, so the wrongness cost nothing on screen - but the
+        // next workspace's first target animated FROM that coordinate, over the
+        // indicator's `slow * 2` tail. Arriving at a workspace therefore began with
+        // the marker in flight from a position it had never legitimately held,
+        // which is the flash. Asserting the resting value is what catches it: an
+        // invisible marker with a stale coordinate is exactly the bug.
+        function test_anEmptyWorkspaceParksTheIndicatorRatherThanPointingAtRowMinusOne() {
+            body.hint = root.makeHint({ windows: [] })
+            settleIndicator()
+
+            compare(body.focusedRowIndex, -1, "no focused window means no row")
+            verify(!body.hasTarget, "and so no target")
+
+            // Zero, not a negative offset: the marker's own documented rest value,
+            // the one `_snapIndicator` writes before the first placement.
+            compare(body._barTop, 0, "parked at rest, not at row -1")
+            verify(body._barTop >= 0,
+                "and never at a coordinate above the panel, was " + body._barTop)
+            compare(body._barLength, Lazer.LazerTheme.barWidgetHeight - 16,
+                "contracted, not left stretched from the lost target")
+
+            var bar = findByName(live(), "windowHintFocusIndicator")
+            verify(bar !== null, "the instance exists even with nothing to mark")
+            compare(bar.visible, false, "and is not drawn")
+            compare(bar.opacity, 0, "nor given any opacity")
+        }
+
+        // Two workspaces focused on the SAME row, switched between.
+        //
+        // This is the case where the focused index does not change, so no
+        // `focusedRowIndexChanged` fires and the marker is never told to move. It is
+        // recorded here as a fact about the geometry rather than as a fix: the
+        // marker's target is `index * rowPitch + ...`, so an unchanged index means an
+        // unchanged target no matter how many rows the two frames carry. Two frames
+        // with different list lengths place the same index at the same height, which
+        // is why "the row moved under the marker" is not available as an explanation
+        // for a switch that flashes.
+        //
+        // What it does establish is the boundary for the next diagnosis: anything
+        // that moves the marker across such a switch has to come from `crossingTop`
+        // or from `_placed`, because the index-derived target provably did not.
+        function test_theSameFocusedIndexGivesTheSameTargetAcrossASwitch() {
+            body.hint = root.tallFramedHint(2, 2, 6, 2)
+            settleIndicator()
+            compare(body.focusedRowIndex, 2, "the panel starts focused on row 2")
+            var restingTop = body._barTop
+
+            body.hint = root.tallFramedHint(3, 2, 6, 2)
+            wait(20)
+            verify(body._markerCrossing, "the marker is travelling")
+            // The refresh niri sends ~40ms after an activation: same position on both
+            // sides, so it routes through `_replaceArriving` rather than committing.
+            body.hint = root.tallFramedHint(3, 3, 3, 2)
+            wait(20)
+
+            settleMarker()
+            settleIndicator()
+
+            compare(body.focusedRowIndex, 2, "and the index is still 2")
+            compare(body._barTop, restingTop,
+                "so the index-derived target never moved across the whole switch: "
+                    + body._barTop + " against " + restingTop)
         }
     }
 }
