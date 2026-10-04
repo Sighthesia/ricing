@@ -36,6 +36,10 @@ Singleton {
     // rebuilt against the newer rows once that batch returns, instead of
     // leaving them without metadata until the next poll.
     property bool _metadataRestartPending: false
+    // Ids of the last published set, and whether the most recent parse brought
+    // exactly that set again.
+    property var _publishedIds: []
+    property bool _listUnchangedSinceLastPublish: false
     property var _pendingSignatureIds: []
     property var _pendingSignatureRows: ({})
     property var _signaturePendingById: ({})
@@ -283,6 +287,37 @@ Singleton {
         root._parsePublished = true
     }
 
+    // Whether the published set is the same one, in the same order, as the last
+    // time it was published. The launcher re-pulls the whole history whenever
+    // listCompleted fires while it is open, so a poll that brought nothing new
+    // - which is every poll but the one after a copy - used to cost a full
+    // re-stream of ~750 rows every five seconds, on the frames the user is
+    // looking at.
+    function _sameIdsAsPublished() {
+        var rows = root.items
+        if (!rows || rows.length === 0)
+            return false
+        var previous = root._publishedIds
+        if (!previous || previous.length !== rows.length)
+            return false
+        for (var index = 0; index < rows.length; index++)
+            if (previous[index] !== String(rows[index].id))
+                return false
+        return true
+    }
+
+    function _rememberPublishedIds() {
+        var rows = root.items
+        if (!rows || rows.length === 0) {
+            root._publishedIds = []
+            return
+        }
+        var ids = new Array(rows.length)
+        for (var index = 0; index < rows.length; index++)
+            ids[index] = String(rows[index].id)
+        root._publishedIds = ids
+    }
+
     function _finishListParse() {
         root._parseRunning = false
         root._parseLines = []
@@ -299,7 +334,22 @@ Singleton {
             root._initialFirstSeenRecovery = true
             root._finishInitialFirstSeenRecovery()
         }
+        root.announceListIfChanged()
+    }
+
+    // Announces a completed parse, but only when the published set actually
+    // moved. Every consumer that re-pulls on this signal pays a full re-read of
+    // the history, so a poll that brought nothing new must stay quiet.
+    // Returns whether it announced.
+    function announceListIfChanged() {
+        if (root._sameIdsAsPublished()) {
+            root._listUnchangedSinceLastPublish = true
+            return false
+        }
+        root._listUnchangedSinceLastPublish = false
+        root._rememberPublishedIds()
         root.listCompleted()
+        return true
     }
 
     property Process _firstSeenSignatureProc: Process {
