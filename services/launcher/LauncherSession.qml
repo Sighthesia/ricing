@@ -42,6 +42,7 @@ QtObject {
         root.noteInput()
         // A lens change rides the pooled fast path: the full sorted set for
         // this mode is already here, so no adapter call is needed.
+        root.publishCategorySummary()
         root.refresh()
     }
 
@@ -110,6 +111,19 @@ QtObject {
     // service's background queues off. Raised for a clipboard session that is
     // open or still streaming; every other host may ignore it.
     property bool foregroundBusy: false
+
+    // Category chip counts for the current pool and query. Published, not
+    // derived: a binding would recompute the whole pool's summary on every
+    // arriving batch, which is both a full second pass per commit and a set of
+    // numbers the user watches tick up from a partial set to the real one as
+    // the tail streams in. So it is published when it means something - when
+    // the data is whole, and when a query or lens change makes it wrong.
+    property var categorySummary: ({ total: 0, categories: [] })
+
+    function publishCategorySummary() {
+        root.categorySummary = LauncherLogic.categorySummary(
+            root.displayPool, LauncherLogic.parseQuery(root.query).text)
+    }
 
     function setForegroundBusy(busy) {
         root.foregroundBusy = !!busy
@@ -180,6 +194,7 @@ QtObject {
     onQueryChanged: {
         if (root.visible) {
             root.noteInput()
+            root.publishCategorySummary()
             root.refresh()
         }
     }
@@ -379,6 +394,7 @@ QtObject {
             var sorted = LauncherLogic.sortResults(collected)
             root.displayPool = sorted
             root._pooledMode = "apps"
+            root.publishCategorySummary()
             root.results = LauncherLogic.filterResults(sorted, "", root.category)
             root.selectedIndex = LauncherLogic.clampSelection(0, root.results.length)
         })
@@ -515,6 +531,12 @@ QtObject {
         // not reassign results or the surface replays its refill animation.
         root.results = LauncherLogic.poolMatches(previous, filtered)
                 ? previous : filtered
+        // The chip counts follow the data, but only where they are true: the
+        // first batch is what the rail can show at all, and the completing
+        // batch is when the numbers are final. The batches in between would
+        // only restate a partial set.
+        if (!appending || complete)
+            root.publishCategorySummary()
     }
 
     // Background revalidation for change announcers (desktop-entry rescans,
@@ -557,8 +579,10 @@ QtObject {
             if (!answered)
                 return
             var sorted = LauncherLogic.sortResults(collected)
-            if (!LauncherLogic.poolMatches(sorted, root.displayPool))
+            if (!LauncherLogic.poolMatches(sorted, root.displayPool)) {
                 root.displayPool = sorted
+                root.publishCategorySummary()
+            }
         })
     }
 

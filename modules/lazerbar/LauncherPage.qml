@@ -74,10 +74,13 @@ Item {
     // with the first batch of data would shift the whole list mid-entrance.
     readonly property string activeCategory: root.session && root.session.category != null
                                                 ? String(root.session.category) : ""
+    // The counts come from the session, which publishes them when the data is
+    // whole rather than on every arriving batch - a binding here would count
+    // the whole pool per batch and the numbers would tick up as the tail
+    // streamed in.
     readonly property var categoryChips: LauncherCategories.chipsFor(
         root.activeMode,
-        LauncherLogic.categorySummary(root.session ? root.session.displayPool : null,
-                                      root.activeSearchText))
+        root.session ? root.session.categorySummary : null)
 
     function setCategory(id) {
         if (!root.session)
@@ -476,7 +479,7 @@ Item {
     // unfolds with a small position-based stagger instead of a full wave.
     // Only rows already held by the commit choreography (fresh tail, full
     // swaps) replay the stagger; untouched survivors keep gliding.
-    function playRefillCascade() {
+    function playRefillCascade(hasNewcomers) {
         var children = resultsColumn.children
         if (MotionTokens.reducedMotion) {
             for (var r = 0; r < children.length; r++)
@@ -493,7 +496,10 @@ Item {
             children[i].playReveal(children[i].entryExitDelay)
             revealed++
         }
-        if (revealed > 0)
+        // Only a cascade that actually has something to reveal keeps the
+        // entrance gate closed; a batch that filled nothing new would otherwise
+        // arm the backstop on rows that never move.
+        if (revealed > 0 && hasNewcomers !== false)
             entranceWatchdog.restart()
     }
 
@@ -603,27 +609,31 @@ Item {
             else
                 root.playEntranceWave()
         } else if (root._isPrefixAppend(ids, prev)) {
-            // Window growth rebuilds every delegate, so every row reports
-            // fresh: only ids beyond the previous window are truly new.
-            // Survivors release untouched (already at their settled fold
-            // state — holding them would replay the entrance), folded rows
-            // stay folded, and only visible newcomers stagger in.
+            // A batch that extends the window is a prefix append: every id the
+            // previous window had is still there, in place, and only the ones
+            // beyond it are new. Newcomer slots are found by id rather than by
+            // "freshly built", because the window is materialized once now and
+            // a slot that gains content is not a new delegate. Survivors are
+            // left exactly as they are - re-holding a settled list would replay
+            // the entrance - and rows the user cannot see have nothing to
+            // reveal.
             var prevSet = ({})
             for (var s = 0; s < prev.length; s++)
                 prevSet[prev[s]] = true
-            for (var g = 0; g < freshRows.length; g++) {
-                var grown = freshRows[g]
-                var grownId = grown.result ? String(grown.result.id) : ""
-                // Rows the user cannot see have nothing to reveal: a
-                // window growth materializes them below the fold, and
-                // holding them would block the wheel for the delay.
-                var belowFold = grown.y > resultsView.height
-                if (prevSet[grownId] === true || grown.hidden === true || belowFold)
+            var newcomers = 0
+            for (var g = 0; g < ids.length; g++) {
+                if (prevSet[ids[g]] === true)
+                    continue
+                var grown = resultsRepeater.itemAt(g)
+                if (!grown || grown.result == null || typeof grown.holdInstantly !== "function")
+                    continue
+                newcomers++
+                if (grown.hidden === true || grown.y > resultsView.height)
                     grown.releaseInstantly()
                 else
                     grown.holdInstantly()
             }
-            root.playRefillCascade()
+            root.playRefillCascade(newcomers > 0)
         } else {
             root._holdAllRowsInstantly()
             root.playRefillCascade()
@@ -726,6 +736,14 @@ Item {
             return pool || []
         return pool.slice(0, _resultWindowLimit)
     }
+    // The row window is materialized once, at its current limit, and the
+    // arriving batches fill those slots instead of resizing it. Sizing it to
+    // the results that happen to exist rebuilt every delegate on each commit -
+    // measured at 15ms and 20ms for the two growths a 96-row window goes
+    // through on a clipboard open, both of them right after the open and both
+    // visible as the list twitching as it fills. A slot with no result yet is
+    // collapsed and inert (see LauncherResultRow.slotEmpty).
+    readonly property int rowSlotCount: windowedResults.length > 0 ? _resultWindowLimit : 0
     // Stretch the materialized window past the base slice only when a query
     // actually matches rows beyond it. This runs in two phases: the query
     // first folds the current window in place (persisted delegates glide,
@@ -1254,7 +1272,13 @@ Item {
         onHeightChanged: thumbQueue.wake()
         boundsBehavior: Flickable.StopAtBounds
         onContentYChanged: {
-            if (contentY > contentHeight - height - 900)
+            // Stretch only for a list that actually runs past the prefetch
+            // band. With less content than that band, "near the end" is
+            // trivially true, so every contentY change - the open's own
+            // normalization, the selection glide - would stretch the window on
+            // every open even though the user is nowhere near the end.
+            if (contentHeight > height + 900
+                    && contentY > contentHeight - height - 900)
                 extendResultWindow()
             thumbQueue.wake()
         }
@@ -1266,7 +1290,10 @@ Item {
         // nothing until the last row had landed.
         interactive: true
 
-        readonly property int resultCount: resultsRepeater.count
+        // Live results, not slots: window sizing, selection positioning and
+        // every row lookup work in result indices.
+        readonly property int resultCount: root.windowedResults.length
+        readonly property int slotCount: root.rowSlotCount
 
         // Glide the shared frame onto the selected row; hide it while the
         // selection is empty or the target row is still folded.
@@ -1276,7 +1303,7 @@ Item {
                     ? service.results[service.selectedIndex] : null
             var row = null
             if (current) {
-                for (var i = 0; i < resultsRepeater.count; i++) {
+                for (var i = 0; i < resultsView.resultCount; i++) {
                     var candidate = resultsRepeater.itemAt(i)
                     // A row mid-fling-exit is invisible; it must never
                     // anchor the shared frame over blank space.
@@ -1326,16 +1353,16 @@ Item {
                 return
             // Keyboard navigation can outrun the window; extend until the
             // target row exists before positioning.
-            while (service.selectedIndex >= resultsRepeater.count) {
-                var before = resultsRepeater.count
+            while (service.selectedIndex >= resultsView.resultCount) {
+                var before = resultsView.resultCount
                 extendResultWindow()
-                if (resultsRepeater.count === before)
+                if (resultsView.resultCount === before)
                     return
             }
             var current = service.results[service.selectedIndex]
             if (!current)
                 return
-            for (var i = 0; i < resultsRepeater.count; i++) {
+            for (var i = 0; i < resultsView.resultCount; i++) {
                 var row = resultsRepeater.itemAt(i)
                 if (row && row.result && row.result.id === current.id) {
                     scrollTo(i)
@@ -1504,7 +1531,7 @@ Item {
             // survivors from newcomers by id (see _holdAndScheduleReleases).
             Repeater {
                 id: resultsRepeater
-                model: root.windowedResults.length
+                model: root.rowSlotCount
 
                 delegate: LauncherResultRow {
                     required property int index

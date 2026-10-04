@@ -1113,6 +1113,59 @@ Item {
 
         // --- category lens ---
 
+        // Reads one chip's published count out of the session's summary, or -1
+        // when the summary does not mention that category at all.
+        function chipCount(id) {
+            var entries = svc().categorySummary.categories || []
+            for (var index = 0; index < entries.length; index++)
+                if (String(entries[index].id) === String(id))
+                    return Number(entries[index].count)
+            return -1
+        }
+
+        function test_chipCountsHoldSteadyWhileTheTailStreamsIn() {
+            // The counts beside the chips are what the user reads first, and a
+            // binding recomputed per batch made them tick up from a partial set
+            // to the real one while the list was still filling - the visible
+            // half of an open that feels stuttery. They are published when the
+            // data is whole instead: once for the opening batch, once for the
+            // batch that completes the set.
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+            svc().open()
+            wait(0)
+
+            apps.pendingRefreshes[0]([makeCategorized("a", "Steam", "games"),
+                                      makeCategorized("b", "Steam Deck", "games")], false)
+            compare(chipCount("games"), 2)
+            var afterFirst = svc().categorySummary
+
+            apps.pendingRefreshes[0]([makeCategorized("c", "Firefox", "network")], false)
+            verify(svc().categorySummary === afterFirst,
+                   "a tail batch must not restate the counts")
+            compare(chipCount("games"), 2)
+            compare(chipCount("network"), -1)
+
+            apps.pendingRefreshes[0]([makeCategorized("d", "Nautilus", "network")], true)
+            verify(svc().categorySummary !== afterFirst,
+                   "the completing batch must land the real counts")
+            compare(chipCount("games"), 2)
+            compare(chipCount("network"), 2)
+        }
+
+        function test_aQueryEditReCountsImmediately() {
+            // A query makes the counts stale the moment it lands, so that is
+            // the other moment they are republished.
+            openWithCategories([makeCategorized("a", "Steam", "games"),
+                                makeCategorized("b", "Firefox", "network")])
+            compare(chipCount("games"), 1)
+            compare(chipCount("network"), 1)
+
+            svc().query = "fire"
+            compare(chipCount("games"), 0)
+            compare(chipCount("network"), 1)
+        }
+
         function test_categoryLensNarrowsResultsWithoutPullingAgain() {
             var apps = openWithCategories([makeCategorized("a", "Steam", "games", 3),
                                            makeCategorized("b", "Firefox", "network", 2)])
