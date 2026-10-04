@@ -237,6 +237,55 @@ inside `/tmp/opencode/xdg-data/`.
   under test sees a fresh set of registrations and every assertion about
   persistence fails for a reason that is not the bug.
 
+## The default gate is the shell's log, not the suite
+
+`scripts/check-shell.sh` is what you run after a QML change. It reads the live
+shell's log and reports QML diagnostics naming a repo file plus our services'
+own failure reports, then exits non-zero. `--watch` follows the live shell while
+you restart it; `--all` reads everything; `--launch N` starts a shell when none
+is running (and refuses when one is — two instances paint two bars and the
+session lock belongs to one of them).
+
+Why it outranks a green suite here: a shell fails in ways assertions cannot
+reach. The live log on this branch contained a `NiriService` that could not write
+its kdl file, an `Image` that could not open a lock asset, and two `TypeError`s
+in `BarWindowHintContent.qml` — repeating dozens of times each, asserted by
+nothing.
+
+Two things about the log worth knowing before you trust it:
+
+- **`.qslog` is Qt's binary message format.** Level names are meta-type tags, so
+  grepping for `WARN` finds nothing. The bodies are plain text; extract with
+  `strings -n 8`.
+- **Find it through `/proc/<pid>/fd`, not by mtime.** The `by-id` directory name
+  is random and other projects' shells log into the same tree, so the newest
+  `log.qslog` is often someone else's warnings.
+
+Keep the suite for pure logic — `.js`, geometry formulas, state machines — via
+`scripts/run-tests.sh <filter>` or `scripts/qmltest.sh <file>`. A green suite
+says nothing about bindings, assets, services or compositor calls.
+
+## Do not let a reporting tool report "clean" when it is broken
+
+`check-shell.sh` shipped a classifier that matched nothing and still printed
+"no QML errors", because "produced no output" and "found nothing wrong" are the
+same bytes. Three separate bugs hid behind that one symptom, and only an
+assertion about the tool's own output caught them:
+
+- `for (x in arr)` walks an awk array's **indices**, not its values, so the
+  buckets were named `1`, `2`, `3` and matched nothing while still printing
+  well-formed lines. A structural check passes; only a semantic one fails.
+- `[:-]` inside an awk regex is a character **range**, and an invalid one, so the
+  program never compiled. mawk also refuses to let a regex literal span lines,
+  and an apostrophe inside the awk program silently terminated its shell quoting.
+- `grep -q` exits at the first match; `printf` on the other end of the pipe takes
+  SIGPIPE, and under `pipefail` that turns a *successful* match into a failed
+  pipeline, which `!` reports as "output unusable".
+
+So: a checker must verify its own output is usable, not merely present. The
+script exits 2 when the three bucket names do not appear, because a tool that
+lies "clean" is worse than no tool.
+
 ## Do not let tests touch the real environment
 
 `AppThemeService` is a test seam: with `AFLOAT_APP_THEME_PREFIX` unset it runs

@@ -11,16 +11,45 @@ Afloat is a Wayland desktop shell built with **Quickshell** (QML), targeting the
 - `modules/bar/` — layout-driven top bar (`TopBar`, `BarContent`, `widgets/`). `modules/lazerbar/` — lazer surfaces (settings panel, launcher, notifications, overlays; singletons `LazerTheme`, `MotionTokens`, `SettingsOverlayBridge` via its own `qmldir`). `modules/lock/` — session lock. `modules/shared/glsl/` — shaders.
 - `scripts/` — `afloat-ipc <target> <function> [args...]` wraps `qs ipc`; Python bridges tested under `scripts/tests/`. `docs/superpowers/` — dated design-intent plans.
 
-## Running & testing
+## Running & verifying
 
-- **Run everything through `scripts/run-tests.sh`** — it defaults to the offscreen platform, so a test run never maps a window over the live desktop. `scripts/run-tests.sh <name-substring>…` filters, `--no-python` skips pytest, `--suite` runs the whole QtTest tier as one process (~5x faster, and one window in the worst case instead of ~70), `-g` additionally runs the window-based harnesses (they will flash real windows — only when explicitly asked).
-- **For a single test file, use `scripts/qmltest.sh`**, never `qmltestrunner` directly: `scripts/qmltest.sh tst_bar_layout` (resolves under `tests/qml/`), or `scripts/qmltest.sh --suite` for everything in one process. A bare `qmltestrunner` inherits `QT_QPA_PLATFORM=wayland` from the session and creates a real, niri-focused window per file — see "Never disturb the live session" for what that costs.
-- Launch: `qs -p /path/to/afloat`. IPC: `scripts/afloat-ipc <target> <function> [args...]`.
+**Default verification: run the shell and read its log.** `scripts/check-shell.sh`
+reports what went wrong since the last time you asked, grouped so the two lines
+that matter are not buried under the machine's own noise:
+
+```bash
+scripts/check-shell.sh                # since last time — this is the gate
+scripts/check-shell.sh --watch        # follow the live shell while you restart it
+scripts/check-shell.sh --all          # the whole log
+scripts/check-shell.sh --launch 20    # no shell running: start one for 20s
+```
+
+It exits non-zero when there is a QML diagnostic naming a file in this repo, or
+one of our services reporting a failure, so it gates a commit the way a test run
+did. It never starts a second shell over a live one — restart your own, then read.
+
+Why this is the default rather than the suite: a desktop shell mostly fails in
+ways no assertion can reach. Reading the live log on this branch found a
+`NiriService` that could not write its kdl file, an `Image` that could not open a
+lock asset, and two `TypeError`s in the window-hint file — each recurring dozens
+of times, none covered by any test. The suite still earns its keep on logic with
+no runtime, so keep using it for that:
+
+- **Pure logic** (a `.js`, a geometry formula, a state machine): run the relevant
+  file — `scripts/run-tests.sh <name-substring>`, or `scripts/qmltest.sh <file>`
+  for one. Whole suite: `scripts/run-tests.sh` (~5 min; `--suite` for the QtTest
+  tier in one process, ~5x faster). `python3 -m pytest scripts/tests/` for the
+  bridges.
+- Everything else — bindings, assets, services, compositor calls — is the log's
+  job. A green suite says nothing about any of it.
+
+Launch: `qs -p /path/to/afloat`. IPC: `scripts/afloat-ipc <target> <function> [args...]`.
 - Logic tests (pure `.js`, in `tests/qml/`) run under QtTest, which `scripts/qmltest.sh` wraps. The raw form, if you ever need it, is `QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_bar_layout.qml -o -,txt` — **and it must carry `QT_QPA_PLATFORM=offscreen`**, or it will steal keyboard focus.
   - Use the Qt6 runner path exactly — `/usr/bin/qmltestrunner` is Qt5 and fails silently. `qs -p tests/qml/tst_*.qml` runs **zero** tests (Quickshell never drives QtTest).
 - Service-behavior harnesses (need Quickshell singletons) live in the **repo root**: `qs -p tst_media_binding.qml` (from repo root). Under the offscreen platform a harness that instantiates a `PanelWindow` cannot load (`No PanelWindow backend loaded`) — the runner classifies that as window-only and skips it.
 - Python: `python3 -m pytest scripts/tests/`.
-- **After every QML change**, run the relevant test file(s) and fix WARN/ERROR output before finishing.
+- **After every QML change**, run `scripts/check-shell.sh` and fix what it reports
+  before finishing. Add the relevant test file when the change is pure logic.
 
 ## Never disturb the live session (read before running anything)
 
