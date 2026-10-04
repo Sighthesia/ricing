@@ -557,6 +557,15 @@ Item {
     function _joinsMarkerJourney() {
         if (!root._markerCrossing || !root.plan)
             return false
+        // `hint` as well as `plan`, because it is read on the next line and it starts
+        // null. The log caught this where no test ever could: `scripts/check-shell.sh`
+        // reported `TypeError: Cannot read property 'activeWorkspacePosition' of null`
+        // against this file, recurring on the live session. A journey's flag and its plan
+        // can both be set while the hint they describe is momentarily absent - the panel
+        // is being rebuilt from a publish that has not resolved its windows yet - and the
+        // guard above was checking the two of the three that are set.
+        if (!root.hint)
+            return false
         return root.plan.activePosition === root.hint.activeWorkspacePosition
     }
     // The leg currently in progress, and how far through it. `InOutQuad` is at its
