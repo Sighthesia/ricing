@@ -2158,13 +2158,9 @@ Item {
 
                                     // The running profile is marked with a thin
                                     // colour band, not a rounded outline: a band
-                                    // states a fact, an outline decorates. It sits
-                                    // inside the row's own margin so the names
-                                    // below share one left edge with the port name
-                                    // above rather than stepping in by 2px.
+                                    // states a fact, an outline decorates.
                                     Rectangle {
                                         anchors.left: parent.left
-                                        anchors.leftMargin: 8
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: 2
                                         height: 20
@@ -2181,9 +2177,7 @@ Item {
                                         objectName: "wiredProfileNameText"
                                             + wiredGroupCard.index + "_" + wiredProfileRow.index
                                         anchors.left: parent.left
-                                        // The port header's own margin, so the two
-                                        // columns of this card line up.
-                                        anchors.leftMargin: 10
+                                        anchors.leftMargin: 12
                                         anchors.right: wiredProfileStateText.left
                                         anchors.rightMargin: 6
                                         anchors.top: parent.top
@@ -2204,7 +2198,7 @@ Item {
                                         objectName: "wiredProfileMetaText"
                                             + wiredGroupCard.index + "_" + wiredProfileRow.index
                                         anchors.left: parent.left
-                                        anchors.leftMargin: 10
+                                        anchors.leftMargin: 12
                                         anchors.right: parent.right
                                         anchors.rightMargin: 10
                                         anchors.top: wiredProfileNameText.bottom
