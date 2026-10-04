@@ -792,14 +792,13 @@ Item {
         root._exitFrom = root.exitFrom
         root._markerCrossing = true
         root.swapping = true
-        // Cancel the tracker's trail, here and not only in `_syncIndicator`. The
-        // `focusedRowIndex` that made the tracker start moving was delivered by the
-        // publish itself, a moment BEFORE this function runs - so by the time the flag
-        // above goes up the head and tail are already in flight, and gating the sync
-        // would arrive too late to stop them. The displacement is the marker's motion
-        // for the next 320ms; a stretch running underneath it would be a second motion
-        // on one marker.
-        root._snapIndicator(root._targetYFor(root.focusedRowIndex))
+        // Hand the tracker to the frame's journey rather than cancelling it. The publish that
+        // starts this crossing is what moved the focus, so the tracker may already be
+        // mid-trail toward the arriving row; committing to the journey from wherever its
+        // two ends are keeps that one motion continuous instead of resetting it to zero
+        // length on this frame - which is what the snap here used to do, and what made a
+        // trail in flight collapse the instant a switch began.
+        root._followJourney()
         root.positionFrom = plan.fromPosition
         root.positionTo = plan.toPosition
         root.slideProgress = 0
@@ -842,10 +841,10 @@ Item {
         // Already true on a re-aim, and deliberately not reset: the marker carries on
         // down through the second switch rather than restarting its journey.
         root._markerCrossing = true
-        // As in `_startSlide`: the publish that re-aims this leg is what moved the focus,
-        // so the tracker may already be trailing. Cancel it, or the bar carries two
-        // motions from here to the landing.
-        root._snapIndicator(root._targetYFor(root.focusedRowIndex))
+        // As in `_startSlide`: the tracker joins this leg from wherever it is, rather
+        // than being reset. A second switch lands mid-trail more often than not, and a
+        // snap here is exactly the sudden shortening it is meant to avoid.
+        root._followJourney()
         root.positionFrom = here
         root.positionTo = plan.toPosition
         // Restart both clocks from the current position, not from either crossing's own
@@ -872,12 +871,13 @@ Item {
         duration: MotionTokens.page * debugTimeScale
         easing.type: Easing.InOutQuad
         onFinished: {
-            // Settle the tracker before the flag goes down. Whatever the tail was doing,
-            // the bar has to be at its resting length on the frame the marker arrives -
-            // otherwise clearing the flag hands over a bar that is suddenly stretched
-            // again, which is a second motion starting at the exact moment the first one
-            // finished.
-            root._snapIndicator(root._restingY())
+            // No settle here. The tracker has been following the frame all the way, so the
+            // bar arrives already stretched; the tail's own flight - three times the
+            // head's - contracts it, and that contraction is the last beat of the switch
+            // rather than a second event bolted onto the frame's landing. Snapping it
+            // away here used to be deliberate, to hand over a bar at rest at exactly the
+            // moment the motion finished, but it is the same snap that made a switch cut
+            // a trail short, just at the other end.
             // The frame lands. There is
             // nothing to hold the tint back for here any more: the tint has been
             // following the frame's own rectangle the whole way in, so the card lit on
@@ -961,21 +961,42 @@ Item {
     // bar at y 307 - 171px apart, which is the scroll.
     readonly property real _barTop: Math.min(_headY, _tailY) - strip.scrollOffset
     readonly property real _barLength: indicatorLength + Math.abs(_headY - _tailY)
+
+    // Where the bar belongs while the frame is travelling: on the frame, in the bar's own
+    // length, measured in the tracker's scrolled coordinates like every other target
+    // (`_targetYFor` is pre-scroll too, and `_barTop` subtracts the offset back out).
+    // Where the bar belongs while the frame is travelling: on the frame, in the bar's own
+    // length, measured in the tracker's scrolled coordinates like every other target
+    // (`_targetYFor` is pre-scroll too, and `_barTop` subtracts the offset back out).
+    //
+    // A FUNCTION and not a `readonly` property, which is the trap this file has already
+    // paid for twice. A property's binding is re-evaluated when its dependencies change,
+    // and nothing orders that before the `onCrossingTopChanged` handler that reads it - so
+    // the handler was handed the PREVIOUS frame's target and the head trailed the frame by
+    // exactly one frame, forever. Measured across a crossing at quarters: `journeyY` ran
+    // 69, 118.5, -42, -20.5, 1 and the head ran 74, 69, 118.5, -42, -20.5 - the same
+    // series, one step behind, for the whole journey. A function is evaluated on the call,
+    // so it can only ever be current.
+    function _journeyTarget() {
+        return root.crossingTop + root.markerOffset + strip.scrollOffset
+    }
     readonly property bool hasTarget: focusedRowIndex >= 0
             && activeColumn
             && focusedRowIndex < activeColumn.rows.length
 
-    // `!root._markerCrossing` is the load-bearing term on both of these, and it is here
-    // rather than inside `_syncIndicator` because a `Behavior` reads `enabled` at the
-    // moment its property CHANGES - and the publish that starts a crossing is what moves
-    // `focusedRowIndex`, so the sync that retargets the tracker has already run by the
-    // time any flag set during the crossing could be read. Gating the animation itself is
-    // what makes every tracker write inside a crossing a snap instead, which is what the
-    // displacement needs: it is the marker's motion for 320ms, and a stretch running
-    // underneath it would be a second, independent motion on the same bar.
+    // `_snapping` is the load-bearing gate on both of these, and it is a
+    // property rather than anything about the crossing, so a `Behavior` sees it at the
+    // moment the property CHANGES - which is what a write inside `_snapIndicator` needs
+    // and a flag read inside `_syncIndicator` would arrive a step too late for.
+    //
+    // `!root._markerCrossing` used to sit here as well, and it froze the tracker for the
+    // whole journey: head and tail could not differ, so a workspace switch had no trail
+    // and the crossing's own first write collapsed any trail in flight from before it.
+    // The trail belongs on a switch - it is the widget's own behaviour - so the gate is
+    // gone and the tracker's target during a crossing is the frame itself, which
+    // `_followJourney` supplies on every frame the frame moves.
     Behavior on _headY {
         enabled: root._placed && !MotionTokens.reducedMotion && !root._snapping
-            && !root._markerCrossing
         NumberAnimation {
             id: indicatorHeadAnimation
             duration: MotionTokens.medium * debugTimeScale
@@ -984,7 +1005,6 @@ Item {
     }
     Behavior on _tailY {
         enabled: root._placed && !MotionTokens.reducedMotion && !root._snapping
-            && !root._markerCrossing
         // 3x the head's flight: the tail lingers long after the head lands, which
         // is what keeps the stretch readable.
         NumberAnimation {
@@ -1008,6 +1028,58 @@ Item {
         _headY = top
         _tailY = top
         _snapping = false
+    }
+
+    // Hand the tracker to the journey rather than freezing it.
+    //
+    // The distinction from `_snapIndicator` is the whole point: this writes the two ends
+    // as TARGETS and lets the Behaviors animate towards them, so while the frame is
+    // moving the head runs after it and the tail - three times the head's flight - lags,
+    // and the bar is drawn stretched between them. That is the workspace widget's own
+    // vocabulary: `Workspaces.activeHighlight` slides by being stretched, the head
+    // arriving at the new square's centre while a shadow trails over the gap.
+    //
+    // It used to be frozen instead. `_syncIndicator` snapped head and tail together for
+    // the whole crossing and both Behaviors were gated on `!_markerCrossing`, so a
+    // workspace switch produced no trail at all - and because the gate made every tracker
+    // write inside a crossing a snap, the write at the crossing's FIRST frame collapsed
+    // whatever trail was still in flight from an earlier focus change to zero in one step.
+    // That was the tail visibly shortening on consecutive switches, and it was worst
+    // exactly when switches came quickly, because a trail was in flight more of the time.
+    //
+    // Snapping here at all is still wrong, though, and is why the hand-off writes the
+    // CURRENT position rather than the arriving row's: the publish that starts a crossing
+    // is the same publish that moves `focusedRowIndex`, so by this point the tracker may
+    // already be trailing toward the arriving row. Committing to the journey from wherever
+    // the two ends actually are keeps one continuous motion; committing to either end's
+    // value would be a second one.
+    function _followJourney() {
+        const target = root._journeyTarget()
+        if (!isFinite(target))
+            return
+        _anchorY = target
+        // Not `_targetKey`: the landing row's own key. At the landing `_restingY()` is
+        // that row, and a key that still said "journey" would read as a genuine switch
+        // and flash the bar back to full length instead of letting the tail finish
+        // contracting - the arrival's own motion, cut off by a bookkeeping value.
+        _targetKey = String(root.focusedRowIndex)
+        // The head SNAPS and the tail is merely re-targeted, and the asymmetry is the
+        // design rather than an inconsistency. The head is the frame's own position: the
+        // bar has to stay one `markerOffset` below the outline for the whole journey, or
+        // the two stop being one gesture - and a Behavior chasing a target that moves
+        // every frame is always behind it, which is a lag, not a lead. So the leading end
+        // of the bar is pinned to the frame and only the trailing end flies, three times
+        // the head's flight. `_barTop` is the MINIMUM of the two, so the bar is drawn
+        // upward from the tail to just past the head: the stretch is a wake behind the
+        // frame, and the frame never leaves the bar's leading edge.
+        //
+        // `_snapping` is read at the moment the property changes, which is why it brackets
+        // the head's write rather than being set for the whole function: the tail below it
+        // has to animate.
+        _snapping = true
+        _headY = target
+        _snapping = false
+        _tailY = target
     }
 
     // Route every re-anchor through here. A genuine target switch desyncs head and
@@ -1297,14 +1369,19 @@ Item {
         // column for the departure leg exactly as the outline is.
         x: (root._markerCrossing ? root.markerLeft - root.cellPaddingX
             : strip.activeColumnX) + root.indicatorInset
-        // One `markerOffset` below the outline at every point of the crossing, so the bar
-        // stays centred on the card it is marking while it travels - and lands on exactly
-        // where the resting bar would have been.
-        y: root._markerCrossing ? root.crossingTop + root.markerOffset : root._barTop
-        // The bar's LENGTH is the resting one throughout. The tracker's stretch is the
-        // focus moving within one workspace; here the bar is being carried, and a length
-        // that changed underneath the travel would be a second motion on one marker.
-        height: root._markerCrossing ? root.indicatorLength : root._barLength
+        // The tracker's two ends, ALWAYS - the stretch is the bar's
+        // own dual-speed motion and it belongs on a workspace switch as much as on a
+        // focus change inside one workspace. During a crossing the tracker's target is
+        // the frame itself (`_followJourney`), so the head runs after the frame and the
+        // tail trails over the gap, and the bar draws stretched between them.
+        //
+        // It used to be `crossingTop + markerOffset` at a fixed `indicatorLength` for the
+        // duration, on the reasoning that the bar was being carried and a changing length
+        // would be a second motion on one marker. The stretch is not a second motion: it
+        // is the bar's own, and it is what made the bar read as attached to the frame
+        // instead of being repositioned by it.
+        y: root._barTop
+        height: root._barLength
         visible: root.markerHasTarget
         opacity: root.markerHasTarget ? 1 : 0
 
@@ -1395,20 +1472,22 @@ Item {
 
     function _syncIndicator() {
         var target = root._restingY()
-        // While the marker is travelling, it is placed by the crossing's clock and by
-        // nothing else. The tracker exists to stretch the bar ALONG its long axis when
-        // the focus moves within one workspace - the widget's dual-speed lead/trail - and
-        // `focusedRowIndex` changes the instant a switch is published, so without this
-        // gate the bar would start its own head/tail travel underneath the displacement:
-        // two independent motions on one marker, and a bar whose length is no longer the
-        // one `markerOffset` was measured against.
+        // While the marker is travelling, the tracker's target is the FRAME, and it is fed
+        // from `crossingTop` rather than from a row index. `focusedRowIndex` changes the
+        // instant a switch is published - before the crossing starts and while it runs -
+        // so retargeting to the row would put a second, independent motion on the bar
+        // underneath the frame's own, and a bar whose length is no longer the one
+        // `markerOffset` was measured against.
         //
-        // Snapping rather than retargeting also means the tracker is already settled on
-        // the arriving row when the crossing ends, so the landing introduces no motion of
-        // its own.
+        // The end of the crossing needs no special case either: `_followJourney` leaves
+        // `_targetKey` naming the landing row, so the resting sync that follows finds the
+        // key unchanged, sees the position it is already at, and returns - leaving the
+        // tail to finish contracting on its own. That contraction is the arrival's own
+        // motion and belongs on the bar; snapping it away was a second event at the exact
+        // moment the first finished.
         if (root._markerCrossing) {
             root._pendingTop = -1
-            root._snapIndicator(target)
+            root._followJourney()
             return
         }
         if (!root.hasTarget) {
@@ -1464,6 +1543,16 @@ Item {
         _revealFocusedRow()
     }
     onHasTargetChanged: _syncIndicator()
+
+    // The tracker's target during a crossing moves every frame the frame moves, so this
+    // is where the trail comes from. One handler rather than a binding, because the head
+    // and the tail are written by their Behaviors - a binding on either would be torn off
+    // by the first animation that started - and because both must be written on the same
+    // frame to keep the target they are chasing a single value.
+    onCrossingTopChanged: {
+        if (root._markerCrossing)
+            _followJourney()
+    }
 
     Component.onCompleted: {
         if (root.hasTarget)

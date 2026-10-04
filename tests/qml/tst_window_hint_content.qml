@@ -1293,6 +1293,39 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             return findByName(body, "windowHintFocusIndicator")
         }
 
+        // How the bar sits against the frame, as three numbers rather than one verdict.
+        //
+        // The bar used to be exactly one `markerOffset` below the outline for the whole
+        // journey and the equality WAS the test. It is a containment now, because the bar
+        // is no longer a rigid bar riding on the frame: it is the same stretchy bar as
+        // everywhere else, with the frame pinned to its leading edge and the tail flying.
+        // Containment says the same thing whichever way the switch went - the frame's own
+        // position for the bar is inside the bar - which an equality cannot, because which
+        // END is pinned depends on the direction.
+        //
+        // `above` is slack behind a downward journey and `below` slack behind an upward
+        // one; neither is ever negative by more than a rounding step. `stretch` is the wake
+        // itself and is zero at rest.
+        function barVersusFrame() {
+            const core = outline().y + body.markerOffset
+            return {
+                above: core - bar().y,
+                below: bar().y + bar().height - (core + body.indicatorLength),
+                stretch: bar().height - body.indicatorLength
+            }
+        }
+
+        // Where the bar's LEADING edge is - the end the frame is pinned to. The bar's own
+        // `y` is its TRAILING edge, the end that flies, so `y` reads as frozen under a
+        // stepped clock (no wall time passes, so the 480ms tail cannot advance) and says
+        // nothing about whether the bar travelled at all. Derived from the bar's own two
+        // ends rather than from the tracker's internals, and direction-agnostic, because
+        // which end leads depends on which way the switch went.
+        function barLeadingEdge() {
+            return Math.max(bar().y,
+                bar().y + bar().height - body.indicatorLength)
+        }
+
         // The panel's clip, in the markers' coordinates. Read off the component rather
         // than restated as literals, and deliberately: the claim is where the marker sits
         // RELATIVE to the clip, which holds for any clip, and a suite that pinned the
@@ -1329,6 +1362,19 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             }
             wait(body.crossingAnimation.duration + 60)
             verify(!body._markerCrossing, "the marker has landed")
+        }
+
+        // The BAR's settle, separate from the marker's on purpose. The tail is three times
+        // the head's flight and it was chasing the frame, so it is still stretched when the
+        // frame stops - the landing starts the contraction rather than finishing it. Only a
+        // test making a claim about the bar's RESTING length needs to wait for that, and
+        // folding it into `settleMarker` charged every test in the suite 540ms for a claim
+        // most of them never make, which is what pushed the file past its time cap.
+        function settleBar() {
+            settleMarker()
+            wait(Lazer.MotionTokens.slow * 2 + 60)
+            compare(bar().height, body.indicatorLength,
+                "and the bar really has come back to its resting length")
         }
 
         // Land a crossing that was driven by hand. `driveSlideTo` and `driveMarkerTo`
@@ -1620,43 +1666,128 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 "and then down onto the arriving card, at " + watched.y)
             var watchedBar = bar()
             driveMarkerTo(0)
-            var barStart = watchedBar.y
+            // The leading edge, not `y`: `y` is the trailing edge, and a stepped clock
+            // gives the tail's 480ms flight no wall time to move it, so `y` would read as
+            // frozen and report that the bar never moved.
+            var barStart = barLeadingEdge()
             driveMarkerTo(0.45)
-            verify(bar() === watchedBar && watchedBar.y > barStart,
+            verify(bar() === watchedBar && barLeadingEdge() > barStart,
                 "and so is the bar, down off the old card from " + barStart + " to "
-                    + watchedBar.y)
+                    + barLeadingEdge())
             driveMarkerTo(1)
-            compare(watchedBar.y, body.focusedRowTop + body.markerOffset,
+            settleBar()
+            // Asserted AFTER the settle, not at the stepped clock. A teleported clock is
+            // not a resting state: the head is pinned to the frame but the tail has had no
+            // wall time at all to fly, so the bar is a stretched bar caught mid-wake and
+            // its exact position says nothing about where it comes to rest. Where it comes
+            // to rest is the claim that matters - one instance, on the arriving card.
+            compare(barLeadingEdge(), body.focusedRowTop + body.markerOffset,
                 "and then onto the arriving one, centred on the same card")
-            settleMarker()
         }
 
         function test_theBarAndTheOutlineAreOneGesture() {
-            // The bar is a bar CENTRED on its card, so it sits one `markerOffset` below
-            // the outline at EVERY point of the journey - not only at rest. Two markers
-            // drifting apart mid-travel would read as two independent things happening.
+            // The bar carries the frame at EVERY point of the journey - not only at rest.
+            // Two markers drifting apart mid-travel would read as two independent things
+            // happening.
+            //
+            // "Carries" is a containment and not the equality it used to be, and that is
+            // the whole of the change: the bar is no longer a rigid bar riding on the
+            // frame, it is the same stretchy bar as everywhere else with the frame pinned
+            // to its leading edge and the tail flying. The frame therefore cannot fall off
+            // either end, whichever way the switch went, and the bar is never SHORTER than
+            // its resting length.
             startCrossingOverTwoRows(2, 2, 3, 0)
             for (var step = 0; step <= 8; ++step) {
                 var at = step / 8
                 driveMarkerTo(at)
-                compare(bar().y - outline().y, body.markerOffset,
-                    "at " + at + " the bar is centred on the card the outline draws, was "
-                        + (bar().y - outline().y))
+                var span = barVersusFrame()
+                verify(span.above >= -1 && span.below >= -1,
+                    "at " + at + " the bar covers the frame's own position on it, with "
+                        + span.above.toFixed(1) + " of it above and "
+                        + span.below.toFixed(1) + " past the leading edge")
                 compare(bar().width, body.indicatorThickness,
                     "at " + at + " the bar keeps the indicator's thickness, was "
                         + bar().width)
-                // The tracker's stretch is the focus moving within one workspace. Here the
-                // bar is being carried, so a length that changed underneath the travel
-                // would be a second motion on one marker.
-                compare(bar().height, body.indicatorLength,
-                    "at " + at + " and the bar keeps its resting length, was "
-                        + bar().height)
+                verify(span.stretch >= -1,
+                    "at " + at + " and it is never shorter than its resting length, was "
+                        + span.stretch.toFixed(1))
                 compare(bar().x, outline().x - body.cellPaddingX + body.indicatorInset,
                     "at " + at + " and the bar is in that card's column's padding")
             }
+            settleBar()
+        }
+
+        // (c) A workspace switch used to carry a rigid bar, because the tracker was frozen
+        // for the duration of the crossing. That is the widget's own behaviour - the
+        // workspace indicator slides by being stretched, head arriving while a shadow
+        // trails over the gap - and its absence was visible as the bar being repositioned
+        // rather than dragged.
+        function test_aSwitchStretchesTheBarAndTheStretchIsAWakeBehindTheFrame() {
+            // Sampled in WALL-CLOCK time, not by stepping the marker's clock, and that is
+            // not a convenience. `driveMarkerTo` teleports the journey: no time passes
+            // between samples, so a 480ms tail animation is retargeted before it can
+            // advance and the tail never leaves its starting value. Stepping the clock is
+            // the right instrument for where the FRAME is, and useless for how the bar's
+            // own flight behaves.
+            body.hint = root.tallFramedHint(2, 2, 6, 0)
+            wait(300)
+            var peak = 0
+            var sawSlackBehind = false
+            var wentDown = false
+            var before = outline().y
+            body.hint = root.tallFramedHint(3, 2, 6, 5)
+            var samples = Math.round(body.crossingAnimation.duration / 16)
+            for (var i = 0; i < samples; ++i) {
+                wait(16)
+                var span = barVersusFrame()
+                if (span.stretch > peak)
+                    peak = span.stretch
+                if (span.above > 1)
+                    sawSlackBehind = true
+                if (outline().y > before)
+                    wentDown = true
+            }
+            verify(peak > 2,
+                "the bar stretched while it travelled, by a peak of " + peak.toFixed(1)
+                    + " against a resting length of " + body.indicatorLength)
+            verify(wentDown, "and this journey did travel downwards, which is the "
+                + "direction the slack is expected on the other side of")
+            // ...and the stretch is BEHIND the frame, not ahead of it. The bar is drawn
+            // from `min(head, tail)`, so a wake means the frame sits at the bar's leading
+            // edge: the far end is the one that flew.
+            verify(sawSlackBehind,
+                "the slack trailed the frame rather than leading it")
+            settleSlide()
+            settleBar()
+        }
+
+        // (b) The sudden shortening. A focus change inside one workspace leaves a trail in
+        // flight; a switch published while that trail is still running used to snap the two
+        // ends together on its first frame, because the tracker was frozen for the duration
+        // of a crossing and every write inside one was a commit. Consecutive switches made
+        // it routine rather than rare, because a trail was in flight more of the time.
+        //
+        // What must not happen is a DISCONTINUITY: the bar's length is a function of the
+        // tail's flight, so it may grow or shrink between samples, but it must never fall
+        // to nothing in a single step.
+        function test_aSwitchInTheMiddleOfATrailDoesNotCutTheTrailToNothing() {
+            startCrossingOverTwoRows(2, 2, 3, 0)
+            // Leave a trail in flight: two rows apart, which is further than the tail's
+            // 160ms head flight covers before the switch is published.
+            body.hint = root.tallFramedHint(2, 2, 6, 4)
+            wait(body.crossingAnimation.duration + 40)
+            var stretched = barVersusFrame().stretch
+            verify(stretched > 2,
+                "there is a trail in flight to cut, " + stretched.toFixed(1))
+            // Now the switch, published while that trail is still out.
+            body.hint = root.tallFramedHint(3, 2, 6, 1)
+            wait(body.slideDuration / 2)
+            var after = barVersusFrame().stretch
+            verify(after > 0,
+                "the trail survived the switch rather than being cut to nothing: "
+                    + stretched.toFixed(1) + " before, " + after.toFixed(1) + " after")
+            settleSlide()
             settleMarker()
-            compare(bar().height, body.indicatorLength,
-                "and it is still that length once it has landed")
         }
 
         function test_theJourneyLandsAndStays() {
@@ -1841,15 +1972,27 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 findByName(body, "windowHintFocusFrame").y + body.markerOffset,
                 "the bar is one markerOffset below the outline to begin with")
             body.hint = root.tallFramedHint(3, 2, 12, 9)
+            // Containment through the journey, and the equality only at rest. The bug
+            // being guarded against put the bar a whole scroll's worth away from the
+            // outline - 227px against a 170px scroll when it was last measured - so it
+            // could not hide inside the tail's wake, which is bounded by the journey
+            // itself. What can no longer be claimed is the exact offset: the bar is
+            // stretched while it travels, so the end carrying the frame is the one that
+            // holds the offset and the other end is slack.
             var worst = 0
             for (var step = 0; step <= 8; ++step) {
                 driveMarkerTo(step / 8)
-                worst = Math.max(worst, Math.abs(findByName(body, "windowHintFocusIndicator").y
-                    - findByName(body, "windowHintFocusFrame").y - body.markerOffset))
+                var span = barVersusFrame()
+                worst = Math.max(worst, -Math.min(span.above, span.below))
             }
-            compare(worst, 0,
-                "and stays that way through the whole journey - the worst disagreement was "
-                    + worst + " against a scroll of " + scroll)
+            verify(worst <= 1,
+                "and the bar never falls off the frame's own position through the whole "
+                    + "journey - the worst it came short by was " + worst.toFixed(1)
+                    + " against a scroll of " + scroll)
+            settleBar()
+            compare(findByName(body, "windowHintFocusIndicator").y,
+                findByName(body, "windowHintFocusFrame").y + body.markerOffset,
+                "and once the tail has contracted it is one markerOffset below again")
             settleSlide()
             settleMarker()
             compare(findByName(body, "windowHintFocusIndicator").y,
@@ -3468,19 +3611,31 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // 64; and 0px when the next switch\'s refresh merely confirmed the row, which
             // is the reported "suddenly shorter".
             //
-            // Sampled rather than read once, because the streak takes a few frames to
-            // open: the bar\'s length is the resting one plus the tracker\'s own
-            // separation, so "never longer than the resting length" is the claim.
-            var stretched = 0
+            // Those gates are gone now - the tracker follows the frame through a crossing,
+            // which is where the trail on a switch comes from - so what this test guards
+            // is the narrower thing the gates were standing in front of: a refresh that
+            // re-commits the tracker while the journey is still running.
+            //
+            // Sampled rather than read once, and the claim is about DISCONTINUITY rather
+            // than about length. "Never longer than the resting length" was the old claim
+            // and it is no longer available: the bar is stretched by design while the
+            // frame travels, so a switch legitimately has samples above it. What a
+            // re-commit looks like instead is a single-frame step - the wake returning to
+            // nothing at once - so the claim is that the length never DROPS sharply between
+            // two adjacent samples. The tail opens smoothly because it is a 480ms flight
+            // chasing a target that moves; only a commit moves in one frame.
+            var worstDrop = 0
+            var previousLength = body._barLength
             for (var i = 0; i < 12; ++i) {
-                if (body._barLength > body.indicatorLength + 0.5)
-                    stretched += 1
                 wait(16)
+                var length = body._barLength
+                worstDrop = Math.max(worstDrop, previousLength - length)
+                previousLength = length
             }
-            compare(stretched, 0, "and the bar never stretched past its resting length "
-                + "while the refresh settled - it did on " + stretched + " of 12 samples, "
-                + "and is " + body._barLength.toFixed(1) + " against a resting "
-                + body.indicatorLength)
+            verify(worstDrop <= 12, "and the bar did not snap: its worst one-frame drop "
+                + "was " + worstDrop.toFixed(1) + "px, while the wake stood at "
+                + (body._barLength - body.indicatorLength).toFixed(1)
+                + "px over its resting " + body.indicatorLength + "px")
 
             // Which is only half of it: the journey must still ARRIVE, on the row the
             // refresh says is focused. A frame that has been stopped at 0.76 and then
