@@ -3347,6 +3347,86 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(strip().opacity, 1, "and full once landed")
         }
 
+        function test_aRefreshAfterTheColumnsLandDoesNotCutTheJourneyShort() {
+            // The strip's clock is `MotionTokens.medium` and the marker's is
+            // `MotionTokens.page`, so every switch has a window - 160ms at scale 1, and
+            // `debugTimeScale` times that again in the observation build - in which the
+            // COLUMNS have landed and the FRAME has not. niri's refresh lands wherever it
+            // lands, and this window is a third of the whole journey.
+            //
+            // The guard that routed such a refresh was `swapping`, which is the strip's
+            // clock, so for that window it read false and the refresh committed. Measured
+            // at scale 1 with the refresh 220ms into the switch: `_markerCrossing` dropped
+            // with `crossingClock` at 0.76, and the frame - two thirds of the way down the
+            // panel - teleported the rest of the way.
+            //
+            // The resting frame first, then the switch. A snapshot reports no movement
+            // when its own two positions agree, so publishing the destination with
+            // `previous` already equal to it commits instead of crossing - which is what
+            // `startCrossingOverTwoRows` does for the same reason.
+            body.hint = root.tallFramedHint(2, 2, 5, 1)
+            settleIndicator()
+            body.hint = root.tallFramedHint(3, 2, 5, 3)
+            wait(20)
+            verify(body._markerCrossing, "the marker is travelling")
+            compare(body.focusedRowIndex, 3, "and the arriving frame names row 3")
+            // Out the strip's OWN recipe rather than a guessed number, which is what puts
+            // the sample in the window: the columns have landed and the frame has not.
+            wait(body.slideDuration + 40)
+            verify(!body.swapping, "the columns have landed")
+            verify(body._markerCrossing, "while the frame is still travelling")
+
+            // The refresh niri sends after an activation: the same workspace on both
+            // sides, so it reports no movement, and a DIFFERENT focused row because the
+            // arriving workspace's windows are only now resolved. The second half is what
+            // made the commit visible on the indicator.
+            body.hint = root.tallFramedHint(3, 3, 5, 1)
+            wait(1)
+            verify(body._markerCrossing,
+                "so the refresh did not end the journey - it is the new workspace\'s "
+                    + "content, refreshed, not a denial of the move")
+            verify(body.crossingClock < 1,
+                "and the clock is still short of the end, at " + body.crossingClock
+                    + ", which is what being inside the window means")
+            // And the indicator is the other half of the same commit. `_markerCrossing`
+            // is the load-bearing term in BOTH of the tracker\'s Behaviors, so clearing it
+            // mid-switch handed the head and the tail their animations back - and the
+            // refresh\'s own correction to the focused row then ran as a full dual-speed
+            // streak on top of a switch, whose whole design is that the frame IS the
+            // motion. Measured peak 37.6px at this scale, growing the drawn bar from 26 to
+            // 64; and 0px when the next switch\'s refresh merely confirmed the row, which
+            // is the reported "suddenly shorter".
+            //
+            // Sampled rather than read once, because the streak takes a few frames to
+            // open: the bar\'s length is the resting one plus the tracker\'s own
+            // separation, so "never longer than the resting length" is the claim.
+            var stretched = 0
+            for (var i = 0; i < 12; ++i) {
+                if (body._barLength > body.indicatorLength + 0.5)
+                    stretched += 1
+                wait(16)
+            }
+            compare(stretched, 0, "and the bar never stretched past its resting length "
+                + "while the refresh settled - it did on " + stretched + " of 12 samples, "
+                + "and is " + body._barLength.toFixed(1) + " against a resting "
+                + body.indicatorLength)
+
+            // Which is only half of it: the journey must still ARRIVE, on the row the
+            // refresh says is focused. A frame that has been stopped at 0.76 and then
+            // placed does look like this at the end, so the arrival is what tells the two
+            // apart - and the marker's clock reaching 1 on its own is the claim.
+            settleMarker()
+            settleSlide()
+            verify(!body._markerCrossing, "and the journey finished")
+            compare(body.crossingClock, 1,
+                "with the clock all the way round, not stopped at " + body.crossingClock)
+            compare(findByName(live(), "windowHintFocusFrame").y,
+                body.focusedRowTop,
+                "so the frame arrived on the card rather than being placed there")
+            compare(body._barLength, body.indicatorLength,
+                "and the indicator is at its resting length, " + body._barLength)
+        }
+
         function test_aRefreshWithNoMovementDoesNotCancelTheCrossing() {
             // The regression that made every retune of this traverse invisible.
             //

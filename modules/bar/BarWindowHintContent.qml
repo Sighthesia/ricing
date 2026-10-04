@@ -485,6 +485,36 @@ Item {
     // animation's `onFinished` otherwise - which is why a cancelled crossing has to
     // reach one of those rather than simply being abandoned.
     property bool _markerCrossing: false
+    // Does the snapshot now in hand belong to the journey that is under way? Both terms
+    // are load-bearing, and the second is the one that was missing.
+    //
+    // `_markerCrossing` says a journey is placing the frame, and it outlives the strip's
+    // own clock by `MotionTokens.page - MotionTokens.medium`, so a snapshot arriving in
+    // that window is part of the journey and must not commit over it.
+    //
+    // `plan.activePosition` says which workspace that journey is arriving at, and it is
+    // what makes the question answerable: a snapshot reporting no movement names the
+    // workspace the previous one named, so during a journey it is naming the destination
+    // - and a snapshot naming anything else is a different frame, which has to be
+    // committed whatever the marker's clock is still doing. See the note at the branch.
+    //
+    // A FUNCTION, and the reason is the whole of it. Written as a `readonly property`
+    // with `&&` it was a lazily evaluated binding, and QML tracks dependencies only for
+    // the operands a `&&` actually reached: every evaluation made while
+    // `_markerCrossing` was false returned without ever reading `plan` or `hint`, so the
+    // binding held no dependency on either, and the next thing to dirty it was
+    // `_markerCrossing` going true - at which point it compared the new plan against
+    // whatever `hint` had been when it was last genuinely read. Measured: a snapshot for
+    // workspace 1 arriving while a journey was arriving at 3 was answered "yes, it
+    // joins", out of a cached `3 === 3`. That is the same hazard the indicator's own
+    // tracker was rebuilt to avoid - a derived value read back before its inputs have
+    // been recomputed - and this is a function precisely because a function has no
+    // remembered value to read back.
+    function _joinsMarkerJourney() {
+        if (!root._markerCrossing || !root.plan)
+            return false
+        return root.plan.activePosition === root.hint.activeWorkspacePosition
+    }
     // The leg currently in progress, and how far through it. `InOutQuad` is at its
     // fastest exactly here, so the marker leaves through one edge at speed and re-enters
     // through the other at the same speed: one continuous sweep rather than two stops.
@@ -590,9 +620,63 @@ Item {
         // crossing and the crossing finishes on its own clock. With no crossing in
         // flight there is nothing to protect, and a title edit on the current
         // workspace commits straight away exactly as before.
+        //
+        // The test for "a crossing is in flight" is `_markerCrossing`, and it was
+        // `swapping` - which is the STRIP's clock, and that clock ends
+        // `MotionTokens.page - MotionTokens.medium` = 160ms (times `debugTimeScale`)
+        // BEFORE the marker's. So for the last 160ms of every switch the guard read
+        // false while the frame was still two thirds of the way down the panel, and a
+        // refresh landing in that window took `_commitHint()`.
+        //
+        // Measured, at scale 1 with a refresh 220ms into a switch: `_markerCrossing`
+        // dropped with `crossingClock` at 0.76, 0.78 and 0.82 across three runs - the
+        // journey stopped with the frame in mid-air and it teleported the rest of the
+        // way. At scale 6 with a refresh 1200ms in, the clock was at 0.71.
+        //
+        // The streak is the worse half, and it is why this was reported as the
+        // indicator rather than as the frame. `_commitHint` clears `_markerCrossing`,
+        // and that flag is the load-bearing term in BOTH of the tracker's Behaviors -
+        // so a commit in the dead window handed the head and the tail their animations
+        // back in the middle of a switch, and the refresh's own correction to the
+        // focused row then ran as a full genuine streak. Measured peak: 37.6px at
+        // scale 1 and 37.7px at scale 6, growing the drawn bar from `indicatorLength`
+        // (26) to 64 - on a switch, whose whole design is that the frame IS the
+        // motion and a stretch underneath it would be a second motion on one marker.
+        //
+        // And the length of that streak is not the switch's to decide: it is how far
+        // the refresh's focused row is from the row the switch had already put the bar
+        // on. So it is long when the refresh disagrees with the switch and it is
+        // nothing at all when the refresh merely confirms it - which is exactly the
+        // reported shape. Two switches at scale 6, each refreshed inside its own dead
+        // window: 37.7px of streak after the first, 0px after the second, the bar
+        // stretching to 83px and then to nothing.
+        //
+        // `_replaceArriving()` is the right destination in that window rather than a
+        // special case, because by then the strip has already landed: `slideRun`'s
+        // handler has released the held frame and put a REST plan in place, so
+        // `stripColumns(hint, null, rest)` - which is what `_replaceArriving` computes
+        // there - is the same three columns `_commitHint` would have built. The only
+        // thing the commit added was stopping the marker's clock, which is the fault.
+        //
+        // Joined to the journey by the workspace it is arriving at rather than by
+        // `_markerCrossing` alone, because that flag alone is not the same question. A
+        // marker's clock can still be winding down while the panel has been handed a
+        // DIFFERENT frame altogether - the panel re-shown with a fresh snapshot, or the
+        // next workspace in a run - and that frame has to be committed, because
+        // `_replaceArriving` re-seats only the columns and leaves `panelPosition` on the
+        // journey it was already showing. Measured: re-seating the panel on workspace 1
+        // while a crossing was still arriving at 2 left `positionFrom` and `positionTo`
+        // both at 2, so the panel went on drawing three columns centred two workspaces
+        // away from the frame it had just been given.
+        //
+        // The service cannot produce that case - a snapshot reporting no movement names
+        // the workspace the previous one named, because `previousActiveWorkspacePosition`
+        // is what makes it report movement at all - so this is about the flag meaning
+        // what it says rather than about a case the shell can reach.
         if (direction === 0) {
             root._lastFrame = root.hint
-            return root.swapping ? root._replaceArriving() : root._commitHint()
+            return root._joinsMarkerJourney() ? root._replaceArriving()
+                : root._commitHint()
         }
         const plan = HintLogic.stripPlan(
             root.hint.previousActiveWorkspacePosition,
