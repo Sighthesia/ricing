@@ -162,6 +162,17 @@ PanelWindow {
     signal actionRequested(string action)
     signal closeRequested()
 
+    // Stop the volume panel's process-backed route poll as the popup closes.
+    // Driven from here rather than from the body because a body cannot see the
+    // host hide the whole surface: its own `visible` stays true through a close,
+    // so a body-side visibility handler would leave pactl polling forever.
+    onCloseRequested: {
+        if (popupActions && popupActions.stopRoutePolling)
+            popupActions.stopRoutePolling()
+        if (popupActionsOutgoing && popupActionsOutgoing.stopRoutePolling)
+            popupActionsOutgoing.stopRoutePolling()
+    }
+
     // Identity travels its own height; content starts further away, matching
     // the settings panel's shorter-rail / longer-content stagger. A body-only
     // intent has no rail to stagger, so its travel collapses to the same

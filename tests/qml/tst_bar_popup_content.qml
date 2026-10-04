@@ -14,6 +14,13 @@ Item {
     Component { id: sliderComp; Bar.BarPopupSlider {} }
     Component { id: actionsComp; Bar.BarPopupActions {} }
 
+    // Recorder slots the injected fake services write into, so an assertion can
+    // see which object the panel actually handed over.
+    property var _movedStream: null
+    property var _movedSink: null
+    property var _pickedSink: null
+    property var _pickedSource: null
+
     // Recursive search across children/data.
     function findByName(item, name) {
         if (!item)
@@ -657,7 +664,298 @@ Item {
             // Calling handler with null payload must not throw and must not require real Pipewire.
             slider.valueCommitted(0.9)
             slider.toggleRequested()
+            // The mixer seams must be inert with no service at all, rather than
+            // throwing on a null payload.
+            item.setStreamVolume(null, 0.5)
+            item.toggleStreamMute(null)
+            item.moveStreamToSink(null, null)
+            item.handleAudioSink(null)
+            item.handleAudioSource(null)
             verify(true, "no throw with null payload")
+        }
+
+        // --- Device pickers and application mixer ---
+
+        // Fakes must be QObjects: a plain JS record is copied on assignment, so
+        // identity comparisons inside the components would see a fresh object
+        // every time and every assertion about persistence would fail for a
+        // reason that is not the bug.
+        function fakeDevice(id, name, description, volume, muted, suffix) {
+            return Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property int id: ' + id + ';'
+                + ' property string name: "' + name + '";'
+                + ' property string description: "' + description + '";'
+                + ' property QtObject audio: QtObject { property real volume: ' + volume
+                + '; property bool muted: ' + (muted ? "true" : "false") + ' } }',
+                root, "fakeDevice" + (suffix || id))
+        }
+
+        function fakeStream(id, appName, mediaName, volume, muted, suffix) {
+            return Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property int id: ' + id + ';'
+                + ' property string name: "' + appName + '";'
+                + ' property var properties: ({ "application.name": "' + appName + '",'
+                + ' "media.name": "' + mediaName + '", "media.class": "Stream/Output/Audio" });'
+                + ' property QtObject audio: QtObject { property real volume: ' + volume
+                + '; property bool muted: ' + (muted ? "true" : "false") + ' } }',
+                root, "fakeStream" + (suffix || id))
+        }
+
+        function test_volumePanelExposesBothDeviceListsAndTheMixer() {
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' property var defaultSinkNode: null; property var defaultSourceNode: null;'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted } }',
+                root, "fakeVolDevices")
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume",
+                payload: { volumeService: fake, volume: 0.5, muted: false }
+            })
+            verify(findByName(item, "outputDeviceList") !== null, "output device list exists")
+            verify(findByName(item, "inputDeviceList") !== null, "input device list exists")
+            verify(findByName(item, "audioMixer") !== null, "mixer exists")
+            // Master slider survives the restructure.
+            verify(findByName(item, "volumeSlider") !== null, "master slider still exists")
+            // Empty service means empty lists, not a crash and not a stale copy.
+            compare(item.audioSinks.length, 0)
+            compare(item.audioSources.length, 0)
+            compare(item.audioStreams.length, 0)
+        }
+
+        function test_deviceRowsRenderAndSelectTheCurrentDevice() {
+            var speaker = fakeDevice(56, "alsa_output.speaker_sink", "Laptop Speakers", 0.4, false, "spk")
+            var headset = fakeDevice(73, "bluez_output.94", "TimeEar BTE-9", 0.26, false, "hs")
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: [];'
+                + ' property var streams: [];'
+                + ' property var defaultSinkNode: null;'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted } }',
+                root, "fakeVolSinkList")
+            fake.sinks = [speaker, headset]
+            fake.defaultSinkNode = headset
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            var list = findByName(item, "outputDeviceList")
+            compare(list.devices.length, 2)
+            compare(list.currentDevice, headset)
+            var first = findByName(item, "audioDeviceRow0")
+            var second = findByName(item, "audioDeviceRow1")
+            verify(first !== null && second !== null, "both device rows render")
+            // The description is the label, so the mixer chip and this list name
+            // a device identically.
+            compare(findByName(first, "audioDeviceName").text, "Laptop Speakers")
+            compare(findByName(second, "audioDeviceName").text, "TimeEar BTE-9")
+            // Selection is a left band + a brightness step, not an accent fill.
+            compare(findByName(first, "audioDeviceSelectedBar").opacity, 0)
+            compare(findByName(second, "audioDeviceSelectedBar").opacity, 1)
+            compare(findByName(first, "audioDeviceLevel").text, "40%")
+        }
+
+        function test_mutedDeviceShowsTheWordNotALevel() {
+            var mutedSink = fakeDevice(56, "alsa.sink", "Laptop Speakers", 0.4, true, "muted")
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0; property bool sinkMuted: true;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted } }',
+                root, "fakeVolMuted")
+            fake.sinks = [mutedSink]
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            compare(findByName(item, "audioDeviceList").count, 1)
+            compare(findByName(item, "audioDeviceLevel").text, "Muted")
+        }
+
+        function test_mixerRowRendersAppMediaLevelAndRoute() {
+            var stream = fakeStream(112, "Firefox", "Tune", 0.5, false, "ff")
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted }'
+                + ' function streamAppName(s){ return s && s.properties ? s.properties["application.name"] : "" }'
+                + ' function streamMediaName(s){ return s && s.properties ? s.properties["media.name"] : "" }'
+                + ' function streamLevel(s){ return s && s.audio ? s.audio.volume : 0 }'
+                + ' function streamMuted(s){ return !s || !s.audio ? true : s.audio.muted }'
+                + ' function streamRouteLabel(s){ return "TimeEar BTE-9" }'
+                + ' function setStreamVolume(s,v){ s.audio.volume = v }'
+                + ' function toggleStreamMute(s){ s.audio.muted = !s.audio.muted } }',
+                root, "fakeVolMixer")
+            fake.streams = [stream]
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            verify(findByName(item, "mixerRow0") !== null, "mixer row renders")
+            compare(findByName(item, "mixerAppName").text, "Firefox")
+            compare(findByName(item, "mixerMediaName").text, "Tune")
+            compare(findByName(item, "mixerLevelText").text, "50%")
+            compare(findByName(item, "mixerRouteLabel").text, "TimeEar BTE-9")
+            compare(findByName(item, "mixerSlider0").value, 50)
+        }
+
+        function test_mixerRowDrivesTheServiceForLevelAndMute() {
+            var stream = fakeStream(112, "Firefox", "Tune", 0.5, false, "drive")
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted }'
+                + ' function streamAppName(s){ return s && s.properties ? s.properties["application.name"] : "" }'
+                + ' function streamMediaName(s){ return s && s.properties ? s.properties["media.name"] : "" }'
+                + ' function streamLevel(s){ return s && s.audio ? s.audio.volume : 0 }'
+                + ' function streamMuted(s){ return !s || !s.audio ? true : s.audio.muted }'
+                + ' function streamRouteLabel(s){ return "TimeEar BTE-9" }'
+                + ' function setStreamVolume(s,v){ s.audio.volume = v }'
+                + ' function toggleStreamMute(s){ s.audio.muted = !s.audio.muted } }',
+                root, "fakeVolMixerDrive")
+            fake.streams = [stream]
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            findByName(item, "mixerSlider0").valueModified(30)
+            compare(stream.audio.volume, 0.3)
+            findByName(item, "mixerMuteButton").toggleMute()
+            verify(stream.audio.muted, "mute reaches the service")
+        }
+
+        function test_routeChipStaysDisabledUntilTheRouteIsRead() {
+            // An unread route must read as unavailable, not as the default
+            // device - naming a device the panel cannot vouch for is the failure
+            // this guards.
+            var stream = fakeStream(112, "Firefox", "Tune", 0.5, false, "unread")
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted }'
+                + ' function streamAppName(s){ return s && s.properties ? s.properties["application.name"] : "" }'
+                + ' function streamMediaName(s){ return s && s.properties ? s.properties["media.name"] : "" }'
+                + ' function streamLevel(s){ return s && s.audio ? s.audio.volume : 0 }'
+                + ' function streamMuted(s){ return !s || !s.audio ? true : s.audio.muted }'
+                + ' function streamRouteLabel(s){ return "" } }',
+                root, "fakeVolUnread")
+            fake.streams = [stream]
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            var chip = findByName(item, "mixerRouteChip")
+            verify(!chip.enabled, "chip disabled while the route is unknown")
+            compare(findByName(item, "mixerRouteLabel").text, "Reading…")
+            var mixer = findByName(item, "audioMixer")
+            compare(mixer.routeMode, false)
+        }
+
+        function test_routePickerListsSinksAndReportsTheMove() {
+            var stream = fakeStream(112, "Firefox", "Tune", 0.5, false, "pick")
+            var alsa = fakeDevice(56, "alsa_output.speaker_sink", "Laptop Speakers", 0.4, false, "pickSpk")
+            var bluez = fakeDevice(73, "bluez_output.94", "TimeEar BTE-9", 0.26, false, "pickHs")
+            var moved = []
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' property var defaultSinkNode: null;'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted }'
+                + ' function streamAppName(s){ return s && s.properties ? s.properties["application.name"] : "" }'
+                + ' function streamMediaName(s){ return s && s.properties ? s.properties["media.name"] : "" }'
+                + ' function streamLevel(s){ return s && s.audio ? s.audio.volume : 0 }'
+                + ' function streamMuted(s){ return !s || !s.audio ? true : s.audio.muted }'
+                + ' function streamRouteLabel(s){ return "TimeEar BTE-9" }'
+                + ' function moveStreamToSink(s, d){ root._movedStream = s; root._movedSink = d } }',
+                root, "fakeVolPick")
+            fake.streams = [stream]
+            fake.sinks = [alsa, bluez]
+            fake.defaultSinkNode = bluez
+            root._movedStream = null
+            root._movedSink = null
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            var mixer = findByName(item, "audioMixer")
+            verify(!mixer.routeMode, "starts in mixer mode")
+
+            mixer.openRoutePicker(stream)
+            verify(mixer.routeMode, "route chip opens the picker")
+            compare(findByName(item, "mixerHeaderTitle").text, "Output for Firefox")
+            compare(findByName(item, "mixerList").count, 2)
+
+            findByName(item, "mixerSinkRow0").choose()
+            compare(root._movedSink, alsa, "picking a sink asks the service to move the stream")
+            compare(root._movedStream, stream)
+            // Returning to the mixer either way: a refused move must not strand
+            // the user in a list that did nothing.
+            verify(!mixer.routeMode, "picker closes after a choice")
+        }
+
+        function test_routePickerAlsoClosesFromItsHeader() {
+            var stream = fakeStream(112, "Firefox", "Tune", 0.5, false, "back")
+            var bluez = fakeDevice(73, "bluez_output.94", "TimeEar BTE-9", 0.26, false, "backHs")
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted }'
+                + ' function streamAppName(s){ return s && s.properties ? s.properties["application.name"] : "" }'
+                + ' function streamMediaName(s){ return s && s.properties ? s.properties["media.name"] : "" }'
+                + ' function streamLevel(s){ return s && s.audio ? s.audio.volume : 0 }'
+                + ' function streamMuted(s){ return !s || !s.audio ? true : s.audio.muted }'
+                + ' function streamRouteLabel(s){ return "TimeEar BTE-9" } }',
+                root, "fakeVolBack")
+            fake.streams = [stream]
+            fake.sinks = [bluez]
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            var mixer = findByName(item, "audioMixer")
+            mixer.openRoutePicker(stream)
+            verify(mixer.routeMode)
+            findByName(item, "mixerHeader").goBack()
+            verify(!mixer.routeMode, "header is the way back out of the picker")
+        }
+
+        function test_deviceActivationGoesThroughTheServiceSeam() {
+            var alsa = fakeDevice(56, "alsa_output.speaker_sink", "Laptop Speakers", 0.4, false, "actSpk")
+            var pickedSink = null
+            var pickedSource = null
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted }'
+                + ' function setAudioSink(d){ root._pickedSink = d }'
+                + ' function setAudioSource(d){ root._pickedSource = d } }',
+                root, "fakeVolActivate")
+            fake.sinks = [alsa]
+            root._pickedSink = null
+            root._pickedSource = null
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            item.handleAudioSink(alsa)
+            compare(root._pickedSink, alsa)
+            item.handleAudioSource(alsa)
+            compare(root._pickedSource, alsa)
+        }
+
+        function test_routePollingFollowsTheOpenKindAndStops() {
+            // pactl is only worth spawning while the mixer is on screen, and the
+            // singleton outlives every popup - so the panel owns the poll's life.
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' property bool polling: false;'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted }'
+                + ' function setRoutePolling(on){ polling = on } }',
+                root, "fakeVolPoll")
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            verify(fake.polling, "opening the volume kind starts the route poll")
+            item.actionKind = "network"
+            verify(!fake.polling, "leaving the volume kind stops it")
+            item.actionKind = "volume"
+            verify(fake.polling, "returning restarts it")
+            // The host calls this on close, where the body's own `visible` never
+            // changes - without it pactl would poll for the life of the shell.
+            item.visible = false
+            verify(!fake.polling, "hiding the body stops it too")
         }
 
         // Dummy for tryCompare helper.

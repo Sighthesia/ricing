@@ -17,9 +17,55 @@ Item {
     // network body asks the service for a fresh read of the radio. The popup
     // is constructed already bound to its kind, which fires no change signal,
     // so the first read is requested from onCompleted too.
-    onActionKindChanged: if (root.actionKind === "network") root.refreshWifi()
-    onPayloadChanged: if (root.actionKind === "network") root.refreshWifi()
-    Component.onCompleted: if (root.actionKind === "network") root.refreshWifi()
+    //
+    // The mixer is the only kind whose content depends on a process-backed
+    // read, and that read is worthless the moment the panel closes, so opening
+    // the kind starts one read plus a bounded poll and closing it stops both.
+    // QML allows one handler per property, so both kinds share these.
+    onActionKindChanged: {
+        if (root.actionKind === "network")
+            root.refreshWifi()
+        root.syncRoutePolling()
+    }
+    onPayloadChanged: {
+        if (root.actionKind === "network")
+            root.refreshWifi()
+        root.syncRoutePolling()
+    }
+    onVisibleChanged: root.syncRoutePolling()
+    Component.onCompleted: {
+        if (root.actionKind === "network")
+            root.refreshWifi()
+        root.syncRoutePolling()
+    }
+
+    // The service this body started polling on, kept so the stop always reaches
+    // the same instance even if the payload is swapped mid-flight.
+    property var lastPolledVolumeService: null
+
+    function syncRoutePolling() {
+        var shouldPoll = visible && root.actionKind === "volume" && !!root.volumeService
+        if (shouldPoll) {
+            root.stopRoutePolling()
+            if (typeof root.volumeService.setRoutePolling === "function") {
+                root.volumeService.setRoutePolling(true)
+                root.lastPolledVolumeService = root.volumeService
+            }
+            return
+        }
+        root.stopRoutePolling()
+    }
+
+    // Public because a body cannot observe the host hiding the whole surface:
+    // its own `visible` stays true while the popup closes, so a body-side
+    // visibility handler alone would leave pactl polling for the life of the
+    // shell. The host calls this on close.
+    function stopRoutePolling() {
+        if (root.lastPolledVolumeService
+                && typeof root.lastPolledVolumeService.setRoutePolling === "function")
+            root.lastPolledVolumeService.setRoutePolling(false)
+        root.lastPolledVolumeService = null
+    }
 
     // The window hint's width is the body's own, because the body is what knows
     // how many columns there are: a workspace with no windows takes no slot, so
@@ -35,11 +81,15 @@ Item {
     // surface and clipped. The body must never be told to stretch to fill: it
     // sizes itself from its columns, and a stretched body would just move the
     // clipping to whichever column happened to be narrowest.
+    // Volume is wider than the default card because an application mixer row has
+    // to hold an app name, a media name, a slider, a percentage and a route chip
+    // on one line each - at 260 the names elide to nothing.
     implicitWidth: root.actionKind === "media" ? 420
-        : (root.actionKind === "window-hint"
-            ? (windowHintBody.implicitWidth > 0
-                ? windowHintBody.implicitWidth + root.contentInset * 2 : 260)
-            : 260)
+        : (root.actionKind === "volume" ? 360
+            : (root.actionKind === "window-hint"
+                ? (windowHintBody.implicitWidth > 0
+                    ? windowHintBody.implicitWidth + root.contentInset * 2 : 260)
+                : 260))
     implicitHeight: root.actionKind === "context" ? 0 : contentColumn.implicitHeight + 16
     width: implicitWidth
     height: implicitHeight
@@ -70,6 +120,97 @@ Item {
         if (payload && payload.muted !== undefined)
             return !!payload.muted
         return false
+    }
+
+    // Device lists and mixer state read live off the injected service, with no
+    // snapshot fallback: an empty list means "none right now", and inventing one
+    // from the payload would show a device that is not there. Fakes in the test
+    // suite simply omit these and the sections render their empty states.
+    readonly property var audioSinks: root.volumeService && root.volumeService.sinks !== undefined
+        ? (root.volumeService.sinks || []) : []
+    readonly property var audioSources: root.volumeService && root.volumeService.sources !== undefined
+        ? (root.volumeService.sources || []) : []
+    readonly property var audioStreams: root.volumeService && root.volumeService.streams !== undefined
+        ? (root.volumeService.streams || []) : []
+    readonly property var defaultAudioSinkNode: root.volumeService
+        && root.volumeService.defaultSinkNode !== undefined ? root.volumeService.defaultSinkNode : null
+    readonly property var defaultAudioSourceNode: root.volumeService
+        && root.volumeService.defaultSourceNode !== undefined ? root.volumeService.defaultSourceNode : null
+
+    // Published for the host and the harnesses, matching the `readonly property
+    // Item` convention the settings rows use: an id is not reachable from
+    // outside the component that declares it.
+    readonly property Item volumeContentItem: volumeContent
+    readonly property Item volumeScrollItem: volumeScroll
+    readonly property real volumeViewportCap: volumeContent.viewportCap
+
+    // Thin pass-throughs so the mixer component stays free of service imports.
+    function streamAppName(stream) {
+        if (root.volumeService && typeof root.volumeService.streamAppName === "function")
+            return root.volumeService.streamAppName(stream)
+        return ""
+    }
+    function streamMediaName(stream) {
+        if (root.volumeService && typeof root.volumeService.streamMediaName === "function")
+            return root.volumeService.streamMediaName(stream)
+        return ""
+    }
+    function streamLevel(stream) {
+        if (root.volumeService && typeof root.volumeService.streamLevel === "function")
+            return root.volumeService.streamLevel(stream)
+        return 0
+    }
+    function streamMuted(stream) {
+        if (root.volumeService && typeof root.volumeService.streamMuted === "function")
+            return root.volumeService.streamMuted(stream)
+        return true
+    }
+    function streamRouteLabel(stream) {
+        if (root.volumeService && typeof root.volumeService.streamRouteLabel === "function")
+            return root.volumeService.streamRouteLabel(stream)
+        return ""
+    }
+    function setStreamVolume(stream, value) {
+        if (payload && typeof payload.onStreamVolume === "function") {
+            payload.onStreamVolume(stream, value)
+            return
+        }
+        if (root.volumeService && typeof root.volumeService.setStreamVolume === "function")
+            root.volumeService.setStreamVolume(stream, value)
+    }
+    function toggleStreamMute(stream) {
+        if (payload && typeof payload.onStreamMute === "function") {
+            payload.onStreamMute(stream)
+            return
+        }
+        if (root.volumeService && typeof root.volumeService.toggleStreamMute === "function")
+            root.volumeService.toggleStreamMute(stream)
+    }
+    function moveStreamToSink(stream, sink) {
+        if (payload && typeof payload.onStreamRoute === "function") {
+            payload.onStreamRoute(stream, sink)
+            return
+        }
+        if (root.volumeService && typeof root.volumeService.moveStreamToSink === "function")
+            root.volumeService.moveStreamToSink(stream, sink)
+    }
+    function handleAudioSink(device) {
+        if (!device) return
+        if (payload && typeof payload.onAudioSink === "function") {
+            payload.onAudioSink(device)
+            return
+        }
+        if (root.volumeService && typeof root.volumeService.setAudioSink === "function")
+            root.volumeService.setAudioSink(device)
+    }
+    function handleAudioSource(device) {
+        if (!device) return
+        if (payload && typeof payload.onAudioSource === "function") {
+            payload.onAudioSource(device)
+            return
+        }
+        if (root.volumeService && typeof root.volumeService.setAudioSource === "function")
+            root.volumeService.setAudioSource(device)
     }
     readonly property real brightnessValue: {
         if (root.brightnessService && root.brightnessService.brightness !== undefined)
@@ -942,24 +1083,105 @@ Item {
         spacing: 8
         visible: true
 
-        // Volume content uses the settings slider and mute rows directly.
+        // Volume content: the master slider and mute, then the two device
+        // lists, then the per-application mixer. One bounded scroll body holds
+        // all three because the panel's height is the layer-shell surface
+        // height - free-growing sections would resize the committed surface on
+        // every hotplug and every stream appearing.
         Item {
             id: volumeContent
             objectName: "volumeContent"
             width: parent.width
-            height: volumeSlider.height
+            height: volumeScroll.height
             visible: root.actionKind === "volume"
+            // A section can grow while the panel is open (a device appears, an
+            // app starts playing). The height follows one bounded number, so
+            // the host sees a single geometry change per step rather than a
+            // cascade of per-section ones.
+            readonly property real viewportCap: 460
 
-            BarPopupSlider {
-                id: volumeSlider
-                objectName: "volumeSlider"
+            // Bounded scroll body. `interactive` only when it actually
+            // overflows, so a short panel leaves the wheel to the bar widget's
+            // own volume step instead of trapping it on a dead list.
+            Flickable {
+                id: volumeScroll
+                objectName: "volumeScroll"
                 width: parent.width
-                value: root.volumeValue
-                muted: root.volumeMuted
-                label: "Volume"
-                showMute: true
-                onValueCommitted: function(v) { root.handleVolumeValue(v) }
-                onToggleRequested: root.handleToggleMute()
+                height: Math.min(contentHeight, volumeContent.viewportCap)
+                contentWidth: width
+                contentHeight: volumeColumn.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                interactive: contentHeight > height
+                flickDeceleration: 4000
+                maximumFlickVelocity: 200
+
+                Column {
+                    id: volumeColumn
+                    objectName: "volumeColumn"
+                    width: volumeScroll.width
+                    spacing: 10
+
+                    // Master volume and mute, unchanged from the single-control
+                    // panel: the slider card stays the first thing under the
+                    // header, because every other row here is subordinate to it.
+                    BarPopupSlider {
+                        id: volumeSlider
+                        objectName: "volumeSlider"
+                        width: parent.width
+                        value: root.volumeValue
+                        muted: root.volumeMuted
+                        label: "Volume"
+                        showMute: true
+                        onValueCommitted: function(v) { root.handleVolumeValue(v) }
+                        onToggleRequested: root.handleToggleMute()
+                    }
+
+                    // Output devices. Tapping a row makes it the default sink.
+                    BarAudioDeviceList {
+                        id: outputDeviceList
+                        objectName: "outputDeviceList"
+                        width: parent.width
+                        sectionTitle: "Output"
+                        sectionIcon: Qt.resolvedUrl("icons/volume.svg")
+                        devices: root.audioSinks
+                        currentDevice: root.defaultAudioSinkNode
+                        emptyText: "No output devices"
+                        onDeviceActivated: function (device) { root.handleAudioSink(device) }
+                    }
+
+                    // Input devices, same component so the two pickers cannot
+                    // drift apart in row metrics or selection treatment.
+                    BarAudioDeviceList {
+                        id: inputDeviceList
+                        objectName: "inputDeviceList"
+                        width: parent.width
+                        sectionTitle: "Input"
+                        sectionIcon: Qt.resolvedUrl("icons/mic.svg")
+                        devices: root.audioSources
+                        currentDevice: root.defaultAudioSourceNode
+                        emptyText: "No input devices"
+                        onDeviceActivated: function (device) { root.handleAudioSource(device) }
+                    }
+
+                    // Per-application mixer: level, mute and output route.
+                    BarAudioMixer {
+                        id: audioMixer
+                        objectName: "audioMixer"
+                        width: parent.width
+                        streams: root.audioStreams
+                        sinks: root.audioSinks
+                        defaultSink: root.defaultAudioSinkNode
+                        appNameOf: function (stream) { return root.streamAppName(stream) }
+                        mediaNameOf: function (stream) { return root.streamMediaName(stream) }
+                        levelOf: function (stream) { return root.streamLevel(stream) }
+                        mutedOf: function (stream) { return root.streamMuted(stream) }
+                        routeLabelOf: function (stream) { return root.streamRouteLabel(stream) }
+                        streamVolumeSink: function (stream, value) { root.setStreamVolume(stream, value) }
+                        streamMuteSink: function (stream) { root.toggleStreamMute(stream) }
+                        routeMoveSink: function (stream, sink) { root.moveStreamToSink(stream, sink) }
+                    }
+                }
             }
         }
 

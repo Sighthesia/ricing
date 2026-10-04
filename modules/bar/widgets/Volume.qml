@@ -26,6 +26,13 @@ BarPill {
     implicitWidth: LazerTheme.barWidgetHeight
     implicitHeight: LazerTheme.barWidgetHeight
 
+    // Which device the bar is playing through. The popup can switch it, so the
+    // bar has to be able to say which one is current - otherwise the picker is
+    // only reachable by opening a panel that does not tell you what it changes.
+    readonly property string deviceLabel: Services.VolumeService.defaultSinkNode
+        ? Services.VolumeService.deviceLabel(Services.VolumeService.defaultSinkNode)
+        : ""
+
     // Build hover intent payload for the two-layer popup.
     function buildHoverIntent() {
         var centerX = 0
@@ -33,7 +40,11 @@ BarPill {
             try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
         }
         if (!isFinite(centerX)) centerX = 0
-        var summaryText = root.muted ? "Muted \u00B7 " + Math.round(root.level * 100) + "%" : Math.round(root.level * 100) + "%"
+        var percentText = Math.round(root.level * 100) + "%"
+        var levelText = root.muted ? "Muted \u00B7 " + percentText : percentText
+        // Device first when it is known: that is the fact the popup is about to
+        // let the user change, and the percentage is already on the bar itself.
+        var summaryText = root.deviceLabel !== "" ? root.deviceLabel + " \u00B7 " + levelText : levelText
         return {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,
