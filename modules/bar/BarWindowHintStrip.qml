@@ -89,10 +89,11 @@ Item {
     // however many windows the workspace holds.
     property int viewportRows: HintLogic.MAX_WINDOW_ROWS
 
-    // Whether the body's focus marker is mid-journey. The row's focus tint follows the
-    // MARKER rather than the data, so this is what switches the tint off for the whole
-    // of a journey and back on when the marker lands - see the row's `color`.
-    property bool markerCrossing: false
+    // Whether the body's frame is actually ON this column's focused row right now, which
+    // is what the row's focus tint follows - see the row's `color`. The frame's own
+    // animated position, not a state flag, so it is true on the frame the frame is there
+    // and false on every frame it is not.
+    property bool markerOnFocusedRow: true
     // ...and whether the tint has just landed WITH the marker, in which case it must not
     // also animate. One shot: set by the journey's last frame, cleared by the next focus
     // change. Two flags rather than one because they answer different questions - "is the
@@ -326,7 +327,7 @@ Item {
                     // card lights up on the frame the marker lands on it - which is what
                     // "the region the frame encloses changes" has to mean.
                     color: windowRow.index === root.focusedRowIndex
-                        && !root.markerCrossing
+                        && root.markerOnFocusedRow
                         ? LazerTheme.settingsSelected
                         : (rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard)
                     // A Rectangle borders itself by default; this row's own tint is its
@@ -340,24 +341,29 @@ Item {
                     readonly property alias rowFlashAnimation: rowFlash
                     readonly property alias rowFlashOverlay: rowFlashOverlay
 
-                    // Off for the whole of a crossing. Measured, not reasoned: niri's
-                    // second snapshot about 40ms into a switch is often the first that
-                    // carries the new workspace's windows, so the tint arrives then - and
-                    // the arriving frame's rows REPLACE the leaving frame's, which means
-                    // the delegate that becomes the focused row is a RECYCLED one still
-                    // holding its previous colour. With a Behaviour, that recycled delegate
-                    // animates from where it was to the tint, and the card's background
-                    // visibly flushed through an unrelated colour on the way: measured on
-                    // a switch into a workspace whose focus was on row 4, a ~300ms ramp
-                    // from the tint through `#fb2320` to the new tint, while the marker
-                    // was still out of sight above the panel.
+                    // Off whenever the frame is not on this row, which covers both of
+                    // the cases where the tint would otherwise be a second motion
+                    // somewhere it does not belong.
                     //
-                    // Instant is right here rather than merely acceptable: the content is
-                    // already travelling, so a background fade is motion that is not part
-                    // of the gesture, and it lands on the card the marker is about to
-                    // arrive on. At rest - a focus change inside one workspace, with no
-                    // journey under way - the crossfade stays, because there the tint
-                    // arriving IS the event and a short fade reads as intent.
+                    // One of them is measured, not reasoned: niri's second snapshot about
+                    // 40ms into a switch is often the first that carries the new
+                    // workspace's windows, so the tint arrives then - and the arriving
+                    // frame's rows REPLACE the leaving frame's, which means the delegate
+                    // that becomes the focused row is a RECYCLED one still holding its
+                    // previous colour. With a Behaviour, that recycled delegate animates
+                    // from where it was to the tint and the card's background visibly
+                    // flushed through an unrelated colour on the way: a ~300ms ramp from
+                    // the tint through `#fb2320` to the new tint, while the frame was
+                    // still out of sight above the panel.
+                    //
+                    // The other is the focus glide: a window change inside one workspace
+                    // moves the frame over `settingsSidebarCollapse`, and for those 300ms
+                    // it is between two rows - neither of which should be lit, because the
+                    // frame is on neither.
+                    //
+                    // At rest the crossfade stays, because there the frame has arrived
+                    // and the tint arriving alongside it reads as intent rather than as a
+                    // glitch.
                     Behavior on color {
                         enabled: !root.markerCrossing && !root.tintInstant
                         ColorAnimation { duration: MotionTokens.fast * debugTimeScale }

@@ -192,14 +192,6 @@ Item {
     property real positionTo: 0
     readonly property real panelPosition: positionFrom
         + (positionTo - positionFrom) * slideProgress
-    // How far the strip dims at the middle of the crossing, 0 at either end.
-    //
-    // A translation has no weight of its own: nothing about the content changes, so
-    // the panel slides rather than moves. A small dip gives it some, and it is safe
-    // here precisely because there is only one copy to dim - with two, they would
-    // have to dim together or the seam would show one through the other. Shallow on
-    // purpose: enough to register, far too little to read as a fade.
-    readonly property real slideDip: Math.sin(Math.PI * slideProgress) * 0.12
     // The crossing runs on the WORKSPACE WIDGET'S ACTIVE-HIGHLIGHT CURVE: one ease,
     // `Easing.OutQuad` over `medium`. That is the recipe `Workspaces.qml`'s
     // `activeHighlight` slides on, and it is the right reference twice over - this
@@ -538,6 +530,26 @@ Item {
     // travels with, on both legs. One formula, one offset, two elements that cannot
     // drift apart.
     readonly property real markerOffset: rowHeight / 2 - indicatorLength / 2
+    // Is the frame resting ON the focused row, as opposed to travelling or parked
+    // somewhere else? The row's tint is gated on this rather than on `hasTarget` alone,
+    // because during the departure leg the frame is on the card being LEFT - a different
+    // row, in a different column - while `focusedRowIndex` has already moved to the
+    // arriving frame. Without this the tint would light the arriving card while the
+    // frame is still visibly on its way out of the old one.
+    // Is the frame ON the focused row - actually on it, not merely heading for it?
+    //
+    // Read off the frame's own animated `y` rather than off a state flag, because a flag
+    // cannot see the one case that matters most: after a focus change with no workspace
+    // switch under it, the frame GLIDES to the new row over `settingsSidebarCollapse` and
+    // a flag says nothing for those 300ms. A flag would let the tint move at once, which
+    // is the same complaint as the journey's version of it - the card changing before the
+    // frame has got there - only 300ms shorter and far more often, since switching
+    // windows inside one workspace is the common interaction.
+    //
+    // The frame's own position is the truth, so this is the truth. Every case is covered
+    // by construction rather than by enumeration: travelling (its `y` is nowhere near the
+    // row), parked on a different row, between two rows mid-glide, and settled.
+    readonly property bool markerOnFocusedRow: !_markerCrossing
     // --- the slide -------------------------------------------------------
     // A workspace switch replaces every row, so without this the panel's contents
     // are simply gone and remade between two frames. Here the leaving frame is
@@ -1025,11 +1037,21 @@ Item {
         // The active column's own clip is its business; the strip's height is the
         // viewport the body sized the panel from, which the columns are then measured
         // against.
-        // One object dimming, so one dim. With two copies crossing this had to be
-        // applied to both in lockstep or the seam would show one through the other;
-        // with one strip there is no seam, and the value is a pure function of the
-        // clock - the same progress always gives the same opacity.
-        opacity: 1 - root.slideDip
+        // NO DIP, and its absence is the point.
+        //
+        // The strip used to fade to 88% at the dead middle of a crossing -
+        // `sin(PI * slideProgress) * 0.12` - because a translation has no weight of its
+        // own and something had to give the traverse some. What it gave was a change to
+        // the WHOLE BACKGROUND, peaking exactly halfway through the switch, across all
+        // three columns and every card in them: the largest visual event in the crossing,
+        // and it belonged to nothing. The one thing that should be changing is the card
+        // the focus marker is on, and a surface-wide fade arriving alongside it is a
+        // second event competing with it - which is what made the arrival read as "the
+        // block changed" rather than as "the focus arrived".
+        //
+        // The weight it was there to supply is supplied properly now: the marker travels
+        // the whole height of the panel, from outside one edge onto a card. Nothing else
+        // needs to move for the switch to have a body.
         columns: root.columns
         // Read off the plan the strip was built from, so the column that carries
         // the card fill and the one the focus markers are placed against are the
@@ -1047,7 +1069,7 @@ Item {
         // One viewport, declared once: the body sizes the panel from it and the strip
         // clips the column to it, so the two cannot be different numbers.
         viewportRows: root.viewportRows
-        markerCrossing: root._markerCrossing
+        markerOnFocusedRow: root.markerOnFocusedRow
         debugTimeScale: root.debugTimeScale
         tintInstant: root._tintInstant
         cellPaddingX: root.cellPaddingX

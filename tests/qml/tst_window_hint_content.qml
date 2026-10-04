@@ -1947,7 +1947,7 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                     + "row keeps its fade where it belongs - was " + resting[6].color)
             wait(Lazer.MotionTokens.fast + 60)
             compare(String(resting[6].color), String(Lazer.LazerTheme.settingsSelected),
-                "and settles on the tint")
+                "and settles on the tint once the frame has got there")
         }
 
         function test_theFramedCardIsTheOnlyHighlightInThePanel() {
@@ -3012,36 +3012,41 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // The span must not change the clock: a three-column jump covers the same
             // 160ms and arrives three times as fast, which is what a fixed settle
             // rhythm means.
-            compare(body.slideDuration, Lazer.MotionTokens.medium,
+            compare(body.slideDuration, Lazer.MotionTokens.medium * body.debugTimeScale,
                 "and the clock is the same whatever the span")
-            verify(body.hasOwnProperty("slideDip"), "and it still dims a little in the middle")
         }
 
-        function test_theStripDipsOnceInTheMiddleAndNoFurther() {
-            // The softening dim, on the one object that moves. It is shallow on
-            // purpose: enough to register as weight, far too little to read as a
-            // fade. And it is a property of the progress alone, so the same progress
-            // always gives the same value - a dip that varied along the travel would
-            // make some parts of the panel dimmer than others for no visible reason.
-            compare(strip().opacity, 1, "undimmed at rest")
-            body.hint = root.makeHint({
-                activeWorkspacePosition: 3,
-                previousActiveWorkspacePosition: 2,
-                windows: [{ windowId: "20", title: "term", appId: "kitty", icon: "", isFocused: true }]
-            })
-            // Sampled at the middle, where the dip is deepest. `duration / 2` is
-            // only approximate, so this reads the value rather than assuming the
-            // sample landed exactly on the peak.
-            wait(Math.round(body.slideDuration / 2))
-            verify(strip().opacity < 1, "it has dipped, was " + strip().opacity)
-            verify(strip().opacity > 0.8, "but only slightly, was " + strip().opacity)
-            verify(strip().opacity > 0, "and never to nothing")
-            // The same progress must give the same value, so the dim is a function of
-            // the clock and not a per-frame decision.
-            compare(strip().opacity, 1 - body.slideDip,
-                "and it is the clock's own value, not a sampled one")
+        function test_theStripDoesNotDipInTheMiddleOfACrossing() {
+            // It used to: `opacity: 1 - sin(PI * slideProgress) * 0.12` on the whole
+            // strip, peaking exactly halfway through the switch, across all three columns
+            // and every card in them.
+            //
+            // It was there because a translation has no weight of its own and something
+            // had to give the traverse some. What it gave was the largest visual event in
+            // the crossing, arriving at the same moment as the focus marker's own
+            // arrival, and belonging to no row at all - so the arrival read as "the block
+            // changed" rather than as "the focus got here". The marker's journey supplies
+            // the weight properly now: it crosses the whole height of the panel.
+            body.hint = root.framedHint(2, 2)
+            wait(20)
+            body.hint = root.framedHint(3, 2)
+            wait(20)
+            verify(body.swapping, "the crossing is under way")
+            // Sampled at the very middle, which is where the dip used to be at its
+            // largest, and on both sides of it.
+            for (var step = 0; step <= 6; ++step) {
+                var at = step / 6
+                driveSlideTo(at)
+                compare(strip().opacity, 1,
+                    "at " + at + " the whole strip is fully opaque - nothing dips")
+            }
+            compare(strip().opacity, 1,
+                "and at the dead middle of the crossing, which is where it used to be at "
+                    + "its largest")
+            verify(!body.hasOwnProperty("slideDip"),
+                "the dip itself is gone rather than merely turned down")
             settleSlide()
-            compare(strip().opacity, 1, "and full again once landed")
+            compare(strip().opacity, 1, "and full once landed")
         }
 
         function test_aRefreshWithNoMovementDoesNotCancelTheCrossing() {
