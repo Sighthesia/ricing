@@ -35,3 +35,4 @@ singleton SpectrumService 1.0 SpectrumService.qml
 singleton SystemMonitorService 1.0 SystemMonitorService.qml
 singleton RipplePulseService 1.0 RipplePulseService.qml
 singleton LocationService 1.0 LocationService.qml
+singleton WeatherService 1.0 WeatherService.qml
