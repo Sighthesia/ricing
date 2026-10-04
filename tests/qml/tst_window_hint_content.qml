@@ -1357,6 +1357,129 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 + Math.abs(body._tailY - body._anchorY) + 1
         }
 
+        // The peak the two flights produce, as a FRACTION of the travel rather than as a
+        // pixel count, and bounded on both sides.
+        //
+        // The analytic peak of `OutQuad(t/medium) - OutSine(t/(slow*2))` is 0.555 of the
+        // travel, and the widget's own indicator measured 0.553 of a 269.2px travel on a real
+        // workspace change - so the number is a property of the pair of RECIPES, which
+        // `test_theWakesTwoEndsRunTheWorkspaceWidgetsRecipe` pins separately, and it does
+        // not move when the travel does. Measured here across a 4.7x range of travel: 55.2,
+        // 55.3, 55.3, 55.3 and 55.3%.
+        //
+        // The band is [0.50, 0.60] and both ends of it are load-bearing, which is the whole
+        // reason this test exists. An upper bound alone - "the peak is no more than 60% of
+        // the travel" - is satisfied by ANY cap below it, so it could not tell the bar's
+        // real shape from the one that produced the report: reintroducing
+        // `Math.min(separation, indicatorLength * 2.5)` put the peak at 65px, which is 38% of
+        // a 170px travel, and the whole suite stayed green. The lower bound is what a cap
+        // cannot satisfy. The upper end has 4.6pp of margin over the highest value ever
+        // measured and the lower end 12pp of margin under the lowest, so neither end is
+        // doing delicate work.
+        function wakePeakBand() {
+            return [0.5, 0.6]
+        }
+
+        // Sample ONE switch's whole wake flight in wall-clock time, and reduce it to the
+        // numbers the shape claims are made of. The series comes back too, because a
+        // failure is read against the frames rather than against a summary.
+        //
+        // Sampled in wall-clock time and not by stepping the marker's clock: `driveMarkerTo`
+        // teleports the journey, so no time passes between samples, the tail's flight is
+        // retargeted before it can advance, and the bar's own motion is invisible. That is
+        // not a convenience - it is the only instrument that can see this at all.
+        //
+        // `longestHoldRun` is the run-length of samples that agree with their neighbour to
+        // within a hundredth of a pixel, and it is the direct reading of what a CLAMP does: a
+        // clamp holds the wake at one value for as many samples as the flight is long. The
+        // real curve passes through a flat maximum once, so it can put two adjacent samples
+        // on the same value - measured at 1 on every journey tried - while the cap measured
+        // NINE in a row on the same journey.
+        function sampleWakeFlight(rows, fromWorkspace, toWorkspace, focusFrom, focusTo) {
+            body.hint = root.tallFramedHint(fromWorkspace, fromWorkspace, rows, focusFrom)
+            settleIndicator()
+            var travel = Math.abs(body._targetYFor(focusTo)
+                - body._targetYFor(focusFrom))
+            body.hint = root.tallFramedHint(toWorkspace, fromWorkspace, rows, focusTo)
+            var series = []
+            var peak = 0
+            var reOpenedAt = -1
+            var falling = false
+            var previousWake = -1
+            var holdRun = 0
+            var longestHoldRun = 0
+            // A hold is only evidence of a clamp while the wake is OPEN, and "open" has to
+            // mean it has actually been open - not merely that it has not finished. Two
+            // readings, both measured: after it closes the bar sits at its resting length
+            // and every remaining sample reads the same, so counting those reports a run of
+            // however many samples were left over (fourteen). And the FIRST sample can land
+            // before the retarget has committed - the switch is published and the tracker
+            // retargets a turn later - so latching on "not yet closed" reads that zero,
+            // switches the counting off, and the clause then passes on a capped bar.
+            // Measured: nine consecutive samples at exactly 65.00 on a capped 170px travel,
+            // and a green run. So the window opens on the wake first being open and closes
+            // on the first zero after that.
+            var seenOpen = false
+            var open = false
+            var worstHead = 0
+            var worstTail = 0
+            var previousHead = body._headY
+            var previousTail = body._tailY
+            var previousAnchor = body._anchorY
+            var samples = Math.round(body.indicatorTailMotion.duration / 16) + 12
+            for (var i = 0; i < samples; ++i) {
+                wait(16)
+                var wake = barVersusFrame().stretch
+                series.push(wake)
+                if (wake > peak)
+                    peak = wake
+                if (previousWake >= 0) {
+                    if (wake < previousWake - 1)
+                        falling = true
+                    if (falling && wake > previousWake + 1)
+                        reOpenedAt = i
+                    if (wake > 0.5)
+                        seenOpen = true
+                    if (open || (seenOpen && wake > 0.5)) {
+                        open = true
+                        holdRun = Math.abs(wake - previousWake) < 0.05
+                            ? holdRun + 1 : 0
+                        if (holdRun > longestHoldRun)
+                            longestHoldRun = holdRun
+                        if (wake < 0.05)
+                            open = false
+                    }
+                    // The per-end bound, so this one journey pins the CLIFF half of the
+                    // reported symptom as well as the plateau half. A clamp alone produces a
+                    // plateau and no cliff; the cliff needs the head jumping, which is a
+                    // separate defect, and both are covered when they appear together.
+                    var reaim = endTravelAllowance(previousAnchor)
+                    worstHead = Math.max(worstHead, Math.abs(body._headY - previousHead)
+                        - Math.abs(previousHead - previousAnchor) - reaim)
+                    worstTail = Math.max(worstTail, Math.abs(body._tailY - previousTail)
+                        - Math.abs(previousTail - previousAnchor) - reaim)
+                }
+                previousWake = wake
+                previousHead = body._headY
+                previousTail = body._tailY
+                previousAnchor = body._anchorY
+            }
+            // ...and the closure, which the loop above runs past rather than up to.
+            for (var k = 0; k < 40 && bar().height !== body.indicatorLength; ++k)
+                wait(16)
+            return {
+                travel: travel,
+                peak: peak,
+                series: series,
+                reOpenedAt: reOpenedAt,
+                longestHoldRun: longestHoldRun,
+                worstHead: worstHead,
+                worstTail: worstTail,
+                closedAt: bar().height === body.indicatorLength,
+                settledLength: bar().height
+            }
+        }
+
         // The bar's own two ends, read off the drawn rectangle rather than the tracker's
         // internals: the trailing end is `y`, the leading end is `y + height -
         // indicatorLength`, and which of them leads depends on which way the bar last
@@ -1819,68 +1942,101 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         // outruns its own follower re-opens the gap every time it passes it, and a
         // travelling frame makes it pass several times. One hump means one target.
         //
-        // Sampled in WALL-CLOCK time, not by stepping the marker's clock, and that is not
-        // a convenience. `driveMarkerTo` teleports the journey: no time passes between
-        // samples, so the tail's three-times-longer flight is retargeted before it can
-        // advance and the tail never leaves its starting value. Stepping the clock is the
-        // right instrument for where the FRAME is, and useless for the bar's own motion.
+        // The journey is six rows, so the travel is 170px and the peak the two recipes give
+        // is 94px - which is 1.45x the 65px the old cap allowed, and that is what makes this
+        // the test that can see the cap. It could not before: with only an upper bound on the
+        // peak, a cap at 65px is 38% of a 170px travel and satisfies "no more than 60%", so
+        // `Math.min(separation, indicatorLength * 2.5)` went back in and the whole file stayed
+        // green. `wakePeakBand` is two-sided for that reason, and `longestHoldRun` is here
+        // because a clamp is a value held, not merely a value bounded.
         function test_aSwitchStretchesTheBarInOneHumpAndTheHumpIsBounded() {
-            body.hint = root.tallFramedHint(2, 2, 6, 0)
-            settleIndicator()
-            var travel = Math.abs(body._targetYFor(5) - body._targetYFor(0))
-            body.hint = root.tallFramedHint(3, 2, 6, 5)
-            var samples = Math.round(body.indicatorTailMotion.duration / 16) + 12
-            var peak = 0
-            var reOpened = -1
-            var reOpenedFrom = 0
-            var worstFall = 0
-            var worstFallAt = -1
-            var previousWake = 0
-            var falling = false
-            for (var i = 0; i < samples; ++i) {
-                wait(16)
-                var wake = barVersusFrame().stretch
-                if (wake > peak)
-                    peak = wake
-                if (wake < previousWake - 1)
-                    falling = true
-                if (falling && wake > previousWake + 1 && reOpened < 0) {
-                    reOpened = i
-                    reOpenedFrom = previousWake
-                }
-                var fall = previousWake - wake
-                if (fall > worstFall) {
-                    worstFall = fall
-                    worstFallAt = i
-                }
-                previousWake = wake
-            }
-            verify(peak > 2,
+            var flight = sampleWakeFlight(6, 2, 3, 0, 5)
+            var band = wakePeakBand()
+            verify(flight.peak > 2,
                 "the bar stretched while the head flew to the new row, by a peak of "
-                    + peak.toFixed(1) + " against a resting length of "
+                    + flight.peak.toFixed(1) + " against a resting length of "
                     + body.indicatorLength)
-            verify(reOpened < 0,
+            verify(flight.peak >= flight.travel * band[0],
+                "and the peak is the pair of curves' peak rather than a bound: "
+                    + flight.peak.toFixed(1) + " on a " + flight.travel.toFixed(1)
+                    + "px travel is " + (100 * flight.peak / flight.travel).toFixed(1)
+                    + "%, and a cap of " + (body.indicatorLength * 2.5).toFixed(1)
+                    + "px would have read " + (100 * body.indicatorLength * 2.5
+                        / flight.travel).toFixed(1) + "%")
+            verify(flight.peak <= flight.travel * band[1],
+                "and no more than the curves give, which is 55.5% of the travel")
+            verify(flight.longestHoldRun <= 2,
+                "and the wake was never held at one value: the longest run of adjacent "
+                    + "samples agreeing to a hundredth of a pixel was "
+                    + flight.longestHoldRun + ", where a clamp holds it for as many "
+                    + "samples as the flight is long - measured at nine on this journey")
+            verify(flight.reOpenedAt < 0,
                 "the wake never re-opened after it started closing - that needs one target, "
-                    + "and there was a second peak at sample " + reOpened + ", from "
-                    + reOpenedFrom.toFixed(1))
-            // The bound is the widget's own, and it is a property of the recipes rather than
-            // a budget: two `Behavior`s over one travel, the faster always ahead, so the
-            // peak of `OutQuad(t/medium) - OutSine(t/(slow*2))` is 0.555 of the travel. The
-            // widget measured 0.553 of its own 269.2px on a real workspace change, so this
-            // is the same number from the same pair of curves.
-            verify(peak <= travel * 0.6,
-                "and the peak is the pair of curves' peak, not a cap: " + peak.toFixed(1)
-                    + " against a " + travel.toFixed(1) + "px travel, which is "
-                    + (100 * peak / travel).toFixed(1) + "% where the widget's own two "
-                    + "recipes give 55.5% (measured 55.3%)")
+                    + "and there was a second peak at sample " + flight.reOpenedAt)
             // And it closes inside the tail's own flight, which is what makes it transient.
             // The old shape was still 52.5 open 480ms after the switch began and took more
             // than 700ms to finish; the whole of that is what the fixed target removes.
-            for (var k = 0; k < 40 && bar().height !== body.indicatorLength; ++k)
-                wait(16)
-            compare(bar().height, body.indicatorLength,
+            verify(flight.closedAt,
                 "and the wake is closed within the tail's own flight of "
-                    + body.indicatorTailMotion.duration + "ms")
+                    + body.indicatorTailMotion.duration + "ms, at "
+                    + flight.settledLength.toFixed(1) + " against a resting "
+                    + body.indicatorLength)
+            settleSlide()
+            settleBar()
+        }
+
+        // The same shape on a travel four times the length, which is where the absolute
+        // numbers stop being comfortable and where a cap is not a rounding difference.
+        //
+        // The peak is a FRACTION of the travel because that is what two flights toward one
+        // target produce - 55.5% analytically, 55.3% measured on the widget - and the
+        // fraction does not move when the travel does. Measured here: 55.3% of 136px, 55.3%
+        // of 170px, 55.2% of 238px, 55.3% of 374px and 55.3% of 646px, a 4.7x range of
+        // travel agreeing to a tenth of a percent. So the absolute peak is whatever that
+        // fraction of the list is, and this journey exists to say so in pixels rather than
+        // leave it to be inferred: on a twelve-window workspace the bar reaches 207px of
+        // wake, 233px drawn, against a panel whose drawable height is 158px.
+        //
+        // That last number is the uncomfortable one and it is NOT answered with a cap. A cap
+        // is the plateau the report is about; reintroducing one to soften a number the user
+        // can see would trade a measured fault for an unmeasured one. What it does mean is
+        // that on a long list the wake is drawn past the panel's clip - the bar is 3px wide in
+        // the band's left padding and never overlaps a card, so it is the vertical extent
+        // alone that is clipped, and only for the flight's peak.
+        function test_aLongSwitchStretchesTheBarInProportionAndNeverPinsIt() {
+            var flight = sampleWakeFlight(12, 2, 3, 0, 11)
+            var band = wakePeakBand()
+            var fraction = flight.peak / flight.travel
+            verify(fraction >= band[0] && fraction <= band[1],
+                "the peak is the same fraction of a "
+                    + flight.travel.toFixed(1) + "px travel as it is of a 170px one: "
+                    + flight.peak.toFixed(1) + "px of wake, "
+                    + (100 * fraction).toFixed(1) + "%, drawn bar "
+                    + (body.indicatorLength + flight.peak).toFixed(1) + "px. The old cap "
+                    + "would have held it at "
+                    + Math.min(body.indicatorLength * 2.5, flight.peak).toFixed(1)
+                    + "px, which is "
+                    + (100 * body.indicatorLength * 2.5 / flight.travel).toFixed(1) + "%")
+            verify(flight.peak > body.indicatorLength * 2.5,
+                "and the wake really does exceed what the cap allowed - "
+                    + flight.peak.toFixed(1) + " against "
+                    + (body.indicatorLength * 2.5).toFixed(1) + " - so a cap cannot pass "
+                    + "this journey, which is the coverage that was missing")
+            // The CLIFF half of the reported symptom, on the same journey. A clamp produces
+            // a plateau and no cliff on its own; the cliff needed the head to jump, and both
+            // were present together in the report. So neither is asserted alone.
+            verify(flight.worstHead <= 0 && flight.worstTail <= 0,
+                "and neither end of it ever jumped further than the flight it had left: "
+                    + "the head was over by " + flight.worstHead.toFixed(1) + "px and the "
+                    + "tail by " + flight.worstTail.toFixed(1) + "px")
+            verify(flight.longestHoldRun <= 2 && flight.reOpenedAt < 0,
+                "nor was it ever held at one value and then re-opened: longest agreeing "
+                    + "run " + flight.longestHoldRun + ", second peak at sample "
+                    + flight.reOpenedAt)
+            verify(flight.closedAt,
+                "and it closed inside the tail's own flight, at "
+                    + flight.settledLength.toFixed(1) + "px against a resting "
+                    + body.indicatorLength)
             settleSlide()
             settleBar()
         }
