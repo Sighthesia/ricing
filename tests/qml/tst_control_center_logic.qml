@@ -237,6 +237,15 @@ Item {
             // A missing detail flag is not a detail page.
             compare(Logic.backAction("control-center", undefined, true), "launcher")
             compare(Logic.backAction("control-center", null, true), "launcher")
+            // A missing route is not a detail route either. Volume and media have
+            // no entry in the detail-route table, so their lookup reads
+            // undefined — which must not compare equal to a route that was never
+            // supplied, or an unbound route would resolve back to the detail page.
+            compare(Logic.backAction(undefined, false, true), "launcher")
+            compare(Logic.backAction(undefined, false, false), "close")
+            compare(Logic.backAction(), "close")
+            // The named detail routes still match.
+            compare(Logic.backAction("bluetooth-detail", false, false), "detail")
         }
     }
 }

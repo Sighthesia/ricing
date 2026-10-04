@@ -126,7 +126,14 @@ function detailRouteFor(kind) {
     return typeof kind === "string" && detailRoutes[kind] ? detailRoutes[kind] : ""
 }
 
+// A route is a name, so reject anything else before matching. The check is not
+// belt-and-braces: volume and media have no detailRoutes entry, so their lookup
+// reads undefined and would otherwise compare equal to a route that was never
+// supplied, resolving an unbound route to the detail page instead of the
+// launcher or the surface close.
 function isDetailRoute(route) {
+    if (typeof route !== "string" || route === "")
+        return false
     for (var i = 0; i < cardKinds.length; i++) {
         if (detailRoutes[cardKinds[i]] === route)
             return true
