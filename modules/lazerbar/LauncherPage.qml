@@ -167,6 +167,9 @@ Item {
         function onSelectedIndexChanged() {
             resultsView.positionToSelection()
             resultsView.syncSelectionFrame()
+            // The selected row is the preview pane's subject, so a move has to
+            // re-rank the decode queue even when nothing is outstanding yet.
+            thumbQueue.wake()
         }
         function onResultsChanged() {
             Qt.callLater(root._scheduleRowsCommit)
@@ -780,24 +783,37 @@ Item {
     onActiveSearchTextChanged: {
         resultsView.normalizeViewport()
         root._syncWindowToMatches()
+        thumbQueue.wake()
     }
     // A chip switch folds rows exactly like a search edit, so the viewport
     // needs the same clamp and deep-match stretch.
     onActiveCategoryChanged: {
         resultsView.normalizeViewport()
         root._syncWindowToMatches()
+        thumbQueue.wake()
     }
+    // Window growth materializes rows below the fold and the query/category
+    // re-ranks fold the ones in it, so both re-derive the decode queue's
+    // served order on the next tick.
+    onWindowedResultsChanged: thumbQueue.wake()
 
     // Clipboard thumbnail cache: one decode per entry id, owned here so
     // rows and the preview pane share the exact same proven path.
     readonly property var _thumbPaths: ({})
-    readonly property var _thumbRequests: ({})
     property int _thumbRev: 0
     // Bumped whenever the session merges clipboard metadata into the live
     // pool in place. Rows and the preview footer read it so merged display
     // fields repaint without replacing the pooled arrays (which would
     // rebuild every delegate and replay the refill cascade).
     property int _clipMetaRev: 0
+    // Handle for probes and tests: the decode queue's counters are the only
+    // way to prove a burst never happened.
+    readonly property alias thumbScheduler: thumbQueue
+    // Prefetch slack around the visible band, in rows. Rows just outside it
+    // are still served - a flick reveals them before their decode could
+    // possibly land - but never ahead of a row the user can actually see.
+    readonly property int thumbPrefetchRows: 2
+
     function clipThumbPath(item) {
         if (!item || !item.isImage)
             return ""
@@ -806,21 +822,131 @@ Item {
             return ""
         return root._thumbPaths[id] || ""
     }
+    // A materialized row asked for a thumbnail. This records interest only:
+    // whether the row is near enough to the viewport to be worth a process
+    // spawn is re-decided every tick from live geometry (see
+    // _thumbCandidates), so materializing 96 rows no longer asks for 96
+    // decodes, and scrolling back to a row re-queues it with no extra wiring.
     function requestClipThumb(item) {
         if (!item || !item.isImage)
             return
-        var id = String(item.id == null ? "" : item.id)
-        if (!/^[0-9]+$/.test(id) || root._thumbPaths[id] || root._thumbRequests[id])
+        thumbQueue.enqueue()
+    }
+    function _thumbDecoded(id, path) {
+        var key = String(id == null ? "" : id)
+        if (!path)
             return
-        root._thumbRequests[id] = true
-        if (root.session)
-            root.session.decodeThumbnail(id, String(item.mime || ""), function(p) {
-                delete root._thumbRequests[id]
-                if (p) {
-                    root._thumbPaths[id] = p
-                    root._thumbRev++
-                }
+        root._thumbPaths[key] = path
+        root._thumbRev++
+    }
+    function _issueThumbDecode(id, mime, done) {
+        var service = root.session
+        if (!service || typeof service.decodeThumbnail !== "function") {
+            done("")
+            return
+        }
+        service.decodeThumbnail(String(id), String(mime == null ? "" : mime), done)
+    }
+    function _selectedResultId() {
+        var service = root.session
+        if (!service || !service.results || service.selectedIndex < 0)
+            return ""
+        var current = service.results[service.selectedIndex]
+        return current && current.id != null ? String(current.id) : ""
+    }
+    // The row the preview pane is rendering: the pointer target when there is
+    // one, otherwise the keyboard selection. It is inside the band by
+    // definition, and it is drawn at a size where a missing thumbnail is the
+    // most visible thing on the whole surface, so it outranks every other
+    // candidate rather than waiting its turn in document order.
+    function _previewedResultId() {
+        var hovered = root._hoveredResult
+        if (hovered && hovered.id != null)
+            return String(hovered.id)
+        return root._selectedResultId()
+    }
+
+    // Ordered decode candidates for the current viewport: the previewed row
+    // first, then rows overlapping the visible band, then the prefetch slack
+    // outward. Rows already holding a decoded path are omitted, so a decoded
+    // row is never asked for twice.
+    //
+    // Deliberately driven off the Repeater rather than off each delegate's
+    // lifecycle: a delegate exists for every materialized row regardless of
+    // where it sits, which is exactly what made the old per-row request ask
+    // the service for 96 decodes on a cold open.
+    function _thumbCandidates() {
+        var out = []
+        var children = resultsColumn.children
+        if (!children || children.length <= 0)
+            return out
+        var probe = resultsRepeater.count > 0 ? resultsRepeater.itemAt(0) : null
+        var pitch = probe ? probe.rowHeight + probe.listGap : 72
+        var padding = root.thumbPrefetchRows * pitch
+        var bandTop = resultsView.contentY - padding
+        var bandBottom = resultsView.contentY + resultsView.height + padding
+        var previewId = root._previewedResultId()
+        for (var i = 0; i < children.length; i++) {
+            var row = children[i]
+            if (!row || !row.result || !row.result.isImage)
+                continue
+            var id = String(row.result.id == null ? "" : row.result.id)
+            if (!/^[0-9]+$/.test(id) || root._thumbPaths[id])
+                continue
+            var previewed = id === previewId
+            var height = row.height
+            // A row folded to zero height (search lens, category lens, or the
+            // entrance wave) occupies no pixels. Ranking on its position then
+            // would stack the whole window at y=0 and put every row in band.
+            if (!previewed && !(height > 0))
+                continue
+            var distance = 0
+            if (!previewed) {
+                if (row.y > bandBottom)
+                    distance = row.y - bandBottom
+                else if (row.y + height < bandTop)
+                    distance = bandTop - (row.y + height)
+                if (distance > 0)
+                    continue
+            }
+            out.push({
+                id: id,
+                mime: row.result.mime == null ? "" : String(row.result.mime),
+                distance: previewed ? -1 : distance,
+                order: i
             })
+        }
+        // Nearest to the band first, document order inside the band so the
+        // list decodes top to bottom, and the previewed row ahead of both.
+        out.sort(function (a, b) {
+            if (a.distance !== b.distance)
+                return a.distance - b.distance
+            return a.order - b.order
+        })
+        return out
+    }
+
+    // The decode queue: viewport priority, one in flight, paced one per tick.
+    // Same contract as the keyboard reclaim timer at the top of the page: a
+    // closed launcher spawns nothing, and a disabled prewarm copy of the page
+    // stays inert even though it shares the session - two live copies would
+    // each own a decode slot.
+    LauncherThumbScheduler {
+        id: thumbQueue
+        active: !!root.session && root.session.visible === true && root.enabled
+        candidates: root._thumbCandidates
+        decode: root._issueThumbDecode
+        decoded: root._thumbDecoded
+    }
+
+    // The one scheduling point every thumbnail decode goes through: no row owns
+    // a timer, and no decode can be issued from a delegate's lifecycle.
+    Timer {
+        id: thumbPacer
+        interval: thumbQueue.interval
+        repeat: true
+        running: thumbQueue.running
+        onTriggered: thumbQueue.pump()
     }
 
     // Full decoded text per entry id: `cliphist list` previews are a single
@@ -1118,11 +1244,18 @@ Item {
         visible: !root.sessionLoading && !root.sessionError
         contentWidth: width
         contentHeight: resultsColumn.height + listFooter.height
-        onContentHeightChanged: syncSelectionFrame()
+        // The decode queue ranks rows against this viewport, so every shape
+        // change to the visible band re-derives the served order.
+        onContentHeightChanged: {
+            syncSelectionFrame()
+            thumbQueue.wake()
+        }
+        onHeightChanged: thumbQueue.wake()
         boundsBehavior: Flickable.StopAtBounds
         onContentYChanged: {
             if (contentY > contentHeight - height - 900)
                 extendResultWindow()
+            thumbQueue.wake()
         }
         flickDeceleration: 2000
         // A row still revealing is what scrolling would fight; the
