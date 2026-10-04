@@ -7,6 +7,7 @@ active palette for the effective light/dark mode, then applies them:
 
 - gsettings org.gnome.desktop.interface color-scheme  -> system light/dark
 - kitty.conf include line + SIGUSR1 reload            -> live kitty colors
+- opencode themes/Afloat.json + SIGUSR2 reload        -> live opencode colors
 - gtk-3.0/gtk-4.0 gtk.css @import                     -> GTK css pickup
 
 Usage:
@@ -21,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import configparser
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -30,7 +30,6 @@ PROCESSOR = Path(__file__).resolve().parent / "template-processor.py"
 DEFAULT_CONFIG = Path(__file__).resolve().parent / "templates" / "app-themes.toml"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from lib.renderer import _atomic_write  # noqa: E402  (needs the path above)
 
 
 def parse_args() -> argparse.Namespace:
@@ -321,42 +320,34 @@ def run_hooks(mode: str) -> None:
             print(f"Warning: kitty reload failed: {e}", file=sys.stderr)
 
 
-def pin_opencode_theme_mode(home: Path, mode: str) -> bool:
-    """Mirror the active desktop mode into both variants of the opencode theme.
+def notify_opencode_theme_reload() -> bool:
+    """Tell a running opencode that its theme file just changed.
 
-    The generated theme carries a light and a dark variant, and opencode picks
-    between them at startup from the terminal's reported background. That query
-    does not survive a terminal multiplexer: run opencode under herdr and no
-    answer comes back, so opencode settles on one variant for the whole session
-    and a desktop light/dark switch never reaches it.
+    opencode resolves the active light/dark variant live — `theme.mode` in
+    cli.json only pins it when it reads exactly "dark" or "light", and "system"
+    leaves it following the terminal's reported appearance. But it reads
+    `themes/*.json` once at startup and only re-reads on SIGUSR2, so a rewrite
+    that lands mid-session is invisible until the TUI restarts. Without this
+    signal a desktop light/dark switch repaints the file and the running
+    session keeps rendering the colours it parsed at launch.
 
-    This pipeline already knows the desktop's mode — it is the `--mode` the
-    shell resolved — so write that mode into both slots. Whichever variant
-    opencode picks is then the one the desktop is actually showing, and the
-    next apply (the shell re-applies on every mode change) carries it across.
+    Same mechanism as the kitty SIGUSR1 reload above, for the same reason: the
+    generated config is only half the job, the other half is the live reload.
 
-    Returns True when the file changed. Only the legacy dual-variant layout is
-    touched; anything else is left alone.
+    Returns True when at least one opencode process was signalled.
     """
-    path = home / ".config/opencode/themes/Afloat.json"
+    if not _which("pkill"):
+        return False
     try:
-        theme = json.loads(path.read_text())
-    except (OSError, ValueError):
+        result = subprocess.run(
+            ["pkill", "-USR2", "-f", "opencode"],
+            capture_output=True, timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        print(f"Warning: opencode reload failed: {e}", file=sys.stderr)
         return False
-    tokens = theme.get("theme")
-    if not isinstance(tokens, dict):
-        return False
-    other = "light" if mode == "dark" else "dark"
-    changed = False
-    for value in tokens.values():
-        if (isinstance(value, dict) and mode in value and other in value
-                and value[mode] != value[other]):
-            value[other] = value[mode]
-            changed = True
-    if not changed:
-        return False
-    _atomic_write(path, json.dumps(theme, indent=2) + "\n")
-    return True
+    # pkill exits 1 when nothing matched, which is the normal idle case.
+    return result.returncode == 0
 
 
 def main() -> int:
@@ -425,10 +416,10 @@ def main() -> int:
     sync_kitty_clear_text(home, args.terminal_clear_text)
     sync_kde_theme(home)
     sync_niri_config(home)
-    pin_opencode_theme_mode(home, args.mode)
 
     if args.home_prefix is None:
         notify_kde_theme()
+        notify_opencode_theme_reload()
         run_hooks(args.mode)
         if not reload_niri():
             print("Warning: Niri config reload unavailable", file=sys.stderr)

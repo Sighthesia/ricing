@@ -376,28 +376,74 @@ def test_diff_lines_are_visibly_highlighted(sandbox):
             )
 
 
-def test_opencode_theme_follows_the_desktop_mode(sandbox):
-    """Both variants must carry the desktop's mode, not the palette's two.
+def test_opencode_theme_keeps_both_variants(sandbox):
+    """The file must carry a real light and a real dark palette, side by side.
 
-    opencode chooses between the light and dark variant at startup from the
-    terminal's reported background, and that query does not survive a terminal
-    multiplexer — so it can settle on the wrong one and never notice a desktop
-    switch. The pipeline knows the mode, so it writes it into both slots.
+    opencode resolves the active variant itself, live: `theme.mode` in cli.json
+    only pins it when it reads exactly "dark" or "light", and "system" leaves it
+    following the terminal's reported appearance. Flattening both slots to the
+    desktop's current mode therefore does not "guarantee a match" — it makes
+    the mode flip invisible, because both halves render identically. The live
+    half of the contract is the SIGUSR2 in notify_opencode_theme_reload().
     """
     tmp, palette = sandbox
     home = tmp / "home"
 
     assert run_apply(palette, "light", home).returncode == 0
     theme = json.loads((home / ".config/opencode/themes/Afloat.json").read_text())["theme"]
-    assert theme["background"]["light"] == theme["background"]["dark"]
-    assert theme["text"]["light"] == theme["text"]["dark"]
     assert theme["text"]["light"] == "#4c4f69", theme["text"]["light"]
+    assert theme["text"]["dark"] == "#cdd6f4", theme["text"]["dark"]
+    assert theme["background"]["light"] != theme["background"]["dark"]
 
+    # Re-applying the other mode must not disturb the half we are not in.
     assert run_apply(palette, "dark", home).returncode == 0
     theme = json.loads((home / ".config/opencode/themes/Afloat.json").read_text())["theme"]
-    assert theme["background"]["dark"] == theme["background"]["light"]
-    assert theme["text"]["dark"] == theme["text"]["light"]
+    assert theme["text"]["light"] == "#4c4f69", theme["text"]["light"]
     assert theme["text"]["dark"] == "#cdd6f4", theme["text"]["dark"]
+    assert theme["background"]["light"] != theme["background"]["dark"]
+
+
+def test_opencode_theme_reload_is_signalled(monkeypatch):
+    """A rewrite that nobody announces is invisible to a running TUI.
+
+    opencode parses themes/*.json once at startup and only re-reads on SIGUSR2,
+    so a desktop switch mid-session leaves the TUI on its launch-time colours
+    until it is restarted. The apply must send that signal.
+    """
+    import importlib.util
+    from unittest.mock import Mock
+
+    spec = importlib.util.spec_from_file_location("apply_app_themes", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    calls = []
+    monkeypatch.setattr(module, "_which", lambda name: "/usr/bin/pkill")
+    monkeypatch.setattr(
+        module.subprocess, "run",
+        lambda cmd, **kw: calls.append(cmd) or Mock(returncode=0),
+    )
+
+    assert module.notify_opencode_theme_reload() is True
+    assert calls == [["pkill", "-USR2", "-f", "opencode"]], calls
+
+
+def test_opencode_theme_reload_tolerates_no_opencode(monkeypatch):
+    """No opencode running is the normal case, not an error worth surfacing."""
+    import importlib.util
+    from unittest.mock import Mock
+
+    spec = importlib.util.spec_from_file_location("apply_app_themes", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    monkeypatch.setattr(module, "_which", lambda name: "/usr/bin/pkill")
+    monkeypatch.setattr(
+        module.subprocess, "run",
+        lambda cmd, **kw: Mock(returncode=1),  # pkill: no processes matched
+    )
+
+    assert module.notify_opencode_theme_reload() is False
 
 
 def test_generated_files_are_replaced_atomically(sandbox):
