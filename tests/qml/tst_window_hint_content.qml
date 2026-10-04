@@ -695,20 +695,35 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         function test_theActiveColumnIsTwiceANeighbourAtRest() {
             // The resting frame, as five literals. This is the arrangement every other
             // test in the file measures against, so it is stated once, here, from the
-            // panel's edges inwards - and read off the real band and the real column
-            // delegates rather than off the body's own arithmetic.
+            // panel's edges inwards - and read off the real column delegates rather than
+            // off the body's own arithmetic.
             //
             //   |<-180-| -6- |<-  360  ->|-6-| <-180-|
             //   0      186  186        546 552     732
-            var band = findByName(body, "windowHintColumnHighlight")
-            verify(band !== null, "the panel has a band for the active column")
-            compare(band.x, 186, "the band starts at 186")
-            compare(band.width, 360, "and is 360 wide, so it ends at 546")
-            compare(band.x + band.width, 546, "which is the wide middle slot exactly")
+            //
+            // Its own frame, established here rather than inherited. It used to read a
+            // band whose x is a fixed property, so it worked whatever the strip was doing;
+            // a column delegate's x is `slotX(position - panelPosition)`, so without a
+            // frame of its own it would be measuring the previous test's leftovers.
+            body.hint = root.tallFramedHint(2, 2, 6, 0)
+            wait(60)
 
-            // The band is the ACTIVE column's cell, and the cards sit one padding
-            // inside it on every side: 19 is 8 of clearance, the 3px focus indicator
-            // that lives in that padding, and 8 again on the card's own edge.
+            // Read off the active column's own delegate. There is no band element behind
+            // it any more - the panel's only highlight is one card's worth - so the wide
+            // middle slot is established by the delegate that occupies it and by nothing
+            // drawn underneath it.
+            compare(findAllByName(body, "windowHintColumnHighlight").length, 0,
+                "and no column-wide highlight is drawn behind it")
+            var active = columnForPosition(2)
+            verify(active !== null, "the active column is on the strip")
+            compare(active.x, 186, "the active column starts at 186")
+            compare(active.width, 360, "and is 360 wide, so it ends at 546")
+            compare(active.x + active.width, 546,
+                "which is the wide middle slot exactly")
+
+            // The cards sit one padding inside it on every side: 19 is 8 of clearance,
+            // the 3px focus indicator that lives in that padding, and 8 again on the
+            // card's own edge.
             var cards = findAllByName(body, "windowHintWindowRow")
             verify(cards.length > 0, "the active column has cards to measure")
             var cardInBody = cards[0].mapToItem(body, 0, 0)
@@ -732,10 +747,10 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 "also 180 wide, was " + neighbours[1].parent.width)
             compare(right.x + neighbours[1].parent.width, 732,
                 "so it ends at the panel's right edge")
-            compare(band.x - (left.x + leftColumnItem.width), 6,
-                "one gutter between the left neighbour and the band")
-            compare(right.x - (band.x + band.width), 6,
-                "and one between the band and the right neighbour")
+            compare(active.x - (left.x + leftColumnItem.width), 6,
+                "one gutter between the left neighbour and the middle column")
+            compare(right.x - (active.x + active.width), 6,
+                "and one between the middle column and the right neighbour")
             // The claim, as a ratio, so the point survives a retune of the unit: the
             // active column is EXACTLY twice a neighbour's. This is the only asymmetry
             // in the panel, and it is the whole of the emphasis the wide slot adds.
@@ -1918,6 +1933,61 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 "and settles on the tint")
         }
 
+        function test_theFramedCardIsTheOnlyHighlightInThePanel() {
+            // There used to be a second, coarser one: a full-height `activeFill`
+            // rectangle behind the whole middle column, which also swelled 2% at the
+            // middle of every crossing. Nested inside the focus marker, it is what made
+            // a switch read as "the block changed" while the thing being asked about -
+            // which window - arrived underneath it.
+            //
+            // Asserted three ways, because "only" is the whole of the claim: the element
+            // is gone, nothing else in the panel carries a fill, and the single row that
+            // differs from the plain card colour is the one the frame is around.
+            compare(findAllByName(body, "windowHintColumnHighlight").length, 0,
+                "no column-wide highlight exists")
+            body.hint = root.tallFramedHint(2, 2, 6, 3)
+            wait(300)
+            compare(findAllByName(body, "windowHintColumnHighlight").length, 0,
+                "and none appears once there is content to sit behind")
+
+            var plain = String(Lazer.LazerTheme.settingsCard)
+            var rows = findAllByName(strip(), "windowHintWindowRow")
+            compare(rows.length, 6, "the active column's cards are all there")
+            var lit = []
+            for (var i = 0; i < rows.length; ++i)
+                if (String(rows[i].color) !== plain)
+                    lit.push(i)
+            compare(lit.length, 1,
+                "exactly one card carries any fill of its own, and it was " + lit.length
+                    + " that did - " + lit.join(","))
+            compare(lit[0], body.focusedRowIndex,
+                "which is the focused one")
+
+            // And it is the same card the frame is around, not merely the same index.
+            var frame = findByName(strip(), "windowHintFocusFrame")
+            compare(frame.y, rows[lit[0]].mapToItem(strip(), 0, 0).y,
+                "the frame is around that very card")
+            compare(frame.x, rows[lit[0]].mapToItem(strip(), 0, 0).x,
+                "on both axes")
+            compare(frame.y + frame.height,
+                rows[lit[0]].mapToItem(strip(), 0, 0).y + body.rowHeight,
+                "and covers its whole height")
+
+            // And the other half of "only": with nothing drawn behind it, the active
+            // column is marked by its WIDTH - twice a neighbour's - which is the claim
+            // that replaces the band.
+            for (var column = 1; column <= 3; column += 2) {
+                var neighbour = columnForPosition(column)
+                verify(neighbour !== null, "neighbour column at position " + column
+                    + " is on the strip")
+                if (neighbour)
+                    compare(neighbour.width, body.columnWidth,
+                        "position " + column + " is a neighbour's width, so the middle "
+                            + "column being " + body.activeColumnWidth + " wide is what "
+                            + "marks the active one")
+            }
+        }
+
         function test_theWholePanelArrivesInOnePiece() {
             // No row is left behind and none arrives on its own. A switch used to
             // stagger the three columns in row by row, which meant the panel was
@@ -2838,237 +2908,6 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                             + columnForPosition(to).width)
                 }
             }
-        }
-
-        function test_theActiveWorkspaceHasTheWidgetsSlidingBackground() {
-            // The bar's workspace widget draws the active workspace as one surface
-            // behind the squares, covering a square exactly, with the square's content
-            // inset inside it. This is that surface one size up.
-            var band = findByName(body, "windowHintColumnHighlight")
-            verify(band !== null, "the strip carries a background surface")
-            if (!band)
-                return
-            compare(findAllByName(body, "windowHintColumnHighlight").length, 1,
-                "exactly one, however many columns are on the strip")
-
-            // The widget's own colour, so the panel and the bar agree.
-            compare(band.color, Lazer.LazerTheme.activeFill, "in the widget's fill")
-
-            // Square, like both surfaces in the widget: its hover highlight and its
-            // active one are `radius: 0`. Stated as a literal rather than read from the
-            // card or from the component, because the claim is about matching a
-            // reference outside this file - a rounded band was tried and read as a slot
-            // floating over the panel rather than as the column itself.
-            compare(band.radius, 0,
-                "square, like the widget's hover and active highlights, was "
-                    + band.radius)
-
-            // A child of the BODY, not of the strip. The strip travels and its active
-            // slot moves; the band does not, because the column you are looking at
-            // does not. As a strip child it teleported a whole column at the start of
-            // a crossing and had to slide back.
-            compare(band.parent, body, "anchored to the panel, not to the travelling strip")
-
-            // Behind the cards, so it is a background and never an overlay on a title.
-            var stripIndex = body.children.indexOf(findByName(body, "windowHintStrip"))
-            verify(body.children.indexOf(band) < stripIndex,
-                "and declared before the strip, so it paints behind the cards")
-
-            // Under the pointer means nothing - it is decoration.
-            verify(!band.enabled, "and inert to input")
-
-            // The margin is the GAP BETWEEN COLUMNS, not a shrink of the band. The band
-            // was inset 8px instead, which is backwards: that leaves the column's own
-            // content overhanging the thing that marks it. The widget's highlight covers
-            // exactly one square and the margin comes from the spacing between squares.
-            verify(body.columnGutter > 0,
-                "and the columns are separated, by " + body.columnGutter)
-            // The narrow pitch - two NEIGHBOUR columns and the gutter between them. It
-            // is not the distance from the panel's left edge to the band's x, and it is
-            // not the distance from the band to the right neighbour either: the middle
-            // slot is the WIDE one, so both of those are a gutter and an extra 180px
-            // longer. Only two narrow columns share a pitch.
-            compare(body.narrowPitch, body.columnWidth + body.columnGutter,
-                "the narrow pitch is the neighbour column plus the gap")
-            compare(body.narrowPitch, root.pitch, "and it is 186")
-            // The band, on the real object, against literals: the WIDE middle slot,
-            // which is the one thing in the panel that never moves. Two narrow columns
-            // share a pitch; the slot between them is 180px wider than that.
-            compare(band.x, root.bandX, "the band sits at the wide slot's left edge, was "
-                + band.x)
-            compare(band.width, root.wideCol,
-                "and spans the active column's width, was " + band.width)
-
-            // A margin on every side, sized from the widget rather than picked.
-            //
-            // Measured from real cards, not from the focus highlight: that sits on
-            // whichever row is current, so its top edge says nothing about the band's
-            // margin. Only the ACTIVE column instantiates `windowHintWindowRow` - its
-            // neighbours get plain labels - so every row found here belongs to the
-            // column the band is on.
-            //
-            // The expected numbers live HERE, not read back from the component: a test
-            // whose expected value is the component's own constant cannot tell "the
-            // padding is there" from "the padding is gone" - with the padding at 0 it
-            // compared 0 against 0 and passed either way. Stated here they have to be
-            // argued with.
-            //
-            // Vertical is 12, because the widget's square is a fixed `barWidgetHeight`
-            // of 42 with an 18px content row centred in it, leaving 12 above and below.
-            //
-            // Horizontal is 19, and that is NOT the widget's card padding any more: the
-            // focus indicator lives in this padding now, so it holds a clearance, the
-            // indicator and a clearance again. 8 and 8, so the marker is as far from
-            // the band as the card is and as far from the card as the band is - one
-            // padding in three places rather than three numbers that merely look close.
-            var marginX = 8 + 3 + 8
-            var marginY = 12
-            var cards = findAllByName(body, "windowHintWindowRow")
-            verify(cards.length > 0, "the active column has cards to measure against")
-            if (cards.length > 0) {
-                var top = cards[0].y
-                var bottom = cards[0].y + cards[0].height
-                for (var ci = 1; ci < cards.length; ++ci) {
-                    if (cards[ci].y < top)
-                        top = cards[ci].y
-                    if (cards[ci].y + cards[ci].height > bottom)
-                        bottom = cards[ci].y + cards[ci].height
-                }
-                // Both edges measured in the body's space: the cards are in the strip's
-                // and the band is in the body's, so comparing a card's own y against the
-                // band's would put a strip-relative number next to a body-relative one.
-                var box = body
-                var topCard = cards[0].mapToItem(box, 0, 0)
-                var blockTop = topCard.y + top
-                var blockBottom = topCard.y + bottom
-                var blockLeft = topCard.x
-                var blockRight = blockLeft + cards[0].width
-                var bandBox = band.mapToItem(box, 0, 0)
-                compare(blockTop - bandBox.y, marginY,
-                    "margin above the first card, was " + (blockTop - bandBox.y))
-                // The band's own height, not a mapped one: `mapToItem` returns a point.
-                // Measured at rest, where the scale is 1, so the untransformed height is
-                // the visual one.
-                compare(band.height - (blockBottom - bandBox.y), marginY,
-                    "and below the last, was " + (band.height - (blockBottom - bandBox.y)))
-                compare(blockLeft - bandBox.x, marginX,
-                    "and to the left of the cards, was " + (blockLeft - bandBox.x))
-                compare(bandBox.x + band.width - blockRight, marginX,
-                    "and to the right, was " + (bandBox.x + band.width - blockRight))
-            }
-        }
-
-        function test_theBandHugsThePanelEdgeTheWayTheWidgetHugsTheBar() {
-            // The other half of the widget's arrangement, and the half that was
-            // backwards. `Workspaces.activeHighlight` is `barWidgetHeight` tall, and
-            // `barWidgetHeight` is `barLiveHeight - barWidgetGutter * 2` - so the band
-            // sits `barWidgetGutter` from the BAR's edge while its content sits
-            // `cellPadding` inside it. The panel had those the wrong way round: a 2px
-            // inner margin and an outer edge 10px in.
-            //
-            // 3 is `LazerTheme.barWidgetGutter`, read off the theme rather than
-            // restated, because the claim is about agreeing with a token.
-            var band = findByName(body, "windowHintColumnHighlight")
-            if (!band)
-                return
-            // Declared as the host declares it. Mounted on its own the body has no host
-            // inset, and then "near the panel's edge" and "near the body's edge" are the
-            // same measurement - and the band's whole point is that the two differ,
-            // since it deliberately reaches past the body into the popup's inset.
-            body.surfaceInset = 8
-            compare(band.y + body.surfaceInset, Lazer.LazerTheme.barWidgetGutter,
-                "the band's top edge is the gutter from the panel's, was "
-                    + (band.y + body.surfaceInset))
-            compare(body.height - (band.y + band.height) + body.surfaceInset,
-                Lazer.LazerTheme.barWidgetGutter,
-                "and its bottom edge, was "
-                    + (body.height - (band.y + band.height) + body.surfaceInset))
-            // Which means the band reaches past the body's own edge, into the popup's
-            // content inset - otherwise it could not be near the panel's edge at all.
-            verify(body.surfaceInset > Lazer.LazerTheme.barWidgetGutter,
-                "so the band does reach past the body's edge, inset is "
-                    + body.surfaceInset)
-            verify(band.y < 0,
-                "and it does, band y is " + band.y)
-            body.surfaceInset = 0
-        }
-
-        function test_theBandDoesNotTeleportAcrossACrossing() {
-            // The defect this pins down, measured rather than reasoned about: with the
-            // band glued to the strip's active SLOT it sat at 186px at rest and at
-            // 347px on the first frame of a crossing - a 161px jump in one frame -
-            // then slid the rest of the way back. A test written for the earlier
-            // arrangement asserted that jump as the contract.
-            //
-            // The band is anchored to the panel's middle column, which is where the
-            // active column always is, so the claim is simply that it does not move:
-            // sampled across a whole crossing, in panel coordinates, in both
-            // directions, it must stay put to within a pixel.
-            var band = findByName(body, "windowHintColumnHighlight")
-            if (!band)
-                return
-            for (var direction = 0; direction < 2; ++direction) {
-                var from = direction === 0 ? 5 : 6
-                var to = direction === 0 ? 6 : 5
-                body.hint = root.framedHint(from, from)
-                wait(60)
-                var home = band.mapToItem(body, 0, 0).x
-                compare(home, root.bandX,
-                    "dir " + direction + ": at rest it is the wide middle slot, was " + home)
-
-                // The band's CENTRE, not its left edge: `mapToItem` folds in the
-                // scale, and the crossing deliberately pulses the band by 2%, which
-                // moves the mapped left edge by about 1.8px without the band going
-                // anywhere. A uniform scale cannot move a centre, so this measures
-                // translation alone.
-                function centreX() {
-                    return band.mapToItem(body, band.width / 2, 0).x
-                }
-                var lowest = centreX()
-                var highest = lowest
-                body.hint = root.framedHint(to, from)
-                for (var step = 0; step < 24; ++step) {
-                    wait(8)
-                    var here = centreX()
-                    lowest = Math.min(lowest, here)
-                    highest = Math.max(highest, here)
-                }
-                settleSlide()
-                lowest = Math.min(lowest, centreX())
-                highest = Math.max(highest, centreX())
-                verify(highest - lowest <= 1,
-                    "dir " + direction + ": it never moves, over "
-                        + (highest - lowest) + "px")
-            }
-        }
-
-        function test_theBandPulsesOnTheCrossingsOwnClock() {
-            // The scale is a pure function of `slideProgress`, so it cannot drift from
-            // the slide: there is one clock and this is read off it. Asserted as an
-            // observation of the sampled scale rather than as the recipe, because the
-            // recipe is one line and the thing worth protecting is that the pulse
-            // actually peaks while the crossing is in flight and is gone afterwards.
-            var band = findByName(body, "windowHintColumnHighlight")
-            if (!band)
-                return
-            body.hint = root.framedHint(5, 5)
-            wait(80)
-            compare(band.scale, 1, "and at rest it is not scaled, was " + band.scale)
-
-            var peak = 1
-            body.hint = root.framedHint(6, 5)
-            for (var step = 0; step < 20; ++step) {
-                wait(8)
-                peak = Math.max(peak, band.scale)
-            }
-            verify(peak > 1,
-                "and it swells mid-crossing, peaked at " + peak.toFixed(3))
-            // Shallow: 2% of a 180px column is under 4px, which reads as a pulse. A
-            // larger factor reads as a zoom, and at a factor big enough to matter it
-            // would cross the gutter and touch a neighbour's cards.
-            verify(peak <= 1.05, "but only a little, peaked at " + peak.toFixed(3))
-            settleSlide()
-            compare(band.scale, 1, "and it settles back, was " + band.scale)
         }
 
         function test_theCrossingRunsOnTheWorkspacesHighlightCurve() {

@@ -147,35 +147,16 @@ Item {
     // What the band reaches out past the body's own edges to sit `bandInset` from the
     // surface. Zero when the host declares no inset.
     readonly property int bandOutset: Math.max(0, surfaceInset - bandInset)
-    // The band's radius: square, like the widget's hover highlight and its active
-    // highlight - both are `radius: 0`. A rounded band was tried and read as a slot
-    // floating over the panel rather than as the column itself; the design language
-    // keeps rounding for component details, and a full-height column band is a band.
-    readonly property int bandRadius: 0
-    // How far the band swells at the middle of a crossing, as a share of its size.
-    // 2% of the active column's 360 is 7.2px across - 3.6px a side - which reads as a
-    // pulse rather than as a zoom, and stays inside the 6px gutter at either side so
-    // it never touches a neighbour's cards. The share rather than a pixel count is
-    // what keeps that true: this was written when the band was a 180px column and the
-    // same 2% was 1.8px a side, and a literal would have had to be re-derived every
-    // time the active column's width changed.
-    readonly property real bandPulse: 0.02
-    // Where the band sits: the panel's middle column, always, and it is the WIDE one.
+    // The panel's middle column, as a coordinate. The active workspace's column is ALWAYS
+    // the middle one - the crossing runs precisely so that the arriving active column
+    // lands there - so this is where that column's left edge is, whatever the crossing
+    // is doing. Kept as a named number because the panel's own geometry is arithmetic
+    // that several places reason about and none of them should be repeating it.
     //
-    // The active workspace's column is ALWAYS the panel's middle one - the crossing
-    // runs precisely so that the arriving active column lands there. So the band has
-    // no reason to move, and moving it is what broke it twice: glued to the strip's
-    // active SLOT it teleported a whole column at the start of a crossing and had to
-    // slide back (measured: 161px in one frame), and given a clock of its own it
-    // jumped at the end instead, because the body snaps the strip's offset there.
-    //
-    // Anchored to the panel, both jumps are impossible - there is nothing to be out of
-    // step with. The crossing is expressed by the two columns trading places THROUGH
-    // the band, and by the band swelling on the crossing's own progress, which is a
-    // pure function of the one clock.
+    // It used to also be the x of a full-height `activeFill` rectangle behind the column
+    // - the workspace widget's `activeHighlight` cell, magnified. That is gone: see the
+    // note where the band used to be.
     readonly property real bandX: narrowPitch
-    readonly property real bandScale: 1
-        + Math.sin(Math.PI * slideProgress) * bandPulse
     readonly property int shownColumnCount: HintLogic.COLUMN_COUNT
     // The two ends of the crossing as WORKSPACE POSITIONS, and the position in
     // between - which is the whole animation.
@@ -981,44 +962,28 @@ Item {
     // that could disagree with them or fall a frame behind them. The panel is the
     // three-column window onto it, and `clip` on the body is what keeps the rest of
     // the run off the surface.
-    // The active workspace's cell. The bar's `Workspaces.qml` draws that as one
-    // rectangle behind the squares - `activeHighlight`, covering the square exactly -
-    // and this is the same surface one size up, in the same token, with the same
-    // geometry: the cell, whose edges are the panel's edges, with the cards sitting
-    // `cellPaddingX` inside it.
+    // NO COLUMN-WIDE HIGHLIGHT, and its absence is the design.
     //
-    // A child of the BODY, and the strip has no motion of its own for it to be out
-    // of step with any more. The band is the wide middle SLOT, and the two columns
-    // trading places through it are placed by `slotX` on either side of it - so the
-    // band is the one thing in the panel that does not move at all. It used to be
-    // glued to the strip's active slot, which is what put a 161px teleport at the
-    // start of every crossing.
-    Rectangle {
-        id: activeBand
-        objectName: "windowHintColumnHighlight"
-        // `bandInset` from the SURFACE, so `bandInset - surfaceInset` from the body -
-        // negative when the popup insets its content column, which is what puts the
-        // band's edge near the panel's edge the way the widget's sits near the bar's.
-        y: root.bandInset - root.surfaceInset
-        x: root.bandX
-        // The WIDE slot. `panelWidth` is `bandX + this + columnGutter + columnWidth`,
-        // so the band's right edge lands exactly one gutter before the panel's - the
-        // same reach its left edge makes towards the surface.
-        width: root.activeColumnWidth
-        // The cell, not the card block: the cards sit `cellPaddingY` inside the band's
-        // top and bottom edges, so the band is the block plus that padding on each side.
-        height: Math.max(0, strip.contentHeight + cellPaddingY * 2)
-        radius: root.bandRadius
-        color: LazerTheme.activeFill
-        // The crossing's own progress, so the pulse cannot drift from the slide: one
-        // clock, no second animation to fall behind.
-        scale: root.bandScale
-        visible: root.ready && strip.contentHeight > 0
-        // Inert to input: under the pointer this is decoration, and a surface that
-        // swallows taps meant for the cards would be a fault the user only finds by
-        // missing a click.
-        enabled: false
-    }
+    // There was one here: the bar's `Workspaces.qml` draws the active workspace's cell as
+    // a single `activeHighlight` rectangle behind its squares, and this was the same
+    // surface at three times the size - a full-height, full-column `activeFill` (mTertiary
+    // at 14% alpha) sitting behind the cards, swelling 2% at the middle of every crossing.
+    //
+    // It was the wrong grain. The panel already says which workspace is active three
+    // other ways - the middle column is twice a neighbour's width, the columns trade
+    // places through the middle slot, and the focus marker travels the whole height of
+    // the panel onto one card. A fourth, coarser signal drawn UNDER all of them is the
+    // one that reads as "the block changed", and it changed on every switch while the
+    // thing the user is actually asking about - which window - arrived underneath it.
+    // So the panel showed two nested highlights, and the outer one was the one that
+    // moved.
+    //
+    // The focus marker's own three parts are the whole of the highlight now, and they are
+    // all one card's worth: the row's own background (`settingsSelected`, painted under
+    // its icon and title as its children), the border drawn around it, and the green bar
+    // beside it. The active column is still unmistakable - it is the wide one.
+    //
+    // What is left of the band's geometry is `bandX`, above.
 
     BarWindowHintStrip {
         id: strip
