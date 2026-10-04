@@ -70,19 +70,58 @@ Item {
     // back from the component, which is the mistake a test makes when it asserts a rule
     // by calling the rule. Strictly positive, because a card the frame has just touched
     // is lit: the frame is on it, and the frame is what the user can see.
+    // The frame's rectangle over a row, as GEOMETRY, over this suite's own pitch and the
+    // suite's own row height - not read back from the component, which is the mistake a
+    // test makes when it asserts a rule by calling the rule. Returns the covered height,
+    // because the mask is a partial one and "is it lit" throws away the part of the answer
+    // that matters: how MUCH of the card is lit.
     function frameOverRow(frame, index) {
         var top = root.rowTopInStrip(index, strip().scrollOffset)
-        var covered = Math.min(top + root.rowH, frame.y + frame.height)
-            - Math.max(top, frame.y)
-        return covered > 0
+        return Math.max(0, Math.min(top + root.rowH, frame.y + frame.height)
+            - Math.max(top, frame.y))
+    }
+
+    // Where that height lands inside the row, which is what the overlay's `y` is. The
+    // masked band's top, less the row's own top.
+    function frameMaskTopOverRow(frame, index) {
+        var top = root.rowTopInStrip(index, strip().scrollOffset)
+        return Math.max(top, frame.y) - top
     }
     // The cards currently carrying the focus tint, by index. Indices rather than
     // objects, so a failure says WHICH cards and not how many.
+    // The focus tint is GEOMETRY, not a colour: `windowHintRowFocusMask`, the part of a
+    // card the frame is currently over. A card's own `color` is its plain surface, so
+    // "is this card lit" is a question about an overlay's height.
+    //
+    // Everything that used to ask "does this row's colour equal the tint" asks this
+    // instead, including the partial cases - a card the frame is only part way across has
+    // a mask shorter than itself, and is part lit rather than not lit at all.
+    function maskOf(index) {
+        var rows = findAllByName(strip(), "windowHintWindowRow")
+        if (index >= rows.length)
+            return null
+        return findByName(rows[index], "windowHintRowFocusMask")
+    }
+
     function litCards() {
         var lit = []
         var rows = findAllByName(strip(), "windowHintWindowRow")
         for (var i = 0; i < rows.length; ++i) {
-            if (String(rows[i].color) === String(Lazer.LazerTheme.settingsSelected))
+            var mask = findByName(rows[i], "windowHintRowFocusMask")
+            if (mask && mask.visible && mask.height > 0)
+                lit.push(i)
+        }
+        return lit
+    }
+
+    // The rows whose masks do not cover them WHOLELY - which is the shape of "the frame is
+    // part way across", and the thing a whole-card tint could not express.
+    function partlyLitCards() {
+        var lit = []
+        var rows = findAllByName(strip(), "windowHintWindowRow")
+        for (var i = 0; i < rows.length; ++i) {
+            var mask = findByName(rows[i], "windowHintRowFocusMask")
+            if (mask && mask.height > 0 && mask.height < body.rowHeight)
                 lit.push(i)
         }
         return lit
@@ -1961,9 +2000,9 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var rows = findAllByName(strip(), "windowHintWindowRow")
             verify(rows.length >= 5,
                 "the arriving column's cards are all there, " + rows.length)
-            compare(String(rows[4].color), String(Lazer.LazerTheme.settingsCard),
-                "and the focused card is the plain card - its rectangle is nowhere near "
-                    + "this row, so nothing lights it, was " + rows[4].color)
+            compare(findByName(rows[4], "windowHintRowFocusMask").height, 0,
+                "and the focused card's mask has no height - the frame's rectangle is "
+                    + "nowhere near this row, so nothing of it is lit")
             verify(body._markerCrossing, "which is the point: the journey is still running")
             // And once the frame has arrived the card is lit with the frame around it. The
             // tint and the outline come off the same rectangle, so neither of them can be
@@ -1971,8 +2010,9 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             settleSlide()
             settleMarker()
             var landed = findAllByName(strip(), "windowHintWindowRow")
-            compare(String(landed[4].color), String(Lazer.LazerTheme.settingsSelected),
-                "once the frame has landed the card is tinted, was " + landed[4].color)
+            compare(findByName(landed[4], "windowHintRowFocusMask").height, body.rowHeight,
+                "once the frame has landed the mask covers the whole card, was "
+                    + findByName(landed[4], "windowHintRowFocusMask").height)
             compare(findByName(strip(), "windowHintFocusFrame").y,
                 landed[4].mapToItem(strip(), 0, 0).y,
                 "and the frame is around it")
@@ -1985,19 +2025,14 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             body.hint = root.tallFramedHint(3, 3, 8, 6)
             wait(Lazer.MotionTokens.settingsSidebarCollapse + 200)
             var resting = findAllByName(strip(), "windowHintWindowRow")
-            var lit = []
-            for (var i = 0; i < resting.length; ++i) {
-                if (String(resting[i].color) !== String(Lazer.LazerTheme.settingsCard))
-                    lit.push(i)
-            }
-            compare(lit.length, 1, "one card carries a fill of its own, and it was "
-                + lit.length + " - " + lit.join(","))
+            var lit = litCards()
+            compare(lit.length, 1, "one card is lit, and it was " + lit.length + " - "
+                + lit.join(","))
             compare(lit[0], 6, "and it is the one the focus moved to")
-            compare(String(resting[6].color), String(Lazer.LazerTheme.settingsSelected),
-                "which is exactly the tint and not a blend of it, because the change was "
-                    + "a step")
-            verify(body.frameAtRest, "and with the frame resting on it the row's Behaviour "
-                + "is on again, so a change the frame is not causing may still fade")
+            compare(partlyLitCards().length, 0,
+                "and it is lit WHOLELY rather than partly - the frame has stopped on it")
+            compare(findByName(resting[6], "windowHintRowFocusMask").height, body.rowHeight,
+                "its mask being exactly one row tall")
         }
 
         // Every card on the strip agrees with the frame's rectangle over it - the claim
@@ -2012,9 +2047,12 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var rows = findAllByName(strip(), "windowHintWindowRow")
             var wrong = []
             for (var i = 0; i < rows.length; ++i) {
-                var lit = String(rows[i].color) === String(Lazer.LazerTheme.settingsSelected)
-                if (lit !== root.frameOverRow(frame, i))
-                    wrong.push(i + (lit ? " lit" : " dark"))
+                var mask = findByName(rows[i], "windowHintRowFocusMask")
+                var covered = mask ? mask.height : 0
+                var wanted = root.frameOverRow(frame, i)
+                if (Math.abs(covered - wanted) > 1e-6
+                    || Math.abs(mask.y - root.frameMaskTopOverRow(frame, i)) > 1e-6)
+                    wrong.push(i + (covered > 0 ? " lit" : " dark") + " by " + covered)
             }
             compare(wrong.length, 0,
                 "every card matches the frame\'s rectangle over it " + where + " - wrong: "
@@ -2035,8 +2073,8 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             wait(300)
             compare(litCards().join(","), "1",
                 "at rest the band is exactly on the focused row, so that card alone is lit")
-            verify(body.frameAtRest,
-                "and the frame is at rest, which is what keeps the row's Behaviour on")
+            compare(maskOf(1).height, body.rowHeight,
+                "and its mask is the whole card, so the mask is the tint at rest")
 
             body.hint = root.tallFramedHint(3, 2, 6, 4)
             wait(20)
@@ -2055,9 +2093,9 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             driveMarkerTo(0.8)
             compare(litCards().join(","), "2",
                 "the band is over row 2, and that is the whole of what is lit")
-            compare(frameOverRow(findByName(strip(), "windowHintFocusFrame"), 4), false,
-                "and the frame's rectangle is not over the focused row, so nothing lights "
-                    + "it")
+            compare(root.frameOverRow(findByName(strip(), "windowHintFocusFrame"), 4), 0,
+                "and the frame's rectangle is not over the focused row at all - not by a "
+                    + "pixel - so nothing of that card is lit")
             assertTintMatchesTheFrame("at four fifths of the arrival leg")
 
             // Three quarters. The band straddles the gap between rows 1 and 2, and a card
@@ -2114,18 +2152,23 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(findAllByName(body, "windowHintColumnHighlight").length, 0,
                 "and none appears once there is content to sit behind")
 
-            var plain = String(Lazer.LazerTheme.settingsCard)
             var rows = findAllByName(strip(), "windowHintWindowRow")
             compare(rows.length, 6, "the active column's cards are all there")
-            var lit = []
+            var lit = litCards()
+            compare(lit.length, 1,
+                "exactly one card is lit, and it was " + lit.length + " that did - "
+                    + lit.join(","))
+            compare(lit[0], body.focusedRowIndex, "which is the focused one")
+            // And every card's own surface is plain, because the tint is in the overlay
+            // and not in the card: the two are separate claims and only the first is about
+            // which card is focused.
+            var plain = String(Lazer.LazerTheme.settingsCard)
+            var tinted = []
             for (var i = 0; i < rows.length; ++i)
                 if (String(rows[i].color) !== plain)
-                    lit.push(i)
-            compare(lit.length, 1,
-                "exactly one card carries any fill of its own, and it was " + lit.length
-                    + " that did - " + lit.join(","))
-            compare(lit[0], body.focusedRowIndex,
-                "which is the focused one")
+                    tinted.push(i)
+            compare(tinted.length, 0,
+                "and no card's own colour carries the tint, was " + tinted.join(","))
 
             // And it is the same card the frame is around, not merely the same index.
             var frame = findByName(strip(), "windowHintFocusFrame")
@@ -2180,9 +2223,10 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 // destroyed item.
                 var frame = findByName(strip(), "windowHintFocusFrame")
                 var rows = findAllByName(strip(), "windowHintWindowRow")
-                var lit = rows.length > 4
-                    && String(rows[4].color) === String(Lazer.LazerTheme.settingsSelected)
-                if (lit !== root.frameOverRow(frame, 4))
+                var mask = rows.length > 4
+                    ? findByName(rows[4], "windowHintRowFocusMask") : null
+                var covered = mask ? mask.height : 0
+                if (Math.abs(covered - root.frameOverRow(frame, 4)) > 1e-6)
                     wrong += 1
                 samples += 1
                 wait(8)
@@ -2256,9 +2300,6 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 "the frame has left the first card, was " + frame.y)
             verify(frame.y < root.rowTopInStrip(2, 0),
                 "and has not reached the third, was " + frame.y)
-            verify(!body.frameAtRest,
-                "so the row\'s Behaviour is off - a colour change the frame\'s own motion "
-                    + "caused must not also animate")
             compare(body.focusedRowIndex, 2, "while the data already names the new row")
             var lit = litCards()
             assertTintMatchesTheFrame("mid-glide")
@@ -2276,6 +2317,17 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var rows = findAllByName(strip(), "windowHintWindowRow")
             var plain = String(Lazer.LazerTheme.settingsCard)
             var tint = String(Lazer.LazerTheme.settingsSelected)
+            // Every card's own surface is the plain token on every one of these samples,
+            // which is the new form of "nothing is mid-fade": the mask carries the tint and
+            // the mask has no animation at all, so there is no colour anywhere to be
+            // part way between two.
+            var drifted = []
+            for (i = 0; i < rows.length; ++i)
+                if (String(rows[i].color) !== plain)
+                    drifted.push(i)
+            compare(drifted.length, 0,
+                "and no card's own surface has changed at all - the tint is entirely in "
+                    + "the overlays, was " + drifted.join(","))
             var blended = []
             for (var i = 0; i < rows.length; ++i) {
                 if (String(rows[i].color) !== plain && String(rows[i].color) !== tint)
@@ -2285,8 +2337,9 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 "no card is part way between the two, so the tint changed in one step - "
                     + blended.join(", "))
             wait(Lazer.MotionTokens.settingsSidebarCollapse + 160)
-            compare(litCards().join(","), "2", "and once the frame has arrived it is alone")
-            verify(body.frameAtRest, "with the frame resting on it")
+            compare(litCards().join(","), "2",
+                "and once the frame has arrived it is alone, lit wholly")
+            compare(partlyLitCards().length, 0, "with nothing left part way across")
         }
 
         function test_theWholePanelArrivesInOnePiece() {
@@ -2351,20 +2404,26 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
 
         // ---- state markers ----------------------------------------------
         function test_theFocusTintIsTheFocusedRowsOwnBackground() {
-            // The tint has to be painted by the ROW, because that is the only thing
-            // underneath the icon and the title. It was a separate element at z 5
-            // above the rows instead - the only arrangement that let a shared element
-            // mark an opaque card - and `settingsSelected` is the primary at a
-            // quarter alpha, so it veiled both. This is `LauncherResultRow.qml`'s
-            // arrangement: the row's own fill, with its content as children on top.
-            var tint = Lazer.LazerTheme.settingsSelected
+            // The tint has to be painted INSIDE the row, because that is the only place
+            // underneath the icon and the title. It was a separate element at z 5 above the
+            // rows instead - the only arrangement that let a shared element mark an opaque
+            // card - and `settingsSelected` is the primary at a quarter alpha, so it veiled
+            // both. It is now the mask overlay, declared as the row's FIRST child: above the
+            // row's own fill, below the content that follows. `LauncherResultRow.qml`'s
+            // layering, with the fill clipped to the frame's rectangle rather than covering
+            // the whole card.
             var rows = findAllByName(live(), "windowHintWindowRow")
-            var tinted = rows.filter(function(r) { return r.color === tint })
-            compare(tinted.length, 1, "exactly one row carries the tint")
-            compare(tinted[0], rows[body.focusedRowIndex],
-                "and it is the focused row, not row " + rows.indexOf(tinted[0]))
-            compare(rows[0].color, Lazer.LazerTheme.settingsCard,
-                "the rows either side keep the plain card")
+            var tinted = litCards()
+            compare(tinted.length, 1, "exactly one row is lit")
+            compare(tinted[0], body.focusedRowIndex, "and it is the focused row")
+            // Every card's own surface is plain: the tint lives in the overlays, so "which
+            // card is focused" and "which cards changed colour" are separate questions and
+            // only the first has an answer.
+            var tintedSurfaces = rows.filter(function(r) {
+                return String(r.color) !== String(Lazer.LazerTheme.settingsCard)
+            })
+            compare(tintedSurfaces.length, 0,
+                "and no card's own colour carries the tint, was " + tintedSurfaces.length)
             // A Rectangle borders itself by default; the tint is this row's signal,
             // so the default hairline would be a second, wrong outline around it.
             compare(rows[0].border.width, 0)
@@ -2397,7 +2456,11 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var wash = findByName(live(), "windowHintFocusFrame")
             var bar = findByName(live(), "windowHintFocusIndicator")
             var icon = findByName(live(), "windowHintWindowIcon")
-            compare(icon.x, rows[0].children[0].x, "glyphs share one inset")
+            // By name, not by position: `children[0]` used to be the icon and is the focus
+            // mask overlay now, and a test that silently measures the wrong child is worse
+            // than one that fails.
+            compare(icon.x, findByName(rows[0], "windowHintWindowIcon").x,
+                "glyphs share one inset")
             // Left of the card, so its whole width is clear of the card's left edge.
             // The bar is a child of the strip and the row a child of one of its
             // columns, so the row is mapped into the strip's space before the two are
@@ -2488,8 +2551,6 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // Which is also what stops the tint from fading: a colour change the frame\'s
             // own motion caused must not also animate, or the card the band has already
             // left is still climbing toward its old colour behind it.
-            verify(!body.frameAtRest,
-                "and with the frame in flight the row\'s Behaviour on color is off")
 
             wait(Lazer.MotionTokens.settingsSidebarCollapse + 120)
             var moved = findByName(live(), "windowHintFocusFrame")

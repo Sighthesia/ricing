@@ -557,17 +557,6 @@ Item {
     // coordinates on the crossing's first frame, so the position alone would read a
     // travelling frame as a rested one.
     //
-    // It carries the job two flags used to share, and it carries the WHOLE of it because
-    // it is a question about the frame rather than about a moment. The rule preserved is
-    // the one those flags were built for: a colour change caused by the frame ARRIVING
-    // must not also animate, while a change with the frame already resting on the row may.
-    // A journey's displacement never satisfies this except on its landing frame, and
-    // neither does the focus glide until it finishes - so every card the band passes is
-    // handed over in one step, and the crossfade that used to remain "at rest" is gone
-    // because a focus change at rest IS a glide. What may still fade is a change the
-    // frame is not causing at all, which after this is the hover response.
-    readonly property bool frameAtRest: !_markerCrossing
-        && Math.abs(focusFrame.y - focusedRowTop) < 0.5
     // --- the slide -------------------------------------------------------
     // A workspace switch replaces every row, so without this the panel's contents
     // are simply gone and remade between two frames. Here the leaving frame is
@@ -802,7 +791,7 @@ Item {
             // again, which is a second motion starting at the exact moment the first one
             // finished.
             root._snapIndicator(root._restingY())
-            // The frame lands, and `frameAtRest` goes true on this frame. There is
+            // The frame lands. There is
             // nothing to hold the tint back for here any more: the tint has been
             // following the frame's own rectangle the whole way in, so the card lit on
             // the frame the band first touched it rather than on this one - and
@@ -1092,7 +1081,6 @@ Item {
         // there - so these are the two numbers the whole of the focus tint rests on.
         focusFrameTop: focusFrame.y
         focusFrameHeight: focusFrame.height
-        frameAtRest: root.frameAtRest
         debugTimeScale: root.debugTimeScale
         cellPaddingX: root.cellPaddingX
         listSpacing: root.listSpacing

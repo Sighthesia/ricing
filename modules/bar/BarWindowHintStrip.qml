@@ -102,9 +102,6 @@ Item {
     // construction, which is the whole of what that ordering is safe on.
     property real focusFrameTop: 0
     property real focusFrameHeight: 0
-    // Whether the frame has ARRIVED. See the body's `frameAtRest` for why this is asked
-    // of the frame rather than of a journey flag.
-    property bool frameAtRest: true
     // Observation slow-motion, fed from the body. The row flash and the focus tint live
     // here rather than on the body, so they are on the marker's path and have to be
     // slowed with it - a 100ms tint left unscaled next to a 2s journey is the one thing
@@ -196,11 +193,35 @@ Item {
     // cards, and the frame is drawn around whichever of them it is nearer. It lasts for
     // `rowHeight - listSpacing` of travel - 22px, two thirds of a row pitch - and it is
     // the reason a focus glide reads as one sweep rather than as a switch.
-    function frameOverRow(index) {
+    // The frame's rectangle CLIPPED TO this row, in the row's own coordinates. The mask,
+    // not a yes/no.
+    //
+    // The row's rect in the strip's space starts at `index * rowPitch - scrollOffset` -
+    // the scroll is in here because the active column is drawn at `-scrollOffset`, so a
+    // row's on-screen position and its position in the list are two different numbers and
+    // this one is the on-screen one. The frame's rect is `focusFrameTop` through
+    // `focusFrameTop + focusFrameHeight`. What this returns is their intersection, expressed
+    // relative to the row so the overlay can be a plain child of it.
+    //
+    // The horizontal axis needs no intersection at all, and that is not an oversight: the
+    // frame is placed from the active column's own geometry and the cards are placed from
+    // the same two numbers, so the two rects have identical left edges and identical widths
+    // at every instant of a crossing - the frame widens with the column because it is
+    // computed from it. So the mask is the full width of the card and only its height and
+    // offset vary, which is what a vertical traverse needs.
+    //
+    // `top` may exceed the row's height and `height` may come back zero or negative; the
+    // caller clamps nothing, because a zero-height overlay IS the answer for "the frame is
+    // not on this card" and `visible` reads it.
+    function frameMaskOverRow(index) {
         const top = index * root.rowPitch - root.scrollOffset
-        const covered = Math.min(top + root.rowHeight,
-            root.focusFrameTop + root.focusFrameHeight) - Math.max(top, root.focusFrameTop)
-        return covered > 0
+        const maskedFrom = Math.max(top, root.focusFrameTop)
+        const maskedTo = Math.min(top + root.rowHeight,
+            root.focusFrameTop + root.focusFrameHeight)
+        return {
+            top: maskedFrom - top,
+            height: Math.max(0, maskedTo - maskedFrom)
+        }
     }
 
     // The tallest column on the strip, MEASURED rather than bound.
@@ -347,34 +368,19 @@ Item {
                     height: root.rowHeight
                     radius: 6
                     transformOrigin: Item.Center
-                    // The focus tint is the row's OWN background, drawn under its icon
-                    // and title as children - `LauncherResultRow.qml`'s recipe, and the
-                    // reason the shared highlight above is border-only. Painting the tint
-                    // from a separate element above the row put a translucent panel of
-                    // `settingsSelected` over the icon and the text, veiling both.
+                    // NO focus tint here, ever. This rectangle is the card's PLAIN surface
+                    // and the focus tint is the overlay below, clipped to the frame - so a card
+                    // the frame is only part way across is part way lit rather than wholly
+                    // lit. Tinting the card itself cannot express that: a colour is a
+                    // whole-surface property, and the moment the frame touched a card the
+                    // entire card changed, which is a card switching state rather than a
+                    // mark travelling across the list.
                     //
-                    // What decides it is the frame's own rectangle, read per row and read
-                    // every frame: `root.frameOverRow`, above. It was `focusedRowIndex`,
-                    // which is read off the ARRIVING snapshot and so is correct from the
-                    // crossing's first frame - the card lit up while the frame was still
-                    // above the panel, a long way from arriving, giving the answer away
-                    // before the gesture delivered it. Then it was a state flag
-                    // (`markerOnFocusedRow`, a renamed `!_markerCrossing`), which held the
-                    // tint off for a whole journey and then switched it on at the landing.
-                    // A flag can only be right on the frames something writes it on, so it
-                    // is either too early or too late everywhere else.
-                    //
-                    // The frame's live rectangle is neither: it is where the thing being
-                    // marked IS, so the tint is that rectangle made visible. The frame
-                    // leaves the card being left by travelling down the panel, so the
-                    // band lights the cards it passes on the way out; it re-enters through
-                    // the opposite edge and comes down onto the arriving card, so it
-                    // lights them again on the way in and stays on the one it lands on. The
-                    // frame is the mark, and a card under it is lit - which is what "the
-                    // region the frame encloses changes" has to mean.
-                    color: root.frameOverRow(windowRow.index)
-                        ? LazerTheme.settingsSelected
-                        : (rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard)
+                    // The overlay is a CHILD, so it paints above this fill and below the
+                    // icon and title that follow it - which is the whole reason the tint is
+                    // not on this rectangle. A fill above the row's content veiled both.
+                    color: rowHover.hovered
+                        ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
                     // A Rectangle borders itself by default; this row's own tint is its
                     // focus signal, so that default is off - the outline that marks the
                     // focused row is the one shared element, and it has its own border.
@@ -386,45 +392,64 @@ Item {
                     readonly property alias rowFlashAnimation: rowFlash
                     readonly property alias rowFlashOverlay: rowFlashOverlay
 
-                    // The tint tracks the frame frame by frame, so the only colour change
-                    // allowed to animate is one the frame is NOT causing - which is the
-                    // change that happens with the frame already resting on the row.
-                    // `frameAtRest` is that question, asked of the frame's own position
-                    // rather than of a moment: a journey's displacement never satisfies it
-                    // except on its landing frame, and neither does the focus glide until
-                    // it finishes.
+                    // THE FOCUS TINT AS A MASK: the part of this card the focus frame is
+                    // over right now, and nothing else.
                     //
-                    // This gate replaces two. One disabled the animation for a whole
-                    // journey, which is right for the arrival and useless for every card
-                    // the band swept over on the way there; the other was a one-shot set on
-                    // the landing, which covered the landing alone. Between them they left
-                    // the tint crossfading through each card the band passed - and a 100ms
-                    // fade on a card the frame has already left reads as that card being
-                    // selected a second time, which is the lag the geometry removes.
+                    // Declared FIRST so it paints above this card's own fill and below the
+                    // icon and title that follow it. That ordering is the entire reason it
+                    // is an overlay rather than a colour on the card above - a colour on
+                    // the card is the tint under the content, which is right, but a colour
+                    // is also a WHOLE-SURFACE property: the moment the frame touched a card
+                    // the entire card changed. That is a card switching state, not a mark
+                    // travelling across the list, and it is the difference between this and
+                    // a card lit all at once the moment the frame arrives at its edge.
                     //
-                    // The other is the focus glide, and the case a state flag could never
-                    // see: a window change inside one workspace - the common interaction -
-                    // moves the frame over `settingsSidebarCollapse`, and for those 300ms
-                    // it is BETWEEN the rows rather than on one of them. The geometry
-                    // covers that with nothing to enumerate, and it is why there is no
-                    // crossfade at rest any more: a focus change at rest IS a glide, so
-                    // "at rest" and "the tint may fade" were never the same moment.
-                    //
-                    // The fault both of those gates were written for is still covered, and
-                    // by the geometry rather than by a flag. niri's second snapshot about
-                    // 40ms into a switch is often the first that carries the new
-                    // workspace's windows, so that is when the tint's inputs change - and
-                    // the arriving frame's rows REPLACE the leaving frame's, which means
-                    // the delegate that becomes the focused row is a RECYCLED one still
-                    // holding its previous colour. Measured, that delegate used to ramp
-                    // over ~300ms from the tint through `#fb2320` to the new tint while
-                    // the frame was still out of sight above the panel: a flash of the
-                    // background, on exactly the card the frame was about to land on. A
-                    // journey is in flight throughout, so this is off and the row takes
-                    // its colour in one step - and the frame is already over that card by
-                    // then, so it is the right colour to take.
+                    // Its geometry is read from `frameMaskOverRow` every frame and carries
+                    // no `Behavior`, because the frame is a moving mark and a mark that
+                    // eases towards its position is a different mark. Nothing is lost by
+                    // that: at rest the mask covers the whole card, so the card looks
+                    // wholly tinted, exactly as it did before. The two differ only while
+                    // the frame is travelling, and there following it frame-for-frame IS
+                    // the effect.
+                    Rectangle {
+                        id: windowRowFocusMask
+                        objectName: "windowHintRowFocusMask"
+                        // Full width, and that is not an oversight: the frame is placed
+                        // from the active column's own geometry and the cards from the same
+                        // two numbers, so the frame's rect and this card's have identical
+                        // left edges and identical widths at every instant of a crossing -
+                        // the frame widens with the column because it is computed from it.
+                        // A vertical traverse needs no horizontal intersection, so this is
+                        // the whole of the mask's width.
+                        x: 0
+                        width: windowRow.width
+                        y: root.frameMaskOverRow(windowRow.index).top
+                        height: root.frameMaskOverRow(windowRow.index).height
+                        color: LazerTheme.settingsSelected
+                        // The card's own radius, so at rest - the mask being the whole card
+                        // - the two are the same shape and the join is invisible. Part way
+                        // through a pass it is a band with rounded ends, which reads as the
+                        // card's own surface being lit rather than as a separate object
+                        // sliding over it.
+                        radius: 6
+                        // Zero height IS the answer for "the frame is not on this card",
+                        // and saying it with height rather than with `visible` keeps the
+                        // geometry honest for anything that measures it. `visible` is the
+                        // belt to that braces, since a zero-height item still costs a
+                        // little to consider.
+                        visible: height > 0
+                        // Inert to input. It is decoration lying over the card, and a
+                        // surface that swallowed taps meant for the window would be a fault
+                        // the user only finds by missing a click.
+                        enabled: false
+                    }
+
+                    // Behaviour on `color` is now only ever about HOVER. The focus tint is
+                    // the overlay declared above, so no change to this rectangle's colour
+                    // can be caused by the frame - which is what makes the gate that used
+                    // to sit here pointless rather than merely unused. A short fade on hover
+                    // is the settings panel's own recipe and stays.
                     Behavior on color {
-                        enabled: root.frameAtRest
                         ColorAnimation { duration: MotionTokens.fast * debugTimeScale }
                     }
                     Behavior on scale {
