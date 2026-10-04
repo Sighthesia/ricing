@@ -42,7 +42,7 @@ QtObject {
         root.noteInput()
         // A lens change rides the pooled fast path: the full sorted set for
         // this mode is already here, so no adapter call is needed.
-        root.publishCategorySummary()
+        root.publishCategorySummary(true)
         root.refresh()
     }
 
@@ -119,10 +119,31 @@ QtObject {
     // the tail streams in. So it is published when it means something - when
     // the data is whole, and when a query or lens change makes it wrong.
     property var categorySummary: ({ total: 0, categories: [] })
+    // Running tally for the set currently streaming in. Counting a batch as it
+    // arrives costs one pass over that batch; recounting the pool per batch cost
+    // a pass over all of it, six times over, on the frames the list is filling.
+    property var _categoryTally: null
 
-    function publishCategorySummary() {
-        root.categorySummary = LauncherLogic.categorySummary(
-            root.displayPool, LauncherLogic.parseQuery(root.query).text)
+    // Publishes the counts for what has arrived so far, from the running tally
+    // when there is one. `final` says the stream is over, which drops the tally
+    // so the next set starts clean.
+    function publishCategorySummary(final) {
+        if (root._categoryTally) {
+            root.categorySummary = LauncherLogic.categoryTallyToSummary(root._categoryTally)
+        } else {
+            root.categorySummary = LauncherLogic.categorySummary(
+                root.displayPool, LauncherLogic.parseQuery(root.query).text)
+        }
+        if (final === true)
+            root._categoryTally = null
+    }
+
+    // Counts a batch into the running tally without publishing it.
+    function tallyCategorySummary(batch) {
+        if (!root._categoryTally)
+            root._categoryTally = LauncherLogic.newCategoryTally()
+        LauncherLogic.tallyCategories(root._categoryTally, batch,
+                LauncherLogic.parseQuery(root.query).text)
     }
 
     function setForegroundBusy(busy) {
@@ -162,6 +183,7 @@ QtObject {
         var held = root._heldBatches
         root._heldBatches = []
         root._inputActive = false
+        root._categoryTally = null
         for (var index = 0; index < held.length; index++)
             root._applyBatch(held[index][0], held[index][1], held[index][2],
                              held[index][3], held[index][4])
@@ -194,7 +216,7 @@ QtObject {
     onQueryChanged: {
         if (root.visible) {
             root.noteInput()
-            root.publishCategorySummary()
+            root.publishCategorySummary(true)
             root.refresh()
         }
     }
@@ -207,7 +229,13 @@ QtObject {
         target: root.clipboardService
         ignoreUnknownSignals: true
         function onListCompleted() {
-            if (root.visible && !root.loading
+            // A poll that lands while the list is still filling must not restart
+            // it: the force pull supersedes the in-flight stream, so the tail
+            // it had not delivered yet is thrown away and the whole set starts
+            // arriving again - the counts step backwards and the open never
+            // settles. `loading` only covers the wait before the first batch, so
+            // the streaming half has to be asked for separately.
+            if (root.visible && !root.loading && !root.loadingMore
                     && LauncherLogic.parseQuery(root.query).mode === "clipboard")
                 root.refresh(true)
         }
@@ -394,7 +422,7 @@ QtObject {
             var sorted = LauncherLogic.sortResults(collected)
             root.displayPool = sorted
             root._pooledMode = "apps"
-            root.publishCategorySummary()
+            root.publishCategorySummary(true)
             root.results = LauncherLogic.filterResults(sorted, "", root.category)
             root.selectedIndex = LauncherLogic.clampSelection(0, root.results.length)
         })
@@ -532,11 +560,14 @@ QtObject {
         root.results = LauncherLogic.poolMatches(previous, filtered)
                 ? previous : filtered
         // The chip counts follow the data, but only where they are true: the
-        // first batch is what the rail can show at all, and the completing
-        // batch is when the numbers are final. The batches in between would
-        // only restate a partial set.
+        // opening batch is what the rail can show at all, and the completing
+        // batch is when the numbers are final. The batches in between are only
+        // counted into the running tally - a pass over the batch rather than
+        // over everything - and publish nothing, so the numbers do not step
+        // while the list is still filling.
+        root.tallyCategorySummary(batch)
         if (!appending || complete)
-            root.publishCategorySummary()
+            root.publishCategorySummary(complete === true)
     }
 
     // Background revalidation for change announcers (desktop-entry rescans,
@@ -581,7 +612,7 @@ QtObject {
             var sorted = LauncherLogic.sortResults(collected)
             if (!LauncherLogic.poolMatches(sorted, root.displayPool)) {
                 root.displayPool = sorted
-                root.publishCategorySummary()
+                root.publishCategorySummary(true)
             }
         })
     }

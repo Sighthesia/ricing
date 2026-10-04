@@ -24,6 +24,7 @@ Item {
             property var requests: []
             signal previewDecoded(string id, string contentOrPath)
             signal metadataUpdated(string id)
+            signal listCompleted()
             function requestPreview(id, isImage) {
                 requests.push({ id: id, isImage: isImage })
             }
@@ -1151,6 +1152,36 @@ Item {
                    "the completing batch must land the real counts")
             compare(chipCount("games"), 2)
             compare(chipCount("network"), 2)
+        }
+
+        function test_aPollMidStreamDoesNotRestartTheOpen() {
+            // Clipboard history is polled on a timer, so a poll can land while
+            // the list is still filling. A force pull supersedes the in-flight
+            // stream, which threw away the tail it had not delivered and sent
+            // the whole set arriving again - the counts stepping backwards and
+            // an open that never settles.
+            _clipboardStub = clipboardStubComponent.createObject(null)
+            svc().clipboardService = _clipboardStub
+            var clips = makeManualAdapter()
+            svc()._adapters = { clipboard: clips }
+
+            svc().openClipboard()
+            wait(0)
+            resolveBatch(clips, 0, [makeItem("c1", "First", 0, 0)], false)
+            compare(svc().loadingMore, true)
+            var streamToken = svc()._refreshToken
+
+            _clipboardStub.listCompleted()
+
+            compare(svc()._refreshToken, streamToken,
+                    "a poll during the stream must not re-pull")
+            compare(clips.queries.length, 1, "the adapter must not be asked again")
+            compare(svc().loadingMore, true, "the stream keeps running")
+
+            // The tail still lands on the callback the open is holding.
+            resolveBatch(clips, 0, [makeItem("c2", "Second", 0, 0)], true)
+            compare(svc().results.length, 2)
+            compare(svc().loadingMore, false)
         }
 
         function test_aQueryEditReCountsImmediately() {

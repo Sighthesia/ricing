@@ -122,17 +122,19 @@ function itemVisible(item, text, category) {
     return resultMatches(item, text) && matchesCategory(item, category)
 }
 
-// Per-category tally over a pooled set. Ids are registered from the whole
-// pool - not just the current text matches - so a chip keeps its slot (and
-// its 0 count) while typing instead of vanishing and reflowing the bar.
-// Unclassified items contribute to total only; they have no chip of their
-// own.
-function categorySummary(items, text) {
-    var categories = []
-    var counts = ({})
-    var total = 0
-    if (!items || !items.length)
-        return { total: 0, categories: categories }
+// An empty tally, and the accumulator the summary is built from. Counting a
+// streamed set batch by batch costs one pass over each batch instead of one
+// pass over everything per batch, and the ids are registered as they arrive so
+// a chip keeps its slot while the set is still filling.
+function newCategoryTally() {
+    return { total: 0, counts: ({}), order: [] }
+}
+
+// Adds a pooled set into a tally. `text` is the current needle: only rows that
+// would be shown are counted, exactly as categorySummary does in one pass.
+function tallyCategories(tally, items, text) {
+    if (!tally || !items || !items.length)
+        return tally
     for (var i = 0; i < items.length; i++) {
         var item = items[i]
         if (!item)
@@ -140,20 +142,42 @@ function categorySummary(items, text) {
         var id = categoryOf(item)
         if (id.length > 0) {
             var key = "$" + id
-            if (!Object.prototype.hasOwnProperty.call(counts, key)) {
-                counts[key] = 0
-                categories.push({ id: id, count: 0 })
+            if (!Object.prototype.hasOwnProperty.call(tally.counts, key)) {
+                tally.counts[key] = 0
+                tally.order.push(id)
             }
         }
         if (resultMatches(item, text)) {
-            total++
+            tally.total++
             if (id.length > 0)
-                counts["$" + id]++
+                tally.counts["$" + id]++
         }
     }
-    for (var c = 0; c < categories.length; c++)
-        categories[c].count = counts["$" + categories[c].id]
-    return { total: total, categories: categories }
+    return tally
+}
+
+// Freezes a tally into the shape the chip rail reads. Ids that arrived with a
+// zero count keep their slot, so a chip does not vanish and reflow the bar.
+function categoryTallyToSummary(tally) {
+    var summary = { total: 0, categories: [] }
+    if (!tally)
+        return summary
+    summary.total = tally.total
+    for (var i = 0; i < tally.order.length; i++) {
+        var id = tally.order[i]
+        summary.categories.push({ id: id, count: tally.counts["$" + id] })
+    }
+    return summary
+}
+
+// Per-category tally over a pooled set. Ids are registered from the whole
+// pool - not just the current text matches - so a chip keeps its slot (and
+// its 0 count) while typing instead of vanishing and reflowing the bar.
+// Unclassified items contribute to total only; they have no chip of their
+// own.
+function categorySummary(items, text) {
+    return categoryTallyToSummary(
+        tallyCategories(newCategoryTally(), items, text))
 }
 
 // Searchable text for one pooled item; mirrors the adapter needles via
