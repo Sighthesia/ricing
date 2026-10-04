@@ -30,6 +30,12 @@ Singleton {
     property bool _metadataDirty: false
     property bool _metadataCacheReady: false
     property bool _createMetadataCache: false
+    property var _metadataQueueIds: []
+    property bool _metadataBusy: false
+    // A fetch that landed while a metadata batch was running: the queue is
+    // rebuilt against the newer rows once that batch returns, instead of
+    // leaving them without metadata until the next poll.
+    property bool _metadataRestartPending: false
     property var _pendingSignatureIds: []
     property var _pendingSignatureRows: ({})
     property var _signaturePendingById: ({})
@@ -43,6 +49,47 @@ Singleton {
     property bool _createFirstSeenCache: false
     property bool _initialFirstSeenRecovery: false
     property bool _firstListLoaded: false
+
+    // ---- List parse state ------------------------------------------------
+    // A 750-row history parsed in one turn blocked the event loop for tens of
+    // milliseconds, which a launcher open landing in that window paid in full.
+    // The parse therefore publishes slices: the first slice is exactly one
+    // consumer batch (LauncherAdapters.clipboardChunkSize is 64), the rest
+    // follows a slice per turn, and no turn's cost grows with history length.
+    property var _parseLines: []
+    property var _parseRows: []
+    property int _parseIndex: 0
+    property bool _parseRunning: false
+    property bool _parsePublished: false
+    // id -> row for the published history. The metadata merge and first-seen
+    // confirmation both look rows up by id; scanning the array instead made
+    // every one of the ~750 signature completions walk all 750 rows.
+    property var _itemById: ({})
+
+    // ---- Background work pacing ------------------------------------------
+    // Not motion tokens: these pace a data pipeline, not an animation. They
+    // bound how much of the event loop the background queues may take when the
+    // foreground is idle, and the queues stop entirely while it is not.
+    readonly property int _parseFirstSliceRows: 64
+    readonly property int _parseSliceRows: 192
+    readonly property int _metadataBatchSize: 16
+    readonly property int _metadataGapMs: 24
+    readonly property int _signatureGapMs: 16
+    // How long a gated queue waits before looking again, so a foreground that
+    // stops touching the service can never strand the queue.
+    readonly property int _foregroundRetryMs: 120
+    // Held after any foreground-only entry point (preview, thumbnail, a
+    // consumer's explicit hint) so a burst of foreground reads is one yield,
+    // not one yield per row.
+    readonly property int _foregroundHoldMs: 250
+
+    // ---- Foreground priority ---------------------------------------------
+    // A launcher open pulls rows and metadata merges through this service and
+    // requests previews and thumbnails; those are foreground-only paths, so
+    // they are what the background queues yield to. setForegroundBusy() lets a
+    // consumer hold the gate for a whole open instead of relying on touches.
+    property bool _foregroundBusy: false
+    readonly property bool _foregroundActive: root._foregroundBusy || _foregroundHoldTimer.running
 
     property Process _cacheDirProc: Process {
         command: ["mkdir", "-p", root._cacheDir]
@@ -151,48 +198,108 @@ Singleton {
         onRunningChanged: listing = running
 
         stdout: StdioCollector {
-            onStreamFinished: {
-                let lines = this.text.trim().split("\n")
-                let result = []
-                for (let index = 0; index < lines.length; index++) {
-                    let row = LauncherAdapters.splitClipboardListLine(lines[index])
-                    if (!row)
-                        continue
-                    // cliphist separates id and preview with a tab
-                    let id = row.id
-                    let preview = row.preview
-                    let isImage = LauncherAdapters.isClipboardImagePreview(preview)
-                    if (!root._firstSeenById[id]) {
-                        // Entries the shell just copied back surface here with
-                        // a fresh id; inherit the original timestamp so the row
-                        // keeps its position instead of jumping to the top
-                        // until signature recovery confirms the same value.
-                        var seededMs = LauncherAdapters.matchClipboardCopySeed(
-                            root._recentCopySeeds, preview, isImage, Date.now())
-                        root._firstSeenById[id] = seededMs > 0 ? seededMs : Date.now()
-                        root._firstSeenDirty = true
-                        root._enqueueFirstSeenSignature(id, index)
-                    }
-                    let mime = LauncherAdapters.clipboardMimeForPreview(preview, isImage)
-                    result.push({ id, preview, isImage, mime, firstSeenMs: root._firstSeenById[id] })
-                }
-                root.items = result
-                root.revision++
-                root._startMetadataQueue()
-                if (!root._firstListLoaded) {
-                    root._firstListLoaded = true
-                    // Pre-seeded rows skip the assign path above, so enqueue
-                    // them here for signature learning (dedup skips the ones
-                    // just enqueued): a later copy-back then resolves to the
-                    // original timestamp instead of learning the jump time.
-                    for (var learnIndex = 0; learnIndex < result.length; learnIndex++)
-                        root._enqueueFirstSeenSignature(String(result[learnIndex].id), learnIndex)
-                    root._initialFirstSeenRecovery = true
-                    root._finishInitialFirstSeenRecovery()
-                }
-                root.listCompleted()
-            }
+            // Everything expensive about a list lands here, so it hands the
+            // output to the slice pump instead of parsing it inline: the first
+            // slice is published in this same turn and the rest follows one
+            // turn at a time.
+            onStreamFinished: root._beginListParse(this.text)
         }
+    }
+
+    // ---- Incremental list parse ------------------------------------------
+    // Rows are built and published in slices so a consumer never waits for the
+    // whole history and no single turn's cost grows with its length. The
+    // published array is always a prefix of the finished list in the same
+    // order, so a consumer that reads mid-parse sees a valid ordered subset.
+    // listCompleted still fires only once the full list is committed, and
+    // revision still moves exactly once per fetch, which is what
+    // LauncherAdapters' refresh() uses to tell "never loaded" from "loading".
+    property Timer _parseTimer: Timer {
+        interval: 0
+        repeat: false
+        onTriggered: root._pumpListParse()
+    }
+
+    function _beginListParse(text) {
+        // A fetch that arrives mid-parse replaces the pending one: same
+        // last-fetch-wins rule the single-turn parse had.
+        root._parseLines = text.trim().split("\n")
+        root._parseRows = []
+        root._parseIndex = 0
+        root._parsePublished = false
+        root._parseRunning = true
+        root._itemById = ({})
+        root._pumpListParse()
+    }
+
+    function _pumpListParse() {
+        if (!root._parseRunning)
+            return
+        var lines = root._parseLines
+        var limit = root._parsePublished ? root._parseSliceRows : root._parseFirstSliceRows
+        var end = Math.min(lines.length, root._parseIndex + limit)
+        for (var index = root._parseIndex; index < end; index++)
+            root._appendListRow(lines[index], index)
+        root._parseIndex = end
+        root._publishParsedRows()
+        if (root._parseIndex < lines.length) {
+            root._parseTimer.restart()
+            return
+        }
+        root._finishListParse()
+    }
+
+    // One history row.
+    function _appendListRow(line, lineIndex) {
+        let parsed = LauncherAdapters.splitClipboardListLine(line)
+        if (!parsed)
+            return
+        // cliphist separates id and preview with a tab
+        let id = parsed.id
+        let preview = parsed.preview
+        let isImage = LauncherAdapters.isClipboardImagePreview(preview)
+        if (!root._firstSeenById[id]) {
+            // Entries the shell just copied back surface here with
+            // a fresh id; inherit the original timestamp so the row
+            // keeps its position instead of jumping to the top
+            // until signature recovery confirms the same value.
+            var seededMs = LauncherAdapters.matchClipboardCopySeed(
+                root._recentCopySeeds, preview, isImage, Date.now())
+            root._firstSeenById[id] = seededMs > 0 ? seededMs : Date.now()
+            root._firstSeenDirty = true
+            root._enqueueFirstSeenSignature(id, lineIndex)
+        }
+        let mime = LauncherAdapters.clipboardMimeForPreview(preview, isImage)
+        let row = { id: id, preview: preview, isImage: isImage, mime: mime,
+                    firstSeenMs: root._firstSeenById[id] }
+        root._itemById[id] = row
+        root._parseRows.push(row)
+    }
+
+    function _publishParsedRows() {
+        // A fresh array per publish: consumers may hold on to the array they
+        // read, and a snapshot is what lets the parse keep appending.
+        root.items = root._parseRows.slice()
+        root._parsePublished = true
+    }
+
+    function _finishListParse() {
+        root._parseRunning = false
+        root._parseLines = []
+        root.revision++
+        root._startMetadataQueue()
+        if (!root._firstListLoaded) {
+            root._firstListLoaded = true
+            // Pre-seeded rows skip the assign path above, so enqueue
+            // them here for signature learning (dedup skips the ones
+            // just enqueued): a later copy-back then resolves to the
+            // original timestamp instead of learning the jump time.
+            for (var learnIndex = 0; learnIndex < root.items.length; learnIndex++)
+                root._enqueueFirstSeenSignature(String(root.items[learnIndex].id), learnIndex)
+            root._initialFirstSeenRecovery = true
+            root._finishInitialFirstSeenRecovery()
+        }
+        root.listCompleted()
     }
 
     property Process _firstSeenSignatureProc: Process {
@@ -221,7 +328,10 @@ Singleton {
                     delete root._pendingSignatureRows[rowIndex]
                 root._persistFirstSeenMap()
             }
-            root._processNextFirstSeenSignature()
+            // The next job is not started here: going straight back into the
+            // pump is what turned this queue into a back-to-back spawn loop.
+            // The gate timer keeps one decode per _signatureGapMs.
+            root._armSignatureGate(root._signatureGapMs)
             root._finishInitialFirstSeenRecovery()
         }
     }
@@ -229,7 +339,19 @@ Singleton {
     // Resolve exact text lengths and image dimensions after the lightweight
     // cliphist list has reached the UI. This keeps first paint independent of
     // per-entry decoding while making metadata authoritative when it lands.
-    property bool _metadataBusy: false
+    //
+    // The queue runs in batches rather than as one long-lived process over the
+    // whole history: a single pass decodes every uncached row back to back for
+    // as long as it takes, which is the other half of the background load the
+    // foreground used to sit behind. Batches are resumable (the pending ids
+    // live in the service), rate limited between batches, and yield entirely
+    // while a consumer is reading.
+    property Timer _metadataBatchTimer: Timer {
+        interval: root._metadataGapMs
+        repeat: false
+        onTriggered: root._pumpMetadataQueue()
+    }
+
     property Process _metadataProc: Process {
         id: metadataProc
         command: []
@@ -237,59 +359,83 @@ Singleton {
         stdout: StdioCollector {}
         onExited: exitCode => {
             root._metadataBusy = false
-            if (exitCode !== 0)
-                return
-            var byId = ({})
-            var outputLines = stdout.text.split("\n")
-            for (var lineIndex = 0; lineIndex < outputLines.length; lineIndex++) {
-                var line = outputLines[lineIndex]
-                var parts = line.trim().split("|")
-                if (parts.length < 3)
-                    continue
-                byId[parts[0]] = parts.slice(1)
+            if (exitCode === 0)
+                root._mergeMetadataBatch(stdout.text)
+            if (root._metadataRestartPending) {
+                root._metadataRestartPending = false
+                root._rebuildMetadataQueue()
             }
-            for (var index = 0; index < root.items.length; index++) {
-                var item = root.items[index]
-                var metadata = byId[String(item.id)]
-                if (!metadata)
-                    continue
-                var updated = false
-                if (metadata[0] === "image" && metadata.length >= 6) {
-                    item.imageFormat = metadata[1]
-                    item.imageWidth = Number(metadata[2])
-                    item.imageHeight = Number(metadata[3])
-                    item.imageBytes = Number(metadata[4])
-                    item.metadataReady = true
-                    updated = true
-                } else if (metadata[0] === "text" && /^\d+$/.test(metadata[1])) {
-                    item.textCharCount = Number(metadata[1])
-                    item.metadataReady = true
-                    updated = true
-                }
-                if (updated) {
-                    if (item.isImage) {
-                        root._metadataCacheById[String(item.id)] = {
-                            preview: item.preview,
-                            isImage: true,
-                            format: item.imageFormat,
-                            width: item.imageWidth,
-                            height: item.imageHeight,
-                            bytes: item.imageBytes
-                        }
-                    } else {
-                        root._metadataCacheById[String(item.id)] = {
-                            preview: item.preview,
-                            isImage: false,
-                            textCharCount: item.textCharCount
-                        }
-                    }
-                    root._metadataDirty = true
-                    root.metadataRevision++
-                }
+            if (root._metadataQueueIds.length) {
+                root._armMetadataGate(root._metadataGapMs)
+            } else {
+                // One announcement per completed pass, as before: a consumer's
+                // metadata merge re-reads the whole history, so announcing per
+                // batch would multiply a ~100 ms merge by the batch count.
+                root._persistMetadataCache()
+                root.metadataUpdated("")
             }
-            root._persistMetadataCache()
-            root.metadataUpdated("")
         }
+    }
+
+    function _armMetadataGate(intervalMs) {
+        root._metadataBatchTimer.interval = intervalMs
+        root._metadataBatchTimer.restart()
+    }
+
+    // Merges one batch's output. Bounded by the batch size: rows are reached
+    // through the id index instead of rescanning the whole history.
+    function _mergeMetadataBatch(output) {
+        var byId = ({})
+        var outputLines = String(output).split("\n")
+        for (var lineIndex = 0; lineIndex < outputLines.length; lineIndex++) {
+            var line = outputLines[lineIndex]
+            var parts = line.trim().split("|")
+            if (parts.length < 3)
+                continue
+            byId[parts[0]] = parts.slice(1)
+        }
+        for (var id in byId) {
+            if (!Object.prototype.hasOwnProperty.call(byId, id))
+                continue
+            var item = root._itemById[id]
+            if (!item)
+                continue
+            var metadata = byId[id]
+            var updated = false
+            if (metadata[0] === "image" && metadata.length >= 6) {
+                item.imageFormat = metadata[1]
+                item.imageWidth = Number(metadata[2])
+                item.imageHeight = Number(metadata[3])
+                item.imageBytes = Number(metadata[4])
+                item.metadataReady = true
+                updated = true
+            } else if (metadata[0] === "text" && /^\d+$/.test(metadata[1])) {
+                item.textCharCount = Number(metadata[1])
+                item.metadataReady = true
+                updated = true
+            }
+            if (!updated)
+                continue
+            if (item.isImage) {
+                root._metadataCacheById[id] = {
+                    preview: item.preview,
+                    isImage: true,
+                    format: item.imageFormat,
+                    width: item.imageWidth,
+                    height: item.imageHeight,
+                    bytes: item.imageBytes
+                }
+            } else {
+                root._metadataCacheById[id] = {
+                    preview: item.preview,
+                    isImage: false,
+                    textCharCount: item.textCharCount
+                }
+            }
+            root._metadataDirty = true
+            root.metadataRevision++
+        }
+        root._persistMetadataCache()
     }
 
     function _pruneMetadataCache() {
@@ -317,27 +463,52 @@ Singleton {
     }
 
     function _startMetadataQueue() {
-        if (root._metadataBusy || !root.items.length || !root.available)
+        if (!root.items.length || !root.available)
+            return
+        // The cached metadata is cheap and applies to the rows the consumer is
+        // reading right now, so it goes on even when a batch is in flight.
+        root._rebuildMetadataQueue()
+        if (root._metadataBusy) {
+            root._metadataRestartPending = true
+            return
+        }
+        root._pumpMetadataQueue()
+    }
+
+    function _rebuildMetadataQueue() {
+        if (!root.items.length)
             return
         root._pruneMetadataCache()
         LauncherAdapters.applyClipboardMetadataCache(root.items, root._metadataCacheById)
-        var command = ""
-                + "while [ \"$#\" -gt 0 ]; do "
-                + "id=\"$1\"; shift; "
-                + "count=$(cliphist decode \"$id\" 2>/dev/null | wc -m); "
-                + "printf '%s|text|%s\\n' \"$id\" \"$count\"; done"
-        var args = ["sh", "-c", command, "afloat-clipboard-meta"]
-        var queued = false
+        var ids = []
         for (var index = 0; index < root.items.length; index++) {
             // Images already carry synchronous preview metadata; their exact
             // bytes are resolved when their visible thumbnail is decoded.
             if (root.items[index].metadataReady || root.items[index].isImage)
                 continue
-            args.push(String(root.items[index].id))
-            queued = true
+            ids.push(String(root.items[index].id))
         }
-        if (!queued)
+        root._metadataQueueIds = ids
+    }
+
+    function _pumpMetadataQueue() {
+        if (root._metadataBusy || !root._metadataQueueIds.length || !root.available)
             return
+        if (root._foregroundActive) {
+            root._armMetadataGate(root._foregroundRetryMs)
+            return
+        }
+        var take = Math.min(root._metadataBatchSize, root._metadataQueueIds.length)
+        var args = ["sh", "-c",
+            ""
+                + "while [ \"$#\" -gt 0 ]; do "
+                + "id=\"$1\"; shift; "
+                + "count=$(cliphist decode \"$id\" 2>/dev/null | wc -m); "
+                + "printf '%s|text|%s\\n' \"$id\" \"$count\"; done",
+            "afloat-clipboard-meta"]
+        for (var index = 0; index < take; index++)
+            args.push(root._metadataQueueIds[index])
+        root._metadataQueueIds = root._metadataQueueIds.slice(take)
         metadataProc.command = args
         root._metadataBusy = true
         metadataProc.running = true
@@ -371,6 +542,37 @@ Singleton {
         return root.available
     }
 
+    // ---- Foreground priority ---------------------------------------------
+    // Background decode queues (metadata counts, content signatures) exist to
+    // enrich the history after it is already on screen, so they must never be
+    // the reason a launcher open waits. A consumer that is reading the service
+    // can hold the gate for the whole read; the foreground-only entry points
+    // below (preview decodes, thumbnail decodes) hold it implicitly for a
+    // moment after each request, which covers an open that only scrolls.
+    property Timer _foregroundHoldTimer: Timer {
+        interval: root._foregroundHoldMs
+        repeat: false
+        onTriggered: root._resumeBackgroundWork()
+    }
+
+    function setForegroundBusy(busy) {
+        root._foregroundBusy = !!busy
+        if (!root._foregroundBusy)
+            root._resumeBackgroundWork()
+    }
+
+    function _noteForegroundTouch() {
+        root._foregroundHoldTimer.restart()
+    }
+
+    // Called when the implicit hold lapses, and when a consumer releases the
+    // explicit gate: both queues look again immediately instead of waiting out
+    // their next gap.
+    function _resumeBackgroundWork() {
+        root._pumpMetadataQueue()
+        root._pumpSignatureQueue()
+    }
+
     function _finishFirstSeenCacheLoad(firstSeenMap) {
         if (root._firstSeenCacheReady)
             return
@@ -399,20 +601,44 @@ Singleton {
         _checkProc.running = true
     }
 
+    // ---- First-seen signature queue --------------------------------------
+    // One cliphist decode per pending id, strictly one at a time, and now rate
+    // limited: a bare pump on every enqueue spawned a process from inside the
+    // list parse and then kept spawning back-to-back for the whole drain.
+    property Timer _signatureGateTimer: Timer {
+        interval: root._signatureGapMs
+        repeat: false
+        onTriggered: root._pumpSignatureQueue()
+    }
+
+    function _armSignatureGate(intervalMs) {
+        root._signatureGateTimer.interval = intervalMs
+        root._signatureGateTimer.restart()
+    }
+
     function _enqueueFirstSeenSignature(id, rowIndex) {
         if (!id || root._signaturePendingById[id])
             return
         root._signaturePendingById[id] = true
         root._pendingSignatureRows[rowIndex] = true
-        root._pendingSignatureIds = root._pendingSignatureIds.concat([{ id, rowIndex }])
-        root._processNextFirstSeenSignature()
+        // Pushed in place. The queue drains at a bounded rate, so it grows to
+        // hundreds of entries while the list parse runs; copying it per
+        // enqueue made the parse quadratic.
+        root._pendingSignatureIds.push({ id: id, rowIndex: rowIndex })
+        if (!root._signatureGateTimer.running)
+            root._armSignatureGate(root._signatureGapMs)
     }
 
-    function _processNextFirstSeenSignature() {
+    function _pumpSignatureQueue() {
         if (firstSeenSignatureProc.running || !root._pendingSignatureIds.length)
             return
-        var next = root._pendingSignatureIds[0]
-        root._pendingSignatureIds = root._pendingSignatureIds.slice(1)
+        if (root._foregroundActive) {
+            // Yield to the foreground and look again shortly: the queue is
+            // resumable, so waiting costs nothing but time.
+            root._armSignatureGate(root._foregroundRetryMs)
+            return
+        }
+        var next = root._pendingSignatureIds.shift()
         root._currentSignatureId = next.id
         root._currentSignatureRow = next.rowIndex
         firstSeenSignatureProc.command = [
@@ -427,23 +653,16 @@ Singleton {
     function _applyFirstSeenToItems(id, firstSeenMs) {
         if (!id || !root.items.length)
             return
-        var changed = false
-        for (var index = 0; index < root.items.length; index++) {
-            var item = root.items[index]
-            if (!item || item.id !== id)
-                continue
-            if (item.firstSeenMs === firstSeenMs)
-                return
-            item.firstSeenMs = firstSeenMs
-            changed = true
-            break
-        }
-        if (changed) {
-            root.firstSeenRevision++
-            if (!root._initialFirstSeenRecovery)
-                root.firstSeenDisplayRevision++
-            root.firstSeenUpdated(id, firstSeenMs)
-        }
+        var item = root._itemById[id]
+        if (!item || String(item.id) !== String(id))
+            return
+        if (item.firstSeenMs === firstSeenMs)
+            return
+        item.firstSeenMs = firstSeenMs
+        root.firstSeenRevision++
+        if (!root._initialFirstSeenRecovery)
+            root.firstSeenDisplayRevision++
+        root.firstSeenUpdated(id, firstSeenMs)
     }
 
     function _finishInitialFirstSeenRecovery() {
@@ -484,12 +703,7 @@ Singleton {
 
     function _clipboardItemById(id) {
         var wanted = String(id == null ? "" : id)
-        for (var index = 0; index < root.items.length; index++) {
-            var item = root.items[index]
-            if (item && String(item.id) === wanted)
-                return item
-        }
-        return null
+        return root._itemById[wanted] || null
     }
 
     function _storeImageMetadata(item, format, width, height, bytes) {
@@ -524,6 +738,9 @@ Singleton {
             if (callback) callback("")
             return
         }
+        // A thumbnail is only ever decoded for a row the user can see, so it is
+        // a foreground signal like a preview.
+        root._noteForegroundTouch()
         var ext = "png"
         var m = String(mime == null ? "" : mime).toLowerCase()
         if (m.indexOf("jpeg") >= 0 || m.indexOf("jpg") >= 0) ext = "jpg"
@@ -623,9 +840,26 @@ Singleton {
         if (!root.available) return
         Quickshell.execDetached(["cliphist", "wipe"])
         root.items = []
+        root._itemById = ({})
         root._firstSeenById = ({})
         root._recentCopySeeds = []
         root._metadataCacheById = ({})
+        // A wipe invalidates every queue: the pending ids, rows and signature
+        // jobs all refer to entries that no longer exist.
+        root._parseRunning = false
+        root._parseLines = []
+        root._parseRows = []
+        root._parseIndex = 0
+        root._parsePublished = false
+        root._parseTimer.running = false
+        root._metadataQueueIds = []
+        root._metadataRestartPending = false
+        root._metadataBatchTimer.running = false
+        root._pendingSignatureIds = []
+        root._pendingSignatureRows = ({})
+        root._signaturePendingById = ({})
+        root._signatureGateTimer.running = false
+        root._initialFirstSeenRecovery = false
         root._metadataDirty = true
         root._persistMetadataCache()
         root._firstSeenDirty = true
@@ -675,6 +909,7 @@ Singleton {
         if (!root.available || !id) return
         var key = String(id)
         root._previewRequestId = key
+        root._noteForegroundTouch()
         // A decode already in flight keeps its own identity; queue behind it
         // instead of overwriting the running id.
         if (previewDecodeProc.running) {
