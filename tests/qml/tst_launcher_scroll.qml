@@ -77,11 +77,12 @@ Item {
         }
     }
 
-    function makeRows(count) {
+    function makeRows(count, prefix) {
+        var stem = prefix || "app"
         var out = []
         for (var i = 0; i < count; i++) {
             out.push({
-                id: "app" + i,
+                id: stem + i,
                 displayName: "App " + i,
                 description: "",
                 category: i % 3 === 0 ? "games" : (i % 3 === 1 ? "network" : "office"),
@@ -144,6 +145,60 @@ Item {
                 page.session.close()
                 wait(120)
             }
+            adapter.destroy()
+            testRoot.activeAdapter = null
+        }
+
+        function test_aConcealedRowKeepsItsSlotSoTheListStaysScrollable() {
+            // The live failure: the entrance wave folds every row to zero
+            // height, and both wheel paths refuse input while it plays. The list
+            // is therefore flat - nothing to scroll - and unresponsive until
+            // the last row has landed, which on a 96-row window is the better
+            // part of a second, and it is why the wheel did nothing on some
+            // opens and worked on the ones that skipped the wave.
+            //
+            // Driven through a single row rather than by timing: holdInstantly()
+            // is exactly what the wave does to a row, so this asserts the
+            // contract without racing the stagger.
+            var adapter = chunkedAdapterComponent.createObject(null)
+            adapter.rows = makeRows(251)
+            adapter.tick = function() { testRoot.batchTimer.restart() }
+            testRoot.activeAdapter = adapter
+            page.session._adapters = ({ apps: adapter })
+
+            page.session.open()
+            tryVerify(function() {
+                return page.session.loadingMore === false && !page.rowsAnimatingIn
+            }, 5000)
+            wait(600)
+            tryVerify(function() { return page.resultCount > 0 }, 2000)
+
+            var view = page.resultsView
+            var heightBefore = view.contentHeight
+            var row = page.resultAt(0)
+            verify(row !== null, "the first row must be materialized")
+            var rowSlot = row.rowHeight + row.listGap
+            compare(row.height, rowSlot, "a settled row occupies its slot")
+
+            // Claim the row the way the wave does.
+            row.holdInstantly()
+            tryCompare(row, "revealHeld", true)
+            tryVerify(function() { return page.rowsAnimatingIn }, 1000,
+                      "a concealed row is what the page reads as animating")
+            compare(row.height, rowSlot,
+                    "a concealed row keeps its slot - folding it flattens the list")
+            compare(row.opacity, 0, "a concealed row is still not drawn")
+            verify(view.interactive,
+                   "the viewport must take input while a row is concealed")
+            compare(view.contentHeight, heightBefore,
+                    "concealing a row must not shrink the scrollable content")
+            compare(wheelTravel(), 1,
+                    "a notch must travel while a row is still concealed")
+
+            row.releaseInstantly()
+            wait(60)
+            tryVerify(function() { return !page.rowsAnimatingIn }, 2000)
+            page.session.close()
             adapter.destroy()
             testRoot.activeAdapter = null
         }

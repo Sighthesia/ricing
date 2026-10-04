@@ -270,9 +270,10 @@ Item {
                 var row = resultsRepeater.itemAt(i)
                 if (row && row.result && String(row.result.id) === String(current.id)
                         && typeof row.activate === "function") {
-                    // A row still held by the entrance wave must release
+                    // A row still hidden by the entrance wave must release
                     // first or the activation guard would swallow the key.
-                    if (row.geometryHeld && typeof row.releaseInstantly === "function")
+                    if ((row.concealed || row.folded)
+                            && typeof row.releaseInstantly === "function")
                         row.releaseInstantly()
                     row.activate()
                     return
@@ -1258,9 +1259,12 @@ Item {
             thumbQueue.wake()
         }
         flickDeceleration: 2000
-        // A row still revealing is what scrolling would fight; the
-        // settle timer alone must not keep the wheel off.
-        interactive: !root.rowsAnimatingIn
+        // A concealed row keeps its slot while it fades in, so the list is
+        // already full height on the frame it opens and scrolling never
+        // fights the wave. Gating the wheel on the reveal left the list
+        // refusing input for the length of the stagger - the wheel did
+        // nothing until the last row had landed.
+        interactive: true
 
         readonly property int resultCount: resultsRepeater.count
 
@@ -1445,8 +1449,6 @@ Item {
             blocking: false
             acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
             onWheel: wheel => {
-                if (root.rowsAnimatingIn)
-                    return
                 var scrollingDown = wheel.angleDelta.y < 0 || wheel.pixelDelta.y < 0
                 var delta = wheel.pixelDelta.y
                 if (delta === 0)
@@ -1561,7 +1563,7 @@ Item {
             // Size snaps from constants and visibility fades; only y glides.
             // Tracking the anchor row's animated height made every search
             // re-rank visibly squash the frame through fold mid-heights.
-            opacity: root.selectionAnchor && !root.selectionAnchor.geometryHeld ? 1 : 0
+            opacity: root.selectionAnchor && root.selectionAnchor.fullyShown ? 1 : 0
             Behavior on opacity {
                 enabled: !MotionTokens.reducedMotion
                 NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }

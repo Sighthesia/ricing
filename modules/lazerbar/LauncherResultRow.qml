@@ -88,14 +88,29 @@ Item {
     property bool freshFromBuild: true
     property bool revealHeld: false
     property bool snapTransitions: true
-    readonly property bool geometryHeld: revealHeld || hidden
+    // Two different reasons a row is not showing yet, kept apart on purpose:
+    //
+    //  - concealed (revealHeld): the entrance and refill wave. The row keeps
+    //    its slot and only fades in from a small leftward offset. Folding it
+    //    to zero height instead meant the list was flat and unscrollable until
+    //    the last row landed, then reflowed a screenful of height in one
+    //    frame - which is where "the wheel does nothing on open" and the
+    //    open-time stall both came from.
+    //  - folded (hidden, or exiting): a query or category change, or a row on
+    //    its way out. Folding to zero height is the intent here - a
+    //    non-match leaves the list entirely.
+    readonly property bool folded: hidden || _closing
+    readonly property bool concealed: revealHeld
+    // True once the row is fully shown: neither concealed nor folded. The
+    // owning page anchors the selection frame on rows that are actually there.
+    readonly property bool fullyShown: !folded && !concealed
     // Position-based reveal slot used by the page's entrance/refill waves.
     readonly property real entryExitDelay: Math.round(Math.min(150, Math.max(0, root.y / 6)))
-    height: geometryHeld ? 0 : rowHeight + listGap
-    visible: !_closing && (!geometryHeld || height > 0.5 || opacity > 0.01)
-    opacity: geometryHeld ? 0 : 1
-    x: geometryHeld ? -8 : 0
-    enabled: !geometryHeld && !_closing
+    height: folded ? 0 : rowHeight + listGap
+    visible: !_closing && (!folded && !concealed || height > 0.5 || opacity > 0.01)
+    opacity: folded || concealed ? 0 : 1
+    x: folded || concealed ? -8 : 0
+    enabled: fullyShown && !_closing
 
     Behavior on height {
         enabled: !MotionTokens.reducedMotion && !root.snapTransitions
@@ -292,7 +307,7 @@ Item {
     }
 
     function activate() {
-        if (_closing || geometryHeld)
+        if (!fullyShown || _closing)
             return
         restartFlash()
         _closing = true
