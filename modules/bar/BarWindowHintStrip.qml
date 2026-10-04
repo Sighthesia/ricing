@@ -99,6 +99,11 @@ Item {
     // marker on this row" and "must this change be instant" - and folding them together
     // would switch the tint OFF for the frame the marker arrives.
     property bool tintInstant: false
+    // Observation slow-motion, fed from the body. The row flash and the focus tint live
+    // here rather than on the body, so they are on the marker's path and have to be
+    // slowed with it - a 100ms tint left unscaled next to a 2s journey is the one thing
+    // still moving at speed.
+    property real debugTimeScale: 1
 
     // How far the ACTIVE column is scrolled, in pixels. Owned here rather than by the
     // body because the scrolling content is here: the column's own `y` is this offset,
@@ -355,11 +360,12 @@ Item {
                     // arriving IS the event and a short fade reads as intent.
                     Behavior on color {
                         enabled: !root.markerCrossing && !root.tintInstant
-                        ColorAnimation { duration: MotionTokens.fast }
+                        ColorAnimation { duration: MotionTokens.fast * debugTimeScale }
                     }
                     Behavior on scale {
                         enabled: !MotionTokens.reducedMotion
-                        NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+                        NumberAnimation { duration: MotionTokens.fast * debugTimeScale
+                            easing.type: Easing.OutQuint }
                     }
 
                     // App icon; the service resolves a themed path per window.
@@ -396,7 +402,9 @@ Item {
                         elide: Text.ElideRight
                         maximumLineCount: 1
 
-                        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                        Behavior on color {
+                            ColorAnimation { duration: MotionTokens.fast * debugTimeScale }
+                        }
                     }
 
                     // Click flash, inert to input so it cannot swallow the tap.
@@ -416,7 +424,7 @@ Item {
                         property: "opacity"
                         from: MotionTokens.clickFlashOpacity
                         to: 0
-                        duration: MotionTokens.clickFlashDuration
+                        duration: MotionTokens.clickFlashDuration * debugTimeScale
                         easing.type: MotionTokens.clickFlashEasing
                     }
 
@@ -559,7 +567,7 @@ Item {
         id: settleAnim
         target: root
         property: "scrollOffset"
-        duration: MotionTokens.reducedMotion ? 0 : 260
+        duration: (MotionTokens.reducedMotion ? 0 : 260) * debugTimeScale
         easing.type: Easing.InOutCubic
     }
 
@@ -567,7 +575,7 @@ Item {
         id: driveAnim
         target: root
         property: "scrollOffset"
-        duration: MotionTokens.reducedMotion ? 0 : 80
+        duration: (MotionTokens.reducedMotion ? 0 : 80) * debugTimeScale
         easing.type: Easing.OutQuint
     }
 
@@ -577,14 +585,14 @@ Item {
             id: bounceOut
             target: root
             property: "scrollOffset"
-            duration: MotionTokens.reducedMotion ? 0 : 160
+            duration: (MotionTokens.reducedMotion ? 0 : 160) * debugTimeScale
             easing.type: Easing.OutCubic
         }
         NumberAnimation {
             id: bounceBack
             target: root
             property: "scrollOffset"
-            duration: MotionTokens.reducedMotion ? 0 : 260
+            duration: (MotionTokens.reducedMotion ? 0 : 260) * debugTimeScale
             easing.type: Easing.InOutCubic
         }
     }
@@ -690,7 +698,7 @@ Item {
         }
         revealAnim.from = root.scrollOffset
         revealAnim.to = target
-        revealAnim.duration = 300
+        revealAnim.duration = 300 * root.debugTimeScale
         revealAnim.restart()
     }
 

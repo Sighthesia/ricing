@@ -313,6 +313,12 @@ Item {
         when: windowShown
 
         function init() {
+            // The component ships with an observation slow-motion multiplier on the
+            // marker's path (see `BarWindowHintContent.debugTimeScale`). Every wait in
+            // this file is in wall-clock time, so the suite opts out here once rather than
+            // every assertion having to know about it - the recipes are then measured at
+            // the speed they will actually run at.
+            body.debugTimeScale = 1
             reported.window = ""
             // Reduced motion is a process-wide singleton and a test that sets it
             // would otherwise change every test that runs after it.

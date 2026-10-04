@@ -72,6 +72,18 @@ Item {
     // 0 while a slide is in flight, 1 at rest. The one clock the whole motion runs
     // on: the strip's offset is a pure function of it, so there is no second
     // animation to fall out of step.
+    // ---- OBSERVATION SLOW-MOTION -------------------------------------------
+    // Every duration on the focus marker's path is multiplied by this, so the sequence
+    // can be watched rather than inferred. 6 is slow enough to see a card light up in
+    // the same frame its frame lands, rather than after it.
+    //
+    // It is a WRITABLE property, not a constant, for one reason: the suite waits in
+    // wall-clock time, so a slowed build turns every timing assertion red and makes a
+    // diagnostic nobody can run. `tst_window_hint_content`'s `init()` sets this back to
+    // 1, so the tests always measure the real recipes and the live shell is the only
+    // thing that is slow. Set it to 1 to get normal motion back.
+    property real debugTimeScale: 6
+
     property real slideProgress: 1
     // A crossing is under way. A FLAG, not `slideProgress < 1`.
     //
@@ -753,7 +765,7 @@ Item {
         property: "crossingClock"
         from: 0
         to: 1
-        duration: MotionTokens.page
+        duration: MotionTokens.page * debugTimeScale
         easing.type: Easing.InOutQuad
         onFinished: {
             // Settle the tracker before the flag goes down. Whatever the tail was doing,
@@ -791,7 +803,7 @@ Item {
         // panel is that widget's columns at three times the size, and a crossing that
         // does not move like the highlight it sits inside is the mismatch you can see
         // without noticing you can see it.
-        duration: MotionTokens.medium
+        duration: MotionTokens.medium * debugTimeScale
         easing.type: Easing.OutQuad
         onFinished: {
             // The strip has landed with the arriving frame's active column in the
@@ -861,7 +873,7 @@ Item {
             && !root._markerCrossing
         NumberAnimation {
             id: indicatorHeadAnimation
-            duration: MotionTokens.medium
+            duration: MotionTokens.medium * debugTimeScale
             easing.type: Easing.OutQuad
         }
     }
@@ -872,7 +884,7 @@ Item {
         // is what keeps the stretch readable.
         NumberAnimation {
             id: indicatorTailAnimation
-            duration: MotionTokens.slow * 2
+            duration: MotionTokens.slow * 2 * debugTimeScale
             easing.type: Easing.OutSine
         }
     }
@@ -1036,6 +1048,7 @@ Item {
         // clips the column to it, so the two cannot be different numbers.
         viewportRows: root.viewportRows
         markerCrossing: root._markerCrossing
+        debugTimeScale: root.debugTimeScale
         tintInstant: root._tintInstant
         cellPaddingX: root.cellPaddingX
         // Read from the same `activeColumn` the strip's own columns come from, so the
@@ -1110,7 +1123,8 @@ Item {
 
         Behavior on opacity {
             enabled: !MotionTokens.reducedMotion
-            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+            NumberAnimation { duration: MotionTokens.fast * debugTimeScale
+                easing.type: Easing.OutQuint }
         }
         // The focus glide, and ONLY the focus glide. The displacement is a pure function
         // of the crossing's clock, so a `Behavior` on the same property would be a second
@@ -1119,7 +1133,8 @@ Item {
         // property is re-evaluated at the landing.
         Behavior on y {
             enabled: !root._markerCrossing && !MotionTokens.reducedMotion
-            NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
+            NumberAnimation { duration: MotionTokens.settingsSidebarCollapse * debugTimeScale
+                easing.type: Easing.OutQuint }
         }
     }
 
@@ -1188,11 +1203,13 @@ Item {
             property: "opacity"
             from: MotionTokens.clickFlashOpacity
             to: 0
-            duration: MotionTokens.clickFlashDuration
+            duration: MotionTokens.clickFlashDuration * debugTimeScale
             easing.type: MotionTokens.clickFlashEasing
         }
 
-        Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+        Behavior on opacity {
+            NumberAnimation { duration: MotionTokens.fast * debugTimeScale }
+        }
     }
 
     // Drive the indicator from the one focused row. Hooked to the target itself
