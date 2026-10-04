@@ -632,6 +632,36 @@ Item {
             verify(findByName(item, "networkContent").visible)
         }
 
+        // A card with two columns of text has to actually have two columns. The
+        // profile row once carried its own 2px extra indent, which stepped the
+        // names in from the port name above it.
+        function test_networkWiredCardTextColumnsLineUp() {
+            var svc = makeNetworkService()
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            var portName = findByName(item, "wiredPortNameText0")
+            var portState = findByName(item, "wiredPortStateText0")
+            var profileName = findByName(item, "wiredProfileNameText0_0")
+            var profileMeta = findByName(item, "wiredProfileMetaText0_0")
+            var profileState = findByName(item, "wiredProfileStateText0_0")
+            // Polled: a Repeater delegate is positioned during the layout pass.
+            tryVerify(function () {
+                return profileName.x === portName.x
+            }, 1000, "profile name x=" + profileName.x + " port name x=" + portName.x)
+            tryVerify(function () {
+                return profileMeta.x === portName.x
+            }, 1000, "profile address x=" + profileMeta.x + " port name x=" + portName.x)
+            // The two right-hand words are right-anchored to the same edge, so
+            // "Connected" and "Disconnect" finish on one line rather than
+            // stepping in and out with their own lengths.
+            tryVerify(function () {
+                return Math.abs(profileState.x + profileState.width
+                    - (portState.x + portState.width)) < 0.5
+            }, 1000, "profile state right=" + (profileState.x + profileState.width)
+                + " port state right=" + (portState.x + portState.width))
+        }
+
         // A profile pinned to a port that is gone is still shown, in its own
         // trailing group, so it can be recognised and removed.
         function test_networkWiredOrphanGroupIsNamed() {
