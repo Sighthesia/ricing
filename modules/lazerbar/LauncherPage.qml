@@ -125,6 +125,20 @@ Item {
     // imperative updates are safe under the qs engine.
     property var selectionAnchor: null
 
+    // The shared rect's own band, in the space the rows are positioned in - the results
+    // column - for the per-row tint masks. Read straight off `selectionFrame` rather than
+    // recomputed from the anchor row, so this file holds ONE rectangle and the tint cannot
+    // be placed from a second opinion about where it is; and because `selectionFrame.y`
+    // carries the glide's `Behavior`, these two follow it frame for frame without a clock
+    // of their own.
+    //
+    // Nothing subtracts `contentY` and nothing needs to: the rows and the frame share the
+    // column's space, which is inside the viewport's content item, so a scrolling list
+    // carries the band with it for free and a row's own `y` is the same number the band
+    // is measured against.
+    readonly property real selectionTintTop: selectionFrame.y
+    readonly property real selectionTintHeight: selectionFrame.height
+
     LauncherSession { id: embeddedSession }
 
     Component.onCompleted: root.adoptSessionFocus()
@@ -1543,6 +1557,10 @@ Item {
                     metaStamp: root._clipMetaRev
                     searchQuery: root.activeSearchText
                     categoryFilter: root.activeCategory
+                    // The shared rect's band, so this row lights the slice of itself the
+                    // rect is over rather than deciding for itself whether it is selected.
+                    selectionTintTop: root.selectionTintTop
+                    selectionTintHeight: root.selectionTintHeight
                     selected: {
                         if (!root.session || !root.session.results || root.session.selectedIndex < 0)
                             return false
@@ -1579,9 +1597,10 @@ Item {
             objectName: "selectionFrame"
             z: 5
             radius: 6
-            // Border-only glide: the landing highlight lives in each row as
-            // a tint UNDER its content, so the moving frame never covers
-            // text or icons.
+            // Border-only glide: the landing highlight is the shared rect's band clipped
+            // to each row, so this rectangle never covers text or icons either - it is
+            // the same rectangle the tint is measured from, which is why the two cannot
+            // disagree about where the selection is.
             color: "transparent"
             border.width: root.selectionAnchor ? 1.5 : 0
             border.color: LazerTheme.settingsAccent

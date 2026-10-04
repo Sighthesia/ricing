@@ -65,6 +65,7 @@ Item {
 
     readonly property bool hovered: rowHover.hovered
     readonly property alias surfaceItem: card
+    readonly property alias selectionTintItem: selectionTint
     readonly property alias titleItem: titleText
     readonly property alias descriptionItem: descriptionLabel
     readonly property alias iconItem: iconImage
@@ -89,6 +90,48 @@ Item {
     // lives inside the height so an exited row frees exactly zero space.
     readonly property real listGap: 8
     readonly property real bodyHeight: Math.max(0, root.height - root.listGap)
+
+    // The shared selection rect's own band, in the coordinate space THIS row is
+    // positioned in - the results column - handed down by the page. Two numbers rather
+    // than a boolean, because the tint is the intersection of that band with this card
+    // and a row therefore needs to know where the band IS, not whether it is the row the
+    // band is on.
+    //
+    // Both are read live off the rect rather than derived from `index`, and that is what
+    // keeps them honest across a refill. This list has no uniform pitch to derive: a row
+    // folds to zero height when it stops matching, which is how a query change empties
+    // the list, so every row below a folded one sits `listGap` higher than
+    // `index * (rowHeight + listGap)` says. The rows are also recycled - the page runs a
+    // count model so a same-length pool swap reuses delegates - so a delegate's `index`
+    // is not even a stable identity for a given result. Reading this row's own `y` has
+    // none of those problems: it is the row's real position, whatever produced it.
+    property real selectionTintTop: 0
+    property real selectionTintHeight: 0
+    // Where the shared band begins, in this row's own coordinates, and how much of the
+    // card that leaves lit. The band's other end in row space is
+    // `selectionTintTop + selectionTintHeight`; this card's own band is `y` through
+    // `y + bodyHeight`, so what is left lit is where those two overlap.
+    //
+    // `bodyHeight` and not `height`: the height carries the row's outer list gap, and the
+    // card - and therefore the tint - is the body inside it. A mask measured against the
+    // full height would spill 8px into the gap below the card and draw a band of tint on
+    // the surface between two rows, and it would take the row's fold animation with it -
+    // a card shrinking away would drag its tint down with it.
+    //
+    // Written as two plain reals rather than one returned record, because a bound record
+    // is a fresh object on every evaluation and this list is long. Every operand is read
+    // unconditionally, so the bindings carry complete dependencies - the failure mode
+    // where a `&&` short-circuits, a binding never reads its tail, and a later
+    // re-evaluation compares against a stale input.
+    readonly property real selectionMaskFrom: Math.max(root.y, root.selectionTintTop)
+        - root.y
+    readonly property real selectionMaskHeight: Math.max(0,
+        Math.min(root.y + root.bodyHeight,
+            root.selectionTintTop + root.selectionTintHeight)
+            - root.y - root.selectionMaskFrom)
+    // A folded row has no height, so it has no intersection and goes dark on its own -
+    // no clause needed for it here, which is the whole of asking the geometry rather than
+    // asking `selected`.
     // True until the page's commit choreography first claims this row; lets
     // refill animations target only freshly built delegates so surviving
     // rows keep their exact geometry across query edits.
@@ -197,14 +240,53 @@ Item {
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
-        // Selected background tint sits UNDER the rail, icon, and text so
-        // the focus highlight never washes out the content above it.
+        // The selection tint: the shared frame's band CLIPPED TO this card, in this
+        // card's own coordinates. It is the same mask the window hint's rows use, and for
+        // the same reason - see `BarWindowHintStrip.frameMaskOverRow`.
+        //
+        // It was `anchors.fill: parent` with `color: root.selected ? settingsSelected :
+        // "transparent"`, and that is a whole-surface property: the moment the selection
+        // moved, the row it left went from fully lit to fully dark in a single frame while
+        // the frame travelling between them was still visibly crossing it. The row read
+        // as changing state rather than as a mark passing over the list, and the two
+        // neighbouring rows never agreed about anything mid-glide.
+        //
+        // Clipped, the lit region is wherever the frame actually is. This card is half
+        // lit while the frame is half way across it and dark the moment the frame has
+        // gone; at rest the band covers the whole card, so a settled selection looks
+        // exactly as it did before. The two differ only while the frame is moving, and
+        // there following it frame-for-frame IS the effect.
+        //
+        // Declared exactly where it was - above this card's own fill, below the rail, icon
+        // and text that follow - because that ordering is the reason the tint never washes
+        // out the content above it. It is an overlay rather than the card's `color`
+        // because a colour cannot be a fraction of a surface.
+        //
+        // Full width, and that is not an oversight: the shared frame is placed from the
+        // selected row's own geometry and every row is `resultsColumn.width` wide, so the
+        // two rects share a left edge and a width at every instant and only the vertical
+        // axis ever needs intersecting. The one exception is a row mid-fold, whose own
+        // `x` slides to -8 while the frame's does not; that row is fading out over the
+        // same 240ms, so there is nothing to reconcile.
+        //
+        // No `Behavior` on the colour, because the colour no longer changes: the geometry
+        // moves instead, and the geometry has to keep up with the frame frame-for-frame.
+        // A mark that eases toward its position is a different mark.
         Rectangle {
-            anchors.fill: parent
+            id: selectionTint
+            objectName: "selectionTint"
+            x: 0
+            width: parent.width
+            y: root.selectionMaskFrom
+            height: root.selectionMaskHeight
             radius: 6
-            color: root.selected ? LazerTheme.settingsSelected : "transparent"
+            color: LazerTheme.settingsSelected
             enabled: false
-            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            // Zero height IS the answer for "the frame is not on this card". Saying it
+            // with the geometry keeps it honest for anything that measures it;
+            // `visible` is the belt to that braces, since a zero-height item still costs
+            // a little to consider.
+            visible: height > 0
         }
 
         // Icon rail background like the notification icon column.

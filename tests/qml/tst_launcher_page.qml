@@ -743,6 +743,182 @@ function test_streamedFirstFillLeavesTheViewportScrollable() {
 
         // --- pointer activation ---
 
+        // The selection tint is the shared frame's band CLIPPED to each row, so moving the
+        // selection is a mark travelling over the list rather than one row switching
+        // state. The whole difference is visible only mid-glide: the card the frame is
+        // leaving and the card it is arriving at are BOTH partly lit, in proportion to how
+        // much of each the frame is currently over. A test that only looked at where the
+        // selection ended would pass on the old whole-card fill, which is lit exactly and
+        // never partly - so the claim here is the midpoint, not the destination.
+        function test_theSelectionTintIsTheSharedFrameClippedToEachRow() {
+            // A card is 64 tall and consecutive cards are 72 apart, so an 8px gap sits
+            // between any two of them. Stated here because the arithmetic below divides by
+            // them: the frame is 64 tall and cannot fit in that gap, so it always has both
+            // cards partly lit at once rather than handing over through a dark one.
+            var cardHeight = 64
+            var cardGap = 8
+            var straddledTotal = cardHeight - cardGap
+
+            openWithResults([
+                makeItem("a", "Alpha", 0, 0),
+                makeItem("b", "Beta", 0, 0),
+                makeItem("c", "Gamma", 0, 0)
+            ])
+            // Rows have to be standing before anything is measured: a held row is at zero
+            // height, has no intersection, and would make every assertion below vacuous.
+            var leaving = page.resultAt(0)
+            var arriving = page.resultAt(1)
+            tryVerify(function() {
+                return leaving.bodyHeight > 60 && arriving.bodyHeight > 60
+            }, 1500)
+            compare(svc().selectedIndex, 0, "the first result starts selected")
+            // The band is anchored only once the entrance wave has settled and the page
+            // has re-resolved the anchor - `syncSelectionFrame` runs from the rows commit
+            // and from the wave's settle timer - so wait for the band itself rather than
+            // for a duration. Everything below is about the relationship between the band
+            // and the cards, so waiting on the band cannot make any of it true by itself.
+            tryVerify(function() {
+                return page.selectionTintHeight === cardHeight
+            }, 2500)
+
+            // At rest the band covers the whole card, so a settled selection looks exactly
+            // as it always did - the change is invisible until the frame is moving. Read
+            // off the painted overlay rather than off the row's arithmetic, so every
+            // assertion below is about what is on screen.
+            compare(leaving.selectionTintItem.y, 0,
+                "and the settled band starts at the card's own top edge")
+            compare(leaving.selectionTintItem.height, cardHeight,
+                "and fills it whole")
+            verify(leaving.selectionTintItem.visible, "so its tint is painted")
+            compare(String(leaving.selectionTintItem.color),
+                String(Lazer.LazerTheme.settingsSelected),
+                "in the shared selection token")
+            compare(arriving.selectionTintItem.visible, false,
+                "and no other card is lit at all")
+
+            keyClick(Qt.Key_Down)
+            tryCompare(svc(), "selectedIndex", 1)
+
+            // Sampled off the real glide rather than a driven clock, because the claim is
+            // about an instant nobody can schedule: the band between two cards, where both
+            // are lit and neither is fully lit.
+            var samples = 0
+            var sawBothPartial = false
+            var split = 0
+            while (samples < 40) {
+                samples += 1
+                var from = leaving.selectionTintItem.height
+                var to = arriving.selectionTintItem.height
+                if (leaving.selectionTintItem.visible && arriving.selectionTintItem.visible
+                        && from > 0.5 && from < cardHeight - 0.5
+                        && to > 0.5 && to < cardHeight - 0.5) {
+                    sawBothPartial = true
+                    split = from + to
+                    break
+                }
+                wait(8)
+            }
+            verify(sawBothPartial,
+                "mid-glide both cards are PARTLY lit - the one being left and the one "
+                    + "being arrived at, which a whole-card fill cannot do on any frame")
+            // And the split is the frame's own height less the gap it cannot cover: the
+            // two lit amounts together are exactly the rectangle, with the 8px between the
+            // cards taking none of it.
+            compare(split, straddledTotal,
+                "and the two lit amounts add up to the frame less the gap between the "
+                    + "cards, was " + split + " against " + straddledTotal)
+
+            // Landed: full on the destination, nothing at all on the row it left.
+            wait(Lazer.MotionTokens.settingsSidebarCollapse + 150)
+            compare(arriving.selectionTintItem.y, 0,
+                "on arrival the band is the whole destination card")
+            compare(arriving.selectionTintItem.height, cardHeight)
+            compare(leaving.selectionTintItem.height, 0,
+                "and the card the frame left is not lit at all")
+            compare(leaving.selectionTintItem.visible, false)
+            // `selected` still says what it always said - it is the row's other
+            // affordances that read it, not its fill.
+            compare(arriving.selected, true, "and the destination row is the selected one")
+            compare(leaving.selected, false, "while the one it left is not")
+        }
+
+        function test_theSelectionTintIsNowhereWhenNothingIsSelected() {
+            openWithResults([
+                makeItem("a", "Alpha", 0, 0),
+                makeItem("b", "Beta", 0, 0)
+            ])
+            var row = page.resultAt(0)
+            tryVerify(function() { return row.bodyHeight > 60 }, 1500)
+            compare(svc().selectedIndex, 0)
+            tryVerify(function() { return page.selectionTintHeight === 64 }, 2500)
+            verify(row.selectionTintItem.visible, "so the first card is lit")
+
+            svc().selectedIndex = -1
+            tryVerify(function() { return !row.selectionTintItem.visible }, 800)
+
+            // The honest failure mode here is a band parked at coordinate zero painting
+            // the first card, so the first card specifically is asserted dark - and so is
+            // every other, because a zero-height band intersects nothing anywhere.
+            compare(row.selectionTintItem.height, 0,
+                "and nothing is lit at all - not the first card at coordinate zero")
+            compare(row.selectionTintItem.visible, false)
+            var lit = 0
+            for (var i = 0; i < page.resultCount; ++i) {
+                if (page.resultAt(i).selectionTintItem.visible)
+                    lit += 1
+            }
+            compare(lit, 0, "no card in the list is lit")
+        }
+
+        // A guard on the mask's own arithmetic rather than on the change: a card with no
+        // height has no intersection, so it must come back with a height of exactly zero -
+        // not a negative one from an unclamped difference, and not a leftover sliver from
+        // the 8px gap that belongs to the row but not to the card. A whole-card fill was
+        // immune to both by having no arithmetic, which is the trade the mask makes.
+        function test_aFoldedRowHasNoIntersectionToLight() {
+            openWithResults([
+                makeItem("alpha", "Alpha", 0, 0),
+                makeItem("beta", "Beta", 0, 0)
+            ])
+            var folded = page.resultAt(0)
+            var standing = page.resultAt(1)
+            tryVerify(function() {
+                return folded.bodyHeight > 60 && standing.bodyHeight > 60
+            }, 1500)
+            tryVerify(function() { return page.selectionTintHeight === 64 }, 2500)
+            verify(folded.selectionTintItem.visible, "the first card starts lit")
+
+            // Fold the first card the way a non-match does. `searchQuery` is the page's own
+            // input for exactly this - it pushes the active text into every row and a row
+            // that stops matching folds to zero height - so setting it on the delegate is
+            // the same fold the query change performs, without a session refresh in the
+            // way to say which results came back.
+            folded.searchQuery = "beta"
+            tryVerify(function() { return folded.bodyHeight === 0 }, 1500)
+            compare(folded.bodyHeight, 0, "the non-matching card is folded away")
+            tryVerify(function() { return standing.bodyHeight > 60 }, 1500)
+
+            // Put the selection on the card that survived, so there is a real band over the
+            // list and the folded card beside it is dark for the right reason. Waiting on
+            // the card rather than on the band's height, because the band's height was
+            // already 64 before the fold and would have said nothing about re-resolving.
+            svc().selectedIndex = 1
+            tryVerify(function() { return standing.selectionTintItem.visible }, 1500)
+            compare(page.selectionTintHeight, 64,
+                "so the band really is a full-height rectangle over the list")
+            compare(folded.selectionTintItem.height, 0,
+                "and the folded card has no lit slice of it - it has no height to be "
+                    + "over, which is the whole of why it goes dark")
+            compare(folded.selectionTintItem.visible, false,
+                "so nothing is painted on a card that is not there")
+            // The 8px gap below a standing card belongs to no card, so the band's whole
+            // height has to be on the card itself: a mask measured against the row's outer
+            // height would leave a sliver of tint in that gap.
+            compare(standing.selectionTintItem.height, standing.bodyHeight,
+                "while the card that is there is lit exactly to its own edges and not "
+                    + "into the gap")
+        }
+
         function test_pointerActivationExecutesClickedRow() {
             var apps = openWithResults([
                 makeItem("a", "Alpha", 0, 0),
