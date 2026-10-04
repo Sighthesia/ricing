@@ -11,8 +11,10 @@ Item {
 
         function test_targetClassification() {
             compare(Logic.normalizeTarget("launcher"), "launcher")
+            compare(Logic.normalizeTarget("control-center"), "control-center")
             compare(Logic.normalizeTarget("remote"), "")
             compare(Logic.ownerFor("launcher"), "wave")
+            compare(Logic.ownerFor("control-center"), "wave")
             compare(Logic.ownerFor("settings"), "settings")
             compare(Logic.ownerFor("music"), "music")
             compare(Logic.ownerFor("remote"), "")

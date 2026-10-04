@@ -8,6 +8,7 @@ TestCase {
 
     function test_routesAndToggle() {
         compare(Logic.normalizeRoute("launcher"), "launcher")
+        compare(Logic.normalizeRoute("control-center"), "control-center")
         compare(Logic.normalizeRoute("settings"), "")
         compare(Logic.normalizeRoute("music"), "")
         compare(Logic.normalizeRoute(""), "")
@@ -17,6 +18,7 @@ TestCase {
         compare(Logic.normalizeRoute("news"), "")
         compare(Logic.normalizeRoute("beatmap"), "")
         compare(Logic.toggleRoute("", "launcher"), "launcher")
+        compare(Logic.toggleRoute("launcher", "control-center"), "control-center")
         compare(Logic.toggleRoute("launcher", "launcher"), "")
         compare(Logic.toggleRoute("", "bogus"), "")
     }

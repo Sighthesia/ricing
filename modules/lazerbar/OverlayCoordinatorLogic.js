@@ -3,8 +3,8 @@
 // The wave owner serves the launcher; settings and music keep dedicated owners.
 // Deprecated Wiki/News/Beatmap content targets are no longer routable.
 
-var targets = ["settings", "music", "launcher"]
-var waveTargets = ["launcher"]
+var targets = ["settings", "music", "launcher", "control-center"]
+var waveTargets = ["launcher", "control-center"]
 
 function normalizeTarget(target) {
     var candidate = target == null ? "" : String(target)
