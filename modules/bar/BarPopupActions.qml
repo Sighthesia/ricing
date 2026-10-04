@@ -1098,7 +1098,7 @@ Item {
             // app starts playing). The height follows one bounded number, so
             // the host sees a single geometry change per step rather than a
             // cascade of per-section ones.
-            readonly property real viewportCap: 460
+            readonly property real viewportCap: 430
 
             // Bounded scroll body. `interactive` only when it actually
             // overflows, so a short panel leaves the wheel to the bar widget's
@@ -1120,18 +1120,24 @@ Item {
                     id: volumeColumn
                     objectName: "volumeColumn"
                     width: volumeScroll.width
-                    spacing: 10
+                    // Wider than the 4px gap inside a list: the space between
+                    // two sections has to read as "a different kind of thing",
+                    // not as one more row of the list above it.
+                    spacing: 12
 
-                    // Master volume and mute, unchanged from the single-control
-                    // panel: the slider card stays the first thing under the
-                    // header, because every other row here is subordinate to it.
-                    BarPopupSlider {
+                    // Master level and mute, on the same row metrics as every
+                    // other card in the panel. This replaces a two-row settings
+                    // card that stood 112px tall directly above 38px rows, which
+                    // made the top of the panel read at a different scale from
+                    // everything under it.
+                    BarAudioLevelRow {
                         id: volumeSlider
                         objectName: "volumeSlider"
                         width: parent.width
                         value: root.volumeValue
                         muted: root.volumeMuted
                         label: "Volume"
+                        glyph: Qt.resolvedUrl("icons/volume.svg")
                         showMute: true
                         onValueCommitted: function(v) { root.handleVolumeValue(v) }
                         onToggleRequested: root.handleToggleMute()
@@ -1144,6 +1150,7 @@ Item {
                         width: parent.width
                         sectionTitle: "Output"
                         sectionIcon: Qt.resolvedUrl("icons/volume.svg")
+                        rowIcon: Qt.resolvedUrl("icons/volume.svg")
                         devices: root.audioSinks
                         currentDevice: root.defaultAudioSinkNode
                         emptyText: "No output devices"
@@ -1158,6 +1165,7 @@ Item {
                         width: parent.width
                         sectionTitle: "Input"
                         sectionIcon: Qt.resolvedUrl("icons/mic.svg")
+                        rowIcon: Qt.resolvedUrl("icons/mic.svg")
                         devices: root.audioSources
                         currentDevice: root.defaultAudioSourceNode
                         emptyText: "No input devices"
@@ -1906,6 +1914,154 @@ Item {
                 width: parent.width
                 spacing: 8
 
+                // The live link's own addressing, straight under the identity rail
+                // that already names it — so the rail says which link, and this
+                // card says what it came up with. It used to sit above the
+                // refresh action as bare text on the section face, which read as
+                // a stray footnote: the foot of this panel belongs to the list
+                // and the action that refreshes it.
+                Rectangle {
+                    id: linkDetails
+                    objectName: "linkDetails"
+                    width: parent.width
+                    height: visible ? linkDetailsColumn.height + 16 : 0
+                    // Collapse by height, not by visibility alone: a Column
+                    // measures an invisible child at its full geometry, so a
+                    // hidden card would still hold its slot.
+                    visible: root.linkDetailsVisible
+                    radius: 6
+                    color: LazerTheme.settingsCard
+
+                    Column {
+                        id: linkDetailsColumn
+
+                        y: 8
+                        width: parent.width
+                        spacing: 1
+
+                        // The port the numbers belong to. The rail above names
+                        // the profile, so this is the only place the interface
+                        // appears — and it is what tells two links apart when
+                        // both a wired and a wireless one are up.
+                        Text {
+                            id: linkDetailsCaption
+                            objectName: "linkDetailsCaption"
+                            width: parent.width - 20
+                            x: 10
+                            height: 12
+                            text: String((root.linkDetails || {}).device || "")
+                            color: LazerTheme.textMuted
+                            font.pixelSize: 9
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                        }
+
+                        // Label left, value right — the battery card's readout
+                        // contract, so the pair reads as the same kind of thing
+                        // everywhere in this shell.
+                        Item {
+                            id: linkIpRow
+                            objectName: "linkIpRow"
+                            width: parent.width - 20
+                            x: 10
+                            height: 14
+
+                            Text {
+                                id: linkIpLabelText
+                                objectName: "linkIpLabelText"
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "IP address"
+                                color: LazerTheme.textMuted
+                                font.pixelSize: 10
+                            }
+
+                            Text {
+                                objectName: "linkIpValueText"
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: linkIpLabelText.right
+                                anchors.leftMargin: 8
+                                horizontalAlignment: Text.AlignRight
+                                text: String((root.linkDetails || {}).ip4 || "") || "—"
+                                color: LazerTheme.textPrimary
+                                font.pixelSize: 10
+                                elide: Text.ElideLeft
+                                maximumLineCount: 1
+                            }
+                        }
+
+                        Item {
+                            id: linkGatewayRow
+                            objectName: "linkGatewayRow"
+                            width: parent.width - 20
+                            x: 10
+                            height: 14
+
+                            Text {
+                                id: linkGatewayLabelText
+                                objectName: "linkGatewayLabelText"
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "Gateway"
+                                color: LazerTheme.textMuted
+                                font.pixelSize: 10
+                            }
+
+                            Text {
+                                objectName: "linkGatewayValueText"
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: linkGatewayLabelText.right
+                                anchors.leftMargin: 8
+                                horizontalAlignment: Text.AlignRight
+                                text: String((root.linkDetails || {}).gateway || "") || "—"
+                                color: LazerTheme.textPrimary
+                                font.pixelSize: 10
+                                elide: Text.ElideLeft
+                                maximumLineCount: 1
+                            }
+                        }
+
+                        Item {
+                            id: linkDnsRow
+                            objectName: "linkDnsRow"
+                            width: parent.width - 20
+                            x: 10
+                            height: 14
+
+                            Text {
+                                id: linkDnsLabelText
+                                objectName: "linkDnsLabelText"
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "DNS"
+                                color: LazerTheme.textMuted
+                                font.pixelSize: 10
+                            }
+
+                            Text {
+                                objectName: "linkDnsValueText"
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: linkDnsLabelText.right
+                                anchors.leftMargin: 8
+                                horizontalAlignment: Text.AlignRight
+                                text: {
+                                    var dns = (root.linkDetails || {}).dns
+                                    if (!dns || dns.length === 0)
+                                        return "—"
+                                    return dns.join(", ")
+                                }
+                                color: LazerTheme.textPrimary
+                                font.pixelSize: 10
+                                elide: Text.ElideLeft
+                                maximumLineCount: 1
+                            }
+                        }
+                    }
+                }
+
                 // Wired ports, one card per interface, each listing the saved
                 // profiles that belong to it. The card is the port — its name
                 // and its link state; the rows inside are the profiles, because
@@ -1988,7 +2144,11 @@ Item {
                                     objectName: "wiredProfileRow" + wiredGroupCard.index
                                         + "_" + wiredProfileRow.index
                                     width: wiredGroupColumn.width
-                                    height: 40
+                                    // Exactly the two text lines it holds (6 + 14 +
+                                    // 12), so the card's bottom padding matches its
+                                    // top. A row taller than its content reads as a
+                                    // card with a stray gap under the last line.
+                                    height: 32
                                     color: wiredProfileHover.hovered
                                         ? LazerTheme.settingsCardHover : "transparent"
 
@@ -2001,7 +2161,7 @@ Item {
                                         anchors.left: parent.left
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: 2
-                                        height: 22
+                                        height: 20
                                         color: wiredProfileRow.modelData.active
                                             ? LazerTheme.settingsAccent : "transparent"
 
@@ -2314,154 +2474,6 @@ Item {
                     }
                 }
 
-                // The live link's own addressing, as the battery card's readouts
-                // are: label left, value right. Placed above the refresh action
-                // so it reads as part of the list it describes, and hidden
-                // entirely when nothing is up — empty rows would claim the panel
-                // knows an address it does not have.
-                Item {
-                    id: linkDetails
-                    objectName: "linkDetails"
-                    width: parent.width
-                    height: root.linkDetailsVisible ? 60 : 0
-                    visible: height > 0
-
-                    // Which link these addresses belong to. With both a wired
-                    // and a wireless link up, an address without its port name is
-                    // a number nobody can act on.
-                    Text {
-                        id: linkDetailsCaption
-                        objectName: "linkDetailsCaption"
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.right: parent.right
-                        anchors.rightMargin: 10
-                        anchors.top: parent.top
-                        height: 13
-                        text: {
-                            var d = root.linkDetails || {}
-                            var name = String(d.connection || "")
-                            var port = String(d.device || "")
-                            if (name !== "" && port !== "")
-                                return name + " · " + port
-                            return name !== "" ? name : port
-                        }
-                        color: LazerTheme.textMuted
-                        font.pixelSize: 9
-                        elide: Text.ElideRight
-                        maximumLineCount: 1
-                    }
-
-                    Item {
-                        id: linkIpRow
-                        objectName: "linkIpRow"
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.right: parent.right
-                        anchors.rightMargin: 10
-                        anchors.top: linkDetailsCaption.bottom
-                        height: 15
-
-                        Text {
-                            id: linkIpLabelText
-                            objectName: "linkIpLabelText"
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "IP address"
-                            color: LazerTheme.textMuted
-                            font.pixelSize: 10
-                        }
-
-                        Text {
-                            objectName: "linkIpValueText"
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.left: linkIpLabelText.right
-                            anchors.leftMargin: 8
-                            horizontalAlignment: Text.AlignRight
-                            text: String((root.linkDetails || {}).ip4 || "") || "—"
-                            color: LazerTheme.textPrimary
-                            font.pixelSize: 10
-                            elide: Text.ElideLeft
-                            maximumLineCount: 1
-                        }
-                    }
-
-                    Item {
-                        id: linkGatewayRow
-                        objectName: "linkGatewayRow"
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.right: parent.right
-                        anchors.rightMargin: 10
-                        anchors.top: linkIpRow.bottom
-                        height: 15
-
-                        Text {
-                            id: linkGatewayLabelText
-                            objectName: "linkGatewayLabelText"
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "Gateway"
-                            color: LazerTheme.textMuted
-                            font.pixelSize: 10
-                        }
-
-                        Text {
-                            objectName: "linkGatewayValueText"
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.left: linkGatewayLabelText.right
-                            anchors.leftMargin: 8
-                            horizontalAlignment: Text.AlignRight
-                            text: String((root.linkDetails || {}).gateway || "") || "—"
-                            color: LazerTheme.textPrimary
-                            font.pixelSize: 10
-                            elide: Text.ElideLeft
-                            maximumLineCount: 1
-                        }
-                    }
-
-                    Item {
-                        id: linkDnsRow
-                        objectName: "linkDnsRow"
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.right: parent.right
-                        anchors.rightMargin: 10
-                        anchors.top: linkGatewayRow.bottom
-                        height: 15
-
-                        Text {
-                            id: linkDnsLabelText
-                            objectName: "linkDnsLabelText"
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "DNS"
-                            color: LazerTheme.textMuted
-                            font.pixelSize: 10
-                        }
-
-                        Text {
-                            objectName: "linkDnsValueText"
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.left: linkDnsLabelText.right
-                            anchors.leftMargin: 8
-                            horizontalAlignment: Text.AlignRight
-                            text: {
-                                var dns = (root.linkDetails || {}).dns
-                                if (!dns || dns.length === 0)
-                                    return "—"
-                                return dns.join(", ")
-                            }
-                            color: LazerTheme.textPrimary
-                            font.pixelSize: 10
-                            elide: Text.ElideLeft
-                            maximumLineCount: 1
-                        }
-                    }
-                }
 
                 // Rescan sits last: the list is the panel's content, and the
                 // refresh action reads as the foot of it. It also carries the

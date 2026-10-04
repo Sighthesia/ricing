@@ -666,7 +666,37 @@ Item {
             compare(item.wifiRowMeta(null), "")
         }
 
-        // Tapping the connected row must tear down the link, not the radio:
+        // The card's own padding has to match at the top and the bottom, or the
+        // last line reads as floating in the middle of the card — which is
+        // exactly how the first cut of this card looked.
+        function test_networkWiredCardPaddingIsSymmetric() {
+            var svc = makeNetworkService()
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            var card = findByName(item, "wiredGroupCard0")
+            var row = findByName(item, "wiredProfileRow0_0")
+            var name = findByName(item, "wiredProfileNameText0_0")
+            var meta = findByName(item, "wiredProfileMetaText0_0")
+            // Polled, not read once: a Repeater delegate is positioned during the
+            // layout pass, so its geometry is only meaningful afterwards.
+            var column = row.parent
+            // The row is exactly the two lines it holds; a taller row is the
+            // dead space the card used to show under the address.
+            tryVerify(function () {
+                return row.height === name.y + name.height + meta.height
+            }, 1000, "row height " + row.height + " against a content height of "
+                + (name.y + name.height + meta.height))
+            // The same padding above the header and below the last row.
+            tryVerify(function () {
+                return column.y === 8
+            }, 1000, "top padding " + column.y)
+            tryVerify(function () {
+                return card.height - column.y - column.height === 8
+            }, 1000, "bottom padding " + (card.height - column.y - column.height))
+        }
+
+
         // switching Wi-Fi off is a different action with a different blast
         // radius, and the bar icon owns it.
         function test_networkDisconnectLeavesTheRadioOn() {
@@ -687,12 +717,31 @@ Item {
             })
             var block = findByName(item, "linkDetails")
             verify(block.visible, "the block is shown while a link is up")
-            // With both a wired and a wireless link up, an address without its
-            // port name is a number nobody can act on.
-            compare(findByName(item, "linkDetailsCaption").text, "有线连接 1 · enp117s0f3u1")
+            // It sits directly under the identity rail that already names the
+            // link, so it carries the port: that is what tells two links apart
+            // when a wired and a wireless one are both up.
+            compare(findByName(item, "linkDetailsCaption").text, "enp117s0f3u1")
             compare(findByName(item, "linkIpValueText").text, "192.168.42.82")
             compare(findByName(item, "linkGatewayValueText").text, "192.168.42.129")
             compare(findByName(item, "linkDnsValueText").text, "192.168.42.129")
+        }
+
+        // The addressing card belongs at the head of the panel, under the rail
+        // that names the link. It used to sit above the refresh action as bare
+        // text on the section face and read as a stray footnote.
+        function test_networkLinkDetailsLeadThePanel() {
+            var svc = makeNetworkService()
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            var column = findByName(item, "wifiColumn")
+            verify(column !== null, "wifi column should exist")
+            var block = findByName(item, "linkDetails")
+            compare(block.parent, column, "the addressing card lives in the panel column")
+            compare(column.children[0].objectName, "linkDetails", "and it leads the panel")
+            // It is a card like everything else in this panel, not bare text on
+            // the section face.
+            compare(block.color, findByName(item, "wiredGroupCard0").color)
         }
 
         function test_networkLinkDetailsCollapseWithoutALink() {
