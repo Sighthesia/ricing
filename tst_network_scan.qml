@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "./services" as Services
+import "./services/network/NetworkLogic.js" as Logic
 
 // Behavioural harness for NetworkService against the live nmcli/NetworkManager
 // on this machine. Lives in the repo root so `./services` resolves inside the
@@ -71,6 +72,16 @@ ShellRoot {
         if (phase === "await-crosscheck") {
             if (!root.detailCheckDone) {
                 if (ticks > 150) { check("cross-check read nmcli", false, "timed out"); return root.finish() }
+                return
+            }
+            phase = "await-wired"
+            ticks = 0
+            wiredListProcess.running = true
+            return
+        }
+        if (phase === "await-wired") {
+            if (!root.wiredCheckDone) {
+                if (ticks > 200) { check("wired cross-check read nmcli", false, "timed out"); return root.finish() }
                 return
             }
             return root.finish()
@@ -329,10 +340,292 @@ ShellRoot {
         }
     }
 
+    // Independent read of the saved wired profiles. This is the list the panel's
+    // wired rows are built from, so it is checked against nmcli rather than
+    // against the service: a parse that quietly returns nothing would otherwise
+    // look like "this machine has no wired profiles".
+    Process {
+        id: wiredListProcess
+        running: false
+        environment: ({ "LC_ALL": "C", "LANG": "C" })
+        command: ["nmcli", "-t", "-f", "NAME,UUID,TYPE", "connection", "show"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var uuids = []
+                var lines = text.split("\n")
+                for (var i = 0; i < lines.length; i++) {
+                    var raw = lines[i]
+                    if (!raw || !raw.trim())
+                        continue
+                    var parts = Logic.splitTerse(raw.trim(), 8)
+                    if (parts.length < 3)
+                        continue
+                    if (parts[2].trim() === "802-3-ethernet" && parts[1].trim())
+                        uuids.push(parts[1].trim())
+                }
+                root.liveWiredUuids = uuids
+                console.log("--- wired ---")
+                console.log("live 802-3-ethernet profiles=" + uuids.length
+                    + "  service=" + Services.NetworkService.wiredProfiles.length)
+                // The detail call still runs with an empty uuid list: it answers
+                // with nothing, and the chain moves on the same way whether or
+                // not this machine has a wired profile.
+                Qt.callLater(function () { wiredDetailProcess.running = true })
+            }
+        }
+    }
+
+    Process {
+        id: wiredDetailProcess
+        running: false
+        environment: ({ "LC_ALL": "C", "LANG": "C" })
+        command: {
+            var args = ["nmcli", "-t", "-f",
+                "connection.uuid,connection.interface-name,ipv4.method,ipv4.addresses",
+                "connection", "show", "uuid"]
+            var uuids = root.liveWiredUuids
+            for (var i = 0; i < uuids.length; i++)
+                args.push(uuids[i])
+            return args
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var rows = []
+                var buffer = {}
+                var lines = text.split("\n")
+                for (var i = 0; i < lines.length; i++) {
+                    var raw = lines[i]
+                    if (!raw || !raw.trim()) {
+                        if (buffer.uuid)
+                            rows.push(buffer)
+                        buffer = {}
+                        continue
+                    }
+                    var sep = raw.indexOf(":")
+                    if (sep <= 0)
+                        continue
+                    var field = raw.substring(0, sep)
+                    var value = raw.substring(sep + 1).trim()
+                    if (field === "connection.uuid")
+                        buffer.uuid = value
+                    else if (field === "connection.interface-name")
+                        buffer.ifname = value
+                    else if (field === "ipv4.method")
+                        buffer.method = value
+                    else if (field === "ipv4.addresses")
+                        buffer.addresses = value
+                }
+                if (buffer.uuid)
+                    rows.push(buffer)
+                root.liveWiredDetails = rows
+                // The device table comes next: the port list is what decides
+                // whether a profile's adapter pin is alive, so the grouped view
+                // cannot be judged before it lands.
+                disconnectHandleProcess.running = true
+            }
+        }
+    }
+
+    // Every live wired profile must reach the panel, and the profile a port is
+    // showing must be one of the profiles nmcli really holds.
+    function checkWired(liveRows) {
+        var svc = Services.NetworkService
+        var groups = svc.wiredGroups
+        var shown = {}
+        for (var g = 0; g < groups.length; g++) {
+            var profiles = groups[g].profiles || []
+            for (var p = 0; p < profiles.length; p++)
+                shown[profiles[p].uuid] = profiles[p]
+        }
+        console.log("wired port groups=" + groups.length + " profiles shown=" + Object.keys(shown).length)
+        for (var g2 = 0; g2 < groups.length; g2++) {
+            var group = groups[g2]
+            console.log("  " + (group.device !== "" ? group.device : "(unassigned)")
+                + "  connected=" + group.connected + "  carrier=" + group.carrier
+                + "  ip4=" + (group.ip4 || "-")
+                + "  profiles=" + (group.profiles || []).map(function (x) {
+                    return x.name + "[" + (x.addresses && x.addresses.length ? x.addresses.join(",") : x.methodLabel)
+                        + (x.active ? ",active" : "") + (x.stalePin ? ",stalePin" : "")
+                }).join(" | "))
+        }
+
+        var lost = []
+        for (var i = 0; i < liveRows.length; i++) {
+            if (!shown[liveRows[i].uuid])
+                lost.push(liveRows[i].uuid)
+        }
+        check("every live wired profile reaches the panel",
+            liveRows.length === 0 || lost.length === 0, "lost=" + lost.join(" | "))
+
+        var invented = []
+        for (var uuid in shown) {
+            var known = false
+            for (var k = 0; k < liveRows.length; k++) {
+                if (liveRows[k].uuid === uuid)
+                    known = true
+            }
+            if (!known)
+                invented.push(uuid)
+        }
+        check("no panel row is a profile nmcli does not hold", invented.length === 0,
+            "invented=" + invented.join(" | "))
+
+        // Addressing must be carried, not just the name: a static profile the
+        // user wants to enable is identified by the address it will hand out.
+        var addressesLost = []
+        for (var r = 0; r < liveRows.length; r++) {
+            var want = String(liveRows[r].addresses || "")
+            var slash = want.indexOf("/")
+            if (slash > 0)
+                want = want.substring(0, slash)
+            var got = shown[liveRows[r].uuid]
+            if (!got)
+                continue
+            var have = (got.addresses || []).join(",")
+            if (want !== "" && have !== want)
+                addressesLost.push(liveRows[r].uuid + " want=" + want + " got=" + have)
+        }
+        check("a profile's configured address reaches its row",
+            addressesLost.length === 0, "mismatched=" + addressesLost.join(" | "))
+
+        // A pin that names a port this machine has must not be reported stale,
+        // and a pin naming a port it does not have must be.
+        var pinsWrong = []
+        var livePorts = root.liveWiredPorts
+        console.log("live wired ports: " + (livePorts.join(", ") || "(none)"))
+        for (var u in shown) {
+            var pin = ""
+            for (var q = 0; q < liveRows.length; q++) {
+                if (liveRows[q].uuid === u) {
+                    pin = String(liveRows[q].ifname || "")
+                    break
+                }
+            }
+            var expectStale = pin !== "" && livePorts.indexOf(pin) === -1
+            if (expectStale !== !!shown[u].stalePin)
+                pinsWrong.push(u + " pin=" + pin + " stalePin=" + shown[u].stalePin)
+        }
+        check("a dead port pin is flagged, a live one is not",
+            pinsWrong.length === 0, "wrong=" + pinsWrong.join(" | "))
+    }
+
+    // The regression this whole change is built around: tapping the connected
+    // row has to produce a `connection down` that names a profile nmcli
+    // actually holds. On this machine the connected SSID is not the profile
+    // name, so the uuid is the only handle that resolves.
+    Process {
+        id: disconnectHandleProcess
+        running: false
+        environment: ({ "LC_ALL": "C", "LANG": "C" })
+        command: ["nmcli", "-t", "-f",
+            "GENERAL.DEVICE,GENERAL.TYPE,GENERAL.STATE,GENERAL.CONNECTION,GENERAL.CON-UUID,IP4.ADDRESS",
+            "device", "show"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var svc = Services.NetworkService
+                var blocks = text.split(/\n[ \t]*\n/)
+                var liveWifiUuid = ""
+                var ports = []
+                var addresses = []
+                for (var b = 0; b < blocks.length; b++) {
+                    var entry = {}
+                    var lines = blocks[b].split("\n")
+                    for (var l = 0; l < lines.length; l++) {
+                        var raw = lines[l]
+                        var sep = raw.indexOf(":")
+                        if (sep <= 0)
+                            continue
+                        var field = raw.substring(0, sep)
+                        if (field.indexOf("IP4.ADDRESS[") === 0) {
+                            var one = raw.substring(sep + 1).trim()
+                            var slash = one.indexOf("/")
+                            entry["IP4"] = slash > 0 ? one.substring(0, slash) : one
+                            continue
+                        }
+                        entry[field] = raw.substring(sep + 1).trim()
+                    }
+                    if (!entry["GENERAL.DEVICE"])
+                        continue
+                    if (entry["IP4"])
+                        addresses.push(entry["IP4"])
+                    if (entry["GENERAL.TYPE"] === "ethernet")
+                        ports.push(entry["GENERAL.DEVICE"])
+                    if (entry["GENERAL.TYPE"] === "wifi"
+                            && String(entry["GENERAL.STATE"] || "").indexOf("(connected)") !== -1)
+                        liveWifiUuid = entry["GENERAL.CON-UUID"] || ""
+                }
+                root.liveIp4 = addresses
+                root.liveWiredPorts = ports
+
+                if (liveWifiUuid === "") {
+                    console.log("no live wireless link right now — skipping the disconnect handle check")
+                } else {
+                    check("service resolved the running connection's uuid",
+                        svc.activeWifiUuid === liveWifiUuid,
+                        "service=" + svc.activeWifiUuid + " nmcli=" + liveWifiUuid)
+                    // The handle has to name a profile that exists, or
+                    // `connection down uuid` reports success and changes nothing.
+                    var allUuids = root.liveUuids.concat(root.liveWiredUuids)
+                    check("the disconnect handle names a live profile",
+                        allUuids.indexOf(svc.activeWifiUuid) !== -1,
+                        svc.activeWifiUuid)
+                    // And it must not be the SSID: that is the name mismatch that
+                    // made the tap a no-op.
+                    var connected = null
+                    var nets = svc.networks
+                    for (var ssid in nets) {
+                        if (nets[ssid].connected)
+                            connected = nets[ssid]
+                    }
+                    if (connected) {
+                        check("the handle is not the SSID",
+                            svc.activeWifiUuid !== String(connected.ssid),
+                            "ssid=" + connected.ssid + " uuid=" + svc.activeWifiUuid)
+                        console.log("disconnect argv for the connected row: nmcli "
+                            + Logic.downArgs(svc.activeWifiUuid, true).join(" "))
+                    }
+                }
+
+                // The rate the row prints has to be a real one, not a number the
+                // panel invented from a stale scan.
+                var rates = 0
+                var scanned = svc.networks
+                for (var key in scanned) {
+                    if (scanned[key].rate)
+                        rates++
+                }
+                console.log("scan rows carrying a link rate: " + rates + "/" + Object.keys(scanned).length)
+                check("scan rows carry a link rate", rates > 0, "withRate=" + rates)
+
+                // The foot block describes the live link, so its address has to
+                // match what nmcli reports for that very link.
+                var details = svc.linkDetails
+                check("the link details block names a live link",
+                    details !== null && String(details.device || "") !== "",
+                    "device=" + (details ? details.device : "none"))
+                if (details && details.ip4) {
+                    check("the address shown is the live one",
+                        root.liveIp4.indexOf(String(details.ip4)) !== -1,
+                        "service=" + details.ip4 + " nmcli=" + root.liveIp4.join(","))
+                }
+
+                root.checkWired(root.liveWiredDetails || [])
+                root.wiredCheckDone = true
+            }
+        }
+    }
+
+    // What nmcli independently reported, kept so every cross-check below
+    // compares the service against the machine rather than against itself.
     property var liveUuids: []
     property var liveWifiDevices: []
+    property var liveWiredUuids: []
+    property var liveWiredPorts: []
+    property var liveWiredDetails: []
+    property var liveIp4: []
     property bool crossCheckDone: false
     property bool detailCheckDone: false
+    property bool wiredCheckDone: false
 
     // Live adapter names, read independently of the service, so the stranded
     // check compares against the machine rather than against the service.

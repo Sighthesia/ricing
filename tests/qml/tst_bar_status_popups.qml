@@ -112,6 +112,10 @@ Item {
             + ' property string activeEthernetConnection: "";'
             + ' property string lastError: "";'
             + ' property var networks;'
+            + ' property var wiredGroups: [];'
+            + ' property string wiredActivating: "";'
+            + ' property string wiredDeactivating: "";'
+            + ' property var linkDetails: null;'
             + ' property int powerCalls: 0;'
             + ' property bool lastPower: false;'
             + ' property int scanCalls: 0;'
@@ -125,6 +129,8 @@ Item {
             + ' property string lastPassword: "";'
             + ' property string lastSecurity: "";'
             + ' property int disconnectCalls: 0;'
+            + ' property int wiredToggleCalls: 0;'
+            + ' property string lastWiredUuid: "";'
             + ' function setWifiEnabled(v) { powerCalls++; lastPower = v; wifiEnabled = v }'
             + ' function scan() { scanCalls++ }'
             + ' function refreshForOpen() { refreshCalls++ }'
@@ -135,11 +141,37 @@ Item {
             + ' function getSignalLabel(s) { return s >= 80 ? "Excellent" : "Good" }'
             + ' function isSecured(s) { return s && s !== "--" && s !== "open" }'
             + ' function connect(ssid, password, hidden, security) { connectCalls++; lastSsid = ssid; lastPassword = password; lastSecurity = security }'
-            + ' function disconnect(ssid) { disconnectCalls++; lastSsid = ssid } }',
+            + ' function disconnect(ssid) { disconnectCalls++; lastSsid = ssid }'
+            + ' function toggleWiredProfile(u) { wiredToggleCalls++; lastWiredUuid = u } }',
             root, "fakeWifi")
         svc.networks = {
-            HomeWifi: { ssid: "HomeWifi", security: "WPA2", signal: 85, connected: true, existing: true },
-            Cafe: { ssid: "Cafe", security: "--", signal: 55, connected: false, existing: false },
+            HomeWifi: { ssid: "HomeWifi", security: "WPA2", signal: 85, rate: "405 Mb/s", connected: true, existing: true },
+            Cafe: { ssid: "Cafe", security: "--", signal: 55, rate: "130 Mb/s", connected: false, existing: false },
+        }
+        // This machine's real shape: a port with the uplink up, and a spare port
+        // carrying the static-IP profile a direct-connect instrument needs.
+        svc.wiredGroups = [
+            {
+                device: "enp117s0f3u1", connected: true, carrier: "on",
+                connection: "有线连接 1", uuid: "uuid-dhcp", ip4: "192.168.42.82",
+                profiles: [
+                    { uuid: "uuid-dhcp", name: "有线连接 1", method: "auto",
+                      methodLabel: "DHCP", addresses: [], active: true, stalePin: false }
+                ]
+            },
+            {
+                device: "enp2s0", connected: false, carrier: "off",
+                reason: "40 (Carrier/link changed)", connection: "", uuid: "", ip4: "",
+                profiles: [
+                    { uuid: "uuid-static", name: "SDS804X-HD直连", method: "manual",
+                      methodLabel: "Manual", addresses: ["192.168.10.1"],
+                      active: false, stalePin: false }
+                ]
+            }
+        ]
+        svc.linkDetails = {
+            device: "enp117s0f3u1", type: "ethernet", connection: "有线连接 1",
+            ip4: "192.168.42.82", gateway: "192.168.42.129", dns: ["192.168.42.129"]
         }
         return svc
     }
@@ -521,31 +553,171 @@ Item {
             verify(!panel.visible, "password panel should close after submit")
         }
 
-        function test_networkEthernetRow() {
+        // A wired profile used to have no affordance at all — the panel showed a
+        // static card that could only report a link that was already up, so
+        // enabling a direct-connect profile meant opening a terminal. Each port
+        // is now a card, and each saved profile on it is a tappable row.
+        function test_networkWiredPortsListTheirProfiles() {
             var svc = makeNetworkService()
-            svc.ethernetAvailable = true
-            svc.ethernetConnected = true
-            svc.activeEthernetConnection = "Office LAN"
             var item = createTemporaryObject(actionsComp, root, {
                 actionKind: "network", payload: { networkService: svc }
             })
-            verify(item.ethAvailable, "ethernet available reflects service")
-            verify(item.ethConnected, "ethernet connected reflects service")
-            compare(item.ethName, "Office LAN")
-            var row = findByName(item, "ethernetRow")
-            verify(row !== null, "ethernet row should exist")
-            verify(row.visible, "ethernet row visible when adapter present")
-            compare(findByName(item, "ethernetStatusText").text, "Connected")
-            // The wired link names itself on its own card; the removed centered
-            // line used to repeat it.
-            compare(findByName(item, "ethernetNameText").text, "Office LAN")
+            var uplink = findByName(item, "wiredGroupCard0")
+            var spare = findByName(item, "wiredGroupCard1")
+            verify(uplink !== null, "the connected port has a card")
+            verify(spare !== null, "the idle port has a card too — it is where the profile lives")
+            compare(findByName(item, "wiredPortNameText0").text, "enp117s0f3u1")
+            compare(findByName(item, "wiredPortStateText0").text, "Connected")
+            // A present but silent port must not read as "disconnected": those
+            // are two different problems with two different fixes.
+            compare(findByName(item, "wiredPortNameText1").text, "enp2s0")
+            compare(findByName(item, "wiredPortStateText1").text, "No cable")
+            // The static profile states its address before it is up, because
+            // the address is the reason the profile exists.
+            compare(findByName(item, "wiredProfileNameText1_0").text, "SDS804X-HD直连")
+            compare(findByName(item, "wiredProfileMetaText1_0").text, "192.168.10.1")
+            compare(findByName(item, "wiredProfileStateText1_0").text, "Connect")
+            // A DHCP profile has no address yet, so its row names the method
+            // instead of reading empty.
+            compare(findByName(item, "wiredProfileNameText0_0").text, "有线连接 1")
+            compare(findByName(item, "wiredProfileMetaText0_0").text, "DHCP")
+            compare(findByName(item, "wiredProfileStateText0_0").text, "Disconnect")
         }
 
-        function test_networkEthernetHiddenWithoutAdapter() {
+        function test_networkWiredRowTapsRouteToTheService() {
+            var svc = makeNetworkService()
             var item = createTemporaryObject(actionsComp, root, {
-                actionKind: "network", payload: { networkService: makeNetworkService() }
+                actionKind: "network", payload: { networkService: svc }
             })
-            verify(!findByName(item, "ethernetRow").visible, "ethernet row hidden without adapter")
+            item.handleWiredProfileTap({ uuid: "uuid-static", active: false })
+            compare(svc.wiredToggleCalls, 1)
+            compare(svc.lastWiredUuid, "uuid-static",
+                "the tap carries the uuid, never the profile name")
+            // The direction is the service's call — it knows which profile is
+            // running; the panel only reports which row was tapped.
+            item.handleWiredProfileTap({ uuid: "uuid-dhcp", active: true })
+            compare(svc.wiredToggleCalls, 2)
+            compare(svc.lastWiredUuid, "uuid-dhcp")
+            item.handleWiredProfileTap(null)
+            compare(svc.wiredToggleCalls, 2, "a null row is not an action")
+        }
+
+        // A second tap on the row that is already moving would be a second nmcli
+        // run fighting the first.
+        function test_networkWiredRowIsInertWhileInFlight() {
+            var svc = makeNetworkService()
+            svc.wiredActivating = "uuid-static"
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            var tap = findByName(item, "wiredProfileTap1_0")
+            verify(tap !== null, "the moving row has a tap target")
+            compare(tap.enabled, false)
+            compare(findByName(item, "wiredProfileStateText1_0").text, "Connecting…")
+            // The other row is unaffected: one busy profile must not freeze the
+            // panel.
+            verify(findByName(item, "wiredProfileTap0_0").enabled)
+        }
+
+        function test_networkWiredPortHiddenWithoutPorts() {
+            var svc = makeNetworkService()
+            svc.wiredGroups = []
+            svc.ethernetAvailable = false
+            svc.ethernetConnected = false
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            compare(findByName(item, "wiredGroupCard0"), null,
+                "no ports means no cards, not an empty card")
+            verify(findByName(item, "networkContent").visible)
+        }
+
+        // A profile pinned to a port that is gone is still shown, in its own
+        // trailing group, so it can be recognised and removed.
+        function test_networkWiredOrphanGroupIsNamed() {
+            var svc = makeNetworkService()
+            svc.wiredGroups = [
+                { device: "", connected: false, carrier: "", profiles: [
+                    { uuid: "uuid-orphan", name: "Old NIC", method: "manual",
+                      methodLabel: "Manual", addresses: ["10.0.0.5"], stalePin: true }
+                ] }
+            ]
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            compare(findByName(item, "wiredPortNameText0").text, "Other wired profiles")
+            compare(findByName(item, "wiredProfileNameText0_0").text, "Old NIC")
+        }
+
+        // The strength a row is scanned for is a percentage and a rate, not a
+        // word about strength: "Excellent" cannot say which band it is.
+        function test_networkWirelessRowShowsStrengthAndRate() {
+            var svc = makeNetworkService()
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            compare(item.wifiRowMeta({ signal: 85, rate: "405 Mb/s" }), "85% · 405 Mb/s")
+            // A row with no rate (some drivers omit it) still shows strength.
+            compare(item.wifiRowMeta({ signal: 40, rate: "" }), "40%")
+            // Neither number available at all: the service's word is better
+            // than an empty right-hand side.
+            compare(item.wifiRowMeta({ signal: 0, rate: "" }), item.wifiSignalLabel(0))
+            compare(item.wifiRowMeta({}), item.wifiSignalLabel(0))
+            compare(item.wifiRowMeta(null), "")
+        }
+
+        // Tapping the connected row must tear down the link, not the radio:
+        // switching Wi-Fi off is a different action with a different blast
+        // radius, and the bar icon owns it.
+        function test_networkDisconnectLeavesTheRadioOn() {
+            var svc = makeNetworkService()
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            item.handleNetworkTap(item.wifiList[0])
+            compare(svc.disconnectCalls, 1)
+            compare(svc.lastSsid, "HomeWifi")
+            compare(svc.powerCalls, 0, "disconnecting a link must not switch the radio off")
+        }
+
+        function test_networkLinkDetailsShowTheLiveAddressing() {
+            var svc = makeNetworkService()
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            var block = findByName(item, "linkDetails")
+            verify(block.visible, "the block is shown while a link is up")
+            // With both a wired and a wireless link up, an address without its
+            // port name is a number nobody can act on.
+            compare(findByName(item, "linkDetailsCaption").text, "有线连接 1 · enp117s0f3u1")
+            compare(findByName(item, "linkIpValueText").text, "192.168.42.82")
+            compare(findByName(item, "linkGatewayValueText").text, "192.168.42.129")
+            compare(findByName(item, "linkDnsValueText").text, "192.168.42.129")
+        }
+
+        function test_networkLinkDetailsCollapseWithoutALink() {
+            var svc = makeNetworkService()
+            svc.linkDetails = null
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            var block = findByName(item, "linkDetails")
+            compare(block.height, 0, "no link means no rows, not rows of em dashes")
+            compare(block.visible, false)
+        }
+
+        // A panel opened before the profile read lands must not claim the
+        // machine has no wired profiles.
+        function test_networkWiredPortMissingOnAnOlderService() {
+            var svc = makeNetworkService()
+            svc.wiredGroups = undefined
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "network", payload: { networkService: svc }
+            })
+            compare(item.wiredGroups.length, 0)
+            verify(findByName(item, "networkContent").visible)
+            item.handleWiredProfileTap({ uuid: "uuid-static" })
+            compare(svc.wiredToggleCalls, 1, "the fallback still reaches the service")
         }
 
         function test_networkNullPayloadDoesNotThrow() {

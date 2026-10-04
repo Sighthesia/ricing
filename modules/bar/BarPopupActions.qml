@@ -321,6 +321,42 @@ Item {
             return String(payload.ethName || "")
         return ""
     }
+
+    // Wired ports, each carrying the saved profiles that belong to it. A wired
+    // profile is activated exactly the way a wireless one is — by tapping the
+    // row — so the panel shows them as rows rather than as a status card that
+    // can only report what is already up.
+    readonly property var wiredGroups: {
+        var groups = root.networkService && root.networkService.wiredGroups !== undefined
+            ? root.networkService.wiredGroups
+            : (payload && payload.wiredGroups ? payload.wiredGroups : null)
+        return groups || []
+    }
+    // uuid of the wired profile currently in flight, in either direction.
+    readonly property string wiredActivating: {
+        if (root.networkService && root.networkService.wiredActivating !== undefined)
+            return String(root.networkService.wiredActivating || "")
+        if (payload && payload.wiredActivating !== undefined)
+            return String(payload.wiredActivating || "")
+        return ""
+    }
+    readonly property string wiredDeactivating: {
+        if (root.networkService && root.networkService.wiredDeactivating !== undefined)
+            return String(root.networkService.wiredDeactivating || "")
+        if (payload && payload.wiredDeactivating !== undefined)
+            return String(payload.wiredDeactivating || "")
+        return ""
+    }
+    // The live link's own addressing, for the foot block. Wired wins when it is
+    // up: on a machine with both, the wired link is the deliberate one.
+    readonly property var linkDetails: {
+        var details = root.networkService && root.networkService.linkDetails !== undefined
+            ? root.networkService.linkDetails
+            : (payload && payload.linkDetails ? payload.linkDetails : null)
+        return details || null
+    }
+    readonly property bool linkDetailsVisible: root.linkDetails !== null
+        && String(root.linkDetails.device || "") !== ""
     readonly property int mediaPositionMs: {
         if (payload && payload.mediaControlService && payload.mediaControlService.positionMs !== undefined)
             return Math.max(0, Number(payload.mediaControlService.positionMs))
@@ -687,6 +723,99 @@ Item {
         if (s >= 35) return "Fair"
         if (s >= 15) return "Poor"
         return "Weak"
+    }
+
+    // A wireless row's right-hand readout: strength as a percentage plus the
+    // link rate. The qualitative word alone cannot answer the question a row is
+    // actually asked — "is this the 5 GHz band, and what will it give me" — so
+    // the numbers lead and the word is only the fallback for a service that
+    // reports neither.
+    function wifiRowMeta(net) {
+        if (!net)
+            return ""
+        var parts = []
+        var signal = parseInt(net.signal, 10)
+        if (isFinite(signal) && signal > 0)
+            parts.push(signal + "%")
+        var rate = net.rate !== undefined && net.rate !== null ? String(net.rate) : ""
+        if (rate !== "")
+            parts.push(rate)
+        if (parts.length === 0)
+            return root.wifiSignalLabel(net.signal)
+        return parts.join(" · ")
+    }
+
+    // A wired profile's second line: the address it will hand out, or the
+    // method when it has none yet. A static-IP profile exists precisely to
+    // carry an address, so that address has to be readable before it is up.
+    function wiredProfileMeta(profile) {
+        if (!profile)
+            return ""
+        var addresses = profile.addresses ? profile.addresses : []
+        if (addresses.length > 0)
+            return addresses.join(", ")
+        if (profile.methodLabel !== undefined)
+            return String(profile.methodLabel || "")
+        var method = String(profile.method || "").toLowerCase()
+        if (method === "" || method === "auto")
+            return "DHCP"
+        if (method === "manual")
+            return "Manual"
+        return method
+    }
+
+    // A port's header state. "No cable" is the answer a present-but-silent port
+    // needs: it separates "nothing plugged in" from "plugged in, nothing
+    // activated", which is the difference between fetching a cable and tapping
+    // a profile.
+    function wiredPortState(group) {
+        if (!group)
+            return { text: "", tone: "idle" }
+        if (group.connected)
+            return { text: "Connected", tone: "active" }
+        if (String(group.carrier || "") === "off")
+            return { text: "No cable", tone: "idle" }
+        var reason = String(group.reason || "")
+        if (reason.indexOf("Carrier") !== -1 || reason.indexOf("40 ") === 0)
+            return { text: "No cable", tone: "idle" }
+        return { text: "Disconnected", tone: "idle" }
+    }
+
+    function wiredPortStateColor(tone) {
+        return tone === "active" ? LazerTheme.osuGreen : LazerTheme.textMuted
+    }
+
+    // Port groups are the one list that can grow past what fits, and a machine
+    // with several NICs (a laptop plus a USB adapter) reaches that quickly.
+    readonly property int wiredMaxVisibleGroups: 3
+    readonly property var wiredVisibleGroups: root.wiredGroups.length > 0
+        ? root.wiredGroups.slice(0, wiredMaxVisibleGroups) : []
+
+    // Tap a wired profile row: the running one goes down, anything else comes
+    // up. Routed through the service so it can pre-flight the port's carrier
+    // instead of leaving an activation queued inside NetworkManager.
+    function handleWiredProfileTap(profile) {
+        if (!profile || !profile.uuid)
+            return
+        if (payload && typeof payload.onWiredToggle === "function") {
+            payload.onWiredToggle(String(profile.uuid))
+            return
+        }
+        var service = root.networkService
+        if (!service)
+            return
+        if (typeof service.toggleWiredProfile === "function") {
+            try { service.toggleWiredProfile(String(profile.uuid)) } catch (e) {}
+            return
+        }
+        // A service without the combined entry point still gets the direction
+        // the row is asking for.
+        try {
+            if (profile.active && typeof service.disconnectWired === "function")
+                service.disconnectWired(String(profile.uuid))
+            else if (typeof service.activateWired === "function")
+                service.activateWired(String(profile.uuid))
+        } catch (e) {}
     }
 
     // Tap a network row: disconnect the active one, otherwise connect.
@@ -1529,7 +1658,7 @@ Item {
             }
         }
 
-        // Network content: wired link, wi-fi power, status, rescan, plus
+        // Network content: wired ports, wi-fi power, status, rescan, plus
         // the wireless network list.
         Item {
             id: networkContent
@@ -1555,38 +1684,191 @@ Item {
                 width: parent.width
                 spacing: 8
 
-                // Wired link reads as a static card: no tap action exists.
-                Rectangle {
-                    id: ethernetRow
-                    objectName: "ethernetRow"
-                    width: parent.width
-                    height: 36
-                    radius: 6
-                    visible: root.ethAvailable
-                    color: LazerTheme.settingsCard
+                // Wired ports, one card per interface, each listing the saved
+                // profiles that belong to it. The card is the port — its name
+                // and its link state; the rows inside are the profiles, because
+                // a profile is the thing a tap acts on. This replaces a static
+                // card that could only report a link that was already up.
+                Repeater {
+                    id: wiredGroupRepeater
+                    objectName: "wiredGroupRepeater"
+                    model: root.wiredVisibleGroups
 
-                    Text {
-                        objectName: "ethernetNameText"
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width - 120
-                        text: root.ethName !== "" ? root.ethName : "Wired"
-                        color: LazerTheme.textPrimary
-                        font.pixelSize: 11
-                        font.bold: true
-                        elide: Text.ElideRight
-                        maximumLineCount: 1
-                    }
+                    delegate: Rectangle {
+                        id: wiredGroupCard
 
-                    Text {
-                        objectName: "ethernetStatusText"
-                        anchors.right: parent.right
-                        anchors.rightMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root.ethConnected ? "Connected" : "Not connected"
-                        color: root.ethConnected ? LazerTheme.osuGreen : LazerTheme.textMuted
-                        font.pixelSize: 10
+                        required property var modelData
+                        required property int index
+
+                        objectName: "wiredGroupCard" + wiredGroupCard.index
+                        width: wifiColumn.width
+                        height: wiredGroupColumn.height + 16
+                        radius: 6
+                        color: LazerTheme.settingsCard
+
+                        Column {
+                            id: wiredGroupColumn
+
+                            y: 8
+                            width: parent.width
+                            spacing: 4
+
+                            // Port header: the interface and what its link is
+                            // doing. The name elides rather than pushing the
+                            // state word off the card.
+                            Item {
+                                id: wiredPortHeader
+                                objectName: "wiredPortHeader" + wiredGroupCard.index
+                                width: parent.width
+                                height: 16
+
+                                Text {
+                                    id: wiredPortNameText
+                                    objectName: "wiredPortNameText" + wiredGroupCard.index
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 10
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: parent.width - 20 - 96
+                                    text: String(wiredGroupCard.modelData.device || "") !== ""
+                                        ? String(wiredGroupCard.modelData.device)
+                                        : "Other wired profiles"
+                                    color: LazerTheme.textPrimary
+                                    font.pixelSize: 11
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                }
+
+                                Text {
+                                    id: wiredPortStateText
+                                    objectName: "wiredPortStateText" + wiredGroupCard.index
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 10
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: root.wiredPortState(wiredGroupCard.modelData).text
+                                    color: root.wiredPortStateColor(
+                                        root.wiredPortState(wiredGroupCard.modelData).tone)
+                                    font.pixelSize: 10
+                                }
+                            }
+
+                            // One row per saved profile on this port.
+                            Repeater {
+                                id: wiredProfileRepeater
+                                model: wiredGroupCard.modelData.profiles || []
+
+                                delegate: Rectangle {
+                                    id: wiredProfileRow
+
+                                    required property var modelData
+                                    required property int index
+
+                                    objectName: "wiredProfileRow" + wiredGroupCard.index
+                                        + "_" + wiredProfileRow.index
+                                    width: wiredGroupColumn.width
+                                    height: 40
+                                    color: wiredProfileHover.hovered
+                                        ? LazerTheme.settingsCardHover : "transparent"
+
+                                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+
+                                    // The running profile is marked with a thin
+                                    // colour band, not a rounded outline: a band
+                                    // states a fact, an outline decorates.
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 2
+                                        height: 22
+                                        color: wiredProfileRow.modelData.active
+                                            ? LazerTheme.settingsAccent : "transparent"
+
+                                        Behavior on color {
+                                            ColorAnimation { duration: MotionTokens.fast }
+                                        }
+                                    }
+
+                                    Text {
+                                        id: wiredProfileNameText
+                                        objectName: "wiredProfileNameText"
+                                            + wiredGroupCard.index + "_" + wiredProfileRow.index
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 12
+                                        anchors.right: wiredProfileStateText.left
+                                        anchors.rightMargin: 6
+                                        anchors.top: parent.top
+                                        anchors.topMargin: 6
+                                        height: 14
+                                        text: String(wiredProfileRow.modelData.name || "")
+                                        color: LazerTheme.textPrimary
+                                        font.pixelSize: 11
+                                        font.bold: true
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                    }
+
+                                    // The address a static profile will hand out,
+                                    // or the method when it has none yet.
+                                    Text {
+                                        id: wiredProfileMetaText
+                                        objectName: "wiredProfileMetaText"
+                                            + wiredGroupCard.index + "_" + wiredProfileRow.index
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 12
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 10
+                                        anchors.top: wiredProfileNameText.bottom
+                                        height: 12
+                                        text: root.wiredProfileMeta(wiredProfileRow.modelData)
+                                        color: LazerTheme.textMuted
+                                        font.pixelSize: 9
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                    }
+
+                                    // What a tap will do, stated on the row
+                                    // rather than left to be read off the border.
+                                    Text {
+                                        id: wiredProfileStateText
+                                        objectName: "wiredProfileStateText"
+                                            + wiredGroupCard.index + "_" + wiredProfileRow.index
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 10
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        readonly property bool busy: root.wiredActivating
+                                                === String(wiredProfileRow.modelData.uuid || "")
+                                            || root.wiredDeactivating
+                                                === String(wiredProfileRow.modelData.uuid || "")
+                                        text: {
+                                            var uuid = String(wiredProfileRow.modelData.uuid || "")
+                                            if (root.wiredActivating === uuid)
+                                                return "Connecting…"
+                                            if (root.wiredDeactivating === uuid)
+                                                return "Disconnecting…"
+                                            return wiredProfileRow.modelData.active
+                                                ? "Disconnect" : "Connect"
+                                        }
+                                        color: wiredProfileStateText.busy
+                                            ? LazerTheme.settingsAccent
+                                            : (wiredProfileRow.modelData.active
+                                                ? LazerTheme.osuGreen : LazerTheme.textMuted)
+                                        font.pixelSize: 10
+                                    }
+
+                                    HoverHandler { id: wiredProfileHover }
+                                    TapHandler {
+                                        objectName: "wiredProfileTap"
+                                            + wiredGroupCard.index + "_" + wiredProfileRow.index
+                                        gesturePolicy: TapHandler.ReleaseWithinBounds
+                                        // One attempt at a time: a second tap on
+                                        // the row that is already moving would be
+                                        // a second nmcli run fighting the first.
+                                        enabled: !wiredProfileStateText.busy
+                                        onTapped: root.handleWiredProfileTap(wiredProfileRow.modelData)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -1789,14 +2071,16 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             // The row is the only place a network is named, so
                             // the in-flight attempt is reported here rather than
-                            // in a separate centered status line.
+                            // in a separate centered status line. Otherwise the
+                            // readout is the numbers the row is scanned for:
+                            // strength and rate, not a word about strength.
                             text: {
                                 var data = wifiNetRow.modelData
                                 if (!data) return ""
-                                if (data.connected) return "Connected"
-                                if (root.wifiConnecting && root.wifiConnectingTo === String(data.ssid || ""))
+                                if (root.wifiConnecting
+                                        && root.wifiConnectingTo === String(data.ssid || ""))
                                     return "Connecting…"
-                                return root.wifiSignalLabel(data.signal)
+                                return root.wifiRowMeta(data)
                             }
                             color: wifiNetRow.modelData && wifiNetRow.modelData.connected
                                 ? LazerTheme.osuGreen
@@ -1804,6 +2088,155 @@ Item {
                                     && root.wifiConnectingTo === String((wifiNetRow.modelData || {}).ssid || "")
                                     ? LazerTheme.settingsAccent : LazerTheme.textMuted)
                             font.pixelSize: 10
+                        }
+                    }
+                }
+
+                // The live link's own addressing, as the battery card's readouts
+                // are: label left, value right. Placed above the refresh action
+                // so it reads as part of the list it describes, and hidden
+                // entirely when nothing is up — empty rows would claim the panel
+                // knows an address it does not have.
+                Item {
+                    id: linkDetails
+                    objectName: "linkDetails"
+                    width: parent.width
+                    height: root.linkDetailsVisible ? 60 : 0
+                    visible: height > 0
+
+                    // Which link these addresses belong to. With both a wired
+                    // and a wireless link up, an address without its port name is
+                    // a number nobody can act on.
+                    Text {
+                        id: linkDetailsCaption
+                        objectName: "linkDetailsCaption"
+                        anchors.left: parent.left
+                        anchors.leftMargin: 10
+                        anchors.right: parent.right
+                        anchors.rightMargin: 10
+                        anchors.top: parent.top
+                        height: 13
+                        text: {
+                            var d = root.linkDetails || {}
+                            var name = String(d.connection || "")
+                            var port = String(d.device || "")
+                            if (name !== "" && port !== "")
+                                return name + " · " + port
+                            return name !== "" ? name : port
+                        }
+                        color: LazerTheme.textMuted
+                        font.pixelSize: 9
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+
+                    Item {
+                        id: linkIpRow
+                        objectName: "linkIpRow"
+                        anchors.left: parent.left
+                        anchors.leftMargin: 10
+                        anchors.right: parent.right
+                        anchors.rightMargin: 10
+                        anchors.top: linkDetailsCaption.bottom
+                        height: 15
+
+                        Text {
+                            id: linkIpLabelText
+                            objectName: "linkIpLabelText"
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "IP address"
+                            color: LazerTheme.textMuted
+                            font.pixelSize: 10
+                        }
+
+                        Text {
+                            objectName: "linkIpValueText"
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left: linkIpLabelText.right
+                            anchors.leftMargin: 8
+                            horizontalAlignment: Text.AlignRight
+                            text: String((root.linkDetails || {}).ip4 || "") || "—"
+                            color: LazerTheme.textPrimary
+                            font.pixelSize: 10
+                            elide: Text.ElideLeft
+                            maximumLineCount: 1
+                        }
+                    }
+
+                    Item {
+                        id: linkGatewayRow
+                        objectName: "linkGatewayRow"
+                        anchors.left: parent.left
+                        anchors.leftMargin: 10
+                        anchors.right: parent.right
+                        anchors.rightMargin: 10
+                        anchors.top: linkIpRow.bottom
+                        height: 15
+
+                        Text {
+                            id: linkGatewayLabelText
+                            objectName: "linkGatewayLabelText"
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "Gateway"
+                            color: LazerTheme.textMuted
+                            font.pixelSize: 10
+                        }
+
+                        Text {
+                            objectName: "linkGatewayValueText"
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left: linkGatewayLabelText.right
+                            anchors.leftMargin: 8
+                            horizontalAlignment: Text.AlignRight
+                            text: String((root.linkDetails || {}).gateway || "") || "—"
+                            color: LazerTheme.textPrimary
+                            font.pixelSize: 10
+                            elide: Text.ElideLeft
+                            maximumLineCount: 1
+                        }
+                    }
+
+                    Item {
+                        id: linkDnsRow
+                        objectName: "linkDnsRow"
+                        anchors.left: parent.left
+                        anchors.leftMargin: 10
+                        anchors.right: parent.right
+                        anchors.rightMargin: 10
+                        anchors.top: linkGatewayRow.bottom
+                        height: 15
+
+                        Text {
+                            id: linkDnsLabelText
+                            objectName: "linkDnsLabelText"
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "DNS"
+                            color: LazerTheme.textMuted
+                            font.pixelSize: 10
+                        }
+
+                        Text {
+                            objectName: "linkDnsValueText"
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left: linkDnsLabelText.right
+                            anchors.leftMargin: 8
+                            horizontalAlignment: Text.AlignRight
+                            text: {
+                                var dns = (root.linkDetails || {}).dns
+                                if (!dns || dns.length === 0)
+                                    return "—"
+                                return dns.join(", ")
+                            }
+                            color: LazerTheme.textPrimary
+                            font.pixelSize: 10
+                            elide: Text.ElideLeft
+                            maximumLineCount: 1
                         }
                     }
                 }

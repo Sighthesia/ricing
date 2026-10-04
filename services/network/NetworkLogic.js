@@ -1,7 +1,8 @@
 .pragma library
 
-// Pure Wi-Fi plumbing for NetworkService: terse `nmcli -t` parsing, security
-// classification, connect-strategy choice and stderr → user-facing message.
+// Network plumbing for NetworkService: terse `nmcli -t` parsing (device table,
+// wireless list, saved profiles, wired profiles), security classification,
+// connect-strategy choice and stderr → user-facing message.
 // Stateless and free of QML/Quickshell imports so it stays runnable under
 // plain qmltestrunner, matching the other services/ *.js siblings.
 
@@ -54,8 +55,19 @@ function normalizeSecurity(value) {
     return text === "" ? "--" : text
 }
 
-// Turn `nmcli -t -f SSID,SECURITY,SIGNAL,IN-USE device wifi list` output into
-// the ssid-keyed map the service exposes. `savedBySsid` comes from
+// nmcli reports the AP's link rate as "1170 Mbit/s". A list row has room for
+// roughly a dozen glyphs, and the shorter unit is unambiguous next to a
+// percentage, so the unit is trimmed rather than the value. An empty rate is
+// normal (some drivers omit it), and must stay empty instead of reading as 0.
+function formatRate(rawValue) {
+    var text = String(rawValue == null ? "" : rawValue).trim()
+    if (text === "" || text === "--")
+        return ""
+    return text.replace(/\s*Mbit\/s\s*$/i, " Mb/s").replace(/\s+/g, " ").trim()
+}
+
+// Turn `nmcli -t -f SSID,SECURITY,SIGNAL,RATE,IN-USE device wifi list` output
+// into the ssid-keyed map the service exposes. `savedBySsid` comes from
 // parseProfileList and decides the `existing` flag plus the exact profile
 // uuid/name a connect should target.
 function parseWifiList(text, savedBySsid) {
@@ -66,15 +78,16 @@ function parseWifiList(text, savedBySsid) {
         var line = lines[i]
         if (!line || !line.trim())
             continue
-        var parts = splitTerse(line.trim(), 4)
-        if (parts.length < 4)
+        var parts = splitTerse(line.trim(), 5)
+        if (parts.length < 5)
             continue
         var ssid = parts[0].trim()
         if (!ssid)
             continue
         var security = normalizeSecurity(parts[1])
         var signal = parseInt(parts[2], 10) || 0
-        var inUse = parts[3].trim() === "*"
+        var rate = formatRate(parts[3])
+        var inUse = parts[4].trim() === "*"
         var profile = saved[ssid] || null
         var existing = !!profile
         if (!map[ssid]) {
@@ -82,6 +95,7 @@ function parseWifiList(text, savedBySsid) {
                 ssid: ssid,
                 security: security,
                 signal: signal,
+                rate: rate,
                 connected: inUse,
                 existing: existing,
                 savedName: profile ? profile.name : "",
@@ -90,13 +104,17 @@ function parseWifiList(text, savedBySsid) {
             continue
         }
         // One SSID can ride several bands/routers: keep the best signal and
-        // never let a weaker non-active band clear the active flag.
+        // never let a weaker non-active band clear the active flag. The rate
+        // follows whichever entry won the signal, and the active AP always
+        // wins outright — its rate is the one the link is actually using.
         var entry = map[ssid]
         if (inUse) {
             entry.connected = true
             entry.signal = signal
+            entry.rate = rate
         } else if (!entry.connected && signal > entry.signal) {
             entry.signal = signal
+            entry.rate = rate
         }
         if (!entry.existing && existing) {
             entry.existing = true
@@ -108,17 +126,24 @@ function parseWifiList(text, savedBySsid) {
 }
 
 // Read `nmcli -t -f <fields> connection show uuid …`. The detailed form does
-// not accept NAME and prints one "<field>:<value>" line per requested field,
-// grouped per connection and separated by a blank line; a field with an empty
-// value contributes an empty line. Every line names its own field, so this is
-// order-independent and needs no positional guesswork — the earlier attempt to
-// pair rows by position silently mismatched profiles to SSIDs.
+// not accept NAME and prints one "<field>:<value>" line per field that has a
+// value, grouped per connection and separated by a blank line. Measured on this
+// machine: a field with no value is not printed at all (it is not printed as an
+// empty "<field>:" line either), so "absent" and "empty" are the same thing
+// here — which is why the fields this needs are all optional.
+//
+// Every line names its own field, so parsing is order-independent and needs no
+// positional guesswork — the earlier attempt to pair rows by position silently
+// mismatched profiles to SSIDs.
 function parseProfileDetail(detailText) {
     var out = []
     var groups = String(detailText == null ? "" : detailText).split(/\n[ \t]*\n/)
     for (var g = 0; g < groups.length; g++) {
         var lines = groups[g].split("\n")
-        var entry = { uuid: "", ssid: "", keyMgmt: "", ifname: "" }
+        var entry = {
+            uuid: "", ssid: "", keyMgmt: "", ifname: "",
+            ip4Method: "", ip4Addresses: "", ip4Gateway: "", autoconnect: ""
+        }
         var sawField = false
         for (var l = 0; l < lines.length; l++) {
             var raw = lines[l]
@@ -140,6 +165,18 @@ function parseProfileDetail(detailText) {
                 sawField = true
             } else if (field === "connection.interface-name") {
                 entry.ifname = value
+                sawField = true
+            } else if (field === "ipv4.method") {
+                entry.ip4Method = value
+                sawField = true
+            } else if (field === "ipv4.addresses") {
+                entry.ip4Addresses = value
+                sawField = true
+            } else if (field === "ipv4.gateway") {
+                entry.ip4Gateway = value
+                sawField = true
+            } else if (field === "connection.autoconnect") {
+                entry.autoconnect = value
                 sawField = true
             }
         }
@@ -181,7 +218,8 @@ function isStaleAdapterPin(profile, liveDevice) {
 //
 //   nmcli -t -f NAME,UUID,TYPE connection show
 //   nmcli -t -f 802-11-wireless.ssid,connection.uuid,
-//   802-11-wireless-security.key-mgmt,connection.interface-name
+//   802-11-wireless-security.key-mgmt,connection.interface-name,
+//   ipv4.method,ipv4.addresses,ipv4.gateway,connection.autoconnect
 //   connection show uuid <uuids…>
 //
 // Matching on profile NAME alone is not enough: NetworkManager appends " 1"
@@ -189,26 +227,10 @@ function isStaleAdapterPin(profile, liveDevice) {
 // sees — those networks read as unsaved, and every connect against them missed
 // (or created yet another duplicate profile).
 function parseProfileList(baseText, detailText, liveDevice) {
+    var base = parseConnectionBase(baseText)
     var bySsid = {}
-    var byName = {}
-    var meta = {}
-
-    var baseLines = String(baseText == null ? "" : baseText).split("\n")
-    for (var b = 0; b < baseLines.length; b++) {
-        var line = baseLines[b]
-        if (!line || !line.trim())
-            continue
-        var parts = splitTerse(line.trim(), 3)
-        if (parts.length < 3)
-            continue
-        var name = parts[0].trim()
-        var uuid = parts[1].trim()
-        var type = parts[2].trim()
-        if (!name || !uuid)
-            continue
-        byName[name] = true
-        meta[uuid] = { name: name, type: type }
-    }
+    var byName = base.byName
+    var meta = base.meta
 
     var details = parseProfileDetail(detailText)
     var matched = {}
@@ -243,6 +265,313 @@ function parseProfileList(baseText, detailText, liveDevice) {
             bySsid[info.name] = fallback
     }
     return { bySsid: bySsid, byName: byName }
+}
+
+// `nmcli -t -f NAME,UUID,TYPE connection show` → the name/uuid/type of every
+// saved profile. Shared by the wireless and the wired lookup so both agree on
+// which names belong to which type.
+//
+// The field budget is deliberately generous rather than exactly 3: nmcli escapes
+// a colon inside a value, so any column beyond the third can be split off
+// safely — and capping the budget at 3 would fold the rest of the row into the
+// type field, which then matches nothing and silently empties the whole wired
+// list the moment a fourth column is requested.
+function parseConnectionBase(baseText) {
+    var byName = {}
+    var meta = {}
+    var baseLines = String(baseText == null ? "" : baseText).split("\n")
+    for (var b = 0; b < baseLines.length; b++) {
+        var line = baseLines[b]
+        if (!line || !line.trim())
+            continue
+        var parts = splitTerse(line.trim(), 8)
+        if (parts.length < 3)
+            continue
+        var name = parts[0].trim()
+        var uuid = parts[1].trim()
+        var type = parts[2].trim()
+        if (!name || !uuid)
+            continue
+        byName[name] = true
+        meta[uuid] = { name: name, type: type }
+    }
+    return { byName: byName, meta: meta }
+}
+
+// "1.2.3.4/24, 1.2.3.5/24" → ["1.2.3.4", "1.2.3.5"]. The prefix length is a
+// routing detail; a row that names an address wants the address.
+function splitAddresses(raw) {
+    var text = String(raw == null ? "" : raw).trim()
+    if (text === "" || text === "--")
+        return []
+    var out = []
+    var parts = text.split(/[,;]/)
+    for (var i = 0; i < parts.length; i++) {
+        var one = parts[i].trim()
+        if (one === "")
+            continue
+        var slash = one.indexOf("/")
+        out.push(slash > 0 ? one.substring(0, slash) : one)
+    }
+    return out
+}
+
+// Saved 802-3-ethernet profiles, with the addressing a static-IP profile exists
+// for. A wired profile is activated by uuid, so the name is presentation only
+// and never a handle.
+function parseWiredProfiles(baseText, detailText) {
+    var base = parseConnectionBase(baseText)
+    var out = []
+    var details = parseProfileDetail(detailText)
+    for (var d = 0; d < details.length; d++) {
+        var row = details[d]
+        var owner = base.meta[row.uuid]
+        if (!owner || owner.type !== "802-3-ethernet")
+            continue
+        out.push({
+            uuid: row.uuid,
+            name: owner.name,
+            type: owner.type,
+            ifname: row.ifname,
+            method: row.ip4Method,
+            addresses: splitAddresses(row.ip4Addresses),
+            gateway: row.ip4Gateway,
+            autoconnect: row.autoconnect
+        })
+    }
+    return out
+}
+
+// IPv4 addressing method → the word a user reads on a profile row. A DHCP
+// profile has no address until it is up, so its row must not look empty.
+function ipMethodLabel(method) {
+    var m = String(method == null ? "" : method).trim().toLowerCase()
+    if (m === "" || m === "auto")
+        return "DHCP"
+    if (m === "manual")
+        return "Manual"
+    if (m === "link-local")
+        return "Link-local"
+    if (m === "shared")
+        return "Shared"
+    if (m === "disabled")
+        return "Disabled"
+    return m
+}
+
+// `nmcli -t -f GENERAL.DEVICE,… device show` → one entry per device, with the
+// link's own addressing. The device block is delimited by GENERAL.DEVICE and
+// every other line names its field, so a block is self-describing regardless
+// of which optional fields the driver omitted.
+function parseDeviceTable(text) {
+    var out = []
+    var blocks = String(text == null ? "" : text).split(/\n[ \t]*\n/)
+    for (var b = 0; b < blocks.length; b++) {
+        var lines = blocks[b].split("\n")
+        var entry = {
+            device: "", type: "", state: "", reason: "",
+            connection: "", uuid: "", carrier: "",
+            ip4: [], gateway: "", dns: [], ip6: []
+        }
+        var sawDevice = false
+        for (var l = 0; l < lines.length; l++) {
+            var raw = lines[l]
+            if (!raw || !raw.trim())
+                continue
+            var sep = raw.indexOf(":")
+            if (sep <= 0)
+                continue
+            var field = raw.substring(0, sep)
+            var value = unescapeTerse(raw.substring(sep + 1).trim())
+            if (field === "GENERAL.DEVICE") {
+                entry.device = value
+                sawDevice = true
+            } else if (field === "GENERAL.TYPE") {
+                entry.type = value
+            } else if (field === "GENERAL.STATE") {
+                entry.state = value
+            } else if (field === "GENERAL.REASON") {
+                entry.reason = value
+            } else if (field === "GENERAL.CONNECTION") {
+                entry.connection = normalizeConnectionName(value)
+            } else if (field === "GENERAL.CON-UUID") {
+                entry.uuid = value
+            } else if (field === "WIRED-PROPERTIES.CARRIER") {
+                entry.carrier = value.toLowerCase()
+            } else if (field.indexOf("IP4.ADDRESS[") === 0) {
+                entry.ip4.push(stripPrefixLength(value))
+            } else if (field === "IP4.GATEWAY") {
+                entry.gateway = value
+            } else if (field.indexOf("IP4.DNS[") === 0) {
+                entry.dns.push(value)
+            } else if (field.indexOf("IP6.ADDRESS[") === 0) {
+                entry.ip6.push(stripPrefixLength(value))
+            }
+        }
+        if (!sawDevice || !entry.device)
+            continue
+        var state = entry.state
+        entry.managed = state.indexOf("(unmanaged)") === -1
+        entry.connected = state.indexOf("(connected)") !== -1
+        out.push(entry)
+    }
+    return out
+}
+
+// nmcli prints "--" for an empty connection name in some forms and nothing in
+// others; both mean "no profile".
+function normalizeConnectionName(value) {
+    var text = String(value == null ? "" : value).trim()
+    return text === "--" ? "" : text
+}
+
+function stripPrefixLength(value) {
+    var text = String(value == null ? "" : value).trim()
+    var slash = text.indexOf("/")
+    return slash > 0 ? text.substring(0, slash) : text
+}
+
+// Wired port state → the label and the tone a header row shows. "No cable" is
+// the answer the user actually needs on a port that is present but silent: it
+// separates "nothing plugged in" from "plugged in but nothing activated".
+//
+// An absent `managed` flag is not a claim that the port is unmanaged — only an
+// explicit false is, so a caller that never computed it cannot make a live port
+// disappear behind that word.
+function linkStateLabel(entry) {
+    if (!entry)
+        return { text: "", tone: "idle" }
+    if (entry.managed === false)
+        return { text: "Not managed", tone: "idle" }
+    if (entry.connected)
+        return { text: "Connected", tone: "active" }
+    if (entry.carrier === "off")
+        return { text: "No cable", tone: "idle" }
+    if (String(entry.reason || "").indexOf("Carrier") !== -1
+            || String(entry.reason || "").indexOf("40 ") === 0)
+        return { text: "No cable", tone: "idle" }
+    return { text: "Disconnected", tone: "idle" }
+}
+
+// Every managed wired port, each carrying the saved profiles that belong to it.
+// A profile pinned to a port names it outright; an unpinned one follows the
+// port it is currently up on; a profile pinned to a port that no longer exists
+// is collected in one trailing group rather than silently dropped — the user
+// needs to see the profile exists in order to get rid of it.
+function groupWiredProfiles(devices, profiles) {
+    var groups = []
+    var byName = {}
+    var i, j, k
+    for (i = 0; i < devices.length; i++) {
+        var device = devices[i]
+        if (!device || device.type !== "ethernet" || device.managed === false)
+            continue
+        var group = {
+            device: device.device,
+            state: device.state,
+            reason: device.reason,
+            connected: device.connected,
+            carrier: device.carrier,
+            connection: device.connection,
+            uuid: device.uuid,
+            ip4: device.ip4 && device.ip4.length ? device.ip4[0] : "",
+            profiles: []
+        }
+        groups.push(group)
+        byName[group.device] = group
+    }
+    var loose = { device: "", connected: false, carrier: "", ip4: "", profiles: [] }
+    for (j = 0; j < profiles.length; j++) {
+        var profile = profiles[j]
+        if (!profile || !profile.uuid)
+            continue
+        var pin = profile.ifname ? String(profile.ifname) : ""
+        var target = null
+        if (pin && byName[pin]) {
+            target = byName[pin]
+        } else {
+            // Unpinned, or pinned to a port that is gone: the port it is
+            // actually up on is the only port it can be shown under.
+            for (k = 0; k < groups.length; k++) {
+                if (groups[k].uuid && groups[k].uuid === profile.uuid) {
+                    target = groups[k]
+                    break
+                }
+            }
+        }
+        var item = {
+            uuid: profile.uuid,
+            name: profile.name,
+            method: profile.method,
+            methodLabel: ipMethodLabel(profile.method),
+            addresses: profile.addresses || [],
+            gateway: profile.gateway || "",
+            autoconnect: profile.autoconnect || "",
+            // A pin that points at an absent port is dead weight: activation
+            // is refused, and the row has to say so before the tap, not after.
+            stalePin: !!(pin && !byName[pin]),
+            active: !!(target && target.uuid && target.uuid === profile.uuid)
+        }
+        if (target)
+            target.profiles.push(item)
+        else
+            loose.profiles.push(item)
+    }
+    if (loose.profiles.length > 0)
+        groups.push(loose)
+    return groups
+}
+
+// The address the user is most likely to type next: the live IPv4 of a link,
+// falling back to the first configured address of a static profile so a row
+// never reads as though it carries no addressing at all.
+function profileAddressText(item) {
+    if (!item)
+        return ""
+    var parts = []
+    if (item.addresses && item.addresses.length)
+        parts.push(item.addresses.join(", "))
+    else
+        parts.push(ipMethodLabel(item.method))
+    return parts.join(" · ")
+}
+
+// The live link a details block describes.
+//
+// Wired first when it is up, because that is the link the user chose on purpose
+// (a direct-connect instrument lives there, and its address is the thing being
+// checked). Among several wired links, one that carries a gateway wins — it is
+// the routable one, and on a machine with both a wired uplink and a wired
+// instrument the uplink is what "the address" means. A link with no gateway
+// answers honestly with "—" rather than borrowing another link's numbers.
+function activeLinkDetails(devices) {
+    var ethernet = null
+    var routableEthernet = null
+    var wifi = null
+    for (var i = 0; i < devices.length; i++) {
+        var device = devices[i]
+        if (!device || device.managed === false || !device.connected)
+            continue
+        if (device.type === "ethernet") {
+            if (!ethernet)
+                ethernet = device
+            if (!routableEthernet && device.gateway)
+                routableEthernet = device
+        } else if (device.type === "wifi" && !wifi) {
+            wifi = device
+        }
+    }
+    var link = routableEthernet || ethernet || wifi
+    if (!link)
+        return { device: "", type: "", connection: "", ip4: "", gateway: "", dns: [] }
+    return {
+        device: link.device,
+        type: link.type,
+        connection: link.connection,
+        ip4: link.ip4 && link.ip4.length ? link.ip4[0] : "",
+        gateway: link.gateway || "",
+        dns: link.dns ? link.dns.slice() : []
+    }
 }
 
 // WPA-PSK family vs. everything else. "open" means no secret is needed.
@@ -326,8 +655,23 @@ function createArgs(ssid, password, hidden, device) {
     return args
 }
 
-function downArgs(uuidOrName) {
-    return ["connection", "down", "id", uuidOrName]
+function upArgs(uuid) {
+    if (!uuid || String(uuid) === "")
+        return ["true"]
+    // No ifname: a wired profile that is already pinned to its port carries
+    // that pin, and passing a mismatched one is exactly the refusal
+    // "not compatible … (mismatching interface name)" comes from.
+    return ["connection", "up", "uuid", String(uuid)]
+}
+
+// Deactivate by uuid, not by name. NetworkManager renames duplicate profiles
+// ("SSID 1"), so the SSID a scan reports is frequently not the connection id
+// `nmcli` accepts — and a disconnect aimed at the SSID silently does nothing.
+function downArgs(uuidOrName, isUuid) {
+    var handle = String(uuidOrName == null ? "" : uuidOrName).trim()
+    if (handle === "")
+        return ["true"]
+    return ["connection", "down", isUuid ? "uuid" : "id", handle]
 }
 
 function deleteArgs(uuid) {
@@ -374,13 +718,16 @@ function classifyConnectError(rawText) {
         return "Connection timeout"
     if (lower.indexOf("unknown connection") !== -1)
         return "Saved profile is gone"
+    if (lower.indexOf("carrier") !== -1
+            || lower.indexOf("no link") !== -1
+            || lower.indexOf("link down") !== -1)
+        return "No cable on this port"
     if (lower.indexOf("no suitable device") !== -1
             || lower.indexOf("not compatible") !== -1
             || lower.indexOf("mismatching interface name") !== -1
             || lower.indexOf("incompatible") !== -1)
         return "No adapter matches this saved profile"
-    if (lower.indexOf("no suitable device") !== -1
-            || lower.indexOf("not available") !== -1
+    if (lower.indexOf("not available") !== -1
             || lower.indexOf("no wifi device") !== -1
             || lower.indexOf("wifi is disabled") !== -1
             || lower.indexOf("rf-kill") !== -1)

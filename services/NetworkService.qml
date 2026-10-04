@@ -28,6 +28,15 @@ Singleton {
     readonly property bool internetConnectivity: _internetConnectivity
     readonly property string networkConnectivity: _networkConnectivity
 
+    // Every device NetworkManager reports, with its own addressing.
+    readonly property var devices: _devices
+    // Saved 802-3-ethernet profiles, and the same profiles grouped under the
+    // port each belongs to — this is what the panel's wired rows read.
+    readonly property var wiredProfiles: _wiredProfiles
+    readonly property var wiredGroups: _wiredGroups
+    // The link the details block describes: wired when it is up, else wireless.
+    readonly property var linkDetails: _linkDetails
+
     property bool _wifiAvailable: false
     property bool _wifiConnected: false
     property bool _ethernetAvailable: false
@@ -37,6 +46,12 @@ Singleton {
     property var _ethernetInterfaces: []
     property bool _internetConnectivity: false
     property string _networkConnectivity: "unknown"
+    property var _devices: []
+    property var _wiredProfiles: []
+    property var _wiredGroups: []
+    property var _linkDetails: ({
+        device: "", type: "", connection: "", ip4: "", gateway: "", dns: []
+    })
 
     // Scan / connection interaction state
     property var networks: ({})
@@ -53,9 +68,19 @@ Singleton {
     // action (re-enter the password / forget the stale profile).
     property string lastErrorSsid: ""
     property string activeWifiIf: ""
+    // uuid of the connection each kind of link is actually running. This is the
+    // only reliable handle for "disconnect this": NetworkManager renames
+    // duplicate profiles ("SSID 1"), so the SSID a scan reports is frequently
+    // not the id `nmcli connection down` accepts — which is why tapping the
+    // connected row used to do nothing at all.
+    property string activeWifiUuid: ""
+    property string activeEthernetUuid: ""
     // Wi-Fi interface name, tracked whether or not a link is up, so a connect
     // can be pinned to the right adapter on multi-radio machines.
     property string wifiDevice: ""
+    // Wired profile uuid in flight, and which of the two directions it is.
+    property string wiredActivating: ""
+    property string wiredDeactivating: ""
 
     // nmcli availability (self-checked, no external ProgramCheckerService)
     property bool nmcliAvailable: false
@@ -71,6 +96,10 @@ Singleton {
     property bool _profilesResolvedBlind: false
     property real _lastOpenRefreshAt: 0
     property string _connectStderr: ""
+    property string _wiredStderr: ""
+    // Immutable snapshot of the wired attempt in flight, for the same reason
+    // `_job` exists on the wireless side.
+    property string _wiredJob: ""
     // Immutable snapshot of the attempt in flight. onExited reads this instead
     // of the live Process properties, which a fast second tap would already
     // have overwritten — that cross-talk reported the first attempt's exit
@@ -78,6 +107,41 @@ Singleton {
     property var _job: null
 
     readonly property var cEnvironment: ({ "LC_ALL": "C", "LANG": "C" })
+
+    // nmcli has no --wait on this version, so a request that never completes
+    // would leave the row spinning forever. Cap the attempt ourselves.
+    Timer {
+        id: connectWatchdog
+        interval: 60000
+        repeat: false
+        onTriggered: {
+            if (!root.connecting || !root._job)
+                return
+            console.warn("[Network] connect timed out for '" + root._job.ssid + "'")
+            root._finishConnect(false, "Connection timeout")
+        }
+    }
+
+    // nmcli has no --wait on this version, so a request that never completes
+    // would leave the row spinning forever. Cap the attempt ourselves. This one
+    // covers both wired directions: a deactivation cannot hang on a carrier
+    // wait, but the row it holds is frozen for as long as the marker is set, so
+    // it needs the same guarantee.
+    Timer {
+        id: wiredWatchdog
+        interval: 30000
+        repeat: false
+        onTriggered: {
+            if (!root.wiredActivating && !root.wiredDeactivating)
+                return
+            var label = root.wiredActivating !== "" ? root.wiredActivating : root.wiredDeactivating
+            var direction = root.wiredActivating !== "" ? "activation" : "deactivation"
+            console.warn("[Network] wired " + direction + " timed out for '"
+                + label + "'")
+            root._finishWired(false,
+                root.wiredActivating !== "" ? "Activation timeout" : "Deactivation timeout")
+        }
+    }
 
     Component.onCompleted: {
         console.info("[Network] Service started")
@@ -195,20 +259,6 @@ Singleton {
         }
     }
 
-    // nmcli has no --wait on this version, so an AP that never answers would
-    // leave the row spinning forever. Cap the attempt ourselves.
-    Timer {
-        id: connectWatchdog
-        interval: 60000
-        repeat: false
-        onTriggered: {
-            if (!root.connecting || !root._job)
-                return
-            console.warn("[Network] connect timed out for '" + root._job.ssid + "'")
-            root._finishConnect(false, "Connection timeout")
-        }
-    }
-
     // --- Core functions ---
 
     function setWifiEnabled(enabled) {
@@ -262,9 +312,28 @@ Singleton {
             return
         }
         root._deviceWaitTries = 0
-        profileCheckProcess.running = true
+        root._refreshProfiles()
         root.scanningActive = true
         console.info("[Network] scanning Wi-Fi (rescan=" + root._rescanRequested + ")…")
+    }
+
+    // The saved-profile chain, which feeds both the wireless lookup and the
+    // wired profile list. Deliberately independent of the radio: with Wi-Fi
+    // switched off the wireless scan is skipped, but a wired profile still has
+    // to be resolvable — that is exactly the state a direct-connect setup is
+    // used in.
+    function _refreshProfiles() {
+        if (!root.nmcliAvailable)
+            return
+        if (profileCheckProcess.running || profileDetailProcess.running)
+            return
+        profileCheckProcess.running = true
+    }
+
+    // Profiles are in; the wireless list follows only when the radio is on.
+    function _afterProfiles() {
+        if (root.wifiEnabled)
+            root._startScan()
     }
 
     // Back-compat alias for the popup's Rescan button and the old call sites.
@@ -282,6 +351,9 @@ Singleton {
         if (now - root._lastOpenRefreshAt < 8000)
             return
         root._lastOpenRefreshAt = now
+        // Profiles first, unconditionally: the wired rows are built from them
+        // and a radio-off start used to leave every wired profile unlisted.
+        root._refreshProfiles()
         if (root.wifiEnabled) {
             root.requestScan(true, false)
         } else if (!deviceStatusProcess.running) {
@@ -355,15 +427,151 @@ Singleton {
         return root.lastErrorSsid === ssid && root.isCredentialFailure(root.lastError)
     }
 
+    // Deactivate a wireless profile. The handle is a uuid wherever one can be
+    // resolved: the running connection's own uuid first (that is literally the
+    // link being torn down), then the saved profile's. Only a machine with no
+    // profile at all falls back to the name, and `nmcli` refuses that loudly
+    // instead of silently doing nothing.
     function disconnect(ssid) {
         if (!root.nmcliAvailable || !ssid) return
+        var net = root.networks[ssid] || null
+        var profile = root.savedProfiles[ssid] || null
+        var uuid = ""
+        if (net && net.connected && root.activeWifiUuid)
+            uuid = root.activeWifiUuid
+        else if (net && net.savedUuid)
+            uuid = net.savedUuid
+        else if (profile)
+            uuid = profile.uuid
+        if (uuid === "") {
+            // Refusing outright beats running a command that would report
+            // success while leaving the link up.
+            root._setError("No saved profile to disconnect", ssid)
+            return
+        }
+        console.info("[Network] disconnect '" + ssid + "' via uuid " + uuid)
         root.disconnectingFrom = ssid
         disconnectProcess.ssid = ssid
+        disconnectProcess.uuid = uuid
         Qt.callLater(function () {
             if (disconnectProcess.running)
                 return
             disconnectProcess.running = true
         })
+    }
+
+    // --- Wired profiles ---
+
+    function _wiredGroupForProfile(uuid) {
+        var groups = root._wiredGroups
+        for (var i = 0; i < groups.length; i++) {
+            var profiles = groups[i].profiles || []
+            for (var j = 0; j < profiles.length; j++) {
+                if (profiles[j].uuid === uuid)
+                    return groups[i]
+            }
+        }
+        return null
+    }
+
+    // Bring a saved wired profile up, or take the running one down. Both are
+    // uuid-only, for the same reason the wireless disconnect is: a profile name
+    // is not a handle NetworkManager guarantees to keep.
+    function toggleWiredProfile(uuid) {
+        if (!root.nmcliAvailable || !uuid)
+            return
+        var target = String(uuid)
+        if (root.wiredActivating === target || root.wiredDeactivating === target)
+            return
+        var group = root._wiredGroupForProfile(target)
+        var profiles = group ? (group.profiles || []) : []
+        var profile = null
+        for (var i = 0; i < profiles.length; i++) {
+            if (profiles[i].uuid === target)
+                profile = profiles[i]
+        }
+        if (profile && profile.active) {
+            root.disconnectWired(target)
+            return
+        }
+        root.activateWired(target)
+    }
+
+    function activateWired(uuid) {
+        if (!root.nmcliAvailable || !uuid)
+            return
+        var target = String(uuid)
+        var group = root._wiredGroupForProfile(target)
+        var profiles = group ? (group.profiles || []) : []
+        var profile = null
+        for (var i = 0; i < profiles.length; i++) {
+            if (profiles[i].uuid === target)
+                profile = profiles[i]
+        }
+        if (profile && profile.stalePin) {
+            // Activating it would be refused with a mismatching interface name
+            // that names an adapter the user cannot see or change from here.
+            root._setError("Pinned to a port that no longer exists", "")
+            return
+        }
+        // Pre-flight the carrier. NetworkManager does not fail a no-cable
+        // activation, it *queues* it and cancels it after carrier-wait-timeout
+        // (120s), so without this check the row would spin for two minutes and
+        // then report a generic activation failure.
+        if (group && !group.connected && group.carrier === "off") {
+            root._setError("No cable on " + group.device, "")
+            return
+        }
+        root.wiredActivating = target
+        root._wiredJob = target
+        root._clearError()
+        wiredWatchdog.restart()
+        console.info("[Network] activating wired profile '" + target + "'")
+        // One turn of separation from the state assignment, so the Process
+        // starts against this profile rather than the previous one.
+        Qt.callLater(root._startWiredUp)
+    }
+
+    function disconnectWired(uuid) {
+        if (!root.nmcliAvailable || !uuid)
+            return
+        var target = String(uuid)
+        root.wiredDeactivating = target
+        root._wiredJob = target
+        root._clearError()
+        wiredWatchdog.restart()
+        console.info("[Network] deactivating wired profile '" + target + "'")
+        Qt.callLater(root._startWiredDown)
+    }
+
+    function _startWiredUp() {
+        if (wiredUpProcess.running || !root._wiredJob)
+            return
+        wiredUpProcess.running = true
+    }
+
+    function _startWiredDown() {
+        if (wiredDownProcess.running || !root._wiredJob)
+            return
+        wiredDownProcess.running = true
+    }
+
+    // Single settle point for both wired directions, so the in-flight markers
+    // and the follow-up device read cannot be applied by two different handlers.
+    function _finishWired(ok, message) {
+        var target = root._wiredJob
+        wiredWatchdog.stop()
+        root.wiredActivating = ""
+        root.wiredDeactivating = ""
+        root._wiredJob = ""
+        if (!ok)
+            root._setError(message, "")
+        // The device table is the authority for whether the link came up, and
+        // it also carries the addressing the details block shows.
+        if (!deviceStatusProcess.running)
+            deviceStatusProcess.running = true
+        console.info("[Network] wired profile '" + (target || "") + "' "
+            + (ok ? "activated" : "failed: " + message))
     }
 
     function forget(ssid) {
@@ -533,9 +741,11 @@ Singleton {
                 // empty map. An empty map is exactly what makes every saved
                 // network read as unsaved, so a hiccup that merely parsed
                 // nothing must leave the previous map in place.
-                if (!text.trim())
+                if (!text.trim()) {
                     root.savedProfiles = ({})
-                Qt.callLater(root._startScan)
+                    root._applyWiredProfiles(Logic.parseWiredProfiles(text, ""))
+                }
+                Qt.callLater(root._afterProfiles)
             }
         }
         stderr: StdioCollector {
@@ -545,7 +755,7 @@ Singleton {
                 if (profileDetailProcess.running || scanProcess.running)
                     return
                 // Keep the previous map: see the note in the stdout handler.
-                Qt.callLater(root._startScan)
+                Qt.callLater(root._afterProfiles)
             }
         }
     }
@@ -566,7 +776,9 @@ Singleton {
     // connection. Passing the uuid as a field is what makes the mapping
     // order-independent; relying on row order silently crossed profiles.
     // `connection.interface-name` rides along because a profile pinned to an
-    // adapter that no longer exists is dead weight that NM refuses outright.
+    // adapter that no longer exists is dead weight that NM refuses outright,
+    // and the ipv4 fields ride along because a wired profile is only useful to
+    // the user if the address it will hand out is visible before it is up.
     Process {
         id: profileDetailProcess
         // Set once a stdout result has been applied, so the stderr handler can
@@ -577,7 +789,8 @@ Singleton {
         command: {
             var args = ["nmcli", "-t", "-f",
                 "802-11-wireless.ssid,connection.uuid,"
-                + "802-11-wireless-security.key-mgmt,connection.interface-name",
+                + "802-11-wireless-security.key-mgmt,connection.interface-name,"
+                + "ipv4.method,ipv4.addresses,ipv4.gateway,connection.autoconnect",
                 "connection", "show", "uuid"]
             var uuids = profileCheckProcess.allUuids || []
             for (var i = 0; i < uuids.length; i++)
@@ -592,8 +805,10 @@ Singleton {
                 // the map is rebuilt once the name lands, rather than waiting for
                 // the next background tick with a wrong pick in place.
                 root._profilesResolvedBlind = (root.wifiDevice === "")
+                root._applyWiredProfiles(Logic.parseWiredProfiles(
+                    profileCheckProcess.baseText, text))
                 profileDetailProcess.detailApplied = true
-                Qt.callLater(root._startScan)
+                Qt.callLater(root._afterProfiles)
             }
         }
         stderr: StdioCollector {
@@ -611,85 +826,104 @@ Singleton {
                     return
                 root.savedProfiles = Logic.parseProfileList(
                     profileCheckProcess.baseText, "", root.wifiDevice).bySsid
-                Qt.callLater(root._startScan)
+                // A rejected detail batch still names the profiles, which is
+                // enough to activate one — only the addressing is missing.
+                root._applyWiredProfiles(Logic.parseWiredProfiles(
+                    profileCheckProcess.baseText, ""))
+                Qt.callLater(root._afterProfiles)
             }
         }
     }
 
-    // Device status + active Wi-Fi details.
+    // Publish the wired profile list and re-derive the port groups from it.
+    // Both happen together because the groups are a join of the profiles with
+    // the device table, and the two land in whichever order nmcli answers.
+    function _applyWiredProfiles(profiles) {
+        root._wiredProfiles = profiles || []
+        root._republishWired()
+    }
+
+    function _republishWired() {
+        root._wiredGroups = Logic.groupWiredProfiles(root._devices, root._wiredProfiles)
+    }
+
+    // Device status, with each device's own addressing. The wireless list this
+    // used to run as a second command in the same shell was parsed by nobody:
+    // the RATE it asked for was thrown away, and the scan already carries it.
     Process {
         id: deviceStatusProcess
         running: false
-        command: ["sh", "-c",
-            "nmcli -t -f GENERAL.DEVICE,GENERAL.TYPE,GENERAL.STATE,GENERAL.CONNECTION,GENERAL.HWADDR,IP4.ADDRESS,IP4.GATEWAY,IP4.DNS,IP6.ADDRESS,IP6.GATEWAY,IP6.DNS device show; echo \"------\"; nmcli -t -f IN-USE,SIGNAL,RATE device wifi list"]
         environment: root.cEnvironment
+        command: ["nmcli", "-t", "-f",
+            "GENERAL.DEVICE,GENERAL.TYPE,GENERAL.STATE,GENERAL.REASON,"
+            + "GENERAL.CONNECTION,GENERAL.CON-UUID,WIRED-PROPERTIES.CARRIER,"
+            + "IP4.ADDRESS,IP4.GATEWAY,IP4.DNS,IP6.ADDRESS",
+            "device", "show"]
 
         stdout: StdioCollector {
             onStreamFinished: {
-                var parts = text.split("------")
-                var deviceText = parts[0]
-                var wifiText = parts[1] || ""
-
-                var lines = deviceText.split("\n")
-                var blocks = []
-                var cur = []
-                for (var i = 0; i < lines.length; i++) {
-                    var line = lines[i].trim()
-                    if (!line) continue
-                    if (line.startsWith("GENERAL.DEVICE:")) {
-                        if (cur.length > 0) blocks.push(cur)
-                        cur = [line]
-                    } else if (cur.length > 0) {
-                        cur.push(line)
-                    }
+                var devices = Logic.parseDeviceTable(text)
+                // Loopback alone guarantees a row, so an empty table is a failed
+                // read, not a machine with no network devices. Keep the last
+                // good one: a wiped table would read as "no ports, no links".
+                if (devices.length === 0) {
+                    if (text.trim())
+                        console.warn("[Network] device table parsed to nothing")
+                    return
                 }
-                if (cur.length > 0) blocks.push(cur)
 
                 var wifiAvailable = false
                 var wifiDevice = ""
                 var activeWifiIf = ""
+                var activeWifiUuid = ""
                 var ethAvailable = false
                 var activeEthIf = ""
                 var activeEthConn = ""
+                var activeEthUuid = ""
                 var ethList = []
 
-                for (var b = 0; b < blocks.length; b++) {
-                    var name = "", type = "", stateStr = "", conn = ""
-                    for (var l = 0; l < blocks[b].length; l++) {
-                        var bl = blocks[b][l]
-                        if (bl.startsWith("GENERAL.DEVICE:")) name = bl.substring(15).trim()
-                        else if (bl.startsWith("GENERAL.TYPE:")) type = bl.substring(13).trim()
-                        else if (bl.startsWith("GENERAL.STATE:")) stateStr = bl.substring(14).trim()
-                        else if (bl.startsWith("GENERAL.CONNECTION:")) conn = bl.substring(19).trim()
-                    }
-                    if (stateStr.indexOf("(unmanaged)") !== -1) continue
-                    var isConnected = stateStr.indexOf("(connected)") !== -1
-                    if (type === "wifi") {
+                for (var b = 0; b < devices.length; b++) {
+                    var device = devices[b]
+                    if (!device.managed)
+                        continue
+                    if (device.type === "wifi") {
                         wifiAvailable = true
                         // Track the adapter whether or not it holds a link, so a
                         // connect can still be pinned to it while idle.
-                        if (!wifiDevice && name) wifiDevice = name
-                        if (isConnected && !activeWifiIf) activeWifiIf = name
-                    } else if (type === "ethernet") {
+                        if (!wifiDevice && device.device) wifiDevice = device.device
+                        if (device.connected && !activeWifiIf) {
+                            activeWifiIf = device.device
+                            activeWifiUuid = device.uuid
+                        }
+                    } else if (device.type === "ethernet") {
                         ethAvailable = true
-                        if (conn === "--") conn = ""
-                        ethList.push({ name: name, connection: conn, connected: isConnected })
-                        if (isConnected && !activeEthIf) {
-                            activeEthIf = name
-                            activeEthConn = conn
+                        ethList.push({
+                            name: device.device,
+                            connection: device.connection,
+                            connected: device.connected
+                        })
+                        if (device.connected && !activeEthIf) {
+                            activeEthIf = device.device
+                            activeEthConn = device.connection
+                            activeEthUuid = device.uuid
                         }
                     }
                 }
 
+                root._devices = devices
                 root._wifiAvailable = wifiAvailable
                 root._wifiConnected = activeWifiIf !== ""
                 root.activeWifiIf = activeWifiIf
+                root.activeWifiUuid = activeWifiUuid
                 root.wifiDevice = wifiDevice
                 root._ethernetAvailable = ethAvailable
                 root._ethernetConnected = activeEthIf !== ""
                 root._activeEthernetIf = activeEthIf
                 root._activeEthernetConnection = activeEthConn
+                root.activeEthernetUuid = activeEthUuid
                 root._ethernetInterfaces = ethList
+                root._linkDetails = Logic.activeLinkDetails(devices)
+                root._republishWired()
 
                 // The profile step was held back waiting for the adapter name;
                 // now it can rank duplicate profiles correctly.
@@ -732,7 +966,7 @@ Singleton {
         id: scanProcess
         running: false
         environment: root.cEnvironment
-        command: ["nmcli", "-t", "-f", "SSID,SECURITY,SIGNAL,IN-USE", "device", "wifi",
+        command: ["nmcli", "-t", "-f", "SSID,SECURITY,SIGNAL,RATE,IN-USE", "device", "wifi",
             "list", "--rescan", root._rescanRequested ? "yes" : "no"]
         stdout: StdioCollector {
             onStreamFinished: {
@@ -825,34 +1059,86 @@ Singleton {
         }
     }
 
-    // Disconnect.
+    // Disconnect. The exit code is the authority here, not the stdout stream:
+    // `nmcli connection down` prints nothing on success, so the old
+    // stdout-close handler also "succeeded" for a command that had failed.
     Process {
         id: disconnectProcess
         property string ssid: ""
+        property string uuid: ""
         running: false
         environment: root.cEnvironment
-        command: Logic.downArgs(ssid)
-        stdout: StdioCollector {
-            onStreamFinished: {
-                console.info("[Network] disconnected from '" + disconnectProcess.ssid + "'")
+        command: ["nmcli"].concat(Logic.downArgs(uuid, uuid !== ""))
+        onExited: function (code) {
+            var target = disconnectProcess.ssid
+            if (code === 0) {
+                console.info("[Network] disconnected from '" + target + "'")
                 root._wifiConnected = false
-                root._updateNetworkStatus(disconnectProcess.ssid, false)
-                root.disconnectingFrom = ""
-                delayedScanTimer.interval = 3000
-                delayedScanTimer.restart()
-                if (!deviceStatusProcess.running)
-                    deviceStatusProcess.running = true
+                root.activeWifiUuid = ""
+                root._updateNetworkStatus(target, false)
+            } else {
+                root._setError(Logic.classifyConnectError(root._connectStderr), target)
+                console.warn("[Network] disconnect failed for '" + target + "'")
             }
+            root.disconnectingFrom = ""
+            delayedScanTimer.interval = code === 0 ? 3000 : 5000
+            delayedScanTimer.restart()
+            if (!deviceStatusProcess.running)
+                deviceStatusProcess.running = true
         }
         stderr: StdioCollector {
             onStreamFinished: {
-                // Fires on stream close even when empty; clearing state here
-                // would cut a successful disconnect short.
+                // Fires on stream close even when empty, so this only ever
+                // captures a real diagnostic.
                 if (!text.trim()) return
-                root.disconnectingFrom = ""
+                root._connectStderr = text
                 console.warn("[Network] disconnect error:", text.trim())
-                delayedScanTimer.interval = 5000
-                delayedScanTimer.restart()
+            }
+        }
+    }
+
+    // Bring a saved wired profile up. Its own Process: the two directions have
+    // different argv shapes, and one Process flipping `command` between two
+    // `running` writes can start with the previous turn's argv.
+    Process {
+        id: wiredUpProcess
+        running: false
+        environment: root.cEnvironment
+        command: ["nmcli"].concat(Logic.upArgs(root._wiredJob))
+        onExited: function (code) {
+            if (!root._wiredJob) return
+            if (code === 0)
+                root._finishWired(true, "")
+            else
+                root._finishWired(false, Logic.classifyConnectError(root._wiredStderr))
+        }
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (!text.trim()) return
+                root._wiredStderr = text
+                console.warn("[Network] wired activation error: " + text.trim())
+            }
+        }
+    }
+
+    // Take the running wired profile down.
+    Process {
+        id: wiredDownProcess
+        running: false
+        environment: root.cEnvironment
+        command: ["nmcli"].concat(Logic.downArgs(root._wiredJob, true))
+        onExited: function (code) {
+            if (!root._wiredJob) return
+            if (code === 0)
+                root._finishWired(true, "")
+            else
+                root._finishWired(false, Logic.classifyConnectError(root._wiredStderr))
+        }
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (!text.trim()) return
+                root._wiredStderr = text
+                console.warn("[Network] wired deactivation error: " + text.trim())
             }
         }
     }
