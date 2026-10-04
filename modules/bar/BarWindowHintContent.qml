@@ -485,10 +485,6 @@ Item {
     // animation's `onFinished` otherwise - which is why a cancelled crossing has to
     // reach one of those rather than simply being abandoned.
     property bool _markerCrossing: false
-    // The tint has just landed WITH the marker, and must not also animate. A one shot,
-    // cleared by the next focus change, so a focus change with no journey under it still
-    // crossfades - there the tint arriving is the event and a short fade reads as intent.
-    property bool _tintInstant: false
     // The leg currently in progress, and how far through it. `InOutQuad` is at its
     // fastest exactly here, so the marker leaves through one edge at speed and re-enters
     // through the other at the same speed: one continuous sweep rather than two stops.
@@ -530,26 +526,48 @@ Item {
     // travels with, on both legs. One formula, one offset, two elements that cannot
     // drift apart.
     readonly property real markerOffset: rowHeight / 2 - indicatorLength / 2
-    // Is the frame resting ON the focused row, as opposed to travelling or parked
-    // somewhere else? The row's tint is gated on this rather than on `hasTarget` alone,
-    // because during the departure leg the frame is on the card being LEFT - a different
-    // row, in a different column - while `focusedRowIndex` has already moved to the
-    // arriving frame. Without this the tint would light the arriving card while the
-    // frame is still visibly on its way out of the old one.
-    // Is the frame ON the focused row - actually on it, not merely heading for it?
+    // --- the row's focus tint, fed from the frame's own rectangle ---------
+    // The frame's rect in the strip's space, and whether it has stopped moving. The
+    // strip runs the focused card's tint off the first and gates the row's
+    // `Behavior on color` on the second, and the body owns both because `focusFrame` is
+    // DECLARED here while being a child of the strip - an id is file-scoped, so the strip
+    // cannot name it and has to be handed the numbers.
     //
-    // Read off the frame's own animated `y` rather than off a state flag, because a flag
-    // cannot see the one case that matters most: after a focus change with no workspace
-    // switch under it, the frame GLIDES to the new row over `settingsSidebarCollapse` and
-    // a flag says nothing for those 300ms. A flag would let the tint move at once, which
-    // is the same complaint as the journey's version of it - the card changing before the
-    // frame has got there - only 300ms shorter and far more often, since switching
-    // windows inside one workspace is the common interaction.
+    // Plain properties rather than a reference to the element, and numbers rather than a
+    // decision, because the point is that nothing in between decides anything. The tint
+    // was `focusedRowIndex` - read off the ARRIVING snapshot, so correct from the
+    // crossing's first frame, which lit the arriving card while the frame was still
+    // above the panel and gave the answer away before the gesture delivered it. It was
+    // then a flag: `markerOnFocusedRow`, a renamed `!_markerCrossing`, which held the
+    // tint off for a whole journey and switched it on at the landing. A flag can only be
+    // right on the frames something writes it on, so it is either too early or too late
+    // everywhere else, and the case it cannot see at all is the common one - a focus
+    // change inside a single workspace, where nothing writes a flag and the frame glides.
     //
-    // The frame's own position is the truth, so this is the truth. Every case is covered
-    // by construction rather than by enumeration: travelling (its `y` is nowhere near the
-    // row), parked on a different row, between two rows mid-glide, and settled.
-    readonly property bool markerOnFocusedRow: !_markerCrossing
+    // The frame's live rectangle is the mask, so the tint is that rectangle made visible:
+    // a card is lit on every frame the frame's band overlaps it, including the frame it
+    // is first touched and including the cards the band sweeps over on the way. Which is
+    // what the user asked for - the region the frame encloses changes colour, as the
+    // frame is over it - and it is the one rule that needs no cases.
+    property real focusFrameTop: 0
+    property real focusFrameHeight: 0
+    // Has the frame ARRIVED: no journey placing it, and its own animated `y` sitting on
+    // the row it is going to. The journey term is not redundant - a switch between two
+    // workspaces whose focus is on the SAME row puts the frame back on that row's own
+    // coordinates on the crossing's first frame, so the position alone would read a
+    // travelling frame as a rested one.
+    //
+    // It carries the job two flags used to share, and it carries the WHOLE of it because
+    // it is a question about the frame rather than about a moment. The rule preserved is
+    // the one those flags were built for: a colour change caused by the frame ARRIVING
+    // must not also animate, while a change with the frame already resting on the row may.
+    // A journey's displacement never satisfies this except on its landing frame, and
+    // neither does the focus glide until it finishes - so every card the band passes is
+    // handed over in one step, and the crossfade that used to remain "at rest" is gone
+    // because a focus change at rest IS a glide. What may still fade is a change the
+    // frame is not causing at all, which after this is the hover response.
+    readonly property bool frameAtRest: !_markerCrossing
+        && Math.abs(focusFrame.y - focusedRowTop) < 0.5
     // --- the slide -------------------------------------------------------
     // A workspace switch replaces every row, so without this the panel's contents
     // are simply gone and remade between two frames. Here the leaving frame is
@@ -635,12 +653,10 @@ Item {
         // drop it onto a card it had already been told about.
         crossingRun.stop()
         root._markerCrossing = false
-        root._tintInstant = false
         root._departingRowIndex = -1
         root._departingScroll = 0
         root._exitFrom = 0
         root._journeyDirection = 1
-        root._tintInstant = false
         // A rest plan rather than no plan: the strip still needs to be drawn, and
         // this is the one that says "three columns, active slot 1, centred here" -
         // the same shape the crossing's plan has, so every binding downstream can be
@@ -786,11 +802,12 @@ Item {
             // again, which is a second motion starting at the exact moment the first one
             // finished.
             root._snapIndicator(root._restingY())
-            // Before the flag goes down, so the row's `Behavior on color` is already
-            // disabled by the time the tint's own binding re-evaluates. The marker lands
-            // and the card lights up on the same frame; a crossfade here would put a
-            // second, slower motion inside the frame that has just arrived.
-            root._tintInstant = true
+            // The frame lands, and `frameAtRest` goes true on this frame. There is
+            // nothing to hold the tint back for here any more: the tint has been
+            // following the frame's own rectangle the whole way in, so the card lit on
+            // the frame the band first touched it rather than on this one - and
+            // `Behavior on color` was off for every frame of that, which is what kept a
+            // crossfade out of the middle of the journey.
             root._markerCrossing = false
             root._departingRowIndex = -1
             root._departingScroll = 0
@@ -1069,14 +1086,15 @@ Item {
         // One viewport, declared once: the body sizes the panel from it and the strip
         // clips the column to it, so the two cannot be different numbers.
         viewportRows: root.viewportRows
-        markerOnFocusedRow: root.markerOnFocusedRow
+        // The frame's own rectangle and whether it has stopped moving: what the row's
+        // tint is computed from and what its `Behavior on color` asks. The strip cannot
+        // read `focusFrame` itself - the element is declared here and only parented
+        // there - so these are the two numbers the whole of the focus tint rests on.
+        focusFrameTop: focusFrame.y
+        focusFrameHeight: focusFrame.height
+        frameAtRest: root.frameAtRest
         debugTimeScale: root.debugTimeScale
-        tintInstant: root._tintInstant
         cellPaddingX: root.cellPaddingX
-        // Read from the same `activeColumn` the strip's own columns come from, so the
-        // row that tints and the row the outline glides onto are the same row by
-        // construction rather than by two lookups agreeing.
-        focusedRowIndex: root.focusedRowIndex
         listSpacing: root.listSpacing
         rowHeight: root.rowHeight
         glyphInset: root.glyphInset
@@ -1113,6 +1131,12 @@ Item {
     // travels with the content it marks and resizes with it. Pinned to the panel, it
     // would say the focus stayed put while the window list moved - two different claims
     // about where the current window is.
+    //
+    // And this rect is not only decoration drawn over the focused row: it is the MASK the
+    // row's tint is computed from, handed down as `focusFrameTop` / `focusFrameHeight`.
+    // A border-only rectangle still has a position and a height, and those are exactly
+    // what says which card is lit - so the tint cannot be a second opinion about where
+    // the focus is, because it is read off the same rectangle the user can see moving.
     Rectangle {
         id: focusFrame
         objectName: "windowHintFocusFrame"
@@ -1293,10 +1317,6 @@ Item {
     }
 
     function _syncIndicator() {
-        // Any focus change is a new event, so the one shot is spent. A crossing's own
-        // landing clears it from the other end - in `crossingRun.onFinished`, which runs
-        // after this - so this is about the changes that follow.
-        root._tintInstant = false
         var target = root._restingY()
         // While the marker is travelling, it is placed by the crossing's clock and by
         // nothing else. The tracker exists to stretch the bar ALONG its long axis when

@@ -50,6 +50,43 @@ Item {
     // column's cards are wider than a neighbour's rather than the same size.
     readonly property int narrowCard: 180 - 19 * 2
     readonly property int wideCard: 360 - 19 * 2
+    // A card's own height and the gap between two of them, 28 and 6, so two cards are
+    // 34 apart. LITERALS for the reason the column widths above are: these are the
+    // numbers the focus mask is checked against, and nothing in the theme says them.
+    // `rowPitch` rather than `28 + 6` on every use, so the gap cannot be changed on one
+    // side of a test and not the other.
+    readonly property int rowH: 28
+    readonly property int rowGap: 6
+    readonly property int rowPitch: rowH + rowGap
+    // The top edge of the card at `index`, in the strip's space. The active column is
+    // drawn at its own negative scroll offset, so a card's place carries that offset -
+    // the same expression the component uses, restated here because a test that read it
+    // back would be asserting that the component agrees with itself.
+    function rowTopInStrip(index, scrollOffset) {
+        return index * root.rowPitch - (scrollOffset || 0)
+    }
+    // Is the focus frame's band over that row? The whole of the focus tint, stated as
+    // arithmetic over the frame's REAL position and this suite's own pitch - not read
+    // back from the component, which is the mistake a test makes when it asserts a rule
+    // by calling the rule. Strictly positive, because a card the frame has just touched
+    // is lit: the frame is on it, and the frame is what the user can see.
+    function frameOverRow(frame, index) {
+        var top = root.rowTopInStrip(index, strip().scrollOffset)
+        var covered = Math.min(top + root.rowH, frame.y + frame.height)
+            - Math.max(top, frame.y)
+        return covered > 0
+    }
+    // The cards currently carrying the focus tint, by index. Indices rather than
+    // objects, so a failure says WHICH cards and not how many.
+    function litCards() {
+        var lit = []
+        var rows = findAllByName(strip(), "windowHintWindowRow")
+        for (var i = 0; i < rows.length; ++i) {
+            if (String(rows[i].color) === String(Lazer.LazerTheme.settingsSelected))
+                lit.push(i)
+        }
+        return lit
+    }
 
     // A snapshot whose every workspace's single window is titled `ws<position>`, so
     // a title in the panel names the workspace it came from and a repeated title is
@@ -1897,12 +1934,18 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // border-only, so the tint IS the row's surface.
             //
             // niri's second snapshot about 40ms into a switch is often the first that
-            // carries the new workspace's windows, so that is when the tint arrives. And
-            // the arriving frame's rows REPLACE the leaving frame's, which means the
-            // delegate that becomes the focused row is a RECYCLED one still holding its
-            // previous colour: measured, a ~300ms ramp from the old tint through
-            // `#fb2320` to the new one while the marker was still above the panel. A
-            // flash of the background, on exactly the card the marker was about to land on.
+            // carries the new workspace's windows, so that is when the tint's INPUTS
+            // change. And the arriving frame's rows REPLACE the leaving frame's, which
+            // means the delegate that becomes the focused row is a RECYCLED one still
+            // holding its previous colour: measured, a ~300ms ramp from the old tint
+            // through `#fb2320` to the new one while the frame was still above the panel.
+            // A flash of the background, on exactly the card the frame was about to land on.
+            //
+            // A journey's displacement never reads as the frame being at rest, so the
+            // row's `Behavior on color` is off for all of it and the recycled row takes the
+            // colour the frame's rectangle says it has, in one step. That is what the
+            // exact token asserted below is for: a crossfade would read as part of the
+            // way to somewhere between the card and the tint.
             body.hint = root.tallFramedHint(2, 2, 8, 1)
             wait(700)
             // The switch arrives, but the new workspace's windows have not.
@@ -1912,42 +1955,140 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             wait(20)
             verify(body._markerCrossing, "the crossing is under way")
             body.hint = root.tallFramedHint(3, 3, 8, 4)
-            // One frame later. A crossfade would still be at the previous colour, or part
-            // way to somewhere between it and the tint.
+            // One frame later, with the frame still in the departure leg and nowhere near
+            // this card.
             wait(1)
             var rows = findAllByName(strip(), "windowHintWindowRow")
             verify(rows.length >= 5,
                 "the arriving column's cards are all there, " + rows.length)
             compare(String(rows[4].color), String(Lazer.LazerTheme.settingsCard),
-                "and the row that is focused is NOT tinted while the marker is still "
-                    + "travelling - the tint follows the marker, not the data - was "
-                    + rows[4].color)
-            verify(body._markerCrossing,
-                "which is the point: the marker is still off the panel")
-            // The card lights up on the frame the marker lands on it, which is the whole
-            // of the claim: the two become correct together, and neither leads.
+                "and the focused card is the plain card - its rectangle is nowhere near "
+                    + "this row, so nothing lights it, was " + rows[4].color)
+            verify(body._markerCrossing, "which is the point: the journey is still running")
+            // And once the frame has arrived the card is lit with the frame around it. The
+            // tint and the outline come off the same rectangle, so neither of them can be
+            // right without the other - and neither leads.
             settleSlide()
             settleMarker()
             var landed = findAllByName(strip(), "windowHintWindowRow")
             compare(String(landed[4].color), String(Lazer.LazerTheme.settingsSelected),
-                "so once the marker has landed the card is tinted, was "
-                    + landed[4].color)
+                "once the frame has landed the card is tinted, was " + landed[4].color)
             compare(findByName(strip(), "windowHintFocusFrame").y,
                 landed[4].mapToItem(strip(), 0, 0).y,
-                "and the frame is around it - neither of the two arrived before the "
-                    + "other")
+                "and the frame is around it")
 
-            // At rest the crossfade stays, because there the tint arriving IS the event
-            // and a short fade reads as intent rather than as a glitch.
+            // What the glide arrives at. There is no crossfade here to assert any more,
+            // and that is the point rather than a loss: a focus change at rest IS a glide,
+            // so "at rest" and "the tint may fade" were never the same moment. The glide
+            // itself is `test_theTintFollowsTheFrameLiveOnAFocusGlide`; what belongs here
+            // is the resting state it lands on - one card, and the frame around it.
             body.hint = root.tallFramedHint(3, 3, 8, 6)
-            wait(1)
+            wait(Lazer.MotionTokens.settingsSidebarCollapse + 200)
             var resting = findAllByName(strip(), "windowHintWindowRow")
-            verify(String(resting[6].color) !== String(Lazer.LazerTheme.settingsSelected),
-                "while a focus change with no journey under way still crossfades, so the "
-                    + "row keeps its fade where it belongs - was " + resting[6].color)
-            wait(Lazer.MotionTokens.fast + 60)
+            var lit = []
+            for (var i = 0; i < resting.length; ++i) {
+                if (String(resting[i].color) !== String(Lazer.LazerTheme.settingsCard))
+                    lit.push(i)
+            }
+            compare(lit.length, 1, "one card carries a fill of its own, and it was "
+                + lit.length + " - " + lit.join(","))
+            compare(lit[0], 6, "and it is the one the focus moved to")
             compare(String(resting[6].color), String(Lazer.LazerTheme.settingsSelected),
-                "and settles on the tint once the frame has got there")
+                "which is exactly the tint and not a blend of it, because the change was "
+                    + "a step")
+            verify(body.frameAtRest, "and with the frame resting on it the row's Behaviour "
+                + "is on again, so a change the frame is not causing may still fade")
+        }
+
+        // Every card on the strip agrees with the frame's rectangle over it - the claim
+        // itself, and the literals in the tests around it are two samples of it.
+        //
+        // Computed here from the frame's REAL position and this suite's own pitch rather
+        // than read back from the component, because a test that asks the component
+        // whether it is right has asked nothing. Every card is checked, not a chosen one:
+        // the rule has no cases, so a card that disagrees is the fault.
+        function assertTintMatchesTheFrame(where) {
+            var frame = findByName(strip(), "windowHintFocusFrame")
+            var rows = findAllByName(strip(), "windowHintWindowRow")
+            var wrong = []
+            for (var i = 0; i < rows.length; ++i) {
+                var lit = String(rows[i].color) === String(Lazer.LazerTheme.settingsSelected)
+                if (lit !== root.frameOverRow(frame, i))
+                    wrong.push(i + (lit ? " lit" : " dark"))
+            }
+            compare(wrong.length, 0,
+                "every card matches the frame\'s rectangle over it " + where + " - wrong: "
+                    + wrong.join(", "))
+        }
+
+        function test_theTintFollowsTheFrameLiveRatherThanAFlag() {
+            // The tint is the focus frame's own rectangle, made visible, so the only way
+            // to test it is to STOP the frame somewhere and ask which cards are lit. The
+            // marker's own clock is the handle: `wait` cannot do this, because a
+            // wall-clock sample of a 320ms journey lands wherever the sampler felt like
+            // and the whole claim is about where the band is.
+            //
+            // Six cards with the focus on row 4, so the arrival leg travels a whole
+            // column: the band comes back in above the panel and comes down onto row 4,
+            // lighting the cards it passes on the way.
+            body.hint = root.tallFramedHint(2, 2, 6, 1)
+            wait(300)
+            compare(litCards().join(","), "1",
+                "at rest the band is exactly on the focused row, so that card alone is lit")
+            verify(body.frameAtRest,
+                "and the frame is at rest, which is what keeps the row's Behaviour on")
+
+            body.hint = root.tallFramedHint(3, 2, 6, 4)
+            wait(20)
+            verify(body._markerCrossing, "the marker is travelling")
+            // Both clocks stopped: the strip's so the arriving column is drawn half-way
+            // across the panel, the marker's so the band is at a chosen height in it. The
+            // tint is the band's vertical overlap, so the column's own x does not enter it.
+            driveSlideTo(0.5)
+            compare(body.focusedRowIndex, 4,
+                "and the data names row 4 from the crossing's FIRST frame - which is "
+                    + "exactly why a tint that followed the data lit this card long before "
+                    + "the frame got here")
+
+            // Four fifths of the way in. The band has cleared row 1 and is inside row 2,
+            // so row 2 is lit and the row the data names is dark.
+            driveMarkerTo(0.8)
+            compare(litCards().join(","), "2",
+                "the band is over row 2, and that is the whole of what is lit")
+            compare(frameOverRow(findByName(strip(), "windowHintFocusFrame"), 4), false,
+                "and the frame's rectangle is not over the focused row, so nothing lights "
+                    + "it")
+            assertTintMatchesTheFrame("at four fifths of the arrival leg")
+
+            // Three quarters. The band straddles the gap between rows 1 and 2, and a card
+            // is `rowH` tall while the gap is `rowGap` - a band one card tall cannot fit in
+            // a gap a fifth of that - so it lights BOTH, and the highlight is handed from
+            // one card to the next by an overlap rather than by a gap. That is what the
+            // frame's rectangle says about two cards, and the frame is drawn around
+            // whichever of them it is nearer.
+            driveMarkerTo(0.75)
+            compare(litCards().join(","), "1,2",
+                "with the band across the gap, both cards it covers are lit")
+            assertTintMatchesTheFrame("with the band across the gap")
+
+            // The corner of the journey, where the band is outside the card block on both
+            // counts. Nothing is lit there, which is the one case where holding the tint
+            // off is right - and the flag version held it off for the whole journey, cards
+            // included.
+            driveMarkerTo(0.5)
+            verify(findByName(strip(), "windowHintFocusFrame").y + root.rowH
+                <= root.rowTopInStrip(0, 0),
+                "the band is wholly above the first card")
+            compare(litCards().length, 0, "so no card is lit there at all")
+
+            driveMarkerTo(1)
+            compare(litCards().join(","), "4",
+                "and on the frame the band lands on row 4, that card and no other is lit")
+            assertTintMatchesTheFrame("on the landing")
+
+            driveSlideTo(1)
+            settleSlide()
+            settleMarker()
         }
 
         function test_theFramedCardIsTheOnlyHighlightInThePanel() {
@@ -1963,7 +2104,13 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             compare(findAllByName(body, "windowHintColumnHighlight").length, 0,
                 "no column-wide highlight exists")
             body.hint = root.tallFramedHint(2, 2, 6, 3)
-            wait(300)
+            // Out the frame's own glide, not a bare 300ms. The wait starts when the
+            // snapshot is assigned and the animation starts a frame or two later, once
+            // the Repeater has rebuilt and the binding has been evaluated - so a wait of
+            // exactly the recipe's length sampled the glide at 98% and read the frame's
+            // `y` as 101.99999 against the card's 102. The same convention as
+            // `test_focusHighlightStillGlidesAndSnaps`: the duration plus room.
+            wait(Lazer.MotionTokens.settingsSidebarCollapse + 120)
             compare(findAllByName(body, "windowHintColumnHighlight").length, 0,
                 "and none appears once there is content to sit behind")
 
@@ -2005,56 +2152,141 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             }
         }
 
-        function test_theCardIsNotTintedUntilTheMarkerLandsOnIt() {
-            // The sequence, sampled. `focusedRowIndex` is correct from the crossing's
-            // first frame, so a tint that follows the DATA is on the arriving card while
-            // the marker is still off the panel - and the marker's whole journey is that
-            // the focus arrives, so a highlight that is already there gives the answer
-            // away before the gesture delivers it.
+        function test_theCardIsNotTintedWhileTheFrameIsOffThePanel() {
+            // Sampled off the real animation, because the claim is about the WHOLE journey
+            // rather than about one point on it: on every sample the arriving card is lit
+            // exactly when the frame's rectangle is over it, and never otherwise.
+            //
+            // The flag this replaced could not make that claim. `markerOnFocusedRow` was
+            // false for the whole journey, so it held the tint back from the cards the
+            // band was visibly sweeping through just as firmly as it held it back while
+            // the band was out of sight - and out of sight is the only case where holding
+            // a card back is right. So the frame and the highlight were two separate
+            // things that happened to agree at the ends of the journey and disagreed
+            // through all of it.
             body.hint = root.tallFramedHint(2, 2, 6, 1)
             wait(300)
-            // A switch DOWN, so the marker leaves through the bottom and returns through
-            // the top: it is off the panel for the whole arrival leg, which is the stretch
-            // this is about.
+            // A switch DOWN, so the band leaves through the bottom and returns through the
+            // top: it is above the panel for the start of the arrival leg, which is the
+            // stretch this is about.
             body.hint = root.tallFramedHint(3, 2, 6, 4)
             wait(20)
             verify(body._markerCrossing, "the journey is under way")
-            var tint = String(Lazer.LazerTheme.settingsSelected)
-            var plain = String(Lazer.LazerTheme.settingsCard)
-            var litEarly = 0
-            var litOnPanel = 0
             var samples = 0
-            // The whole 320ms of the journey plus its landing, sampled off the real
-            // animation rather than a driven clock.
+            var wrong = 0
             while (body._markerCrossing && samples < 80) {
+                // Both looked up again on every sample: the arriving frame's rows are
+                // replaced under the crossing, and a handle taken before that reads a
+                // destroyed item.
+                var frame = findByName(strip(), "windowHintFocusFrame")
                 var rows = findAllByName(strip(), "windowHintWindowRow")
-                var onPanel = rows.length > 4
-                    && rows[4].mapToItem(strip(), 0, 0).y > 0
-                    && rows[4].mapToItem(strip(), 0, 0).y < body.height
-                var lit = rows.length > 4 && String(rows[4].color) === tint
-                if (lit)
-                    litEarly += 1
-                if (lit && !onPanel)
-                    litOnPanel += 1
+                var lit = rows.length > 4
+                    && String(rows[4].color) === String(Lazer.LazerTheme.settingsSelected)
+                if (lit !== root.frameOverRow(frame, 4))
+                    wrong += 1
                 samples += 1
                 wait(8)
             }
-            verify(samples > 0 && samples < 80, "the journey was sampled throughout")
-            compare(litEarly, 0,
-                "the arriving card was never tinted while the marker was travelling - it "
-                    + "was tinted on " + litEarly + " of " + samples + " samples")
-            compare(litOnPanel, 0,
-                "and never while it was off the panel")
-            // And once, at the end, both together.
-            wait(40)
-            var after = findAllByName(strip(), "windowHintWindowRow")
-            compare(String(after[4].color), tint,
-                "the card is tinted once the marker has landed, was " + after[4].color)
+            verify(samples > 4 && samples < 80,
+                "the journey was sampled throughout, " + samples + " samples")
+            compare(wrong, 0, "the arriving card was lit on exactly the samples where the "
+                + "frame\'s rectangle was over it and on none of the others - wrong on "
+                + wrong + " of " + samples)
+            settleSlide()
+            settleMarker()
+
+            // The same claim at the one point a wall-clock sampler cannot be relied on to
+            // land in: the corner between the two legs, where the band is outside the card
+            // block on both counts. It is about 13ms of a 320ms journey, so it is driven
+            // rather than waited for. Back up a workspace, so this is a real crossing - the
+            // direction does not matter, hence the test below asking whether the band is
+            // outside the block rather than which side of it the band is on.
+            body.hint = root.tallFramedHint(2, 3, 6, 1)
+            wait(20)
+            verify(body._markerCrossing, "and a second journey is under way")
+            driveMarkerTo(0.5)
+            var corner = findByName(strip(), "windowHintFocusFrame")
+            var block = findAllByName(strip(), "windowHintWindowRow")
+            var firstTop = root.rowTopInStrip(0, strip().scrollOffset)
+            var lastBottom = root.rowTopInStrip(block.length - 1, strip().scrollOffset)
+                + root.rowH
+            verify(corner.y + corner.height <= firstTop || corner.y >= lastBottom,
+                "the band is outside the card block on both counts, was " + corner.y)
+            compare(litCards().length, 0,
+                "so the arriving card is not lit there, and neither is any other - the "
+                    + "frame is nowhere near the panel")
+            // ...and it is lit on the frame the band lands on it, which is the other half
+            // of the claim.
+            driveMarkerTo(1)
+            compare(litCards().join(","), "1",
+                "and on the frame the band lands on the arriving card, that card is lit")
             compare(findByName(strip(), "windowHintFocusFrame").y,
-                after[4].mapToItem(strip(), 0, 0).y,
+                findAllByName(strip(), "windowHintWindowRow")[1]
+                    .mapToItem(strip(), 0, 0).y,
                 "with the frame around it")
             settleSlide()
             settleMarker()
+        }
+
+        function test_theTintFollowsTheFrameLiveOnAFocusGlide() {
+            // The common interaction, and the case no flag could ever see: niri moves
+            // focus inside ONE workspace, so nothing sets a flag and nothing clears one -
+            // there is no journey, no `onFinished`, no publish that means anything by
+            // itself. The frame GLIDES to the new row over `settingsSidebarCollapse`, and
+            // for those 300ms it is neither on the card it left nor on the card it is
+            // going to.
+            //
+            // `focusedRowIndex` is already the new row on the first frame of that, which is
+            // what made this the worst case for the old tint: a highlight that moves at
+            // once is the journey\'s complaint again, 300ms shorter and far more often.
+            body.hint = root.tallFramedHint(2, 2, 5, 0)
+            wait(400)
+            compare(litCards().join(","), "0",
+                "at rest the first card is the lit one, and it is the focused row")
+            compare(body.focusedRowIndex, 0, "which is the row the snapshot names")
+            // Five cards and a focus on row 2: no journey, because this snapshot reports
+            // the same workspace as the last one, and no scroll either - the row is inside
+            // the viewport already, so the frame moves and nothing else does.
+            body.hint = root.tallFramedHint(2, 2, 5, 2)
+            wait(Math.round(Lazer.MotionTokens.settingsSidebarCollapse / 4))
+            var frame = findByName(strip(), "windowHintFocusFrame")
+            // Genuinely in flight, and bounded by this suite's own pitch rather than by a
+            // duration: past the card it left, short of the one it is going to.
+            verify(frame.y > root.rowTopInStrip(0, 0),
+                "the frame has left the first card, was " + frame.y)
+            verify(frame.y < root.rowTopInStrip(2, 0),
+                "and has not reached the third, was " + frame.y)
+            verify(!body.frameAtRest,
+                "so the row\'s Behaviour is off - a colour change the frame\'s own motion "
+                    + "caused must not also animate")
+            compare(body.focusedRowIndex, 2, "while the data already names the new row")
+            var lit = litCards()
+            assertTintMatchesTheFrame("mid-glide")
+            verify(lit.length > 0, "and something is lit, " + lit.join(","))
+            verify(lit.indexOf(0) === -1,
+                "the card the frame has left is dark, was lit " + lit.join(","))
+            verify(!lit.every(function(i) { return i === body.focusedRowIndex }),
+                "and not every lit card is the one the data names, so this is the frame\'s "
+                    + "rectangle and not the focused row - lit " + lit.join(","))
+            // Nothing mid-fade. Every card is at exactly one of the two tokens, so no
+            // `Behavior on color` is running: the band has been over some of these cards
+            // for a few frames already, and a 100ms crossfade would still be climbing
+            // toward the tint - a value that is neither token and therefore neither of the
+            // two a card is allowed to be here.
+            var rows = findAllByName(strip(), "windowHintWindowRow")
+            var plain = String(Lazer.LazerTheme.settingsCard)
+            var tint = String(Lazer.LazerTheme.settingsSelected)
+            var blended = []
+            for (var i = 0; i < rows.length; ++i) {
+                if (String(rows[i].color) !== plain && String(rows[i].color) !== tint)
+                    blended.push(i + " was " + rows[i].color)
+            }
+            compare(blended.length, 0,
+                "no card is part way between the two, so the tint changed in one step - "
+                    + blended.join(", "))
+            wait(Lazer.MotionTokens.settingsSidebarCollapse + 160)
+            compare(litCards().join(","), "2", "and once the frame has arrived it is alone")
+            verify(body.frameAtRest, "with the frame resting on it")
         }
 
         function test_theWholePanelArrivesInOnePiece() {
@@ -2253,6 +2485,11 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // no Behavior on y would already be at 0 here.
             verify(gliding.y > 0 && gliding.y < after[1].y,
                 "in flight between the rows, was " + gliding.y)
+            // Which is also what stops the tint from fading: a colour change the frame\'s
+            // own motion caused must not also animate, or the card the band has already
+            // left is still climbing toward its old colour behind it.
+            verify(!body.frameAtRest,
+                "and with the frame in flight the row\'s Behaviour on color is off")
 
             wait(Lazer.MotionTokens.settingsSidebarCollapse + 120)
             var moved = findByName(live(), "windowHintFocusFrame")

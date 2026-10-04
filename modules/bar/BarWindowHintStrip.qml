@@ -72,10 +72,6 @@ Item {
     // thing it marks. Vertical padding is the body's, since it comes from a different
     // number - see `cellPaddingX` / `cellPaddingY` there.
     property int cellPaddingX: 0
-    // Which row of the ACTIVE column holds focus, or -1. The body owns it and places
-    // the two shared markers from it; the strip needs it too, because the focused
-    // row's tint is the row's own fill and only the row can paint under its content.
-    property int focusedRowIndex: -1
     property int listSpacing: 6
     property int rowHeight: 28
     property int glyphInset: 20
@@ -89,17 +85,26 @@ Item {
     // however many windows the workspace holds.
     property int viewportRows: HintLogic.MAX_WINDOW_ROWS
 
-    // Whether the body's frame is actually ON this column's focused row right now, which
-    // is what the row's focus tint follows - see the row's `color`. The frame's own
-    // animated position, not a state flag, so it is true on the frame the frame is there
-    // and false on every frame it is not.
-    property bool markerOnFocusedRow: true
-    // ...and whether the tint has just landed WITH the marker, in which case it must not
-    // also animate. One shot: set by the journey's last frame, cleared by the next focus
-    // change. Two flags rather than one because they answer different questions - "is the
-    // marker on this row" and "must this change be instant" - and folding them together
-    // would switch the tint OFF for the frame the marker arrives.
-    property bool tintInstant: false
+    // The focus frame's own rectangle in THIS space, and whether it has stopped moving.
+    // The first two are what the row's tint is a geometric function of; the third is what
+    // the row's `Behavior on color` asks.
+    //
+    // Handed down rather than reached for because an id is file-scoped: `focusFrame` is a
+    // child of this strip but it is DECLARED in the body, so nothing in here can name it.
+    // It arrives as numbers, the way `rowHeight` and `rowPitch` do - and as a POSITION
+    // rather than as a decision, which is the point: the body owns where the frame is,
+    // and the row owns what that means for its own surface. Nothing in between says when
+    // to apply it.
+    //
+    // `focusFrame` is declared after the strip, so these bindings are read for the first
+    // time only once a window row exists - a row needs a snapshot, a snapshot needs a
+    // created component, and by then both objects are there. Nothing reads them during
+    // construction, which is the whole of what that ordering is safe on.
+    property real focusFrameTop: 0
+    property real focusFrameHeight: 0
+    // Whether the frame has ARRIVED. See the body's `frameAtRest` for why this is asked
+    // of the frame rather than of a journey flag.
+    property bool frameAtRest: true
     // Observation slow-motion, fed from the body. The row flash and the focus tint live
     // here rather than on the body, so they are on the marker's path and have to be
     // slowed with it - a 100ms tint left unscaled next to a 2s journey is the one thing
@@ -157,6 +162,45 @@ Item {
     function columnWidthFor(position) {
         return HintLogic.slotWidth(position - root.panelPosition,
             root.columnWidth, root.activeColumnWidth)
+    }
+
+    // Is the focus frame's band over this row, right now? The whole of the focus tint.
+    //
+    // The frame is a rectangle one row tall travelling down a list, and a card is tinted
+    // for exactly as long as that rectangle overlaps it. The frame's live position IS the
+    // mask; nothing else decides, so the tint cannot lead the frame or lag it.
+    //
+    // Strictly a POSITIVE overlap. The frame's lower edge reaching a row's upper edge is
+    // the instant that row lights, because the frame really is on it - and a card the
+    // frame has just touched has to be lit, or "the region the frame encloses changes
+    // colour" would mean something weaker than it reads. Half-open bounds would have
+    // bought a tidier handoff at the cost of leaving a card dark while a rectangle is
+    // visibly sitting on it.
+    //
+    // The row's own rect is computed, not measured off the delegate: `y` is
+    // `index * rowPitch - scrollOffset`, because the active column is drawn at its own
+    // negative scroll offset and the strip's space is therefore the scrolled one. That is
+    // the same expression the body's `focusedRowTop` uses for the frame's resting place,
+    // so the two agree about where a row is by construction.
+    //
+    // Only the vertical band is compared, and that is the whole of it rather than a
+    // shortcut: every card on this strip is in the one ACTIVE column, so they all share
+    // an x and a width, and a horizontal test could only ever reject all of them or none
+    // of them. The frame is what travels along the list, and the list runs down.
+    //
+    // What it costs is worth stating, because it is visible and it is intended. A row is
+    // `rowHeight` tall and the gap between rows is `listSpacing` - 28 and 6 - so a band
+    // 28 tall cannot fit in a 6px gap: where it straddles the space between two cards it
+    // lights BOTH, and the highlight is handed from one card to the next by a short
+    // overlap rather than by a gap. That is what the frame's rectangle says about two
+    // cards, and the frame is drawn around whichever of them it is nearer. It lasts for
+    // `rowHeight - listSpacing` of travel - 22px, two thirds of a row pitch - and it is
+    // the reason a focus glide reads as one sweep rather than as a switch.
+    function frameOverRow(index) {
+        const top = index * root.rowPitch - root.scrollOffset
+        const covered = Math.min(top + root.rowHeight,
+            root.focusFrameTop + root.focusFrameHeight) - Math.max(top, root.focusFrameTop)
+        return covered > 0
     }
 
     // The tallest column on the strip, MEASURED rather than bound.
@@ -286,11 +330,12 @@ Item {
                 model: stripColumn.modelData && stripColumn.isActiveSlot
                     ? stripColumn.modelData.rows : null
 
-                // Window row: app icon and title. The row does not tint itself when
-                // it holds focus - the shared highlight is that highlight, and
-                // painting it per row as well would put two fills on screen and read
-                // as two different states. A row's own surface is only ever the
-                // hover response.
+                // Window row: app icon and title, and the card's own surface - which
+                // is where the focus tint lives. The row does not mark ITSELF: nothing
+                // here decides what is focused, and what the frame's rectangle encloses
+                // is decided by the one shared frame above. This row only reports whether
+                // the frame is over it, so there is still exactly one thing on screen
+                // saying which window is current.
                 Rectangle {
                     id: windowRow
                     required property var modelData
@@ -307,27 +352,27 @@ Item {
                     // reason the shared highlight above is border-only. Painting the tint
                     // from a separate element above the row put a translucent panel of
                     // `settingsSelected` over the icon and the text, veiling both.
-                    // Only while the marker is ON this row, which at rest means always.
                     //
-                    // `focusedRowIndex` is read off the ARRIVING frame, so it is correct
-                    // from the crossing's first frame - and the tint was following it from
-                    // there, which meant the card lit up while the marker was still above
-                    // the panel, two hundred milliseconds before the marker got there. The
-                    // whole of the marker's journey is that the focus ARRIVES; a tint that
-                    // is already on gives the answer away before the gesture delivers it,
-                    // and the frame - which does travel, from off the panel, the whole
-                    // height of the list - reads as decoration on a highlight that was
-                    // never waiting for it.
+                    // What decides it is the frame's own rectangle, read per row and read
+                    // every frame: `root.frameOverRow`, above. It was `focusedRowIndex`,
+                    // which is read off the ARRIVING snapshot and so is correct from the
+                    // crossing's first frame - the card lit up while the frame was still
+                    // above the panel, a long way from arriving, giving the answer away
+                    // before the gesture delivered it. Then it was a state flag
+                    // (`markerOnFocusedRow`, a renamed `!_markerCrossing`), which held the
+                    // tint off for a whole journey and then switched it on at the landing.
+                    // A flag can only be right on the frames something writes it on, so it
+                    // is either too early or too late everywhere else.
                     //
-                    // So the tint follows the MARKER rather than the data. During the
-                    // departure leg the marker is on the card being left, which is in a
-                    // neighbouring column and drawn as a plain label, so nothing in here is
-                    // tinted then; the travelling frame is the mark. During the arrival leg
-                    // the marker is off the panel entirely, so again nothing is tinted. The
-                    // card lights up on the frame the marker lands on it - which is what
-                    // "the region the frame encloses changes" has to mean.
-                    color: windowRow.index === root.focusedRowIndex
-                        && root.markerOnFocusedRow
+                    // The frame's live rectangle is neither: it is where the thing being
+                    // marked IS, so the tint is that rectangle made visible. The frame
+                    // leaves the card being left by travelling down the panel, so the
+                    // band lights the cards it passes on the way out; it re-enters through
+                    // the opposite edge and comes down onto the arriving card, so it
+                    // lights them again on the way in and stays on the one it lands on. The
+                    // frame is the mark, and a card under it is lit - which is what "the
+                    // region the frame encloses changes" has to mean.
+                    color: root.frameOverRow(windowRow.index)
                         ? LazerTheme.settingsSelected
                         : (rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard)
                     // A Rectangle borders itself by default; this row's own tint is its
@@ -341,31 +386,45 @@ Item {
                     readonly property alias rowFlashAnimation: rowFlash
                     readonly property alias rowFlashOverlay: rowFlashOverlay
 
-                    // Off whenever the frame is not on this row, which covers both of
-                    // the cases where the tint would otherwise be a second motion
-                    // somewhere it does not belong.
+                    // The tint tracks the frame frame by frame, so the only colour change
+                    // allowed to animate is one the frame is NOT causing - which is the
+                    // change that happens with the frame already resting on the row.
+                    // `frameAtRest` is that question, asked of the frame's own position
+                    // rather than of a moment: a journey's displacement never satisfies it
+                    // except on its landing frame, and neither does the focus glide until
+                    // it finishes.
                     //
-                    // One of them is measured, not reasoned: niri's second snapshot about
-                    // 40ms into a switch is often the first that carries the new
-                    // workspace's windows, so the tint arrives then - and the arriving
-                    // frame's rows REPLACE the leaving frame's, which means the delegate
-                    // that becomes the focused row is a RECYCLED one still holding its
-                    // previous colour. With a Behaviour, that recycled delegate animates
-                    // from where it was to the tint and the card's background visibly
-                    // flushed through an unrelated colour on the way: a ~300ms ramp from
-                    // the tint through `#fb2320` to the new tint, while the frame was
-                    // still out of sight above the panel.
+                    // This gate replaces two. One disabled the animation for a whole
+                    // journey, which is right for the arrival and useless for every card
+                    // the band swept over on the way there; the other was a one-shot set on
+                    // the landing, which covered the landing alone. Between them they left
+                    // the tint crossfading through each card the band passed - and a 100ms
+                    // fade on a card the frame has already left reads as that card being
+                    // selected a second time, which is the lag the geometry removes.
                     //
-                    // The other is the focus glide: a window change inside one workspace
+                    // The other is the focus glide, and the case a state flag could never
+                    // see: a window change inside one workspace - the common interaction -
                     // moves the frame over `settingsSidebarCollapse`, and for those 300ms
-                    // it is between two rows - neither of which should be lit, because the
-                    // frame is on neither.
+                    // it is BETWEEN the rows rather than on one of them. The geometry
+                    // covers that with nothing to enumerate, and it is why there is no
+                    // crossfade at rest any more: a focus change at rest IS a glide, so
+                    // "at rest" and "the tint may fade" were never the same moment.
                     //
-                    // At rest the crossfade stays, because there the frame has arrived
-                    // and the tint arriving alongside it reads as intent rather than as a
-                    // glitch.
+                    // The fault both of those gates were written for is still covered, and
+                    // by the geometry rather than by a flag. niri's second snapshot about
+                    // 40ms into a switch is often the first that carries the new
+                    // workspace's windows, so that is when the tint's inputs change - and
+                    // the arriving frame's rows REPLACE the leaving frame's, which means
+                    // the delegate that becomes the focused row is a RECYCLED one still
+                    // holding its previous colour. Measured, that delegate used to ramp
+                    // over ~300ms from the tint through `#fb2320` to the new tint while
+                    // the frame was still out of sight above the panel: a flash of the
+                    // background, on exactly the card the frame was about to land on. A
+                    // journey is in flight throughout, so this is off and the row takes
+                    // its colour in one step - and the frame is already over that card by
+                    // then, so it is the right colour to take.
                     Behavior on color {
-                        enabled: !root.markerCrossing && !root.tintInstant
+                        enabled: root.frameAtRest
                         ColorAnimation { duration: MotionTokens.fast * debugTimeScale }
                     }
                     Behavior on scale {
