@@ -38,6 +38,9 @@ Item {
     readonly property int rowGap: 4
     readonly property int headerHeight: 16
     readonly property int headerGap: 6
+    // Room the header's trailing rule keeps for itself, so the title can size
+    // itself without measuring the rule (which is positioned after it).
+    readonly property int headerRuleReserve: 44
     // Matches BarAudioLevelRow and BarAudioDeviceList: 8px inset, 14px glyph, 4px
     // to the text column. Every label in the panel shares this line.
     readonly property int cardPadding: 8
@@ -115,41 +118,43 @@ Item {
         width: parent.width
         height: root.headerHeight
 
-        Row {
-            id: mixerHeaderRow
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 6
+        // Laid out by hand rather than with a Row, for the same reason as the device
+        // list's header: a positioner writes its children's `y`, so
+        // `anchors.verticalCenter` on those same children fights it for the same
+        // property, and Qt reports a `polish() loop` on every panel open.
 
-            BarIcon {
-                id: mixerBackChevron
-                objectName: "mixerBackChevron"
-                width: 12
-                height: 12
-                visible: root.routeMode
-                source: "../lazerbar/icons/chevron-left.svg"
-                tint: LazerTheme.textMuted
-            }
-
-            Text {
-                objectName: "mixerHeaderTitle"
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.headerTitle()
-                color: LazerTheme.settingsNavInactive
-                font.pixelSize: 11
-                font.weight: Font.DemiBold
-                elide: Text.ElideRight
-            }
+        // Back affordance, present only while the route picker is showing.
+        BarIcon {
+            id: mixerBackChevron
+            objectName: "mixerBackChevron"
+            x: 0
+            y: Math.round((mixerHeader.height - height) / 2)
+            width: 12
+            height: 12
+            visible: root.routeMode
+            source: "../lazerbar/icons/chevron-left.svg"
+            tint: LazerTheme.textMuted
         }
 
-        // Positioned from an expression rather than through `anchors.left`: Qt only
-        // accepts a sibling reference there, and a computed offset has to be an
-        // explicit `x` (the rule then owns its own width).
+        Text {
+            id: mixerHeaderTitle
+            objectName: "mixerHeaderTitle"
+            x: mixerBackChevron.visible ? mixerBackChevron.x + mixerBackChevron.width + 6 : 0
+            y: Math.round((mixerHeader.height - height) / 2)
+            width: Math.max(0, Math.min(implicitWidth,
+                mixerHeader.width - x - root.headerRuleReserve))
+            text: root.headerTitle()
+            color: LazerTheme.settingsNavInactive
+            font.pixelSize: 11
+            font.weight: Font.DemiBold
+            elide: Text.ElideRight
+        }
+
         Rectangle {
             objectName: "mixerHeaderRule"
-            x: mixerHeaderRow.x + mixerHeaderRow.width + 8
-            width: Math.max(0, parent.width - x)
-            anchors.verticalCenter: parent.verticalCenter
+            x: mixerHeaderTitle.x + mixerHeaderTitle.width + 8
+            width: Math.max(0, mixerHeader.width - x)
+            y: Math.round((mixerHeader.height - height) / 2)
             height: 1
             color: LazerTheme.divider
             opacity: 0.7
@@ -357,37 +362,33 @@ Item {
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                 Behavior on opacity { ColorAnimation { duration: MotionTokens.fast } }
 
-                Row {
-                    anchors.left: parent.left
-                    anchors.leftMargin: 5
-                    anchors.right: parent.right
-                    anchors.rightMargin: 5
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 4
+                // Explicit x rather than a Row: a positioner writes its children's `y`,
+                // so `anchors.verticalCenter` inside one fights it for the same
+                // property and Qt reports a `polish() loop` on every open.
+                BarIcon {
+                    id: routeChipGlyph
+                    objectName: "mixerRouteGlyph"
+                    x: 5
+                    y: Math.round((routeChip.height - height) / 2)
+                    width: 11
+                    height: 11
+                    source: Qt.resolvedUrl("icons/volume.svg")
+                    tint: LazerTheme.textMuted
+                }
 
-                    BarIcon {
-                        id: routeChipGlyph
-                        objectName: "mixerRouteGlyph"
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 11
-                        height: 11
-                        source: Qt.resolvedUrl("icons/volume.svg")
-                        tint: LazerTheme.textMuted
-                    }
-
-                    Text {
-                        objectName: "mixerRouteLabel"
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: Math.max(0, parent.width - routeChipGlyph.width - parent.spacing)
-                        // An unread route is stated as such. Naming the default
-                        // device here would be a claim the panel cannot back yet.
-                        text: streamRow.routeText === "" ? "Reading…" : streamRow.routeText
-                        color: LazerTheme.textMuted
-                        font.pixelSize: 10
-                        horizontalAlignment: Text.AlignRight
-                        elide: Text.ElideRight
-                        maximumLineCount: 1
-                    }
+                Text {
+                    objectName: "mixerRouteLabel"
+                    x: routeChipGlyph.x + routeChipGlyph.width + 4
+                    y: Math.round((routeChip.height - height) / 2)
+                    width: Math.max(0, routeChip.width - x - 5)
+                    // An unread route is stated as such. Naming the default
+                    // device here would be a claim the panel cannot back yet.
+                    text: streamRow.routeText === "" ? "Reading…" : streamRow.routeText
+                    color: LazerTheme.textMuted
+                    font.pixelSize: 10
+                    horizontalAlignment: Text.AlignRight
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
                 }
 
                 function openPicker() { root.openRoutePicker(streamRow.modelData) }

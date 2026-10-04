@@ -40,6 +40,9 @@ Item {
     readonly property int cardPadding: 8
     readonly property int glyphSize: 14
     readonly property int textLeft: cardPadding + glyphSize + 4
+    // Room the header's trailing rule keeps for itself, so the hoisted scope text
+    // can size itself without measuring the rule (which is positioned after it).
+    readonly property int ruleReserve: 36
 
     readonly property int listContentHeight: root.devices && root.devices.length > 0
         ? root.devices.length * rowHeight + (root.devices.length - 1) * rowGap
@@ -82,56 +85,75 @@ Item {
         height: 16
         readonly property int gap: 6
 
-        Row {
-            id: sectionHeaderRow
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 6
+        // Laid out by hand, not with a Row. Two things make a Row wrong here and
+        // both showed up as a `QQuickItem::polish() loop` on every open:
+        //
+        //   - A positioner writes its children's `y`, so an `anchors.verticalCenter`
+        //     on the same children fights it for the same property whenever the
+        //     children are not all the same height (a 12px glyph beside 14px text).
+        //   - The scope text measured its own width against the Row's width, and
+        //     the Row's width is the sum of its children's widths - so
+        //     row.width -> scope.width -> row.width, forever.
+        //
+        // Each item below depends only on the item before it and on the header's
+        // own width, which is what makes the chain terminate.
 
-            // Direction glyph, so "Output" and "Input" are distinguishable at a
-            // glance even when the two blocks sit next to each other.
-            BarIcon {
-                id: sectionGlyph
-                objectName: "audioSectionGlyph"
-                width: 12
-                height: 12
-                visible: root.sectionIcon !== ""
-                source: root.sectionIcon
-                tint: LazerTheme.textMuted
-            }
-
-            Text {
-                objectName: "audioSectionTitle"
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.sectionTitle
-                color: LazerTheme.settingsNavInactive
-                font.pixelSize: 11
-                font.weight: Font.DemiBold
-                elide: Text.ElideRight
-            }
-
-            // The hoisted hardware prefix, stated once instead of on every row.
-            Text {
-                objectName: "audioSectionScope"
-                anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(0, Math.min(implicitWidth,
-                    sectionHeader.width - sectionHeaderRow.x - sectionHeaderRow.width - 16))
-                visible: width > 0
-                text: root.sharedPrefix
-                color: LazerTheme.textMuted
-                font.pixelSize: 11
-                elide: Text.ElideRight
-            }
+        // Direction glyph, so "Output" and "Input" are distinguishable at a
+        // glance even when the two blocks sit next to each other.
+        BarIcon {
+            id: sectionGlyph
+            objectName: "audioSectionGlyph"
+            x: 0
+            y: Math.round((sectionHeader.height - height) / 2)
+            width: 12
+            height: 12
+            visible: root.sectionIcon !== ""
+            source: root.sectionIcon
+            tint: LazerTheme.textMuted
         }
 
-        // Positioned from an expression rather than through `anchors.left`: Qt
-        // only accepts a sibling reference there, and a computed offset has to be
-        // an explicit `x` (the rule then owns its own width).
+        Text {
+            id: sectionTitle
+            objectName: "audioSectionTitle"
+            x: sectionGlyph.visible ? sectionGlyph.x + sectionGlyph.width + 6 : 0
+            y: Math.round((sectionHeader.height - height) / 2)
+            // The title may claim at most half the row minus the scope's reserved
+            // share, so a long title elides instead of pushing the scope and the
+            // rule off the end.
+            width: Math.max(0, Math.min(implicitWidth, sectionHeader.width * 0.4))
+            text: root.sectionTitle
+            color: LazerTheme.settingsNavInactive
+            font.pixelSize: 11
+            font.weight: Font.DemiBold
+            elide: Text.ElideRight
+        }
+
+        // The hoisted hardware prefix, stated once instead of on every row.
+        Text {
+            id: sectionScope
+            objectName: "audioSectionScope"
+            x: sectionTitle.x + sectionTitle.width + 6
+            y: Math.round((sectionHeader.height - height) / 2)
+            // Bounded against a CONSTANT, not against the rule's own width. The
+            // rule's width depends on its x, which depends on this width - so
+            // measuring against it would close the loop all over again.
+            width: Math.max(0, Math.min(implicitWidth,
+                sectionHeader.width - x - root.ruleReserve))
+            visible: width > 0
+            text: root.sharedPrefix
+            color: LazerTheme.textMuted
+            font.pixelSize: 11
+            elide: Text.ElideRight
+        }
+
+        // Thin rule out to the right edge.
         Rectangle {
+            id: sectionRule
             objectName: "audioSectionRule"
-            x: sectionHeaderRow.x + sectionHeaderRow.width + 8
-            width: Math.max(0, parent.width - x)
-            anchors.verticalCenter: parent.verticalCenter
+            x: sectionScope.visible ? sectionScope.x + sectionScope.width + 8
+                                    : sectionTitle.x + sectionTitle.width + 8
+            y: Math.round((sectionHeader.height - height) / 2)
+            width: Math.max(0, sectionHeader.width - x)
             height: 1
             color: LazerTheme.divider
             opacity: 0.7
