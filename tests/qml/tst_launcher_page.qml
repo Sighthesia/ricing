@@ -67,8 +67,9 @@ Item {
             return adapter
         }
 
-        function resolveRefresh(adapter, index, outcome) {
-            adapter.pendingRefreshes[index](outcome)
+        function resolveRefresh(adapter, index, outcome, complete) {
+            adapter.pendingRefreshes[index](outcome,
+                    complete === undefined ? true : complete)
         }
 
         function resolveExecute(adapter, index, outcome) {
@@ -98,7 +99,7 @@ Item {
             svc()._adapters = ({ apps: apps })
             svc().open()
             wait(0)
-            resolveRefresh(apps, 0, items)
+            resolveRefresh(apps, 0, items, true)
             return apps
         }
 
@@ -571,6 +572,52 @@ function test_streamedFirstFillLeavesTheViewportScrollable() {
         tryVerify(function() { return view.contentY > before }, 1000)
     }
 
+    function test_theRowWindowIsMaterializedOnceAndBatchesFillItsSlots() {
+        // A Repeater rebuilds every delegate when its count changes, so sizing
+        // the row window to the results that happen to exist rebuilt all of
+        // them on every commit - measured at 15ms and 20ms for the two growths
+        // a 96-row window goes through while a clipboard open fills in, both
+        // of them right after the open and both visible as the list twitching.
+        // The window is materialized once, and batches fill its slots.
+        var first = []
+        for (var i = 0; i < 24; i++)
+            first.push(makeItem("item" + i, "Item " + i, 0, 200 - i))
+        // Open with an unfinished stream, the way a real open arrives.
+        var apps = makeManualAdapter()
+        svc()._adapters = ({ apps: apps })
+        svc().open()
+        wait(0)
+        resolveRefresh(apps, 0, first, false)
+        tryVerify(function() { return page.resultCount === 24 }, 2000)
+        var slots = page.resultsView.slotCount
+        compare(slots, page.rowSlotCount,
+                "the window is materialized at its limit, not at what has arrived")
+        verify(slots > page.resultCount, "an unfinished window has slots waiting")
+
+        var survivor = page.resultAt(0)
+        tryVerify(function() {
+            return survivor && survivor.enabled && survivor.revealHeld === false
+        }, 3000)
+
+        // A second batch brings more results. Same window, so the rows already
+        // there must be the same delegate objects - not rebuilt ones.
+        var more = []
+        for (var m = 24; m < 60; m++)
+            more.push(makeItem("item" + m, "Item " + m, 0, 200 - m))
+        // Through the same callback, the way a stream delivers: one refresh,
+        // many batches.
+        apps.pendingRefreshes[0](more, false)
+        tryVerify(function() { return page.resultCount === 60 }, 2000)
+        compare(page.resultsView.slotCount, slots, "a batch must not resize the window")
+        verify(page.resultAt(0) === survivor,
+               "a batch must not rebuild the rows that were already there")
+        // And the slots it filled become real, interactive rows.
+        tryVerify(function() {
+            var last = page.resultAt(59)
+            return last !== null && last.enabled === true && last.height > 0
+        }, 3000)
+    }
+
     function test_windowGrowthReleasesItsNewRowsAndKeepsScrolling() {
         // Growing the materialized window builds fresh delegates. Nothing
         // releases them but the commit that growth schedules, and a held row is
@@ -584,6 +631,10 @@ function test_streamedFirstFillLeavesTheViewportScrollable() {
         tryVerify(function() { return !page.rowsAnimatingIn }, 3000)
 
         var view = page.resultsView
+        // Wait for the window to be laid out before parking: a list whose rows
+        // are still unfolding has no end to park at, and "near the end" is
+        // trivially true of a list with no height yet.
+        tryVerify(function() { return view.contentHeight > view.height + 900 }, 3000)
         // Parking at the end is what triggers the growth in production.
         view.contentY = Math.max(0, view.contentHeight - view.height)
         tryVerify(function() { return page.resultCount > 96 }, 2000)

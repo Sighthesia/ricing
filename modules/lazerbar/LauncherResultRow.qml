@@ -17,12 +17,19 @@ Item {
     // Settings-style search folding: non-matching rows cascade their exit
     // while survivors glide, all through the same height/opacity/x contract.
     property string searchQuery: ""
-    readonly property bool matchesSearch: LauncherLogic.resultMatches(result, searchQuery)
+    // A slot with no result is not a row yet. The page sizes the row window
+    // once and fills the slots as batches land, so most delegates start out
+    // empty: they must take no space, no input and no part in a reveal wave.
+    // An empty needle matches everything, so this cannot be left to the search
+    // and lens bindings.
+    readonly property bool slotEmpty: !result
+    readonly property bool matchesSearch: !slotEmpty && LauncherLogic.resultMatches(result, searchQuery)
     readonly property bool searchHidden: !matchesSearch
     property string categoryFilter: ""
-    readonly property bool matchesCategory: LauncherLogic.matchesCategory(result, categoryFilter)
+    readonly property bool matchesCategory: !slotEmpty
+            && LauncherLogic.matchesCategory(result, categoryFilter)
     readonly property bool categoryHidden: !matchesCategory
-    readonly property bool hidden: searchHidden || categoryHidden
+    readonly property bool hidden: slotEmpty || searchHidden || categoryHidden
 
     readonly property string iconSource: result && result.icon ? String(result.icon) : ""
 
@@ -134,13 +141,31 @@ Item {
         }
     }
 
+    // A freshly built delegate suppresses its Behaviors so its first layout
+    // snaps instead of animating in from nothing. Nothing else has to clear
+    // that: the page no longer rebuilds the window as batches land, so a slot
+    // the commit leaves untouched would otherwise hold that flag for the rest
+    // of the session and keep the page's entrance gate open forever. A row the
+    // wave has claimed keeps the flag until its own reveal clears it.
+    Component.onCompleted: Qt.callLater(function () {
+        if (!root.revealHeld)
+            root.snapTransitions = false
+    })
+
     function holdInstantly() {
+        // An empty slot has nothing to hold or reveal; claiming it would put a
+        // phantom row in the wave and keep the page's entrance gate open for a
+        // row that will never draw.
+        if (slotEmpty)
+            return
         revealTimer.stop()
         root.snapTransitions = true
         root.revealHeld = true
     }
 
     function releaseInstantly() {
+        if (slotEmpty)
+            return
         revealTimer.stop()
         root.snapTransitions = true
         root.revealHeld = false
@@ -148,6 +173,8 @@ Item {
     }
 
     function playReveal(delayMs) {
+        if (slotEmpty)
+            return
         revealTimer.interval = Math.max(1, Math.round(Number(delayMs) || 0))
         revealTimer.restart()    }
 
