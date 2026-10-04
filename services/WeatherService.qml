@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import "./" as Services
 import "weather/WeatherLogic.js" as WeatherLogic
+import "weather/WeatherSeams.js" as WeatherSeams
 
 // Optional current-weather adapter for the control center's header.
 //
@@ -19,6 +20,9 @@ import "weather/WeatherLogic.js" as WeatherLogic
 // Provider: the free Open-Meteo current-weather endpoint, the same provider
 // family services/LocationService.qml already uses for sunrise and sunset. No
 // key, so there is nothing to configure before the header can work.
+//
+// weather/WeatherSeams.js holds the two test seams this reads (where the cache
+// lives, and what carries a request). Both are inert in production.
 Singleton {
     id: root
 
@@ -35,6 +39,14 @@ Singleton {
     // binding cannot observe in-place mutation of a JS object, so this is
     // never edited field by field.
     property var _cache: ({})
+
+    // Where the persisted reading lives. WeatherSeams.cachePathOverride is read
+    // here, once, because this is evaluated when the singleton is constructed —
+    // the only moment a seam can still be honoured (see weather/WeatherSeams.js).
+    // An empty override is the production case: the shell cache directory.
+    readonly property string cachePath: WeatherSeams.cachePathOverride !== ""
+        ? WeatherSeams.cachePathOverride
+        : Quickshell.cacheDir + "/weather-cache.json"
 
     // Manual coordinate override, empty when the settings coordinates are used.
     property real _manualLatitude: Number.NaN
@@ -61,8 +73,12 @@ Singleton {
     readonly property string condition: _state.condition
     // Place name derived from the response's timezone, "" when unknown.
     readonly property string location: _state.location
-    // Epoch ms of the reading.
-    readonly property int updatedAt: _state.updatedAt
+    // Epoch ms of the reading. A double, not an int: epoch milliseconds are
+    // ~1.76e12, which is past a 32-bit int's range, so an int declaration
+    // silently wrapped the stamp into garbage and the age check that retires
+    // the reading would have been reading nonsense. Well inside the 2^53 an
+    // exact double can hold, so nothing is lost.
+    readonly property double updatedAt: _state.updatedAt
     // True once the reading is older than WeatherLogic.cacheTtlMs.
     readonly property bool isStale: _state.isStale
 
@@ -133,6 +149,23 @@ Singleton {
             return false
 
         root.loading = true
+        // Test seam: a harness installs a transport here to drive the response
+        // path with no socket. Both it and the real request below finish in
+        // _applyResponse(), so what a harness exercises is the production
+        // handling rather than a copy of it.
+        if (typeof WeatherSeams.transport === "function") {
+            root._endRequest()
+            var answer = null
+            try {
+                answer = WeatherSeams.transport(url)
+            } catch (err) {
+                root._fail("天气请求失败，稍后自动重试")
+                return true
+            }
+            root._applyResponse(answer, Date.now())
+            return true
+        }
+
         var xhr = new XMLHttpRequest()
         // Bounded so a stalled network cannot leave the header loading forever.
         xhr.timeout = 10000
@@ -144,16 +177,7 @@ Singleton {
             if (xhr.readyState !== XMLHttpRequest.DONE)
                 return
             root._endRequest()
-            if (xhr.status !== 200) {
-                root._fail("天气请求失败（网络 " + xhr.status + "），稍后自动重试")
-                return
-            }
-            var parsed = WeatherLogic.parseResponse(xhr.responseText, Date.now())
-            if (!parsed.ok) {
-                root._fail(parsed.error)
-                return
-            }
-            root._adopt(parsed)
+            root._applyResponse({ status: xhr.status, body: xhr.responseText }, Date.now())
         }
         try {
             xhr.open("GET", url)
@@ -168,6 +192,31 @@ Singleton {
     // Clear the reported failure without discarding the reading it happened on.
     function clearError() {
         root.lastError = ""
+    }
+
+    // Turn one finished answer into a reading. Every answer reaches this — the
+    // real request and an injected transport alike — so a failed refresh
+    // reports the same error, an unusable body is refused the same way, and the
+    // two paths cannot drift apart.
+    //
+    // `now` is the epoch-ms stamp of the answer; an answer may carry its own so a
+    // test can pin updatedAt exactly. Leaving it out means "stamp it now".
+    function _applyResponse(answer, now) {
+        if (answer == null || typeof answer !== "object") {
+            root._fail("天气请求失败，稍后自动重试")
+            return
+        }
+        if (answer.status !== 200) {
+            root._fail("天气请求失败（网络 " + answer.status + "），稍后自动重试")
+            return
+        }
+        var stamp = answer.now === undefined ? now : answer.now
+        var parsed = WeatherLogic.parseResponse(answer.body, stamp)
+        if (!parsed.ok) {
+            root._fail(parsed.error)
+            return
+        }
+        root._adopt(parsed)
     }
 
     // A failure records the reason and nothing else. The previous cache is left
@@ -236,13 +285,15 @@ Singleton {
         }
     }
 
-    // The persisted reading, loaded at construction. blockLoading keeps the read
-    // on the construction path so a cached reading is already adopted by the
-    // time the first consumer reads it.
+    // The persisted reading, loaded at construction from root.cachePath.
+    // blockLoading keeps the read on the construction path so a cached reading
+    // is already adopted by the time the first consumer reads it — though the
+    // read itself still lands on a worker thread, so a consumer that needs the
+    // value immediately must still read `available` rather than assume it.
     property FileView weatherCacheFile: FileView {
         id: weatherCacheFile
 
-        path: Quickshell.cacheDir + "/weather-cache.json"
+        path: root.cachePath
         blockLoading: true
         watchChanges: false
         onLoaded: root._adoptPersisted(weatherCacheFile.text())
