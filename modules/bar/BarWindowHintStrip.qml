@@ -89,10 +89,16 @@ Item {
     // however many windows the workspace holds.
     property int viewportRows: HintLogic.MAX_WINDOW_ROWS
 
-    // Whether the body's focus marker is mid-journey. One flag, read here for one reason:
-    // the row's focus tint is the only thing left on the marker's path that still
-    // crossfades, and a crossfade there is a flash. See the `Behavior on color` below.
+    // Whether the body's focus marker is mid-journey. The row's focus tint follows the
+    // MARKER rather than the data, so this is what switches the tint off for the whole
+    // of a journey and back on when the marker lands - see the row's `color`.
     property bool markerCrossing: false
+    // ...and whether the tint has just landed WITH the marker, in which case it must not
+    // also animate. One shot: set by the journey's last frame, cleared by the next focus
+    // change. Two flags rather than one because they answer different questions - "is the
+    // marker on this row" and "must this change be instant" - and folding them together
+    // would switch the tint OFF for the frame the marker arrives.
+    property bool tintInstant: false
 
     // How far the ACTIVE column is scrolled, in pixels. Owned here rather than by the
     // body because the scrolling content is here: the column's own `y` is this offset,
@@ -295,7 +301,27 @@ Item {
                     // reason the shared highlight above is border-only. Painting the tint
                     // from a separate element above the row put a translucent panel of
                     // `settingsSelected` over the icon and the text, veiling both.
+                    // Only while the marker is ON this row, which at rest means always.
+                    //
+                    // `focusedRowIndex` is read off the ARRIVING frame, so it is correct
+                    // from the crossing's first frame - and the tint was following it from
+                    // there, which meant the card lit up while the marker was still above
+                    // the panel, two hundred milliseconds before the marker got there. The
+                    // whole of the marker's journey is that the focus ARRIVES; a tint that
+                    // is already on gives the answer away before the gesture delivers it,
+                    // and the frame - which does travel, from off the panel, the whole
+                    // height of the list - reads as decoration on a highlight that was
+                    // never waiting for it.
+                    //
+                    // So the tint follows the MARKER rather than the data. During the
+                    // departure leg the marker is on the card being left, which is in a
+                    // neighbouring column and drawn as a plain label, so nothing in here is
+                    // tinted then; the travelling frame is the mark. During the arrival leg
+                    // the marker is off the panel entirely, so again nothing is tinted. The
+                    // card lights up on the frame the marker lands on it - which is what
+                    // "the region the frame encloses changes" has to mean.
                     color: windowRow.index === root.focusedRowIndex
+                        && !root.markerCrossing
                         ? LazerTheme.settingsSelected
                         : (rowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard)
                     // A Rectangle borders itself by default; this row's own tint is its
@@ -328,7 +354,7 @@ Item {
                     // journey under way - the crossfade stays, because there the tint
                     // arriving IS the event and a short fade reads as intent.
                     Behavior on color {
-                        enabled: !root.markerCrossing
+                        enabled: !root.markerCrossing && !root.tintInstant
                         ColorAnimation { duration: MotionTokens.fast }
                     }
                     Behavior on scale {

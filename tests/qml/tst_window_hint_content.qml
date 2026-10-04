@@ -1912,13 +1912,24 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             var rows = findAllByName(strip(), "windowHintWindowRow")
             verify(rows.length >= 5,
                 "the arriving column's cards are all there, " + rows.length)
-            compare(String(rows[4].color), String(Lazer.LazerTheme.settingsSelected),
-                "and the row that is focused is tinted at once rather than fading in, "
-                    + "was " + rows[4].color)
+            compare(String(rows[4].color), String(Lazer.LazerTheme.settingsCard),
+                "and the row that is focused is NOT tinted while the marker is still "
+                    + "travelling - the tint follows the marker, not the data - was "
+                    + rows[4].color)
             verify(body._markerCrossing,
-                "which was still mid-crossing, so this is the journey's doing")
+                "which is the point: the marker is still off the panel")
+            // The card lights up on the frame the marker lands on it, which is the whole
+            // of the claim: the two become correct together, and neither leads.
             settleSlide()
             settleMarker()
+            var landed = findAllByName(strip(), "windowHintWindowRow")
+            compare(String(landed[4].color), String(Lazer.LazerTheme.settingsSelected),
+                "so once the marker has landed the card is tinted, was "
+                    + landed[4].color)
+            compare(findByName(strip(), "windowHintFocusFrame").y,
+                landed[4].mapToItem(strip(), 0, 0).y,
+                "and the frame is around it - neither of the two arrived before the "
+                    + "other")
 
             // At rest the crossfade stays, because there the tint arriving IS the event
             // and a short fade reads as intent rather than as a glitch.
@@ -1986,6 +1997,58 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                             + "column being " + body.activeColumnWidth + " wide is what "
                             + "marks the active one")
             }
+        }
+
+        function test_theCardIsNotTintedUntilTheMarkerLandsOnIt() {
+            // The sequence, sampled. `focusedRowIndex` is correct from the crossing's
+            // first frame, so a tint that follows the DATA is on the arriving card while
+            // the marker is still off the panel - and the marker's whole journey is that
+            // the focus arrives, so a highlight that is already there gives the answer
+            // away before the gesture delivers it.
+            body.hint = root.tallFramedHint(2, 2, 6, 1)
+            wait(300)
+            // A switch DOWN, so the marker leaves through the bottom and returns through
+            // the top: it is off the panel for the whole arrival leg, which is the stretch
+            // this is about.
+            body.hint = root.tallFramedHint(3, 2, 6, 4)
+            wait(20)
+            verify(body._markerCrossing, "the journey is under way")
+            var tint = String(Lazer.LazerTheme.settingsSelected)
+            var plain = String(Lazer.LazerTheme.settingsCard)
+            var litEarly = 0
+            var litOnPanel = 0
+            var samples = 0
+            // The whole 320ms of the journey plus its landing, sampled off the real
+            // animation rather than a driven clock.
+            while (body._markerCrossing && samples < 80) {
+                var rows = findAllByName(strip(), "windowHintWindowRow")
+                var onPanel = rows.length > 4
+                    && rows[4].mapToItem(strip(), 0, 0).y > 0
+                    && rows[4].mapToItem(strip(), 0, 0).y < body.height
+                var lit = rows.length > 4 && String(rows[4].color) === tint
+                if (lit)
+                    litEarly += 1
+                if (lit && !onPanel)
+                    litOnPanel += 1
+                samples += 1
+                wait(8)
+            }
+            verify(samples > 0 && samples < 80, "the journey was sampled throughout")
+            compare(litEarly, 0,
+                "the arriving card was never tinted while the marker was travelling - it "
+                    + "was tinted on " + litEarly + " of " + samples + " samples")
+            compare(litOnPanel, 0,
+                "and never while it was off the panel")
+            // And once, at the end, both together.
+            wait(40)
+            var after = findAllByName(strip(), "windowHintWindowRow")
+            compare(String(after[4].color), tint,
+                "the card is tinted once the marker has landed, was " + after[4].color)
+            compare(findByName(strip(), "windowHintFocusFrame").y,
+                after[4].mapToItem(strip(), 0, 0).y,
+                "with the frame around it")
+            settleSlide()
+            settleMarker()
         }
 
         function test_theWholePanelArrivesInOnePiece() {

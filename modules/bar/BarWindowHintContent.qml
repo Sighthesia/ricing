@@ -481,6 +481,10 @@ Item {
     // animation's `onFinished` otherwise - which is why a cancelled crossing has to
     // reach one of those rather than simply being abandoned.
     property bool _markerCrossing: false
+    // The tint has just landed WITH the marker, and must not also animate. A one shot,
+    // cleared by the next focus change, so a focus change with no journey under it still
+    // crossfades - there the tint arriving is the event and a short fade reads as intent.
+    property bool _tintInstant: false
     // The leg currently in progress, and how far through it. `InOutQuad` is at its
     // fastest exactly here, so the marker leaves through one edge at speed and re-enters
     // through the other at the same speed: one continuous sweep rather than two stops.
@@ -607,10 +611,12 @@ Item {
         // drop it onto a card it had already been told about.
         crossingRun.stop()
         root._markerCrossing = false
+        root._tintInstant = false
         root._departingRowIndex = -1
         root._departingScroll = 0
         root._exitFrom = 0
         root._journeyDirection = 1
+        root._tintInstant = false
         // A rest plan rather than no plan: the strip still needs to be drawn, and
         // this is the one that says "three columns, active slot 1, centred here" -
         // the same shape the crossing's plan has, so every binding downstream can be
@@ -756,6 +762,11 @@ Item {
             // again, which is a second motion starting at the exact moment the first one
             // finished.
             root._snapIndicator(root._restingY())
+            // Before the flag goes down, so the row's `Behavior on color` is already
+            // disabled by the time the tint's own binding re-evaluates. The marker lands
+            // and the card lights up on the same frame; a crossfade here would put a
+            // second, slower motion inside the frame that has just arrived.
+            root._tintInstant = true
             root._markerCrossing = false
             root._departingRowIndex = -1
             root._departingScroll = 0
@@ -1025,6 +1036,7 @@ Item {
         // clips the column to it, so the two cannot be different numbers.
         viewportRows: root.viewportRows
         markerCrossing: root._markerCrossing
+        tintInstant: root._tintInstant
         cellPaddingX: root.cellPaddingX
         // Read from the same `activeColumn` the strip's own columns come from, so the
         // row that tints and the row the outline glides onto are the same row by
@@ -1242,6 +1254,10 @@ Item {
     }
 
     function _syncIndicator() {
+        // Any focus change is a new event, so the one shot is spent. A crossing's own
+        // landing clears it from the other end - in `crossingRun.onFinished`, which runs
+        // after this - so this is about the changes that follow.
+        root._tintInstant = false
         var target = root._restingY()
         // While the marker is travelling, it is placed by the crossing's clock and by
         // nothing else. The tracker exists to stretch the bar ALONG its long axis when
