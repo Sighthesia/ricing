@@ -1007,6 +1007,54 @@ Item {
             verify(sortedOk, "batches must arrive in ranked order")
         }
 
+        function test_batchesDoubleSoALongSetArrivesInAFewCommits() {
+            // What a commit costs is a pool pass and a stretch of the row list,
+            // not the batch's own mapping, so a dozen fixed-size batches read
+            // as the list twitching as it fills. Each batch after the first
+            // doubles up to four times the base: a 750-entry set commits seven
+            // times instead of sixteen, and the opening frame still gets its
+            // small first batch. The ceiling is what keeps the largest frame
+            // inside a budget - past the window size a batch only feeds the
+            // pool, so mapping it is pure per-frame cost.
+            var entries = []
+            for (var index = 0; index < 750; index++)
+                entries.push(makeAppEntry("app" + index, "App " + index, ""))
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource(entries),
+                launchCounts: { map: ({}), getLaunchCount: function() { return 0 },
+                                recordLaunch: function() {} },
+                schedule: function(step) { pending.push(step) }
+            })
+
+            var sizes = []
+            var pending = []
+            var complete = false
+            adapters.apps.refresh("", "apps", function(items, isComplete) {
+                // The last batch is the remainder and can be any size; only the
+                // ones before it are the growth curve.
+                sizes.push(isComplete ? -items.length : items.length)
+                complete = isComplete
+            })
+            while (pending.length > 0)
+                pending.shift()()
+
+            verify(complete, "the stream must finish once the scheduler drains")
+            var grew = sizes.slice(0, sizes.length - 1)
+            compare(grew[0], 24, "the opening batch stays small")
+            verify(sizes.length <= 7,
+                   "750 entries should arrive in a handful of commits, got "
+                   + sizes.length + ": " + sizes.join(","))
+            for (var s = 1; s < grew.length; s++)
+                verify(grew[s] >= grew[s - 1],
+                       "batches must not shrink: " + sizes.join(","))
+            verify(grew[grew.length - 1] >= 192,
+                   "the growth must reach its ceiling: " + sizes.join(","))
+            var total = 0
+            for (var t = 0; t < sizes.length; t++)
+                total += Math.abs(sizes[t])
+            compare(total, 750, "every entry must arrive exactly once")
+        }
+
         function test_appsAdapterStreamedResultMatchesTheOneShotResult() {
             var entries = []
             for (var index = 0; index < 30; index++)

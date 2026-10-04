@@ -67,9 +67,14 @@ var clipboardChunkSize = 64
 var shortcutChunkSize = 96
 // The first batch is what the user sees on the frame the launcher opens, and
 // it also builds that many row delegates. Keeping it small makes the opening
-// frame cheap; the remaining batches, sized for throughput, follow a frame
-// apart behind it.
+// frame cheap.
 var firstChunkSize = 24
+// What a commit costs is a pool pass and a stretch of the row list, not the
+// batch's own mapping, so the number of batches is what the eye feels: a
+// dozen tiny ones read as the list twitching as it fills. Each batch after the
+// first therefore doubles, up to this ceiling, and the tail converges in a
+// handful of commits instead of a dozen.
+var maxChunkFactor = 4
 
 // Streams a mapped result set to `done` in chunks. `make` maps one source
 // entry to a result (or null to skip it). `matches` filters by the refresh
@@ -81,16 +86,15 @@ function createChunkStream(options) {
     var schedule = typeof options.schedule === "function" ? options.schedule : null
     var chunkSize = Math.max(1, toCount(options.chunkSize) || 32)
     var firstChunkSize = Math.max(1, toCount(options.firstChunkSize) || chunkSize)
+    var maxChunkSize = Math.max(chunkSize, chunkSize * maxChunkFactor)
     var done = options.done
     var index = 0
-    var first = true
+    var limit = firstChunkSize
 
     // Returns true once the source is exhausted.
     function step() {
         if (typeof done !== "function")
             return true
-        var limit = first ? firstChunkSize : chunkSize
-        first = false
         var batch = []
         var scanned = 0
         while (index < source.length && scanned < limit) {
@@ -106,6 +110,9 @@ function createChunkStream(options) {
                 batch.push(item)
         }
         var complete = index >= source.length
+        // Every batch after the first is up to twice the last, so the tail of a
+        // long set arrives in a few commits rather than a dozen.
+        limit = Math.min(maxChunkSize, Math.max(chunkSize, limit * 2))
         // The final batch always reports, even when empty: an exhausted
         // source with no matches is the legitimate "nothing to show" answer
         // and the session must not wait for a batch that never comes.
