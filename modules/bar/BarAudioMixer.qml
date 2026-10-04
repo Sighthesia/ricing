@@ -41,11 +41,12 @@ Item {
     // Room the header's trailing rule keeps for itself, so the title can size
     // itself without measuring the rule (which is positioned after it).
     readonly property int headerRuleReserve: 44
-    // Matches BarAudioLevelRow and BarAudioDeviceList: 8px inset, 14px glyph, 4px
-    // to the text column. Every label in the panel shares this line.
-    readonly property int cardPadding: 8
+    // 10px inset, no glyph column - the same text line as the device rows. Rows
+    // carry no application icon: the mute button on the right is the one glyph
+    // here, and a second speaker beside it said the same thing twice.
+    readonly property int cardPadding: 10
     readonly property int glyphSize: 14
-    readonly property int textLeft: cardPadding + glyphSize + 4
+    readonly property int textLeft: cardPadding
     readonly property int muteSize: 20
     readonly property int routeChipWidth: 104
     readonly property int valueTextWidth: 30
@@ -123,7 +124,9 @@ Item {
         // `anchors.verticalCenter` on those same children fights it for the same
         // property, and Qt reports a `polish() loop` on every panel open.
 
-        // Back affordance, present only while the route picker is showing.
+        // Back affordance, present only while the route picker is showing -
+        // and a pointer rather than a speaker, so it never reads as a second
+        // copy of the mute button sitting right below it.
         BarIcon {
             id: mixerBackChevron
             objectName: "mixerBackChevron"
@@ -253,25 +256,6 @@ Item {
 
             HoverHandler { id: streamRowHover }
 
-            // Application glyph, dimmed when the stream is muted. The dim rides
-            // `opacity` rather than `tint`: `BarIcon.tint` is an alias onto a
-            // Qt5Compat ColorOverlay's `color`, and Qt refuses a second
-            // interceptor on that property, so a `Behavior on tint` here would
-            // warn on every row instead of animating.
-            BarIcon {
-                id: streamGlyph
-                objectName: "mixerGlyph"
-                x: root.cardPadding
-                y: 6
-                width: root.glyphSize
-                height: root.glyphSize
-                source: Qt.resolvedUrl("icons/" + (streamRow.muted ? "volume-muted.svg" : "volume.svg"))
-                tint: streamRow.muted ? LazerTheme.textMuted : LazerTheme.textPrimary
-                opacity: streamRow.muted ? 0.55 : 0.9
-
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
-            }
-
             // Identity: the application name, then what it is playing after a
             // muted separator. The media half is elidable and the name is capped,
             // so a long title degrades the secondary text rather than the primary
@@ -362,17 +346,23 @@ Item {
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                 Behavior on opacity { ColorAnimation { duration: MotionTokens.fast } }
 
-                // Explicit x rather than a Row: a positioner writes its children's `y`,
-                // so `anchors.verticalCenter` inside one fights it for the same
-                // property and Qt reports a `polish() loop` on every open.
+                // A chevron rather than a speaker: the chip names where this audio
+                // goes, and repeating the speaker glyph the mute button already
+                // uses two inches away said the same thing twice. A pointer is
+                // also the shape osu reserves for direction, so it reads as
+                // "routes to" without needing the word.
+                //
+                // Explicit x rather than a Row: a positioner writes its children's
+                // `y`, so `anchors.verticalCenter` inside one fights it for the
+                // same property and Qt reports a `polish() loop` on every open.
                 BarIcon {
                     id: routeChipGlyph
                     objectName: "mixerRouteGlyph"
                     x: 5
                     y: Math.round((routeChip.height - height) / 2)
-                    width: 11
-                    height: 11
-                    source: Qt.resolvedUrl("icons/volume.svg")
+                    width: 9
+                    height: 9
+                    source: "../lazerbar/icons/chevron-right.svg"
                     tint: LazerTheme.textMuted
                 }
 

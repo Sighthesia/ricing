@@ -24,8 +24,6 @@ Item {
     id: root
 
     property string sectionTitle: ""
-    property string sectionIcon: ""
-    property string rowIcon: ""
     property var devices: []
     property var currentDevice: null
     property int maxVisibleRows: 3
@@ -35,11 +33,11 @@ Item {
 
     readonly property int rowHeight: 38
     readonly property int rowGap: 4
-    // Matches BarAudioLevelRow and BarAudioMixer: 8px inset, 14px glyph, 4px to
-    // the text column.
-    readonly property int cardPadding: 8
-    readonly property int glyphSize: 14
-    readonly property int textLeft: cardPadding + glyphSize + 4
+    // 10px inset, no glyph column. Rows here carry no icon on purpose: the
+    // section title already says which direction the list is, and a speaker or
+    // microphone repeated on the title and on every row underneath it read as
+    // three copies of the same fact.
+    readonly property int cardPadding: 10
     // Room the header's trailing rule keeps for itself, so the hoisted scope text
     // can size itself without measuring the rule (which is positioned after it).
     readonly property int ruleReserve: 36
@@ -90,7 +88,7 @@ Item {
         //
         //   - A positioner writes its children's `y`, so an `anchors.verticalCenter`
         //     on the same children fights it for the same property whenever the
-        //     children are not all the same height (a 12px glyph beside 14px text).
+        //     children are not all the same height.
         //   - The scope text measured its own width against the Row's width, and
         //     the Row's width is the sum of its children's widths - so
         //     row.width -> scope.width -> row.width, forever.
@@ -98,28 +96,16 @@ Item {
         // Each item below depends only on the item before it and on the header's
         // own width, which is what makes the chain terminate.
 
-        // Direction glyph, so "Output" and "Input" are distinguishable at a
-        // glance even when the two blocks sit next to each other.
-        BarIcon {
-            id: sectionGlyph
-            objectName: "audioSectionGlyph"
-            x: 0
-            y: Math.round((sectionHeader.height - height) / 2)
-            width: 12
-            height: 12
-            visible: root.sectionIcon !== ""
-            source: root.sectionIcon
-            tint: LazerTheme.textMuted
-        }
-
+        // The title is the only thing naming the direction. It used to carry a
+        // speaker or microphone glyph as well, which was the same word twice in
+        // one place.
         Text {
             id: sectionTitle
             objectName: "audioSectionTitle"
-            x: sectionGlyph.visible ? sectionGlyph.x + sectionGlyph.width + 6 : 0
+            x: 0
             y: Math.round((sectionHeader.height - height) / 2)
-            // The title may claim at most half the row minus the scope's reserved
-            // share, so a long title elides instead of pushing the scope and the
-            // rule off the end.
+            // The title may claim at most 40% of the row, so a long title elides
+            // instead of pushing the scope and the rule off the end.
             width: Math.max(0, Math.min(implicitWidth, sectionHeader.width * 0.4))
             text: root.sectionTitle
             color: LazerTheme.settingsNavInactive
@@ -239,20 +225,6 @@ Item {
                 Behavior on opacity { ColorAnimation { duration: MotionTokens.fast } }
             }
 
-            // Direction glyph, dimmed on the selected row so the accent band
-            // stays the loudest thing about it.
-            BarIcon {
-                id: deviceGlyph
-                objectName: "audioDeviceGlyph"
-                x: root.cardPadding
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.glyphSize
-                height: root.glyphSize
-                visible: root.rowIcon !== ""
-                source: root.rowIcon
-                tint: deviceRow.isCurrent ? LazerTheme.settingsAccent : LazerTheme.textMuted
-            }
-
             HoverHandler { id: deviceRowHover }
 
             function activate() {
@@ -268,9 +240,9 @@ Item {
 
             Text {
                 objectName: "audioDeviceName"
-                x: root.textLeft
+                x: root.cardPadding
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(0, levelLabel.x - root.textLeft - 8)
+                width: Math.max(0, levelLabel.x - root.cardPadding - 8)
                 text: deviceRow.valid
                     ? VolumeLogic.trimLabelPrefix(root.deviceName(deviceRow.modelData), root.sharedPrefix)
                     : ""

@@ -122,11 +122,12 @@ Item {
         case 5:
             root.check("volume panel is wide enough for a mixer row",
                 root.panel.implicitWidth === 360)
-            // One row system: the master row and the device rows must be the same
-            // height. They were 112px and 38px once, which is what made the top of
-            // the panel read at a different scale from everything under it.
-            root.check("master row and device rows share one height",
-                root.panel.volumeLevelRowItem.height === root.panel.volumeDeviceListItem.rowHeight)
+            // The master level stays the settings card, so it is expected to be
+            // taller than a list row - that is the panel's two families, not a
+            // mismatch. What must hold is that the card is the settings card.
+            root.check("master level is the settings card",
+                root.panel.volumeMasterCardItem.sliderRow !== undefined
+                    && root.panel.volumeMasterCardItem.muteRow !== undefined)
             root.check("volume content has a finite height",
                 root.panel.volumeContentItem.height > 0
                     && root.panel.volumeContentItem.height <= root.panel.volumeViewportCap)

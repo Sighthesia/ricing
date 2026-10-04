@@ -142,8 +142,7 @@ Item {
     // outside the component that declares it.
     readonly property Item volumeContentItem: volumeContent
     readonly property Item volumeScrollItem: volumeScroll
-    readonly property Item volumeLevelRowItem: volumeSlider
-    readonly property Item volumeDeviceListItem: outputDeviceList
+    readonly property Item volumeMasterCardItem: volumeSlider
     readonly property real volumeViewportCap: volumeContent.viewportCap
 
     // Thin pass-throughs so the mixer component stays free of service imports.
@@ -1100,7 +1099,7 @@ Item {
             // app starts playing). The height follows one bounded number, so
             // the host sees a single geometry change per step rather than a
             // cascade of per-section ones.
-            readonly property real viewportCap: 470
+            readonly property real viewportCap: 540
 
             // Bounded scroll body. `interactive` only when it actually
             // overflows, so a short panel leaves the wheel to the bar widget's
@@ -1127,19 +1126,21 @@ Item {
                     // not as one more row of the list above it.
                     spacing: 12
 
-                    // Master level and mute, on the same row metrics as every
-                    // other card in the panel. This replaces a two-row settings
-                    // card that stood 112px tall directly above 38px rows, which
-                    // made the top of the panel read at a different scale from
-                    // everything under it.
-                    BarAudioLevelRow {
+                    // Master level and mute: the settings card this panel has
+                    // always opened with. It was briefly restyled into a 38px
+                    // strip to match the list rows below it, and that was a
+                    // mistake - the strip needed a level glyph on the left and a
+                    // mute glyph on the right, so the same speaker appeared twice
+                    // on one row, directly under a panel header that already
+                    // showed a third one. A labelled settings card carries the
+                    // same information with no glyphs at all.
+                    BarPopupSlider {
                         id: volumeSlider
                         objectName: "volumeSlider"
                         width: parent.width
                         value: root.volumeValue
                         muted: root.volumeMuted
                         label: "Volume"
-                        glyph: Qt.resolvedUrl("icons/volume.svg")
                         showMute: true
                         onValueCommitted: function(v) { root.handleVolumeValue(v) }
                         onToggleRequested: root.handleToggleMute()
@@ -1151,8 +1152,6 @@ Item {
                         objectName: "outputDeviceList"
                         width: parent.width
                         sectionTitle: "Output"
-                        sectionIcon: Qt.resolvedUrl("icons/volume.svg")
-                        rowIcon: Qt.resolvedUrl("icons/volume.svg")
                         devices: root.audioSinks
                         currentDevice: root.defaultAudioSinkNode
                         emptyText: "No output devices"
@@ -1166,8 +1165,6 @@ Item {
                         objectName: "inputDeviceList"
                         width: parent.width
                         sectionTitle: "Input"
-                        sectionIcon: Qt.resolvedUrl("icons/mic.svg")
-                        rowIcon: Qt.resolvedUrl("icons/mic.svg")
                         devices: root.audioSources
                         currentDevice: root.defaultAudioSourceNode
                         emptyText: "No input devices"

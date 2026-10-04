@@ -403,13 +403,16 @@ Item {
             compare(slider.value, 0.42)
             verify(slider.muted)
             verify(slider.showMute, "volume exposes mute control")
-            // The master row is BarAudioLevelRow: one 38px card with the mute as
-            // a glyph button, not a second settings row underneath the slider.
-            compare(slider.height, 38)
-            var volMuteBtn = findByName(slider, "levelRowMute")
+            // The master level is the settings card this panel has always opened
+            // with, and it stays that way. It was briefly restyled into a 38px
+            // strip to match the list rows below, and that needed a level glyph on
+            // the left and a mute glyph on the right - the same speaker twice on
+            // one row, directly under a panel header that already showed a third.
+            var volMuteBtn = findByName(slider, "sliderMuteButton")
             verify(volMuteBtn !== null, "volume mute button should exist")
-            verify(volMuteBtn.visible, "volume mute button visible")
-            compare(findByName(slider, "levelRowValue").text, "42%")
+            verify(slider.muteRow.visible, "volume mute row visible")
+            verify(findByName(slider, "levelRowMute") === null, "no strip-style mute button")
+            verify(findByName(slider, "levelRowLabel") === null, "no strip-style level label")
             // Trigger slider interaction via signal emission.
             fake.setCalls = 0
             fake.last = -1
@@ -417,63 +420,48 @@ Item {
             compare(fake.setCalls, 1)
             compare(fake.last, 0.8)
             fake.toggleCalls = 0
-            volMuteBtn.toggle()
+            slider.toggleRequested()
             compare(fake.toggleCalls, 1)
             // Brightness content hidden, media hidden etc.
             verify(!findByName(item, "mediaContent").visible)
         }
 
-        function test_masterRowKeepsOneRowSystemWithTheLists() {
-            // The reason the master row was rebuilt: it used to be two stacked
-            // settings rows at 112px standing directly above 38px device rows, so
-            // the top of the panel read at a different scale from everything under
-            // it. One row system is the fix, so the heights are part of the
-            // contract rather than an incidental measurement.
-            var speaker = fakeDevice(56, "alsa_output.speaker_sink", "Laptop Speakers", 0.4, false, "sysA")
+        function test_thePanelDrawsNoRedundantGlyphs() {
+            // Every icon in this panel used to say "this is audio": the section
+            // title carried one, every row beneath it carried another, and the
+            // master strip carried two on a single row. The titles alone are
+            // unambiguous, so rows carry none - which leaves the mute buttons as
+            // the only glyphs and the only things that read as controls.
+            var stream = fakeStream(112, "Firefox", "Tune", 0.5, false, "glyph")
+            var speaker = fakeDevice(56, "alsa_output.speaker_sink", "Laptop Speakers", 0.4, false, "glyphSpk")
             var fake = Qt.createQmlObject('import QtQuick; QtObject {'
                 + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
                 + ' property var sinks: []; property var sources: []; property var streams: [];'
-                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted } }',
-                root, "fakeVolRowSystem")
+                + ' property var defaultSinkNode: null;'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted }'
+                + ' function streamAppName(s){ return s && s.properties ? s.properties["application.name"] : "" }'
+                + ' function streamMediaName(s){ return s && s.properties ? s.properties["media.name"] : "" }'
+                + ' function streamLevel(s){ return s && s.audio ? s.audio.volume : 0 }'
+                + ' function streamMuted(s){ return !s || !s.audio ? true : s.audio.muted }'
+                + ' function streamRouteLabel(s){ return "TimeEar BTE-9" } }',
+                root, "fakeVolGlyphs")
+            fake.streams = [stream]
             fake.sinks = [speaker]
             var item = createTemporaryObject(actionsComp, root, {
                 actionKind: "volume", payload: { volumeService: fake }
             })
-            var master = findByName(item, "volumeSlider")
-            var deviceList = findByName(item, "outputDeviceList")
-            compare(master.height, deviceList.rowHeight,
-                "master row and device rows must share one row height")
-
-            // Every label in the panel starts on the same vertical line. This was
-            // the other half of the mess: device rows began at 10px while the
-            // master and mixer labels began at 26px.
-            compare(findByName(item, "levelRowLabel").x, 26)
-            compare(findByName(item, "audioDeviceName").x, 26)
-        }
-
-        function test_masterRowControlsDoNotOverlap() {
-            // Laid out from both edges: the label column is fixed, the value and
-            // mute are pinned right, and the slider fills between. Measuring the
-            // boxes is the only way this stays true - a binding change that
-            // widened the value text would silently stack them.
-            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
-                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
-                + ' property var sinks: []; property var sources: []; property var streams: [];'
-                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted } }',
-                root, "fakeVolMasterOverlap")
-            var item = createTemporaryObject(actionsComp, root, {
-                actionKind: "volume", payload: { volumeService: fake }
-            })
-            var master = findByName(item, "volumeSlider")
-            var label = findByName(master, "levelRowLabel")
-            var slider = findByName(master, "levelRowSlider")
-            var value = findByName(master, "levelRowValue")
-            var mute = findByName(master, "levelRowMute")
-            verify(label.x + label.width <= slider.x + 0.5, "label must not reach the slider")
-            verify(slider.x + slider.width <= value.x + 0.5, "slider must not reach the value")
-            verify(value.x + value.width <= mute.x + 0.5, "value must not reach the mute button")
-            verify(mute.x + mute.width <= master.width + 0.5, "mute button stays inside the card")
-            verify(slider.width >= 60, "slider keeps a usable drag target")
+            var row = findByName(item, "mixerRow0")
+            verify(row !== null)
+            verify(findByName(row, "mixerGlyph") === null, "no application glyph on the mixer row")
+            verify(findByName(row, "mixerMuteButton") !== null, "the mute button stays")
+            // The route chip points rather than repeating the speaker beside it.
+            verify(findByName(row, "mixerRouteGlyph") !== null, "route chip keeps its pointer")
+            compare(findByName(row, "mixerRouteGlyph").source.toString().indexOf("chevron") !== -1, true)
+            verify(findByName(item, "audioSectionGlyph") === null, "no glyph on a section title")
+            verify(findByName(item, "audioDeviceGlyph") === null, "no glyph on a device row")
+            // One text line across every list row in the panel.
+            compare(findByName(row, "mixerAppName").x, 10)
+            compare(findByName(item, "audioDeviceName").x, 10)
         }
 
         function test_brightnessExposesSlider() {
@@ -688,17 +676,15 @@ Item {
                 payload: { volumeService: fakeVol, volume: 0.1, muted: false }
             })
             var volumeSlider = findByName(volumeItem, "volumeSlider")
-            var levelSlider = findByName(volumeSlider, "levelRowSlider")
             compare(volumeItem.volumeValue, 0.42)
             compare(volumeSlider.value, 0.42)
-            compare(levelSlider.value, 42)
-            compare(findByName(volumeSlider, "levelRowValue").text, "42%")
+            compare(volumeSlider.sliderControl.value, 42)
             verify(volumeSlider.muted)
             fakeVol.sinkVolume = 0.77
             fakeVol.sinkMuted = false
             compare(volumeItem.volumeValue, 0.77)
             compare(volumeSlider.value, 0.77)
-            compare(levelSlider.value, 77)
+            compare(volumeSlider.sliderControl.value, 77)
             verify(!volumeSlider.muted)
 
             var fakeBright = Qt.createQmlObject('import QtQuick; QtObject { property real brightness: 0.33; function setBrightness(v){ brightness=v } }', root, "fakeBrightLive")
