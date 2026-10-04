@@ -102,6 +102,12 @@ Item {
     // construction, which is the whole of what that ordering is safe on.
     property real focusFrameTop: 0
     property real focusFrameHeight: 0
+    // ...and its horizontal extent, which is what makes the mask a MASK rather than a
+    // full-width band. The frame is exactly one card wide, and WHICH card changes across
+    // a crossing - so its left edge is a question with three answers over a journey, not
+    // one, and left unasked the mask cannot tell which column it is in.
+    property real focusFrameLeft: 0
+    property real focusFrameWidth: 0
     // Observation slow-motion, fed from the body. The row flash and the focus tint live
     // here rather than on the body, so they are on the marker's path and have to be
     // slowed with it - a 100ms tint left unscaled next to a 2s journey is the one thing
@@ -203,18 +209,29 @@ Item {
     // `focusFrameTop + focusFrameHeight`. What this returns is their intersection, expressed
     // relative to the row so the overlay can be a plain child of it.
     //
-    // The horizontal axis needs no intersection at all, and that is not an oversight: the
-    // frame is placed from the active column's own geometry and the cards are placed from
-    // the same two numbers, so the two rects have identical left edges and identical widths
-    // at every instant of a crossing - the frame widens with the column because it is
-    // computed from it. So the mask is the full width of the card and only its height and
-    // offset vary, which is what a vertical traverse needs.
+    // The card itself, and the card's OWN `y` as where it sits - not an index and not a
+    // re-derived pitch. Two reasons, both found by measurement.
     //
-    // `top` may exceed the row's height and `height` may come back zero or negative; the
-    // caller clamps nothing, because a zero-height overlay IS the answer for "the frame is
-    // not on this card" and `visible` reads it.
-    function frameMaskOverRow(index) {
-        const top = index * root.rowPitch - root.scrollOffset
+    // The neighbour label's `required property int index` is never filled: read off the
+    // objects, all three columns' labels reported `index` 0, while a bare `index` at the
+    // instantiation site and `neighbourLabel.index` there both read 0 too. Every
+    // neighbour's mask therefore landed on row 0's geometry and none of them lit. The
+    // Column has already placed every delegate, so `card.y` is the answer that does not
+    // depend on a broken property - and it is a better answer regardless, since the
+    // Column's own spacing is then not restated here.
+    //
+    // The column comes from `parent`, which is the same answer for an active row and a
+    // neighbour label, so neither has to be told which it is. Its `y` is added because
+    // the card's own is relative to it, and it is `- scrollOffset` for the active column
+    // and 0 for a neighbour: only the active one scrolls. A `- scrollOffset` term in the
+    // function, which is what an earlier version did, put a neighbour's mask a viewport
+    // out of place on any scrolled panel.
+    //
+    // `top` may exceed the card's height and `height` may come back zero or
+    // negative; the caller clamps nothing, because a zero-height overlay IS the
+    // answer for "the frame is not on this card" and `visible` reads it.
+    function frameMaskOverCard(card) {
+        const top = card.parent.y + card.y
         const maskedFrom = Math.max(top, root.focusFrameTop)
         const maskedTo = Math.min(top + root.rowHeight,
             root.focusFrameTop + root.focusFrameHeight)
@@ -222,6 +239,31 @@ Item {
             top: maskedFrom - top,
             height: Math.max(0, maskedTo - maskedFrom)
         }
+    }
+
+    // Is the frame over this card's COLUMN at all? The vertical half cannot answer
+    // that, and answering only the vertical one is the whole of the fault these two
+    // functions exist to fix.
+    //
+    // The mask used to intersect on the vertical axis alone, which is correct exactly
+    // as long as the frame is over the active column - and it is only ever over the
+    // ACTIVE column for the second half of a journey. For the first half it is on the
+    // card being left, in a departing column that is itself sliding out, and the
+    // active column frequently has a row at the very same height: measured across the
+    // departure leg of a 2-to-3 switch the frame's x ran 205 -> 131 while the active
+    // column's row 1 sat at 571 -> 425, and the mask lit the active column's rows 1,
+    // 2, 3, 4 and 5 in turn as the frame merely DESCENDED past their heights. The
+    // highlight looked confined to the workspace being moved to, and it appeared
+    // before the frame got there.
+    //
+    // An overlap test rather than an equality, because mid-crossing the frame is as
+    // wide as the card it is over and that card changes width as its column narrows.
+    function frameOverCard(card) {
+        const column = card.parent
+        const left = column.x + root.cellPaddingX
+        const width = Math.max(0, column.width - root.cellPaddingX * 2)
+        return Math.min(left + width, root.focusFrameLeft + root.focusFrameWidth)
+            - Math.max(left, root.focusFrameLeft) > 0
     }
 
     // The tallest column on the strip, MEASURED rather than bound.
@@ -404,8 +446,9 @@ Item {
                     // travelling across the list, and it is the difference between this and
                     // a card lit all at once the moment the frame arrives at its edge.
                     //
-                    // Its geometry is read from `frameMaskOverRow` every frame and carries
-                    // no `Behavior`, because the frame is a moving mark and a mark that
+                    // Its geometry is read from `frameMaskOverCard` and
+                    // `frameOverCard` every frame, and carries no `Behavior`, because the
+                    // frame is a moving mark and a mark that
                     // eases towards its position is a different mark. Nothing is lost by
                     // that: at rest the mask covers the whole card, so the card looks
                     // wholly tinted, exactly as it did before. The two differ only while
@@ -414,17 +457,17 @@ Item {
                     Rectangle {
                         id: windowRowFocusMask
                         objectName: "windowHintRowFocusMask"
-                        // Full width, and that is not an oversight: the frame is placed
-                        // from the active column's own geometry and the cards from the same
-                        // two numbers, so the frame's rect and this card's have identical
-                        // left edges and identical widths at every instant of a crossing -
-                        // the frame widens with the column because it is computed from it.
-                        // A vertical traverse needs no horizontal intersection, so this is
-                        // the whole of the mask's width.
+                        // Full width: the frame is placed from the ACTIVE column's geometry
+                        // and this card is too, so while the frame is over the active column
+                        // the two rects share a left edge and a width exactly. That is why a
+                        // vertical-only mask ever looked right, and it stops being true for
+                        // the first half of every journey - hence the `frameOverCard` half of
+                        // the intersection on the `visible` line below, which is the half this
+                        // rectangle cannot express through its own geometry.
                         x: 0
                         width: windowRow.width
-                        y: root.frameMaskOverRow(windowRow.index).top
-                        height: root.frameMaskOverRow(windowRow.index).height
+                        y: root.frameMaskOverCard(windowRow).top
+                        height: root.frameMaskOverCard(windowRow).height
                         color: LazerTheme.settingsSelected
                         // The card's own radius, so at rest - the mask being the whole card
                         // - the two are the same shape and the join is invisible. Part way
@@ -437,7 +480,7 @@ Item {
                         // geometry honest for anything that measures it. `visible` is the
                         // belt to that braces, since a zero-height item still costs a
                         // little to consider.
-                        visible: height > 0
+                        visible: height > 0 && root.frameOverCard(windowRow)
                         // Inert to input. It is decoration lying over the card, and a
                         // surface that swallowed taps meant for the window would be a fault
                         // the user only finds by missing a click.
@@ -551,6 +594,7 @@ Item {
                 // neighbours worth showing at all - niri moves the view to that
                 // window's workspace.
                 BarWindowHintLabel {
+                    id: neighbourLabel
                     objectName: "windowHintNeighbourRow"
                     x: root.cellPaddingX
                     width: stripColumn.cardWidth
@@ -560,6 +604,12 @@ Item {
                     rowHeight: root.rowHeight
                     glyphInset: root.glyphInset
                     glyphWidth: root.glyphWidth
+                    // Resolved here so an active card and a neighbour label are lit by one
+                    // copy of the intersection rather than each carrying a second
+                    // answer to the same question.
+                    focusMaskTop: root.frameMaskOverCard(neighbourLabel).top
+                    focusMaskHeight: root.frameMaskOverCard(neighbourLabel).height
+                    focusMaskVisible: root.frameOverCard(neighbourLabel)
                     enabled: root.interactive
                     onActivated: windowId => root.windowActivated(windowId)
                 }

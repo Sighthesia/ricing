@@ -114,6 +114,20 @@ Item {
         return lit
     }
 
+    // The NEIGHBOUR cards the frame is lighting, as index:coveredHeight pairs in
+    // delegate order. Real height is the test rather than the visible flag: a
+    // zero-height mask draws nothing yet still reports visible whenever only the
+    // column test passed, so counting flags would claim a highlight nobody can see.
+    function litLabels() {
+        var lit = []
+        var masks = findAllByName(strip(), "windowHintLabelFocusMask")
+        for (var i = 0; i < masks.length; ++i) {
+            if (masks[i].visible && masks[i].height > 0)
+                lit.push(i + ":" + masks[i].height.toFixed(0))
+        }
+        return lit
+    }
+
     // The rows whose masks do not cover them WHOLELY - which is the shape of "the frame is
     // part way across", and the thing a whole-card tint could not express.
     function partlyLitCards() {
@@ -2059,32 +2073,58 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                     + wrong.join(", "))
         }
 
-        // ---- TEMPORARY TRACE (removed before commit) ------------------------
-        function test_TRACE_a_horizontal() {
-            body.hint = root.tallFramedHint(2, 2, 6, 1)
+        // The highlight has to be ON THE FRAME, and for the first half of a journey
+        // the frame is not in the column the panel is centred on. Two faults came out of
+        // one cause: the mask asked only how far down the frame was, and the active column
+        // routinely has a card at that same height, so the ARRIVING column lit up while the
+        // frame was still visibly sliding off the card it was leaving; and the departing
+        // card is drawn by a neighbour label, which had no mask at all, so nothing lit
+        // under the frame either.
+        //
+        // Measured before the fix, across the departure leg of a 2-to-3 switch: the frame's
+        // x ran 205 -> 131 while the active column's row 1 sat at 571 -> 425, and the mask
+        // lit active-column rows 1, 2, 3, 4 and 5 in turn as the frame merely DESCENDED
+        // past their heights - while the neighbour label sharing the frame's exact x stayed
+        // dark for all 170ms.
+        function test_theHighlightIsOnTheFrameAndNotInTheColumnBeingMovedTo() {
+            // Departing from row 0 specifically: the frame starts at the top of the card
+            // it is leaving, so a mask on that card has something to cover at clock 0. Any
+            // other departure row puts the frame below the neighbour's only card, and a
+            // correct implementation has nothing to light there either - the test would
+            // pass for the wrong reason.
+            body.hint = root.tallFramedHint(2, 2, 6, 0)
             wait(300)
             body.hint = root.tallFramedHint(3, 2, 6, 4)
             wait(20)
             verify(body._markerCrossing, "travelling")
-            driveSlideTo(0.5)
-            var clocks = [0, 0.1, 0.25, 0.4, 0.49]
-            for (var c = 0; c < clocks.length; ++c) {
-                driveMarkerTo(clocks[c])
-                driveSlideTo(clocks[c])
-                var frame = findByName(strip(), "windowHintFocusFrame")
-                var rows = findAllByName(strip(), "windowHintWindowRow")
-                var labels = findAllByName(strip(), "windowHintNeighbourRow")
-                var card = rows.length > 1 ? rows[1].mapToItem(strip(), 0, 0) : null
-                console.log("TRACE clock=" + clocks[c]
-                    + " frame.x=" + frame.x.toFixed(0)
-                    + " frame.w=" + frame.width.toFixed(0)
-                    + " frame.y=" + frame.y.toFixed(0)
-                    + " card1.x=" + (card ? card.x.toFixed(0) : "-")
-                    + " card1.w=" + (card ? card.width.toFixed(0) : "-")
-                    + " litCards=" + root.litCards().join(",")
-                    + " labels=" + labels.length
-                    + " labelMasks=" + findAllByName(strip(), "windowHintLabelFocusMask").length)
-            }
+
+            // The departure leg. The frame is wholly over the card being left, so that
+            // card is wholly lit and the arriving column is dark - including its rows at
+            // the very heights the frame is passing through.
+            driveSlideTo(0)
+            driveMarkerTo(0)
+            compare(root.litLabels(), ["1:" + body.rowHeight.toFixed(0)],
+                "the card the frame is on is lit, in the frame's own column")
+            compare(root.litCards(), [],
+                "the column being moved to stays dark while the frame is elsewhere")
+
+            // ...and the arrival leg, the other way round: the frame is descending onto the
+            // arriving row, so the arriving column is the lit one and the column it left is
+            // dark again. The neighbour card cannot still be lit here, because the frame
+            // has left it. Which row is lit here depends on how far the journey's easing has
+            // got at this clock, and pinning a number would only be freezing that easing;
+            // what has to hold is that it is not row 0, the row this journey departed from.
+            driveSlideTo(0.8)
+            driveMarkerTo(0.8)
+            compare(root.litLabels(), [],
+                "the column the frame left is dark once it has left")
+            verify(root.litCards().length >= 1,
+                "the arriving column is lit as the frame slides onto it: "
+                    + root.litCards().join(", "))
+            verify(root.litCards()[0] > 0,
+                "and it is lit on the way down rather than still on the row the frame left: "
+                    + root.litCards().join(", "))
+
             driveSlideTo(1)
             settleSlide()
             settleMarker()

@@ -23,10 +23,41 @@ Item {
 
     signal activated(string windowId)
 
+    // The frame's slice of THIS label, computed by the strip - which is where both
+    // halves of the intersection live, so that a neighbour card and an active card
+    // are lit by the same arithmetic and cannot drift apart.
+    //
+    // A neighbour needed this for as long as the active column has. The frame spends
+    // the first half of every journey on the card being LEFT, which lives in a
+    // departing column, and a label with no mask left that whole half dark: the
+    // highlight appeared to jump straight across to the column being moved to while
+    // the frame was still visibly sliding off the old card. Measured across a 2-to-3
+    // switch, the frame's x ran 205 -> 131 over the departure leg - exactly the label's
+    // own x - and nothing there lit at any point in those 170ms.
+    property real focusMaskTop: 0
+    property real focusMaskHeight: 0
+    property bool focusMaskVisible: false
+
     implicitWidth: 180
     implicitHeight: rowHeight
     width: implicitWidth
     height: rowHeight
+
+    // The focus tint, in the same place in the paint order as the active row's: above
+    // this row's own surface - of which a neighbour has none - and below the glyph and
+    // title that follow, so the text is never veiled. Same colour and radius, because
+    // it is the same mark: the focus frame's own rectangle, clipped to this card, and
+    // identical in shape to the frame's border it sits inside.
+    Rectangle {
+        objectName: "windowHintLabelFocusMask"
+        x: 0
+        width: parent.width
+        y: root.focusMaskTop
+        height: root.focusMaskHeight
+        visible: height > 0 && root.focusMaskVisible
+        color: LazerTheme.settingsSelected
+        radius: 6
+    }
 
     // App icon, the same size and inset as the active column's.
     Image {

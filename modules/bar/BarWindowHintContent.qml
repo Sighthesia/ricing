@@ -579,7 +579,10 @@ Item {
     // is first touched and including the cards the band sweeps over on the way. Which is
     // what the user asked for - the region the frame encloses changes colour, as the
     // frame is over it - and it is the one rule that needs no cases.
+    // The frame's rectangle, handed down whole. Top and height alone were enough for as
+    // long as the frame was only ever over the active column - see `focusFrameLeft`.
     property real focusFrameTop: 0
+    property real focusFrameLeft: 0
     property real focusFrameHeight: 0
     // Has the frame ARRIVED: no journey placing it, and its own animated `y` sitting on
     // the row it is going to. The journey term is not redundant - a switch between two
@@ -1165,6 +1168,8 @@ Item {
         // there - so these are the two numbers the whole of the focus tint rests on.
         focusFrameTop: focusFrame.y
         focusFrameHeight: focusFrame.height
+        focusFrameLeft: focusFrame.x
+        focusFrameWidth: focusFrame.width
         debugTimeScale: root.debugTimeScale
         cellPaddingX: root.cellPaddingX
         listSpacing: root.listSpacing
