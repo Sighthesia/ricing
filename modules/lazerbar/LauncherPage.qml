@@ -179,6 +179,10 @@ Item {
                 // materialized rows on every pool swap.
                 root._resultWindowExtra = 0
                 windowStretchTimer.stop()
+                // A thumbnail that would not load gets one more attempt on the
+                // next open: the decoded-path cache is permanent, so nothing
+                // else can ever hand that row a fresh one.
+                root.rearmFailedThumbs()
             }
         }
         function onSelectedIndexChanged() {
@@ -844,6 +848,14 @@ Item {
     // rows and the preview pane share the exact same proven path.
     readonly property var _thumbPaths: ({})
     property int _thumbRev: 0
+    // Entry ids whose thumbnail a row reported as unloadable. The decoded path
+    // cache is keyed by id and never invalidated, so without this a single
+    // failed load was final: the same path came back on every later commit, so
+    // the row's thumbFailed latch - which clears only when thumbPath CHANGES -
+    // had nothing to re-arm it and the row's icon slot stayed empty for the
+    // rest of the session. Cleared on close by rearmFailedThumbs, which is
+    // what bounds this to one fresh attempt per open rather than per failure.
+    property var _thumbFailedIds: ({})
     // Bumped whenever the session merges clipboard metadata into the live
     // pool in place. Rows and the preview footer read it so merged display
     // fields repaint without replacing the pooled arrays (which would
@@ -881,6 +893,39 @@ Item {
             return
         root._thumbPaths[key] = path
         root._thumbRev++
+    }
+    // A materialized row could not load the thumbnail it was handed. Record it
+    // and do nothing else: re-decoding immediately would spin, because the
+    // cached path is already there and the file behind it has not changed.
+    function noteThumbLoadFailed(id) {
+        var key = String(id == null ? "" : id)
+        if (!key)
+            return false
+        root._thumbFailedIds[key] = true
+        return true
+    }
+    // Give every entry that failed to load one more chance, once per open:
+    // drop its cached path so the row's thumbPath goes empty (which re-arms its
+    // thumbFailed latch) and the queue serves the entry again on the next open.
+    // Dropping the path is what makes the retry real - a re-decode writes the
+    // same string back, and an unchanged path never reloads an Image.
+    //
+    // Called on close, so the cost is bounded by opens and not by failures: a
+    // file that is genuinely gone settles on its second attempt instead of
+    // spawning a decode every tick, and one that was merely unreadable for a
+    // moment comes back the next time the launcher is opened.
+    function rearmFailedThumbs() {
+        var dropped = 0
+        for (var id in root._thumbFailedIds) {
+            if (root._thumbPaths[id] !== undefined) {
+                delete root._thumbPaths[id]
+                dropped++
+            }
+        }
+        root._thumbFailedIds = ({})
+        if (dropped > 0)
+            root._thumbRev++
+        return dropped
     }
     function _issueThumbDecode(id, mime, done) {
         var service = root.session
@@ -1582,6 +1627,10 @@ Item {
                             root.session.execute(result)
                     }
                     onHoveredChanged: root.trackHover(result, hovered)
+                    // The page owns the decoded-path cache, so a row that could
+                    // not load its thumbnail reports here and gets re-armed on
+                    // the next open rather than staying blank for good.
+                    onThumbLoadFailed: id => root.noteThumbLoadFailed(id)
                     Component.onDestruction: root.clearHover(result)
                     onExitFlingRequested: spec => root.exitFlingRequested(spec)
                 }

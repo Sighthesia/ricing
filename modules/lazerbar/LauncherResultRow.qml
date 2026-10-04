@@ -42,8 +42,19 @@ Item {
     // survives and later paths (or reused delegates) still flow through.
     // An imperative thumbPath = "" here would sever that binding for good
     // and strand reused delegates with permanently missing thumbnails.
+    //
+    // This flag alone is a one-way door: the page's decoded path is derived
+    // from the entry id and cached forever, so the SAME path comes back on
+    // every later commit and nothing can change thumbPath to clear it. A row
+    // that latched once stayed blank for the rest of the session, across any
+    // number of open/close cycles, even after the file became loadable - so
+    // the failure is reported up and the page re-arms the attempt once per
+    // open (see thumbLoadFailed / LauncherPage.rearmFailedThumbs).
     property bool thumbFailed: false
     onThumbPathChanged: thumbFailed = false
+    // The owning page owns the decoded-path cache and the decode queue, so
+    // it is the only party that can give this entry another decode.
+    signal thumbLoadFailed(string id)
     // Revision stamp from the owning page; read by the display bindings so
     // in-place metadata merges repaint the row without rebuilding it.
     property int metaStamp: 0
@@ -338,8 +349,10 @@ Item {
             asynchronous: true
             enabled: false
             onStatusChanged: {
-                if (status === Image.Error && root.thumbPath.length > 0)
+                if (status === Image.Error && root.thumbPath.length > 0) {
                     root.thumbFailed = true
+                    root.thumbLoadFailed(String(root.result == null ? "" : root.result.id))
+                }
             }
         }
 

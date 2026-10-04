@@ -290,9 +290,10 @@ function commandMatches(command, needle) {
         || containsNormalized(command.keywords, needle)
 }
 
-function commandItem(command, index) {
+function commandItem(command, index, iconResolver) {
     var label = command.label == null ? "" : String(command.label)
     var description = command.description == null ? "" : String(command.description)
+    var rawIcon = command.icon == null ? "" : String(command.icon)
     return {
         id: command.id == null ? "builtin-" + index : String(command.id),
         kind: "command",
@@ -300,7 +301,13 @@ function commandItem(command, index) {
         description: description,
         searchText: normalizeText(label + " " + description + " "
                                   + (command.keywords == null ? "" : String(command.keywords))).toLowerCase(),
-        icon: command.icon == null ? "" : String(command.icon),
+        // Through the resolver like every app icon: a bare theme NAME is not a
+        // source. Handed to Image.source raw, "lock" resolved as a relative
+        // file path against the row's own directory, errored for good, and the
+        // card rendered with its text and an empty icon slot.
+        icon: iconResolver ? String(iconResolver(rawIcon))
+                           : (rawIcon.indexOf("/") === 0 || rawIcon.indexOf("file:") === 0
+                              || rawIcon.indexOf(":") > 0 ? rawIcon : ""),
         actionId: command.actionId == null ? "" : String(command.actionId),
         managedByShell: true,
         // Built-in commands declare their own chip bucket so they ride the
@@ -402,7 +409,7 @@ function createAppsAdapter(config) {
 
     function mapStreamed(raw) {
         if (raw.isCommand)
-            return commandItem(raw.command, raw.index)
+            return commandItem(raw.command, raw.index, cachedIcon)
         return appItem(raw, launchCounts, cachedIcon, categoryResolver)
     }
 
