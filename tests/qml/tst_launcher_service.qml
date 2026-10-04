@@ -858,13 +858,43 @@ Item {
             svc().clipboardMetadataMerged.connect(function() { merged.push(1) })
 
             // Metadata landing must merge into the kept row objects instead
-            // of swapping the pool: same array identity, fresh text.
+            // of swapping the pool: same array identity, fresh text. The merge
+            // waits for the metadata stream to go quiet before it reads.
             _clipboardStub.metadataUpdated("img")
-            wait(0)
+            wait(svc()._metadataQuietMs + 60)
             resolveRefresh(clips, 1, [{ id: "img", displayName: "[Image] 712x522" }])
             verify(svc().results === first)
             compare(svc().results[0].displayName, "[Image] 712x522")
             compare(merged.length, 1)
+        }
+
+        function test_metadataBurstMergesOnceAfterTheStreamGoesQuiet() {
+            // Metadata now lands in batches, and each batch ends with its own
+            // signal. Merging per signal re-mapped the whole history once per
+            // batch; a burst must cost exactly one round, and only once the
+            // signals have stopped.
+            _clipboardStub = clipboardStubComponent.createObject(null)
+            svc().clipboardService = _clipboardStub
+            var clips = makeManualAdapter()
+            svc()._adapters = { clipboard: clips }
+
+            svc().openClipboard()
+            wait(0)
+            resolveRefresh(clips, 0, [{ id: "img", displayName: "[Image]" }])
+
+            for (var burst = 0; burst < 8; burst++) {
+                _clipboardStub.metadataUpdated("img")
+                wait(10)
+            }
+            // Still inside the quiet window: nothing may have been read yet.
+            compare(clips.queries.length, 1)
+
+            wait(svc()._metadataQuietMs + 60)
+            // One round for the whole burst - the adapter was asked once.
+            compare(clips.queries.length, 2)
+            resolveRefresh(clips, 1, [{ id: "img", displayName: "[Image] 712x522" }])
+            wait(0)
+            compare(clips.queries.length, 2)
         }
 
         // --- IPC entry helpers keep their prefix behavior ---

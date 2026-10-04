@@ -159,6 +159,15 @@ QtObject {
     property bool _executionInFlight: false
     property bool _appsPrimeInFlight: false
     property bool _metadataRefreshPending: false
+    // The service now resolves clipboard metadata in batches, and each batch
+    // ends with a metadataUpdated signal. Merging per signal meant re-mapping
+    // the whole history once per batch - dozens of rounds per pass, each of them
+    // mapping every row, which is exactly the background churn a settle window
+    // is for. The merge waits for the stream to go quiet instead, so a pass
+    // costs one round however finely it was split.
+    readonly property int _metadataQuietMs: 180
+    property double _metadataQuietDeadline: 0
+    property bool _metadataWatchScheduled: false
     // Clipboard metadata (exact counts, image dimensions) arrives after the
     // first paint without changing item ids or order. Merging it into the
     // live pool must not replace the pooled arrays: a swap rebuilds every
@@ -188,19 +197,52 @@ QtObject {
                 root.refresh(true)
         }
         function onMetadataUpdated() {
-            if (!root.visible || LauncherLogic.parseQuery(root.query).mode !== "clipboard"
-                    || root._metadataRefreshPending)
-                return
-            root._metadataRefreshPending = true
-            Qt.callLater(function() {
-                root._metadataRefreshPending = false
-                root._mergeClipboardMetadata()
-            })
+            root._noteMetadataUpdate()
         }
         function onPreviewDecoded(id, contentOrPath) {
             root.textPreviewDecoded(String(id == null ? "" : id),
                                     String(contentOrPath == null ? "" : contentOrPath))
         }
+    }
+
+    // Restarts the quiet window on every batch and keeps one watcher alive until
+    // the window closes, then runs a single merge round. Polled on the shared
+    // call-later queue rather than a Timer: this component is a QtObject and
+    // deliberately has no children.
+    function _noteMetadataUpdate() {
+        if (!root.visible || LauncherLogic.parseQuery(root.query).mode !== "clipboard")
+            return
+        root._metadataQuietDeadline = Date.now() + root._metadataQuietMs
+        if (root._metadataWatchScheduled)
+            return
+        root._metadataWatchScheduled = true
+        Qt.callLater(root._checkMetadataQuiet)
+    }
+
+    function _checkMetadataQuiet() {
+        if (root._metadataQuietDeadline <= 0) {
+            root._metadataWatchScheduled = false
+            return
+        }
+        if (Date.now() < root._metadataQuietDeadline) {
+            Qt.callLater(root._checkMetadataQuiet)
+            return
+        }
+        root._metadataWatchScheduled = false
+        // A merge round still in flight means the rows it is reading are the
+        // ones being enriched; wait for it rather than dropping the window on
+        // the floor, which is what a plain early return used to do.
+        if (root._metadataRefreshPending) {
+            root._metadataQuietDeadline = Date.now() + root._metadataQuietMs
+            Qt.callLater(root._checkMetadataQuiet)
+            return
+        }
+        root._metadataQuietDeadline = 0
+        root._metadataRefreshPending = true
+        Qt.callLater(function() {
+            root._metadataRefreshPending = false
+            root._mergeClipboardMetadata()
+        })
     }
 
     // Merge freshly resolved clipboard metadata into the live pool without
@@ -302,6 +344,7 @@ QtObject {
         root._streamActive = false
         root._heldBatches = []
         root._inputActive = false
+        root._metadataQuietDeadline = 0
         root.error = ""
         root.selectedIndex = -1
         root._executionInFlight = false
