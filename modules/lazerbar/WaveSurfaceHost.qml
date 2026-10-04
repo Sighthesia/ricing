@@ -65,6 +65,10 @@ Item {
 
     signal closed()
     signal opened()
+    // The cross-fade between two sibling routes finished: `route` and the
+    // mounted page are the new pair and the surface is still open. Distinct
+    // from `opened()`, which a swap never emits.
+    signal routeSwapped(string route)
     signal sidebarSelected(string id)
 
     function openRoute(nextRoute, source) {
@@ -127,14 +131,29 @@ Item {
     // that publishes `canGoBack` owns the answer outright, so no caller mutates
     // the host; a page that publishes nothing leaves the manual flag in charge,
     // which is what a bare content page has always used.
-    readonly property bool canGoBack: routePage !== null
-            && routePage.canGoBack !== undefined
-            ? routePage.canGoBack === true
-            : pageCanGoBack
+    //
+    // The page's half of the contract is both halves or neither: a page that
+    // publishes `canGoBack: true` with no callable `handleBack()` would take
+    // every Escape press and do nothing with it, and since the page - not the
+    // host - is the authority here, nothing could clear the claim afterwards.
+    // That is a surface nobody can close, so a missing handler means the host
+    // offers no page back at all and Escape closes as usual.
+    readonly property bool canGoBack: {
+        var page = routePage
+        if (page === null || page.canGoBack === undefined)
+            return pageCanGoBack
+        if (page.canGoBack !== true)
+            return false
+        return typeof page.handleBack === "function"
+    }
 
     // Hand a back press to the page. The page owns what "back" means (pop its own
-    // detail stack); it reports whether it consumed the press. Only a page with
-    // no handler falls back to the host clearing the manual flag.
+    // detail stack); it reports whether it consumed the press. A page that
+    // declines the press (`false`) has advertised a back step it cannot take:
+    // asking it again next press would repeat the refusal forever, so the press
+    // falls through to the close. Only a host with no contract page at all falls
+    // back to clearing its own manual flag, which keeps the surface open for the
+    // next press.
     function requestPageBack() {
         var page = routePage
         if (page && typeof page.handleBack === "function") {
@@ -142,6 +161,8 @@ Item {
                 pageBackHandled()
                 return true
             }
+            close()
+            return true
         }
         pageCanGoBack = false
         return true
@@ -332,6 +353,20 @@ Item {
             root._loadedRoute = root._pendingRoute
             root._pendingRoute = ""
         } }
-        NumberAnimation { target: routeLoader; property: "opacity"; to: 1; duration: MotionTokens.waveRoute / 2; easing.type: Easing.OutQuad }
+        // The fade-in landing is the swap's completion: nothing emitted
+        // `opened()` here, because the surface never closed, so this is the one
+        // moment a caller learns the new page is mounted and can be given its
+        // own focus target.
+        NumberAnimation {
+            target: routeLoader
+            property: "opacity"
+            to: 1
+            duration: MotionTokens.waveRoute / 2
+            easing.type: Easing.OutQuad
+        }
+        // Completion is observed on the sequence, not on the last step: a
+        // nested animation's own `onFinished` is never emitted (verified on
+        // this Qt), so a handler there would silently never run.
+        onFinished: root.routeSwapped(root._loadedRoute)
     }
 }

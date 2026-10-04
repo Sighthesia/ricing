@@ -22,10 +22,17 @@ Item {
     width: 900
     height: 700
 
+    // The swap's completion signal. A cross-fade never emits `opened()`, so
+    // this is the only thing that tells a caller the new page is mounted and
+    // can be handed its own focus target.
+    SignalSpy { id: swapSpy; signalName: "routeSwapped" }
+
     function createHost() {
         var host = hostComponent.createObject(testRoot)
         host.width = testRoot.width
         host.height = testRoot.height
+        swapSpy.target = host
+        swapSpy.clear()
         return host
     }
 
@@ -51,6 +58,32 @@ Item {
                 backPage.backPresses++
                 backPage.canGoBack = false
                 return true
+            }
+        }
+    }
+    // A page that advertises a back step but cannot take the press: the flag
+    // without the handler that makes it actionable.
+    Component {
+        id: backlessRoutePage
+        Item {
+            id: backlessPage
+            objectName: "backlessPage"
+            property bool canGoBack: false
+            property int backPresses: 0
+        }
+    }
+    // A page whose handler refuses every press, like the control center's
+    // overview: it publishes the contract, then declines to act on it.
+    Component {
+        id: decliningRoutePage
+        Item {
+            id: decliningPage
+            objectName: "decliningPage"
+            property bool canGoBack: false
+            property int backPresses: 0
+            function handleBack() {
+                decliningPage.backPresses++
+                return false
             }
         }
     }
@@ -167,6 +200,45 @@ Item {
             host.destroy()
         }
 
+        // The swap completion is announced once, naming the route that is actually
+        // mounted. It is observed on the cross-fade sequence rather than on its
+        // last step: a nested animation's own `onFinished` is never emitted, so
+        // a handler there would look right and silently never run.
+        function test_aRouteSwapAnnouncesItsCompletionOnce() {
+            var host = testRoot.createHost()
+            verify(host.openRoute("launcher"))
+            tryCompare(host, "phase", "open", 2000)
+
+            verify(host.openRoute("control-center"))
+
+            // Not at the route flip: the announcement is the end of the fade.
+            compare(swapSpy.count, 0, "the swap is still crossing over")
+            tryCompare(swapSpy, "count", 1, 2000)
+            compare(swapSpy.signalArguments[0][0], "control-center")
+            compare(host.loadedRoute, "control-center")
+            wait(200)
+            compare(swapSpy.count, 1, "one swap, one announcement")
+            host.destroy()
+        }
+
+        // A swap cut short by a close never completes, so it must not announce
+        // a route the surface never finished showing. Deterministic rather than
+        // timed: no animation tick can elapse inside one JS turn, so the close
+        // lands while the cross-fade is still queued.
+        function test_aSwapInterruptedByACloseAnnouncesNothing() {
+            var host = testRoot.createHost()
+            verify(host.openRoute("launcher"))
+            tryCompare(host, "phase", "open", 2000)
+
+            verify(host.openRoute("control-center"))
+            host.close()
+
+            tryCompare(host, "phase", "closed", 3000)
+            compare(swapSpy.count, 0, "an abandoned swap is not a completion")
+            compare(host.route, "")
+            host.destroy()
+        }
+
         function test_aReopenOfTheSameRouteKeepsTheSamePage() {
             var host = testRoot.createHost()
             verify(host.openRoute("control-center"))
@@ -213,6 +285,65 @@ Item {
                     "a page that publishes no back state offers none")
             verify(host.handleEscape())
             compare(host.phase, "closing")
+            host.destroy()
+        }
+
+        // Page back is a contract, not a flag. A page that says it can go back
+        // while publishing no handleBack() would take every Escape press for
+        // itself and do nothing with it, so the surface could never be closed
+        // again - a one-way door behind a normal-looking close button.
+        function test_aPageAdvertisingBackWithNoHandlerCannotWedgeTheSurface() {
+            var host = testRoot.createHost()
+            host.routeComponents = ({ "launcher": backlessRoutePage })
+            verify(host.openRoute("launcher"))
+            tryCompare(host, "phase", "open", 2000)
+            var page = host.contentItem
+            page.canGoBack = true
+            tryVerify(function() { return page.canGoBack === true }, 500)
+
+            compare(host.canGoBack, false,
+                    "back needs a callable handler, not just a published flag")
+            verify(host.handleEscape())
+            compare(host.phase, "closing",
+                    "Escape must still close a page that cannot handle back")
+            tryCompare(host, "phase", "closed", 2000)
+            host.destroy()
+        }
+
+        // The mirror image: the contract is complete, the page just declines
+        // the press. Reporting back as still available would send the next
+        // Escape to the same refusal, so the decline falls through to the
+        // close instead of wedging the surface one press at a time.
+        function test_aPageThatDeclinesThePressFallsThroughToClose() {
+            var host = testRoot.createHost()
+            host.routeComponents = ({ "launcher": decliningRoutePage })
+            verify(host.openRoute("launcher"))
+            tryCompare(host, "phase", "open", 2000)
+            var page = host.contentItem
+            page.canGoBack = true
+            tryVerify(function() { return host.canGoBack === true }, 500)
+
+            verify(host.handleEscape())
+            compare(page.backPresses, 1, "the page must be asked first")
+            compare(host.phase, "closing",
+                    "a declined back press closes rather than repeating forever")
+            tryCompare(host, "phase", "closed", 2000)
+            host.destroy()
+        }
+
+        // A manual back flag on a host with no contract page is still the
+        // host's own answer: clearing it keeps the surface open for the next
+        // press. The handler requirement must not eat this pre-existing path.
+        function test_manualBackFlagStillClearsWithoutClosing() {
+            var host = testRoot.createHost()
+            verify(host.openRoute("launcher"))
+            tryCompare(host, "phase", "open", 2000)
+            host.pageCanGoBack = true
+            tryVerify(function() { return host.canGoBack === true }, 500)
+
+            verify(host.handleEscape())
+            verify(!host.pageCanGoBack, "the manual claim is cleared")
+            compare(host.phase, "open", "clearing a manual claim is not a close")
             host.destroy()
         }
     }

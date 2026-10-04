@@ -26,9 +26,16 @@ Item {
     // Opener Item awaiting the coordinated open dispatch (bar entry path).
     property Item pendingOpener: null
 
+    // What a plain open means. The session is a visibility mirror and names no
+    // route, so this is what its flips replay whenever no route intent is in
+    // flight.
+    readonly property string defaultRoute: "launcher"
+
     // The route the newest open intent asked for. The session mirror reacts to
     // this rather than assuming the launcher, so a control-center open is not
-    // turned back into a launcher open by the session turning visible.
+    // turned back into a launcher open by the session turning visible - and it
+    // is dropped again on every genuine close, so it only ever describes a
+    // request that is still in flight.
     property string requestedRoute: "launcher"
 
     // Launcher palette anchored on the osu pink family; the wave bands come
@@ -96,7 +103,7 @@ Item {
     // Every launcher activation funnels here: bar entry, IPC open, or a
     // session-visible flip. The opener Item is recorded so focus returns to
     // it once the surface closes.
-    function requestOpen(opener) { requestRoute("launcher", opener) }
+    function requestOpen(opener) { requestRoute(root.defaultRoute, opener) }
 
     // The control center is a sibling route on this same surface and session, not
     // a second overlay: one coordinator, one retained Loader, one opener.
@@ -146,6 +153,10 @@ Item {
         if (!root.session)
             return
         if (root.session.visible) {
+            // `requestedRoute` is the newest intent, not a remembered outcome:
+            // a genuine close puts it back to the default, so a session-visible
+            // flip carries a route only while a control-center open is still
+            // being handed off.
             requestRoute(root.requestedRoute, pendingOpener)
         } else {
             var action = Logic.closeAction(snapshot())
@@ -172,9 +183,31 @@ Item {
             if (root.coordinator && root.coordinator.activeTarget === waveHost.route)
                 root.focusActivePage()
         }
+        function onRouteSwapped() {
+            // A route swap crosses over inside the live surface, so no open
+            // event fires for the page that was just mounted - and a freshly
+            // mounted page holds no keyboard focus, which would leave the
+            // surface open with nowhere to type. The owner check is skipped
+            // here on purpose: a swap is not a coordinator hand-off, it is the
+            // already-open surface changing what it shows.
+            root.focusActivePage()
+        }
         function onClosed() {
-            if (root.coordinator)
-                root.coordinator.ownerClosed("wave")
+            // A close is not always a hide. The coordinator closes this owner to
+            // hand it a sibling route, and that close ends in this same signal:
+            // `ownerClosed` dispatches the next route synchronously, so the
+            // session mirror below would run against a surface that has just
+            // been reopened and ask it to close again - the hand-off would land
+            // shut, with the coordinator left owning nothing.
+            var outcome = root.coordinator ? root.coordinator.ownerClosed("wave") : "released"
+            if (outcome === "reopened")
+                return
+            // A real close, so nothing is in flight. Drop the sticky route with
+            // it: the session names no route, and the next session-visible flip
+            // replays `requestedRoute`, so a control-center intent that survived
+            // the close would turn every later open into a control center.
+            // Default opens go back to the launcher.
+            root.requestedRoute = root.defaultRoute
             if (root.session && root.session.visible)
                 root.session.close()
         }

@@ -65,20 +65,32 @@ QtObject {
         _closingOwner = ""
     }
 
+    // Settle an owner's finished close and report what it settled: "reopened"
+    // when the queued target belongs to this same owner, so it is being
+    // dispatched right now and the owner must stay live; "released" when
+    // ownership ended, either because nothing was queued or because another
+    // owner took the queued target; "ignored" when this owner's close was not
+    // the transition being awaited, so nothing changed.
+    //
+    // The distinction is load-bearing because a close is not always a hide. One
+    // owner serves several routes, so handing it a sibling route closes the
+    // surface and immediately reopens it on the new route - and a caller that
+    // mirrors every close into its own visible state would then shut the route
+    // it had just asked for.
     function ownerClosed(owner) {
         if (!transitioning) {
             if (owner !== activeOwner)
-                return
+                return "ignored"
             activeTarget = ""
             activeOwner = ""
             if (opener)
                 opener.forceActiveFocus()
             opener = null
-            return
+            return "released"
         }
 
         if (owner !== _closingOwner)
-            return
+            return "ignored"
 
         var nextTarget = pendingTarget
         pendingTarget = ""
@@ -89,7 +101,7 @@ QtObject {
             activeTarget = nextTarget
             activeOwner = Logic.ownerFor(nextTarget)
             openRequested(activeOwner, activeTarget)
-            return
+            return activeOwner === owner ? "reopened" : "released"
         }
 
         activeTarget = ""
@@ -97,5 +109,6 @@ QtObject {
         if (opener)
             opener.forceActiveFocus()
         opener = null
+        return "released"
     }
 }

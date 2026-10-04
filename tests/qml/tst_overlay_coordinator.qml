@@ -58,6 +58,7 @@ Item {
             s.selectedIndex = -1
             s._adapters = ({})
             launcherSurface.pendingOpener = null
+            launcherSurface.requestedRoute = "launcher"
             openSpy.clear()
             closeSpy.clear()
             opener.forceActiveFocus()
@@ -114,6 +115,147 @@ Item {
             tryCompare(launcherSurface.host, "phase", "closed", 800)
             compare(coordinator.activeTarget, "")
             verify(opener.activeFocus)
+        }
+
+        // The launcher <-> control-center hand-off is one wave owner being
+        // handed a sibling route, not two overlays serializing. It must land
+        // open: a close that only happens to share its completion signal with a
+        // genuine hide would shut the surface the user just asked for.
+        function test_aSiblingRouteHandOffLeavesTheSurfaceOpen() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            tryVerify(function() { return host.page() !== null }, 500)
+
+            launcherSurface.requestControlCenter(opener)
+
+            // Wait for settled state rather than sampling mid-flight: the
+            // failure mode is a close arriving after the open, so an
+            // immediate assertion would read a perfectly healthy surface.
+            wait(600)
+
+            compare(launcherSurface.host.phase, "open",
+                    "the hand-off must settle open, not closed")
+            compare(launcherSurface.host.route, "control-center")
+            compare(coordinator.activeTarget, "control-center")
+            compare(coordinator.activeOwner, "wave")
+            compare(coordinator.pendingTarget, "")
+            verify(!coordinator.transitioning)
+            compare(closeSpy.count, 1,
+                    "one close for the hand-off; the re-open must not close again")
+            compare(openSpy.count, 2)
+            compare(host.session().visible, true,
+                    "the session stays visible across a same-owner route hand-off")
+            verify(launcherSurface.page() === null)
+            tryVerify(function() {
+                return launcherSurface.activePage()
+                        && launcherSurface.activePage().focusDefaultCount === 1
+            }, 500)
+        }
+
+        // A close is not always a hide, so the coordinator says which one it settled.
+        // The wave owner needs the answer: it serves several routes, and a
+        // sibling-route hand-off closes the surface and immediately reopens it.
+        function test_ownerClosedReportsWhetherTheOwnerComesBack() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+
+            // Queued sibling route: this owner is about to be reopened, so it
+            // must not be treated as gone.
+            verify(coordinator.request("control-center", opener, true, true))
+            compare(coordinator.ownerClosed("wave"), "reopened")
+            compare(coordinator.activeOwner, "wave")
+            compare(coordinator.activeTarget, "control-center")
+            compare(coordinator.pendingTarget, "")
+
+            // Queued other owner: it takes the transition and this owner is
+            // released, even though the wave surface is genuinely closing.
+            verify(coordinator.request("settings", alternateOpener))
+            compare(coordinator.ownerClosed("wave"), "released")
+            compare(coordinator.activeOwner, "settings")
+
+            // A close that is not the awaited transition changes nothing.
+            verify(coordinator.request("music", alternateOpener))
+            compare(coordinator.ownerClosed("wave"), "ignored")
+            compare(coordinator.activeOwner, "settings")
+            compare(coordinator.pendingTarget, "music")
+            verify(coordinator.transitioning)
+        }
+
+        // The counterpart guard: a hand-off to *another* owner really does end
+        // this surface, so its session mirror must be hidden. The fix above
+        // skips the mirror only when the coordinator hands this same owner
+        // straight back, and this is what a "skip it whenever something is
+        // transitioning" version of that would break.
+        function test_aHandOffToAnotherOwnerStillReleasesTheWaveAndHidesTheSession() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+
+            verify(coordinator.request("settings", alternateOpener))
+
+            tryCompare(launcherSurface.host, "phase", "closed", 1200)
+            compare(coordinator.activeOwner, "settings")
+            compare(coordinator.activeTarget, "settings")
+            compare(host.session().visible, false,
+                    "the wave's mirror is hidden when another owner takes over")
+        }
+
+        // The route the surface just finished with is not an intent the next session
+        // open may inherit: the session names no route, so it means the
+        // launcher. Order matters here on purpose - control center, then
+        // launcher, then control center again, then a plain session open - so
+        // the sticky route cannot be right by accident of what ran first.
+        function test_aSessionOpenAfterAControlCenterHandOffStillOpensTheLauncher() {
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "route", "launcher", 2000)
+            wait(600)
+            compare(launcherSurface.host.phase, "open")
+
+            launcherSurface.requestControlCenter(opener)
+            wait(600)
+            compare(launcherSurface.host.route, "control-center")
+            compare(launcherSurface.host.phase, "open")
+
+            // A real hide: the control center goes away the way a user closes
+            // it, which is the only moment the surface is allowed to forget it.
+            keyClick(Qt.Key_Escape)
+            tryCompare(launcherSurface.host, "phase", "closed", 1200)
+            compare(host.session().visible, false)
+
+            // A plain session open (bar key, IPC) carries no route: it must land
+            // on the launcher rather than replay the control-center intent the
+            // surface has already finished with.
+            host.session().open()
+
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            compare(launcherSurface.host.route, "launcher")
+            compare(launcherSurface.requestedRoute, "launcher")
+            compare(coordinator.activeTarget, "launcher")
+            verify(host.page() !== null, "the launcher page must be mounted")
+            tryVerify(function() { return host.page().searchField.activeFocus }, 400)
+        }
+
+        // Route swap focus: a cross-fade swap never fires `opened()`, so the
+        // newly mounted page has to be given its own focus target by the swap
+        // completing, or the surface reopens onto a page nobody can type into.
+        function test_aRouteSwapHandsFocusToTheNewlyMountedPage() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            tryVerify(function() { return host.page().searchField.activeFocus }, 400)
+
+            verify(launcherSurface.host.openRoute("control-center", null))
+            tryCompare(launcherSurface.host, "route", "control-center", 2000)
+
+            tryCompare(launcherSurface.activePage(), "focusDefaultCount", 1, 800)
+            compare(launcherSurface.host.phase, "open")
+            verify(launcherSurface.page() === null)
+
+            // And back again: the launcher's own search is its focus target.
+            verify(launcherSurface.host.openRoute("launcher", null))
+            tryCompare(launcherSurface.host, "route", "launcher", 2000)
+            tryVerify(function() { return host.page().searchField.activeFocus }, 800)
         }
 
         function test_launcherIsStillTheDefaultRouteAfterAControlCenterOpen() {
