@@ -223,7 +223,16 @@ Item {
     // written from. The two clocks are asserted to DIFFER, because the whole effect
     // depends on the marker outliving the columns.
     readonly property alias crossingAnimation: crossingRun
-    readonly property alias indicatorHeadMotion: indicatorHeadAnimation
+    // The indicator's switch blink, exposed for the same reason as the two above and with
+    // the same payoff: `restart()` sets `from` synchronously, so a suite can read the recipe
+    // on the frame the switch happened rather than waiting out a decay and guessing where
+    // in it a poll landed. This is `Workspaces.flashIndicator`'s animation.
+    readonly property alias flashAnimation: _flashIndicator
+    // The focus frame's own glide, for the same reason as the rest. A `Behavior` has no
+    // `animation` property of its own, so a suite cannot ask "is the frame still easing?"
+    // any other way - and it has to ask, because a `Behavior`-driven `y` reads the
+    // pre-change value to a test function that does not run the event loop.
+    readonly property alias focusFrameMotion: focusFrameGlide
     readonly property int rowHeight: 28
     // The one row the focus indicator belongs to, or -1. Read from the ARRIVING
     // active column, which is the content the user is being taken to.
@@ -335,6 +344,13 @@ Item {
     //
     // Stretching the WRONG axis would have turned a 3px bar into a tall rectangle
     // mid-flight, which is a shape change rather than a bar growing.
+    //
+    // `Workspaces.qml`'s own name for this number is `indicatorBarWidth`, and everything
+    // about how it stretches lives in that file: `_edgeX` on `medium`/OutQuad,
+    // `_edgeShadowX` on `slow * 2`/OutSine, a raw `_edgeSpan` with no bound on it, and
+    // `retargetEdges` handing both ends ONE committed target and blinking once when the
+    // identity changes. This is that tracker, rotated. Where the two disagree is a bug in
+    // one of them, and "consistent with the workspace widget" is the test for it.
     readonly property int indicatorLength: LazerTheme.barWidgetHeight - 16
 
     property real _headY: 0
@@ -347,7 +363,10 @@ Item {
     property real _anchorY: 0
     property bool _placed: false
     // Same-anchor drift arriving while a trail is in flight; applied as one snap
-    // once the tail catches up, so a trail is never cut short.
+    // once the tail catches up, so a trail is never cut short. The workspace
+    // widget's own `_edgePendingCenterX`, and for the same reason: a drift that
+    // lands mid-trail waits rather than cutting the trail, and the wait is the
+    // tail's own convergence rather than a duration.
     property real _pendingTop: -1
     property string _targetKey: ""
 
@@ -359,6 +378,32 @@ Item {
     function _targetYFor(index) {
         return index * rowPitch + rowHeight / 2 - indicatorLength / 2
     }
+
+    // THE IDENTITY the tracker is aimed at, and the thing a "genuine switch" means
+    // here. `Workspaces.qml` keys its own indicator on the focused WINDOW, falling
+    // back to the active workspace when no window is focused - see `updateIndicator` -
+    // because the bar marks a thing, and two marks of different things are a switch
+    // however far apart they sit.
+    //
+    // It has to be the window rather than the row index, and this is the case that
+    // forced it. Two workspaces can both be focused on their row 2, and a switch
+    // between them does not move `focusedRowIndex` at all - so an index key reports
+    // "nothing moved" for a switch, which is the blink the widget gives every one of
+    // them. Keyed on the window, a switch is a switch, and the bar's target being the
+    // same row on both sides is then correctly reported as a switch that does not
+    // travel: commit, blink, no stretch.
+    //
+    // Derived, and the derivation is safe here for the reason the row index's own
+    // handlers were unsafe: nothing READS another derived property out of this one.
+    // It is compared for change and nothing else, so the one-frame staleness a
+    // derived property has inside its own notification cannot reach it. Every
+    // position still comes from `_targetYFor`, one turn later, from the index.
+    readonly property string focusedWindowKey: hasTarget
+            && activeColumn
+            && focusedRowIndex < activeColumn.rows.length
+            && String(activeColumn.rows[focusedRowIndex].windowId) !== ""
+        ? "w" + String(activeColumn.rows[focusedRowIndex].windowId)
+        : "s" + (root.plan ? root.plan.activePosition : 0)
 
     // --- the crossing displacement ---------------------------------------
     // On a workspace switch ONE instance of the row marker travels the whole height of
@@ -791,13 +836,6 @@ Item {
         root._exitFrom = root.exitFrom
         root._markerCrossing = true
         root.swapping = true
-        // Hand the tracker to the frame's journey rather than cancelling it. The publish that
-        // starts this crossing is what moved the focus, so the tracker may already be
-        // mid-trail toward the arriving row; committing to the journey from wherever its
-        // two ends are keeps that one motion continuous instead of resetting it to zero
-        // length on this frame - which is what the snap here used to do, and what made a
-        // trail in flight collapse the instant a switch began.
-        root._followJourney()
         root.positionFrom = plan.fromPosition
         root.positionTo = plan.toPosition
         root.slideProgress = 0
@@ -840,10 +878,12 @@ Item {
         // Already true on a re-aim, and deliberately not reset: the marker carries on
         // down through the second switch rather than restarting its journey.
         root._markerCrossing = true
-        // As in `_startSlide`: the tracker joins this leg from wherever it is, rather
-        // than being reset. A second switch lands mid-trail more often than not, and a
-        // snap here is exactly the sudden shortening it is meant to avoid.
-        root._followJourney()
+        // The tracker is not told anything here, and that is the design rather than an
+        // omission: it was re-aimed by the publish that got here, because that publish
+        // replaced the columns and therefore the focused window. `_retargetIndicator`
+        // re-aims from wherever the two ends have reached rather than from a committed
+        // value, so a second switch landing mid-wake continues that wake instead of
+        // replacing it - which is the widget's own answer to switching during a switch.
         root.positionFrom = here
         root.positionTo = plan.toPosition
         // Restart both clocks from the current position, not from either crossing's own
@@ -870,13 +910,15 @@ Item {
         duration: MotionTokens.page * debugTimeScale
         easing.type: Easing.InOutQuad
         onFinished: {
-            // No settle here. The tracker has been following the frame all the way, so the
-            // bar arrives already stretched; the tail's own flight - three times the
-            // head's - contracts it, and that contraction is the last beat of the switch
-            // rather than a second event bolted onto the frame's landing. Snapping it
-            // away here used to be deliberate, to hand over a bar at rest at exactly the
-            // moment the motion finished, but it is the same snap that made a switch cut
-            // a trail short, just at the other end.
+            // No settle here, and nothing to settle: the tracker's target has been the
+            // landing row since the switch was published, so the bar is already on its way
+            // to exactly where the frame has just landed, and the tail's own flight -
+            // three times the head's - is the last 320ms of the switch rather than a
+            // second event bolted onto the frame's landing. Snapping it away here used to
+            // be deliberate, to hand over a bar at rest at exactly the moment the motion
+            // finished, but it is the same snap that made a switch cut a trail short, just
+            // at the other end.
+            //
             // The frame lands. There is
             // nothing to hold the tint back for here any more: the tint has been
             // following the frame's own rectangle the whole way in, so the card lit on
@@ -958,108 +1000,75 @@ Item {
     // same number of pixels below the list's own bottom. Measured on a twelve-window
     // workspace with the focus on row 9, the outline landed on the card at y 136 and the
     // bar at y 307 - 171px apart, which is the scroll.
-    // How far the tail may fall behind the head, and why the answer is a bound rather than
-    // "however far it ends up".
+    // The wake, and the bar's geometry from it: `Workspaces.qml`'s `_edgeRectLeft` and
+    // `_edgeSpan`, read down a column instead of across a row. RAW separation, no cap and
+    // no clamp, because that is the widget's rule and the widget has never bounded it.
     //
-    // The frame leaves the panel on both legs of a journey - it slides off the bottom edge
-    // and comes back from above - and that off-panel flight is deliberate: the position
-    // discontinuity is the one thing never on screen. The bar must not inherit it. Its
-    // length is the head-tail separation, so a head that travels 229px off-panel while
-    // the tail is where it is turns a 42px bar into a 230px one and then, at the corner,
-    // snaps it back in a single frame - measured across one switch: 161.7px of wake on the
-    // frame before the corner, 119.6px on the frame after, a 42px step. That is the
-    // reported sudden shortening, and no amount of making the tail faster removes it,
-    // because the head's jump is the thing that has to be absorbed.
+    // Both bounds that used to be here are gone, and their removal is the fix rather than
+    // a tuning. `indicatorWakeCap` existed because the head was PINNED to the focus frame,
+    // so during a journey the head ran 200px off-panel while the tail could only close
+    // `tailCatchUp` of the gap a tick - and a separation with no bound is then whatever the
+    // frame's speed happens to make it. Measured across one switch: 26, 43, 50, 60, 73, 87,
+    // then 91, 91, 91, 91 for five consecutive frames, then 90, 54 in one 16ms step, then
+    // 43, 63, 76, 85, 89 again - and 52.5 still open 480ms after the switch began. That is
+    // the reported fault whole: a bar at 3.5x its resting length, held, then dropped, then
+    // re-opened and closed over the better part of a second. A cap cannot fix it, because
+    // the cap IS the plateau - it converts a growing wake into a held one and the held one
+    // into the drop at the corner.
     //
-    // The stretch itself is what the widget does - `activeHighlight` covers the gap with a
-    // shadow and has always been bounded - so bounding it is faithful rather than a
-    // cap on the effect. Sized above the wake a normal on-panel traverse produces (about
-    // 41px at the catch-up rate below) so an ordinary switch never reaches it, and the
-    // cap is only ever met by the off-panel excursion.
-    readonly property real indicatorWakeCap: indicatorLength * 2.5
-
-    // How much of the remaining gap the tail closes per tick - a first-order follower
-    // with a time constant of roughly 130ms. It replaces a `Behavior` on `_tailY`, and
-    // the reason is arithmetic rather than taste.
+    // The cause is not the arithmetic but the TARGET. A wake is the distance between two
+    // positions converging on ONE place, so it is bounded by that place and it closes. Pin
+    // the head to something that is itself travelling and there is no such place: the wake
+    // becomes a function of SPEED, which has no bound to close against and re-opens every
+    // time the head passes the tail. The widget's target is a fixed point - a window's icon,
+    // or a workspace's centre - and the frame's is not: it sweeps out of the panel and back
+    // in, ending on the same row it started from. So the head no longer follows the frame.
+    // It follows the FOCUSED ROW, which is the hint's own fixed point and the exact
+    // analogue of what the widget's indicator marks, and the frame is a displacement drawn
+    // over the same list rather than the bar's target.
     //
-    // A Behavior is the right tool for a target that moves ONCE. Re-assigning it every
-    // frame restarts its easing every frame, and an easing that has just started is at
-    // the beginning of its curve: `OutSine` covers `sin(0.033 * PI/2)`, about 5% of the
-    // gap, on the first tick of a 480ms flight. With the target itself moving about 5px
-    // per frame, the tail advanced 0.0085px per frame - measured as `tail` sitting at
-    // exactly 60.0 for nineteen consecutive frames of a switch while the head ran from
-    // 137 to 196. The bar's length was therefore the head's motion alone, which is why a
-    // switch had no trail to cut and why the corner's jump had nothing to absorb it.
-    //
-    // A follower does not restart, so it actually moves, and its lag is proportional to
-    // the head's speed - which is the shadow-over-the-gap behaviour rather than a fixed
-    // delay being chased.
-    readonly property real tailCatchUp: 0.12
-
-    // The wake, and the bar's geometry from it. This is deliberately NOT
-    // `min(head, tail)` and `|head - tail|`, which is what it was, and the difference is
-    // the corner.
-    //
-    // The bar's length used to be the raw head-tail separation, which made the frame's
-    // off-panel flight part of the bar: the head would travel 229px out of the panel while
-    // the tail stayed put, and the drawn bar - anchored at whichever end was higher -
-    // covered the whole panel. Bounding the separation is unavoidable; where the bound is
-    // APPLIED is the whole design.
-    //
-    // Clamping the stored tail to `head - cap` looks equivalent and is not. At the corner
-    // the head teleports to the far side of the panel, so the clamp has to move the tail
-    // from one side of it to the other - measured at 242 -> 23, a 219px jump in one frame,
-    // which put a 126px step in the bar's length where the un-clamped version had put 42.
-    // It trades a visible cut for a larger one.
-    //
-    // So the tail is left to follow at its own rate and the CAP IS DRAWN: the bar is
-    // anchored to the head - the frame - and extends backwards by at most the cap. The
-    // head's jump then moves the bar, which is off-panel and invisible, instead of
-    // changing its length. And because the wake is already saturated by the time the
-    // corner arrives - the exit leg runs the head off the bottom of the panel well before
-    // it - nothing visible happens at the corner at all.
+    // That is what the widget does about its own highlight too, and it is why the two
+    // arriving together is not a coincidence: `Workspaces` slides `activeHighlight` to the
+    // new square on its own `medium`/OutQuad while its indicator stretches and flies there
+    // on its own two-speed clock. This panel is that widget magnified, so the frame is the
+    // magnified highlight and this bar is the magnified indicator - two motions, on
+    // purpose, each with the recipe it has in the widget.
     //
     // `head > tail` is a downward journey, and the wake trails above the head; upward, the
-    // head leads and the wake trails below. The two agree where they meet, at a wake of
-    // zero, so the direction cannot introduce a step of its own.
-    readonly property real _wake: Math.min(Math.abs(_headY - _tailY), indicatorWakeCap)
-    readonly property real _barTop: _headY - strip.scrollOffset
-        - (_headY > _tailY ? _wake : 0)
+    // head leads and the wake trails below. `Math.min` agrees with both at a wake of zero,
+    // so the direction cannot introduce a step of its own.
+    readonly property real _wake: Math.abs(_headY - _tailY)
+    readonly property real _barTop: Math.min(_headY, _tailY) - strip.scrollOffset
     readonly property real _barLength: indicatorLength + _wake
 
-    // Where the bar belongs while the frame is travelling: on the frame, in the bar's own
-    // length, measured in the tracker's scrolled coordinates like every other target
-    // (`_targetYFor` is pre-scroll too, and `_barTop` subtracts the offset back out).
-    // Where the bar belongs while the frame is travelling: on the frame, in the bar's own
-    // length, measured in the tracker's scrolled coordinates like every other target
-    // (`_targetYFor` is pre-scroll too, and `_barTop` subtracts the offset back out).
-    //
-    // A FUNCTION and not a `readonly` property, which is the trap this file has already
-    // paid for twice. A property's binding is re-evaluated when its dependencies change,
-    // and nothing orders that before the `onCrossingTopChanged` handler that reads it - so
-    // the handler was handed the PREVIOUS frame's target and the head trailed the frame by
-    // exactly one frame, forever. Measured across a crossing at quarters: `journeyY` ran
-    // 69, 118.5, -42, -20.5, 1 and the head ran 74, 69, 118.5, -42, -20.5 - the same
-    // series, one step behind, for the whole journey. A function is evaluated on the call,
-    // so it can only ever be current.
-    function _journeyTarget() {
-        return root.crossingTop + root.markerOffset + strip.scrollOffset
-    }
     readonly property bool hasTarget: focusedRowIndex >= 0
             && activeColumn
             && focusedRowIndex < activeColumn.rows.length
+
+    // The two ends, and they are `Workspaces.qml`'s two ends: the head on `medium`/OutQuad,
+    // the tail on `slow * 2`/OutSine - three times the head's flight, which is what makes
+    // the stretch readable rather than a blur. Both are gated on the same three terms, and
+    // both are handed to a SINGLE committed target, so neither can be re-targeted per
+    // frame - which is the whole reason the follower that stood here for two rounds is
+    // gone. A `Behavior` is the right tool for a target that moves once; re-assigning one
+    // every frame restarts its easing every frame, and an easing that has just started is
+    // at the beginning of its curve. That was measured while the head chased the frame:
+    // `OutSine` covered `sin(0.033 * PI/2)`, about 5% of the gap, on the first tick, so
+    // the tail sat at exactly 60.0 for nineteen consecutive frames of a switch while the
+    // head ran from 137 to 196. The follower was the answer to THAT, and it was the wrong
+    // question: with a fixed point to converge on, the tail has nothing to chase.
+    //
+    // The recipes are exposed, because "the hint's tail runs the widget's tail" is a claim
+    // about numbers and a suite that re-read `MotionTokens` would only be checking that a
+    // token exists somewhere in the file. Both are asserted, including the two-speed ratio
+    // that makes the shape the widget's rather than merely similar.
+    readonly property alias indicatorHeadMotion: indicatorHeadAnimation
+    readonly property alias indicatorTailMotion: indicatorTailAnimation
 
     // `_snapping` is the load-bearing gate on both of these, and it is a
     // property rather than anything about the crossing, so a `Behavior` sees it at the
     // moment the property CHANGES - which is what a write inside `_snapIndicator` needs
     // and a flag read inside `_syncIndicator` would arrive a step too late for.
-    //
-    // `!root._markerCrossing` used to sit here as well, and it froze the tracker for the
-    // whole journey: head and tail could not differ, so a workspace switch had no trail
-    // and the crossing's own first write collapsed any trail in flight from before it.
-    // The trail belongs on a switch - it is the widget's own behaviour - so the gate is
-    // gone and the tracker's target during a crossing is the frame itself, which
-    // `_followJourney` supplies on every frame the frame moves.
     Behavior on _headY {
         enabled: root._placed && !MotionTokens.reducedMotion && !root._snapping
         NumberAnimation {
@@ -1068,32 +1077,15 @@ Item {
             easing.type: Easing.OutQuad
         }
     }
-    // The tail's motion, as a follower rather than an animation - see `tailCatchUp` for why
-    // a Behavior cannot be re-targeted per frame. Written directly, with no `Behavior` to
-    // suppress, which is also why `_snapping` does not appear here.
-    //
-    // Idle when the two are together, so a panel nobody is touching runs no timer. The
-    // tail closing the last half-pixel is what stops it, so there is no separate
-    // "finished" state to get out of step with the head's.
-    Timer {
-        id: tailCatchUpTimer
-        interval: 16
-        repeat: true
-        running: root._placed && Math.abs(root._headY - root._tailY) > 0.5
-        onTriggered: {
-            if (MotionTokens.reducedMotion) {
-                root._tailY = root._headY
-                return
-            }
-            root._tailY += (root._headY - root._tailY) * root.tailCatchUp
-            // ...and the last fraction of a pixel is committed rather than approached. The
-            // timer stops at half a pixel, so a wake that merely tends to zero leaves the
-            // resting bar a fraction long - measured at 26.449 against a resting 26, which
-            // is a resting-length assertion that fails for a third of a pixel. Closing it
-            // here keeps "at rest" an exact state instead of an asymptote, and the step is
-            // sub-pixel so nothing on screen moves.
-            if (Math.abs(root._headY - root._tailY) < 0.5)
-                root._tailY = root._headY
+    // Three times the head's flight: the tail lingers long after the head lands, and that
+    // lingering is the stretch. Its recipe is the widget's verbatim, which is why the wake
+    // is worth measuring rather than tuning - a fixed point gives this curve a fixed shape.
+    Behavior on _tailY {
+        enabled: root._placed && !MotionTokens.reducedMotion && !root._snapping
+        NumberAnimation {
+            id: indicatorTailAnimation
+            duration: MotionTokens.slow * 2 * debugTimeScale
+            easing.type: Easing.OutSine
         }
     }
 
@@ -1113,63 +1105,18 @@ Item {
         _snapping = false
     }
 
-    // Hand the tracker to the journey rather than freezing it.
+    // Route every re-anchor through here, which is `Workspaces.qml`'s `retargetEdges`
+    // with the numbers renamed: a genuine target switch commits the anchor, desyncs the
+    // two ends into the wake and blinks once; same-target layout drift snaps both so
+    // content churn never stretches the bar; the first placement snaps so it never slides
+    // in from zero.
     //
-    // The distinction from `_snapIndicator` is the whole point: this writes the two ends
-    // as TARGETS and lets the Behaviors animate towards them, so while the frame is
-    // moving the head runs after it and the tail - three times the head's flight - lags,
-    // and the bar is drawn stretched between them. That is the workspace widget's own
-    // vocabulary: `Workspaces.activeHighlight` slides by being stretched, the head
-    // arriving at the new square's centre while a shadow trails over the gap.
-    //
-    // It used to be frozen instead. `_syncIndicator` snapped head and tail together for
-    // the whole crossing and both Behaviors were gated on `!_markerCrossing`, so a
-    // workspace switch produced no trail at all - and because the gate made every tracker
-    // write inside a crossing a snap, the write at the crossing's FIRST frame collapsed
-    // whatever trail was still in flight from an earlier focus change to zero in one step.
-    // That was the tail visibly shortening on consecutive switches, and it was worst
-    // exactly when switches came quickly, because a trail was in flight more of the time.
-    //
-    // Snapping here at all is still wrong, though, and is why the hand-off writes the
-    // CURRENT position rather than the arriving row's: the publish that starts a crossing
-    // is the same publish that moves `focusedRowIndex`, so by this point the tracker may
-    // already be trailing toward the arriving row. Committing to the journey from wherever
-    // the two ends actually are keeps one continuous motion; committing to either end's
-    // value would be a second one.
-    function _followJourney() {
-        const target = root._journeyTarget()
-        if (!isFinite(target))
-            return
-        _anchorY = target
-        // Not `_targetKey`: the landing row's own key. At the landing `_restingY()` is
-        // that row, and a key that still said "journey" would read as a genuine switch
-        // and flash the bar back to full length instead of letting the tail finish
-        // contracting - the arrival's own motion, cut off by a bookkeeping value.
-        _targetKey = String(root.focusedRowIndex)
-        // The head SNAPS and the tail is left entirely alone, and the asymmetry is
-        // the design rather than an inconsistency. The head is the frame's own position:
-        // the bar has to stay one `markerOffset` below the outline for the whole journey,
-        // or the two stop being one gesture - and a Behavior chasing a target that moves
-        // every frame is always behind it, which is a lag, not a lead. So the leading end
-        // of the bar is pinned to the frame and the trailing end is left to the follower,
-        // which lags by an amount set by how fast the head is going rather than by a
-        // fixed duration.
-        //
-        // `_barTop` is the MINIMUM of the two, so the bar is drawn from the tail up to
-        // just past the head: the stretch is a wake behind the frame, and the frame never
-        // leaves the bar's leading edge whichever way the switch went.
-        //
-        // `_snapping` is read at the moment the property changes, which is what stops the
-        // head's own Behavior from starting.
-        _snapping = true
-        _headY = target
-        _snapping = false
-    }
-
-    // Route every re-anchor through here. A genuine target switch desyncs head and
-    // tail into the trail and blinks once; same-target layout drift snaps both so
-    // content churn never stretches the bar; the first placement snaps so it never
-    // slides in from zero.
+    // The commit writes BOTH ends to the target, and that is not a contradiction of the
+    // wake: a `Behavior` animates from the value the property holds when the write
+    // arrives, so each end flies from wherever it actually was to the one place they now
+    // share. Writing them is how the widget says "these two are aimed at one target", and
+    // it is why a switch arriving mid-wake continues the wake instead of cutting it -
+    // there is nothing here that can shorten the bar, only retarget it.
     function _retargetIndicator(top, key) {
         if (!isFinite(top))
             return
@@ -1191,7 +1138,9 @@ Item {
         _snapIndicator(top)
     }
 
-    // Apply a drift that landed mid-trail, once the tail has caught up.
+    // Apply a drift that landed mid-trail, once the tail has caught up. The widget's
+    // `_edgePendingCenterX` timer, and for the same reason: it waits on the TAIL rather
+    // than on a duration, so a trail is never cut short by the wait's own length.
     Timer {
         interval: 16
         repeat: true
@@ -1334,7 +1283,6 @@ Item {
         glyphWidth: root.glyphWidth
         interactive: !root.swapping
         onWindowActivated: windowId => root.windowActivated(windowId)
-        onScrollOffsetChanged: root._onScrollChanged()
         // A crossing replaces the list, and the new column's content can be shorter
         // than the offset the old one was scrolled to.
         onContentHeightChanged: strip.clampScroll()
@@ -1412,8 +1360,11 @@ Item {
         // property is re-evaluated at the landing.
         Behavior on y {
             enabled: !root._markerCrossing && !MotionTokens.reducedMotion
-            NumberAnimation { duration: MotionTokens.settingsSidebarCollapse * debugTimeScale
-                easing.type: Easing.OutQuint }
+            NumberAnimation {
+                id: focusFrameGlide
+                duration: MotionTokens.settingsSidebarCollapse * debugTimeScale
+                easing.type: Easing.OutQuint
+            }
         }
     }
 
@@ -1435,10 +1386,14 @@ Item {
     // declaration order alone would decide, and the outline's left edge is exactly
     // where this bar now sits.
     //
-    // On a workspace SWITCH this same instance is what moves: it displaces down from the
-    // panel's top onto the arriving card, one `markerOffset` below the outline above it,
-    // so the two are one gesture throughout rather than two things that happen to agree.
-    // See `crossingTop`.
+    // On a workspace SWITCH this same instance is what moves, and it moves the way the
+    // widget's does rather than the way the outline above it does: it stretches from the
+    // old row onto the new one and contracts, one `markerOffset` below where the outline
+    // will land, while the outline makes its own sweep through `crossingTop`. Those are
+    // two motions on purpose - `Workspaces` slides `activeHighlight` to the new square on
+    // its own clock while its indicator stretches and flies to the same place, and this
+    // panel is that widget magnified. They agree because both are aimed at the same row,
+    // not because one is tied to the other.
     Rectangle {
         id: focusUnderline
         objectName: "windowHintFocusIndicator"
@@ -1453,17 +1408,16 @@ Item {
         // column for the departure leg exactly as the outline is.
         x: (root._markerCrossing ? root.markerLeft - root.cellPaddingX
             : strip.activeColumnX) + root.indicatorInset
-        // The tracker's two ends, ALWAYS - the stretch is the bar's
-        // own dual-speed motion and it belongs on a workspace switch as much as on a
-        // focus change inside one workspace. During a crossing the tracker's target is
-        // the frame itself (`_followJourney`), so the head runs after the frame and the
-        // tail trails over the gap, and the bar draws stretched between them.
+        // The tracker's two ends, ALWAYS - the stretch is the bar's own dual-speed motion,
+        // on a workspace switch as much as on a focus change inside one workspace, and it
+        // is drawn from the LOWER of the two through the higher: `Workspaces.qml`'s
+        // `_edgeRectLeft` and `_edgeSpan` read down a column instead of across a row.
         //
         // It used to be `crossingTop + markerOffset` at a fixed `indicatorLength` for the
         // duration, on the reasoning that the bar was being carried and a changing length
         // would be a second motion on one marker. The stretch is not a second motion: it
-        // is the bar's own, and it is what made the bar read as attached to the frame
-        // instead of being repositioned by it.
+        // is the bar's own, and it is what the widget's indicator does to mark a new
+        // window while its highlight slides there on its own clock.
         y: root._barTop
         height: root._barLength
         visible: root.markerHasTarget
@@ -1511,17 +1465,15 @@ Item {
     // leaves the bar one switch behind. This is the same discipline the workspace
     // widget uses, where `updateIndicator` computes `centerX` itself and passes it
     // into the tracker.
-    // The active column scrolled. The markers are positioned from `focusedRowTop`,
-    // which already carries the offset, so this is about the marker's own TRACKER: the
-    // dual-speed tracker holds committed targets, and a scroll that moved the row under
-    // it without re-anchoring would leave the bar easing toward a position the row has
-    // already left.
-    function _onScrollChanged() {
-        if (root.swapping)
-            return
-        root._retargetIndicator(root._targetYFor(root.focusedRowIndex),
-            String(root.focusedRowIndex))
-    }
+    //
+    // NO SCROLL HOOK, and the reason is worth recording because there was one here for a
+    // whole round. The tracker's target is `_targetYFor(index)`, which is in the column's
+    // UNSCROLLED space, so a scroll does not move it: the bar is drawn in scrolled space
+    // by `_barTop`, which subtracts the offset on the way out. The retarget a scroll used
+    // to trigger therefore always passed the target the tracker already held and always
+    // deduped - it existed only to re-add the scroll to a journey target derived from
+    // `crossingTop`, and that derivation is gone. A scroll that DOES move the bar is one
+    // that reveals a different row, and that arrives as a different `focusedRowIndex`.
 
     // Reveal the focused window when focus moves to a row the viewport does not show.
     // niri moves focus on its own (a window raises, a shortcut focuses another), and a
@@ -1554,26 +1506,16 @@ Item {
             : root.noRowTop + strip.scrollOffset + root.markerOffset
     }
 
+    // The tracker's one entry point, and it has no crossing in it. That is the whole of
+    // the change: the bar is aimed at the FOCUSED ROW, and during a journey the focused row
+    // is the ARRIVING one - `focusedRowIndex` reads the arriving column, and it says so
+    // from the crossing's first frame - so the landing row IS the target and there is no
+    // second target to be chosen between the two. Everything downstream follows from that:
+    // a switch is one retarget to one fixed point, a second switch mid-flight is one more
+    // retarget from wherever the two ends have got to, and the wake is the tail's own
+    // three-times-longer flight closing on a place both ends already name.
     function _syncIndicator() {
         var target = root._restingY()
-        // While the marker is travelling, the tracker's target is the FRAME, and it is fed
-        // from `crossingTop` rather than from a row index. `focusedRowIndex` changes the
-        // instant a switch is published - before the crossing starts and while it runs -
-        // so retargeting to the row would put a second, independent motion on the bar
-        // underneath the frame's own, and a bar whose length is no longer the one
-        // `markerOffset` was measured against.
-        //
-        // The end of the crossing needs no special case either: `_followJourney` leaves
-        // `_targetKey` naming the landing row, so the resting sync that follows finds the
-        // key unchanged, sees the position it is already at, and returns - leaving the
-        // tail to finish contracting on its own. That contraction is the arrival's own
-        // motion and belongs on the bar; snapping it away was a second event at the exact
-        // moment the first finished.
-        if (root._markerCrossing) {
-            root._pendingTop = -1
-            root._followJourney()
-            return
-        }
         if (!root.hasTarget) {
             // No target: the bar is hidden, so it must not be left mid-trail either
             // - a trail still in flight when the next target arrives would stretch
@@ -1615,67 +1557,33 @@ Item {
         // First placement snaps: there is nothing on screen to travel from.
         if (!root._placed) {
             root._placed = true
-            root._targetKey = String(root.focusedRowIndex)
+            root._targetKey = root.focusedWindowKey
             root._snapIndicator(target)
             return
         }
-        root._retargetIndicator(target, String(root.focusedRowIndex))
+        root._retargetIndicator(target, root.focusedWindowKey)
     }
 
     onFocusedRowIndexChanged: {
-        // The tracker waits a turn, and the ordering is the whole reason. A workspace
-        // switch publishes the arriving hint FIRST and starts the crossing afterwards, so
-        // this handler runs while `_markerCrossing` is still false and
-        // `focusedRowIndex` is already the ARRIVING row. Taking it at face value is a
-        // genuine target switch, which is the branch that commits head and tail together
-        // and blinks once - correct for a focus change inside one workspace, and exactly
-        // wrong here. `_startSlide` then hands the tracker to the frame, which snaps the
-        // head back to the departing card, and the bar is left stretched between two rows
-        // it was never on: measured as a 37px step in the first frame of a switch, against
-        // a 14px ceiling and a wake the whole crossing is not supposed to exceed.
-        //
-        // One turn is enough because everything that decides it - the plan, `swapping`,
-        // `_markerCrossing` - is set synchronously inside the same publish.
+        // The tracker waits a turn, and the ordering is why. `_syncIndicator` reads
+        // `hasTarget` and `focusedRowIndex`, both of which are derived from `activeColumn`
+        // and `plan`; a change handler runs as soon as its own property is notified, which
+        // is before the bindings depending on it have necessarily been recomputed, so
+        // taking it at face value can hand the routine the previous frame's answer. A
+        // `Behavior` then animates FROM that, and the bar lands a frame behind the window
+        // it is marking. One turn is enough because everything that decides it - the plan,
+        // `swapping`, `_markerCrossing` - is set synchronously inside the same publish.
         Qt.callLater(_syncIndicator)
         _revealFocusedRow()
     }
+    // The OTHER hook, and the one that makes a switch between two workspaces focused on
+    // the same row a switch at all. `focusedRowIndex` does not move in that case, so the
+    // hook above never fires and the bar would sit still through a workspace change - no
+    // commit, no blink, and no stretch, which is three of the widget's four responses
+    // missing at once. Keyed on the window, `focusedWindowKey` moves, and the one routine
+    // runs. Both hooks call it; the second is a no-op when the first already ran.
+    onFocusedWindowKeyChanged: Qt.callLater(_syncIndicator)
     onHasTargetChanged: _syncIndicator()
-
-    // The tracker's target during a crossing moves every frame the frame moves, so this
-    // is where the trail comes from. One handler rather than a binding, because the head
-    // and the tail are written by their Behaviors - a binding on either would be torn off
-    // by the first animation that started - and because both must be written on the same
-    // frame to keep the target they are chasing a single value.
-    onCrossingTopChanged: {
-        if (root._markerCrossing)
-            _followJourney()
-    }
-
-    // The same hand-off when the SCROLL moves, which is the other half of what the
-    // journey's target is derived from and the half that is easy to miss.
-    //
-    // The frame is placed in the strip's drawn coordinates and the tracker's two ends are
-    // not - `_barTop` subtracts the scroll on the way out - so the target has to add it
-    // back on the way in. The reveal scroll that brings the arriving row into view changes
-    // that offset WHILE the journey is running, and `crossingTop` does not move when it
-    // does, so listening only to the frame left the bar a whole scroll behind: measured on
-    // a twelve-window workspace with the focus on row 9, the frame at y 136 with a scroll
-    // of 60 and the head at 137, which is the frame's position minus the scroll exactly.
-    //
-    // It is the fault this test was written for, arriving through the other door - the
-    // original was the bar drawn in the column's unscrolled space, and this is the bar's
-    // TARGET computed from a scroll that had already moved.
-    Connections {
-        // The bare id and not `root.strip`: `strip` is an id, not a property of the
-        // root, so `root.strip` resolved to undefined and this connection silently never
-        // fired - which is exactly the fault it was added for, still present and looking
-        // like the fix had not worked.
-        target: strip
-        function onScrollOffsetChanged() {
-            if (root._markerCrossing)
-                root._followJourney()
-        }
-    }
 
     Component.onCompleted: {
         if (root.hasTarget)
