@@ -36,9 +36,18 @@ Item {
 
     // --- Derived presentation state ---
 
-    readonly property bool interactive: root.available
+    // Only a card that has something to act on accepts input, and availability is
+    // not the same question as readiness: a loading, empty or failed card is a
+    // report, not a target. ControlCenterLogic agrees - actionFor() answers "none"
+    // for every non-ready status - so this is that one decision made again at the
+    // frame, and the two cannot drift apart.
+    readonly property bool readyState: root.status === "ready"
+    readonly property bool interactive: root.available && root.readyState
     readonly property bool hoverHighlighted: root.interactive && cardHover.hovered
-    readonly property bool ringVisible: root.hoverHighlighted || root.activeFocus
+    // Hover and focus share one ring, and both belong to a card that takes input:
+    // an inert card cannot be hovered and never joins the tab chain, so it has no
+    // ring to show.
+    readonly property bool ringVisible: root.interactive && (cardHover.hovered || root.activeFocus)
 
     // The compact state vocabulary. These four words are a badge for the state
     // itself; the wording of the status LINE under the title belongs to
@@ -58,22 +67,33 @@ Item {
     // The badge always reserves its widest word rather than its current one, so
     // a state change is a fade and nothing else: the title's box cannot move
     // with state, and no label can ever be measured into the badge's strip.
+    //
+    // "Widest" means widest as PAINTED, which is not the widest as written: the
+    // labels are shown uppercase, so reserving "Unavailable" while painting
+    // "UNAVAILABLE" under-reserves the strip by roughly the cap height - measured
+    // here as 12px, which is exactly enough for the title to reach into the badge.
+    //
+    // The longest label is chosen by length and then MEASURED, because QML cannot
+    // measure several strings in one go: TextMetrics lays out a single line, so a
+    // joined "LOADING\nUNAVAILABLE\n..." measures as one 178px word rather than as
+    // its widest part. The invariant that actually matters - the reservation
+    // covers every label the badge can paint - is asserted against each painted
+    // label in the tests, which is what makes the selection safe.
     readonly property string widestStateLabel: {
         var widest = ""
         for (var i = 0; i < root.badgeStates.length; i++) {
-            var word = String(root.stateLabels[root.badgeStates[i]])
+            var word = String(root.stateLabels[root.badgeStates[i]]).toUpperCase()
             if (word.length > widest.length)
                 widest = word
         }
         return widest
     }
 
-    // Measure that reserved strip with the badge's own font, so the two cannot
-    // disagree about how wide the badge is.
+    // Measured with the badge's own font - bound, not copied - so retuning the
+    // badge's size or weight cannot leave the reservation behind.
     TextMetrics {
         id: widestStateMetrics
-        font.pixelSize: 10
-        font.weight: Font.DemiBold
+        font: stateLabelItem.font
         text: root.widestStateLabel
     }
 
@@ -95,7 +115,12 @@ Item {
 
     implicitWidth: 240
     implicitHeight: root.contentPadding * 2 + Math.max(root.iconSize, root.textBlockHeight)
-    opacity: root.interactive ? 1 : LazerTheme.settingsDisabledAlpha
+    // Dimming answers "is the service there", not "is the card ready". A missing
+    // service dims to the shared disabled alpha, while a loading, empty or failed
+    // card keeps full contrast and only stops accepting input: its label is
+    // exactly the thing the user has to read, and ghosting it to 30% would hide
+    // the one card that says something went wrong.
+    opacity: root.available ? 1 : LazerTheme.settingsDisabledAlpha
     activeFocusOnTab: root.interactive
     Accessible.role: Accessible.Button
     Accessible.name: root.title

@@ -36,23 +36,60 @@ Item {
         property int count: 0
     }
 
+    // Every component a test builds is parented to one per-test host. A failed
+    // assertion abandons the test function before its own destroy() line, and an
+    // abandoned card would keep answering the NEXT test's clicks - which then
+    // fails for a reason that has nothing to do with it. init() creates the host
+    // and cleanup() destroys it, so nothing can outlive its test and no
+    // destroy() ever runs twice.
+    Component {
+        id: hostComponent
+        Item {
+            width: root.width
+            height: root.height
+        }
+    }
+
+    property Item testHost: null
+
     TestCase {
         name: "ControlCenter"
 
         function init() {
             Lazer.MotionTokens.reducedMotionOverride = false
             activationProbe.count = 0
+            root.testHost = hostComponent.createObject(root)
         }
 
         function cleanup() {
             Lazer.MotionTokens.reducedMotionOverride = false
+            if (root.testHost) {
+                root.testHost.destroy()
+                root.testHost = null
+            }
         }
 
         function makeCard(properties) {
             var args = { x: 0, y: 0, width: 320, height: 64 }
             for (var key in properties)
                 args[key] = properties[key]
-            return cardComponent.createObject(root, args)
+            return cardComponent.createObject(root.testHost, args)
+        }
+
+        // The calendar needs a settled layout before a synthetic click means
+        // anything: its step buttons live inside a Column, so their positions are
+        // assigned during polish, and mouseClick maps coordinates through the
+        // scene graph rather than through the item's own x/y.
+        function makeCalendar(properties) {
+            var args = { x: 0, y: 0, width: 260 }
+            for (var key in properties)
+                args[key] = properties[key]
+            return calendarComponent.createObject(root.testHost, args)
+        }
+
+        function calendarSettled(calendar) {
+            return calendar.previousButtonItem.x > 0 && calendar.nextButtonItem.x > 0
+                    && calendar.monthLabelItem.width > 0 && calendar.gridItem.height > 0
         }
 
         // A Repeater leaves one role-less placeholder among its children, so
@@ -93,7 +130,7 @@ Item {
         }
 
         function test_cardStatesRemainPaintable() {
-            var card = cardComponent.createObject(root, {
+            var card = makeCard({
                 title: "Network", summary: "Unavailable", status: "unavailable",
                 available: false
             })
@@ -103,7 +140,7 @@ Item {
         }
 
         function test_calendarMonthNavigation() {
-            var calendar = calendarComponent.createObject(root, { viewYear: 2026, viewMonth: 11 })
+            var calendar = makeCalendar({ viewYear: 2026, viewMonth: 11 })
             calendar.stepMonth(1)
             compare(calendar.viewYear, 2027)
             compare(calendar.viewMonth, 0)
@@ -195,9 +232,13 @@ Item {
 
         function test_cardLabelsStayInsideTheCardBounds() {
             var longText = "a summary long enough to need eliding on a deliberately narrow card"
+            // The tightest case the card can be handed: a long title AND an icon
+            // AND the widest state badge, all inside a card narrower than the sum
+            // of what they would like. Every one of the three has to give.
             var card = makeCard({
                 width: 180, height: 64, title: "Network adapter with a long name",
-                summary: longText, status: "error", available: true, error: longText
+                summary: longText, icon: CcLogic.iconFor("network"),
+                status: "unavailable", available: true
             })
             tryVerify(function() { return card.titleItem.width > 0 }, 800)
 
@@ -208,11 +249,55 @@ Item {
             verify(card.titleItem.elide !== Text.ElideNone, "the title must elide")
             verify(card.summaryItem.elide !== Text.ElideNone, "the summary must elide")
             // The badge keeps its own width; the text column takes what is left,
-            // so the two never claim the same strip of the title row.
+            // so the two never claim the same strip of the title row. Read as two
+            // real boxes, because a reservation that under-measures the painted
+            // word lets the title reach into the badge while both still report
+            // themselves in bounds.
             var titleRight = card.titleItem.mapToItem(card, card.titleItem.width, 0).x
             verify(titleRight <= card.stateBadgeItem.mapToItem(card, 0, 0).x + 0.5,
                 "the title and the badge cannot both claim the same strip")
+            // ...and the fixture is actually tight, so the assertion above is not
+            // passing by accident. implicitWidth is the title's natural width:
+            // a Text reports contentWidth AFTER eliding, so the elision itself
+            // cannot be read back off contentWidth.
+            verify(card.titleItem.implicitWidth > card.titleItem.width,
+                "the long title must be elided, not silently shrunk")
             card.destroy()
+        }
+
+        // The badge paints uppercase, so the strip it reserves has to be measured
+        // on the uppercase word. Reserving the mixed-case label under-reserves the
+        // strip by roughly the cap height, which is exactly enough for the title
+        // to reach past it on a narrow card.
+        function test_theBadgeStripReservesThePaintedUppercaseLabel() {
+            var states = ["loading", "unavailable", "empty", "error"]
+            for (var i = 0; i < states.length; i++) {
+                var card = makeCard({
+                    title: "Network", status: states[i], available: true
+                })
+                compare(card.stateLabelItem.text, card.stateLabel.toUpperCase(),
+                    states[i] + " paints an uppercase label")
+                var painted = card.stateBarItem.width + card.badgeGap
+                        + card.stateLabelItem.width
+                verify(painted <= card.reservedBadgeWidth + 0.5,
+                    states[i] + " badge must fit inside its reserved strip")
+                card.destroy()
+            }
+
+            // And the reservation is the widest of all of them, not the current
+            // one: the label can change without the strip moving.
+            var widestCard = makeCard({ title: "Network", status: "unavailable", available: true })
+            var reserved = widestCard.reservedBadgeWidth
+            compare(widestCard.widestStateLabel, "UNAVAILABLE",
+                "the widest painted label is UNAVAILABLE")
+            compare(widestCard.stateLabel, "UNAVAILABLE")
+            widestCard.status = "empty"
+            compare(widestCard.reservedBadgeWidth, reserved,
+                "a state change must not reflow the strip")
+            verify(widestCard.stateLabelItem.width
+                    <= widestCard.reservedBadgeWidth - widestCard.badgeBarWidth
+                    - widestCard.badgeGap + 0.5)
+            widestCard.destroy()
         }
 
         function test_cardActivationEmitsAndFlashes() {
@@ -241,6 +326,77 @@ Item {
             verify(!card.flashActive)
             compare(card.flashOverlayItem.opacity, 0)
             Lazer.MotionTokens.reducedMotionOverride = false
+            card.destroy()
+        }
+
+        // One non-ready state at a time, each on a card whose service EXISTS, so
+        // every assertion below is about readiness and not about availability.
+        function expectNonReadyAvailableCardToBeInert(status) {
+            var card = makeCard({
+                title: "Network", summary: "Not connected",
+                icon: CcLogic.iconFor("network"),
+                status: status, available: true, error: "adapter missing"
+            })
+            card.activated.connect(function() { activationProbe.count++ })
+            tryVerify(function() { return card.surfaceItem.width > 0 }, 800)
+
+            // Paintable, and at full contrast: dimming is for a service that is
+            // not there, not for a card whose label is the thing to read.
+            verify(card.visible, status + " must stay visible")
+            compare(card.opacity, 1, status + " must stay readable")
+            verify(card.stateLabel.length > 0, status + " must keep its compact label")
+
+            compare(card.interactive, false, status + " must not accept input")
+            compare(card.activeFocusOnTab, false, status + " must not take focus")
+            // ...and a host that forces focus onto it anyway still gets no ring:
+            // the ring belongs to a card that accepts input, not to one that
+            // merely happens to hold focus.
+            card.forceActiveFocus()
+            verify(!card.ringVisible, status + " must not draw a ring when focused")
+
+            // Hover: a synthetic move over the card changes nothing.
+            mouseMove(card, card.width / 2, card.height / 2)
+            verify(!card.hoverHighlighted, status + " must not highlight on hover")
+            compare(card.surfaceItem.color, Lazer.LazerTheme.settingsCard,
+                status + " must not swap to the hover surface")
+            compare(card.highlightItem.border.width, 0, status + " must not draw a ring")
+            compare(card.highlightItem.enabled, false, "the ring layer never takes input")
+
+            // Click: no activation request, and none of the shared click feedback.
+            mouseClick(card, card.width / 2, card.height / 2)
+            compare(activationProbe.count, 0, status + " must not activate")
+            verify(!card.flashActive, status + " must not flash")
+            compare(card.flashOverlayItem.opacity, 0, status + " must not wash")
+
+            // The programmatic path is the same gate as the pointer path.
+            card.activate()
+            compare(activationProbe.count, 0, status + " must ignore a direct activate()")
+            card.destroy()
+        }
+
+        // Availability is not readiness. A loading, empty or failed card is a
+        // report, not a target, so it stays on screen and stays legible while
+        // accepting nothing - and ControlCenterLogic agrees, since actionFor()
+        // answers "none" for every non-ready status.
+        function test_aNonReadyButAvailableCardStaysPaintableYetInert() {
+            var states = ["loading", "unavailable", "empty", "error"]
+            for (var i = 0; i < states.length; i++)
+                expectNonReadyAvailableCardToBeInert(states[i])
+        }
+
+        // The control half of the hover assertions above: the same synthetic move
+        // over a ready card DOES light up. Without this, "no hover on an inert
+        // card" would also pass if the harness could not drive hover at all.
+        function test_theSameHoverStillReachesAReadyCard() {
+            var card = makeCard({ title: "Network", summary: "Home", status: "ready", available: true })
+            tryVerify(function() { return card.surfaceItem.width > 0 }, 800)
+            mouseMove(card, card.width / 2, card.height / 2)
+            tryVerify(function() { return card.hoverHighlighted }, 500)
+            tryCompare(card.surfaceItem, "color", Lazer.LazerTheme.settingsCardHover, 500)
+            // Read through JS, not through tryCompare("border.width"): the Qt 6.11
+            // test helpers cannot resolve a grouped property path, so that form
+            // fails on a value that is already correct.
+            tryVerify(function() { return card.highlightItem.border.width === 1.5 }, 500)
             card.destroy()
         }
 
@@ -307,8 +463,71 @@ Item {
             withoutIcon.destroy()
         }
 
+        // Pagination is asserted through the buttons a user actually presses, not
+        // by calling stepMonth(): the arithmetic was already covered above, so what
+        // is under test here is the wiring from a click to that arithmetic.
+        function test_theStepButtonsPageTheMonthOnAClick() {
+            var calendar = makeCalendar({ viewYear: 2026, viewMonth: 11 })
+            tryVerify(function() { return calendarSettled(calendar) }, 1000)
+
+            mouseClick(calendar.nextButtonItem, calendar.nextButtonItem.width / 2,
+                       calendar.nextButtonItem.height / 2)
+            tryCompare(calendar, "viewYear", 2027, 800)
+            tryCompare(calendar, "viewMonth", 0, 800)
+            // The header followed, and so did the grid's own set of dates.
+            compare(calendar.monthLabelText, Calendar.monthLabel(2027, 0))
+            tryVerify(function() {
+                return delegatesWhere(calendar, "inMonth", true).length
+                        === Calendar.daysInMonth(2027, 0)
+            }, 800)
+
+            // Back again, so a click is a page rather than a one-way latch.
+            mouseClick(calendar.previousButtonItem, calendar.previousButtonItem.width / 2,
+                       calendar.previousButtonItem.height / 2)
+            tryCompare(calendar, "viewYear", 2026, 800)
+            tryCompare(calendar, "viewMonth", 11, 800)
+            compare(calendar.monthLabelText, Calendar.monthLabel(2026, 11))
+            tryVerify(function() {
+                return delegatesWhere(calendar, "inMonth", true).length
+                        === Calendar.daysInMonth(2026, 11)
+            }, 800)
+            calendar.destroy()
+        }
+
+        // The keyboard half: Return and Space on a focused step button are the
+        // actions the component declares, and an unhandled key must do nothing.
+        function test_theStepButtonsPageTheMonthOnTheKeyboard() {
+            var calendar = makeCalendar({ viewYear: 2026, viewMonth: 11 })
+            tryVerify(function() { return calendarSettled(calendar) }, 1000)
+
+            // Focused the way Tab would, since tab order is the host's business.
+            calendar.nextButtonItem.forceActiveFocus()
+            verify(calendar.nextButtonItem.activeFocus)
+            keyPress(Qt.Key_Return)
+            keyRelease(Qt.Key_Return)
+            tryCompare(calendar, "viewYear", 2027, 800)
+            tryCompare(calendar, "viewMonth", 0, 800)
+
+            keyPress(Qt.Key_Space)
+            keyRelease(Qt.Key_Space)
+            tryCompare(calendar, "viewMonth", 1, 800)
+
+            calendar.previousButtonItem.forceActiveFocus()
+            verify(calendar.previousButtonItem.activeFocus)
+            keyPress(Qt.Key_Return)
+            keyRelease(Qt.Key_Return)
+            tryCompare(calendar, "viewMonth", 0, 800)
+
+            // The handler is a whitelist of activation keys, not "any key".
+            keyPress(Qt.Key_Left)
+            keyRelease(Qt.Key_Left)
+            compare(calendar.viewMonth, 0, "an unrelated key must not page the calendar")
+            compare(calendar.viewYear, 2027)
+            calendar.destroy()
+        }
+
         function test_calendarGridIsFixedAtSixRowsForEveryMonth() {
-            var february = calendarComponent.createObject(root, { viewYear: 2026, viewMonth: 1 })
+            var february = makeCalendar({ viewYear: 2026, viewMonth: 1 })
             compare(february.rowCount, 6)
             compare(february.columnCount, 7)
             compare(february.cellCount, 42)
@@ -326,7 +545,7 @@ Item {
             compare(february.viewMonth, 2)
             compare(delegatesWhere(february, "inMonth", true).length, Calendar.daysInMonth(2026, 2))
 
-            var january = calendarComponent.createObject(root, { viewYear: 2026, viewMonth: 0 })
+            var january = makeCalendar({ viewYear: 2026, viewMonth: 0 })
             compare(delegatesWhere(january, "inMonth", true).length, Calendar.daysInMonth(2026, 0))
             compare(january.implicitHeight, february.implicitHeight,
                 "a fixed six-row grid must not change the calendar's height")
@@ -335,7 +554,7 @@ Item {
         }
 
         function test_calendarSteppingWrapsBothWays() {
-            var calendar = calendarComponent.createObject(root, { viewYear: 2026, viewMonth: 0 })
+            var calendar = makeCalendar({ viewYear: 2026, viewMonth: 0 })
             calendar.stepMonth(-1)
             compare(calendar.viewYear, 2025)
             compare(calendar.viewMonth, 11)
@@ -348,7 +567,7 @@ Item {
         }
 
         function test_calendarUsesTheSundayFirstWeekdayConvention() {
-            var calendar = calendarComponent.createObject(root, { viewYear: 2026, viewMonth: 11 })
+            var calendar = makeCalendar({ viewYear: 2026, viewMonth: 11 })
             compare(calendar.weekdayLabels.length, 7)
             compare(calendar.weekdayLabels[0], "\u65E5")
             compare(calendar.weekdayLabels[6], "\u516D")
@@ -368,7 +587,7 @@ Item {
         }
 
         function test_calendarHighlightsExactlyTheTodayCell() {
-            var calendar = calendarComponent.createObject(root, {
+            var calendar = makeCalendar({
                 today: new Date(2026, 10, 12), viewYear: 2026, viewMonth: 10
             })
             var todayCells = delegatesWhere(calendar, "isToday", true)
@@ -389,7 +608,7 @@ Item {
         }
 
         function test_calendarResetViewReturnsToToday() {
-            var calendar = calendarComponent.createObject(root, {
+            var calendar = makeCalendar({
                 today: new Date(2026, 0, 5), viewYear: 2030, viewMonth: 7
             })
             compare(calendar.viewingCurrentMonth, false)
@@ -438,7 +657,7 @@ Item {
         }
 
         function test_calendarStepButtonsAreSquareGeometricArrows() {
-            var calendar = calendarComponent.createObject(root, { width: 260 })
+            var calendar = makeCalendar({})
             tryVerify(function() { return calendar.previousButtonItem.width > 0 }, 800)
 
             compare(calendar.previousButtonItem.width, calendar.previousButtonItem.height)
