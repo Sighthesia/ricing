@@ -1321,6 +1321,17 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         // nothing about whether the bar travelled at all. Derived from the bar's own two
         // ends rather than from the tracker's internals, and direction-agnostic, because
         // which end leads depends on which way the switch went.
+        // How much the bar's length is allowed to change in a single frame, given that the head
+// moved this much. The wake is the head-tail separation, so the length tracks the head's
+        // own motion, plus whatever the tail recovered on that tick - and the tail recovers
+        // at most `tailCatchUp` of a gap no larger than the cap. Anything beyond that is a
+        // cut rather than motion, which is the thing worth asserting; a fixed pixel budget
+        // would instead be asserting the frame's speed on one particular journey, which is
+        // not the property and would need re-tuning for every panel height.
+        function barLengthAllowance(headStep) {
+            return headStep + body.tailCatchUp * body.indicatorWakeCap + 1
+        }
+
         function barLeadingEdge() {
             return Math.max(bar().y,
                 bar().y + bar().height - body.indicatorLength)
@@ -1372,7 +1383,14 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         // most of them never make, which is what pushed the file past its time cap.
         function settleBar() {
             settleMarker()
-            wait(Lazer.MotionTokens.slow * 2 + 60)
+            // Wait for the wake to CLOSE rather than for a computed number of ticks. The
+            // follower commits at half a pixel, so the condition is exact and needs no
+            // arithmetic; a closed-form estimate of a geometric series is a number that
+            // has to be re-derived every time the catch-up rate or the cap moves, and
+            // being one tick short fails an equality on a third of a pixel. The bound is
+            // only there so a broken follower fails rather than hangs.
+            for (var i = 0; i < 150 && bar().height !== body.indicatorLength; ++i)
+                wait(16)
             compare(bar().height, body.indicatorLength,
                 "and the bar really has come back to its resting length")
         }
@@ -1770,24 +1788,116 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         // What must not happen is a DISCONTINUITY: the bar's length is a function of the
         // tail's flight, so it may grow or shrink between samples, but it must never fall
         // to nothing in a single step.
-        function test_aSwitchInTheMiddleOfATrailDoesNotCutTheTrailToNothing() {
-            startCrossingOverTwoRows(2, 2, 3, 0)
-            // Leave a trail in flight: two rows apart, which is further than the tail's
-            // 160ms head flight covers before the switch is published.
+        // The corner, and the sudden shortening that was still there after the tracker
+        // started following the frame.
+        //
+        // The frame leaves the panel on both legs - off the bottom on the way out, back in
+        // from above - and that off-panel flight is deliberate, because the position
+        // discontinuity is the one thing never on screen. The bar's LENGTH is the head-tail
+        // separation, so when the head made that flight while the tail could not follow,
+        // the wake ballooned and then collapsed: measured across one switch, 161.7px of
+        // wake on the frame before the corner and 119.6px on the frame after it, a 42px
+        // step in 16ms. Nothing about the tail's speed can fix that - the head's jump is
+        // what has to be absorbed - so the wake is bounded, which is what the workspace
+        // widget's own shadow has always been.
+        //
+        // The claim is therefore about DISCONTINUITY, sampled every frame across a whole
+        // switch rather than read once: the bar may grow and may shrink, but no single
+        // 16ms step may be large enough to read as a cut. With the wake saturating at its
+        // cap through the corner the length simply holds and then contracts.
+        function test_theBarsLengthNeverStepsInOneFrameAcrossASwitch() {
+            body.hint = root.tallFramedHint(2, 2, 6, 0)
+            wait(300)
+            // A wake in flight when the switch is published, so the switch starts from the
+            // state that used to expose it.
             body.hint = root.tallFramedHint(2, 2, 6, 4)
-            wait(body.crossingAnimation.duration + 40)
-            var stretched = barVersusFrame().stretch
-            verify(stretched > 2,
-                "there is a trail in flight to cut, " + stretched.toFixed(1))
-            // Now the switch, published while that trail is still out.
+            wait(120)
             body.hint = root.tallFramedHint(3, 2, 6, 1)
-            wait(body.slideDuration / 2)
-            var after = barVersusFrame().stretch
-            verify(after > 0,
-                "the trail survived the switch rather than being cut to nothing: "
-                    + stretched.toFixed(1) + " before, " + after.toFixed(1) + " after")
+            var worstExcess = 0
+            var worstAt = -1
+            var worstDetail = ""
+            var previousLength = body._barLength
+            var previousHead = body._headY
+            var samples = Math.round(body.crossingAnimation.duration / 16) + 40
+            for (var i = 0; i < samples; ++i) {
+                wait(16)
+                var length = body._barLength
+                var headStep = Math.abs(body._headY - previousHead)
+                var excess = Math.abs(length - previousLength) - barLengthAllowance(headStep)
+                if (excess > worstExcess) {
+                    worstExcess = excess
+                    worstAt = i
+                    worstDetail = "moved " + Math.abs(length - previousLength).toFixed(1)
+                        + "px on a head that moved " + headStep.toFixed(1) + "px"
+                }
+                previousLength = length
+                previousHead = body._headY
+            }
+            verify(worstExcess <= 0,
+                "no frame changed the bar's length faster than the frame was moving: the "
+                    + "worst excess was " + worstExcess.toFixed(1) + "px at sample "
+                    + worstAt + ", where it " + worstDetail + ". Resting length "
+                    + body.indicatorLength + ", wake cap " + body.indicatorWakeCap.toFixed(1))
             settleSlide()
-            settleMarker()
+            settleBar()
+        }
+
+        function test_aSwitchInTheMiddleOfATrailDoesNotCutTheTrailToNothing() {
+            // Two ways a wake gets cut, and the second is the one that was reported.
+            //
+            // First: a focus change inside one workspace leaves a wake, and a switch
+            // published while it is still out used to commit both ends on its first frame.
+            //
+            // Second, and the commoner: a switch's OWN wake is long - it saturates at the
+            // cap while the frame is off-panel - so a second switch arriving before the
+            // first has landed interrupts a wake in flight. That is "switching repeatedly",
+            // and it is where a trail is in flight more often than not.
+            body.hint = root.tallFramedHint(2, 2, 6, 0)
+            wait(300)
+            body.hint = root.tallFramedHint(2, 2, 6, 4)
+            // Wait for a wake to EXIST rather than for a duration. The tail is a follower,
+            // so how long a trail survives depends on the gap it has to close; this test
+            // used to wait out the old fixed 480ms flight and found a 1.7px wake waiting
+            // for it, which is a test that stopped testing anything.
+            var wake = 0
+            for (var i = 0; i < 24 && wake <= 2; ++i) {
+                wait(16)
+                wake = barVersusFrame().stretch
+            }
+            verify(wake > 2, "there is a wake in flight to cut, " + wake.toFixed(1))
+            body.hint = root.tallFramedHint(3, 2, 6, 1)
+            wait(16)
+            var afterFirst = barVersusFrame().stretch
+            verify(afterFirst > 0,
+                "and it survived the switch rather than being cut to nothing: "
+                    + wake.toFixed(1) + " before, " + afterFirst.toFixed(1) + " after")
+
+            // ...and now the consecutive case, measured the same way as the corner: the
+            // second switch lands mid-wake, and no frame may change the length faster than
+            // the frame is moving.
+            var worstExcess = 0
+            var worstDetail = ""
+            var previousLength = body._barLength
+            var previousHead = body._headY
+            body.hint = root.tallFramedHint(4, 2, 6, 5)
+            for (var f = 0; f < 24; ++f) {
+                wait(16)
+                var length = body._barLength
+                var headStep = Math.abs(body._headY - previousHead)
+                var excess = Math.abs(length - previousLength) - barLengthAllowance(headStep)
+                if (excess > worstExcess) {
+                    worstExcess = excess
+                    worstDetail = "moved " + Math.abs(length - previousLength).toFixed(1)
+                        + "px on a head that moved " + headStep.toFixed(1) + "px"
+                }
+                previousLength = length
+                previousHead = body._headY
+            }
+            verify(worstExcess <= 0,
+                "a second switch into a wake in flight did not cut it either: the worst "
+                    + "excess was " + worstExcess.toFixed(1) + "px, where it " + worstDetail)
+            settleSlide()
+            settleBar()
         }
 
         function test_theJourneyLandsAndStays() {
@@ -1962,10 +2072,13 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // marker arrives is the one moment that reads as a mistake rather than as
             // motion.
             body.hint = root.tallFramedHint(2, 2, 12, 9)
-            // Past the tail's own `MotionTokens.slow * 2`, so the resting assertion below
-            // is about the placement rather than about a fraction of a pixel still in
-            // flight.
-            wait(700)
+            // `settleBar` rather than a fixed wait, and the fixed wait was the tail's old
+            // `MotionTokens.slow * 2` flight. The tail is a follower now, closing a fixed
+            // fraction of its gap per tick, so how long it needs is a function of how far
+            // it has to come - which `settleBar` derives. A named duration here was a
+            // number that happened to be long enough, and it stopped being long enough
+            // the moment the tail stopped being a fixed-duration animation.
+            settleBar()
             var scroll = strip().scrollOffset
             verify(scroll > 0, "the panel is scrolled, by " + scroll)
             compare(findByName(body, "windowHintFocusIndicator").y,
@@ -3625,15 +3738,26 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             // two adjacent samples. The tail opens smoothly because it is a 480ms flight
             // chasing a target that moves; only a commit moves in one frame.
             var worstDrop = 0
+            var worstDetail = ""
             var previousLength = body._barLength
+            var previousHead = body._headY
             for (var i = 0; i < 12; ++i) {
                 wait(16)
                 var length = body._barLength
-                worstDrop = Math.max(worstDrop, previousLength - length)
+                var drop = previousLength - length
+                var allowed = barLengthAllowance(Math.abs(body._headY - previousHead))
+                if (drop - allowed > worstDrop) {
+                    worstDrop = drop - allowed
+                    worstDetail = "dropped " + drop.toFixed(1) + "px on a head that moved "
+                        + Math.abs(body._headY - previousHead).toFixed(1) + "px"
+                }
                 previousLength = length
+                previousHead = body._headY
             }
-            verify(worstDrop <= 12, "and the bar did not snap: its worst one-frame drop "
-                + "was " + worstDrop.toFixed(1) + "px, while the wake stood at "
+            verify(worstDrop <= 0, "and the bar did not snap: its worst one-frame drop "
+                + "beyond what the frame's own motion accounts for was "
+                + worstDrop.toFixed(1) + "px, where it " + worstDetail
+                + ". The wake stood at "
                 + (body._barLength - body.indicatorLength).toFixed(1)
                 + "px over its resting " + body.indicatorLength + "px")
 

@@ -224,7 +224,6 @@ Item {
     // depends on the marker outliving the columns.
     readonly property alias crossingAnimation: crossingRun
     readonly property alias indicatorHeadMotion: indicatorHeadAnimation
-    readonly property alias indicatorTailMotion: indicatorTailAnimation
     readonly property int rowHeight: 28
     // The one row the focus indicator belongs to, or -1. Read from the ARRIVING
     // active column, which is the content the user is being taken to.
@@ -959,8 +958,74 @@ Item {
     // same number of pixels below the list's own bottom. Measured on a twelve-window
     // workspace with the focus on row 9, the outline landed on the card at y 136 and the
     // bar at y 307 - 171px apart, which is the scroll.
-    readonly property real _barTop: Math.min(_headY, _tailY) - strip.scrollOffset
-    readonly property real _barLength: indicatorLength + Math.abs(_headY - _tailY)
+    // How far the tail may fall behind the head, and why the answer is a bound rather than
+    // "however far it ends up".
+    //
+    // The frame leaves the panel on both legs of a journey - it slides off the bottom edge
+    // and comes back from above - and that off-panel flight is deliberate: the position
+    // discontinuity is the one thing never on screen. The bar must not inherit it. Its
+    // length is the head-tail separation, so a head that travels 229px off-panel while
+    // the tail is where it is turns a 42px bar into a 230px one and then, at the corner,
+    // snaps it back in a single frame - measured across one switch: 161.7px of wake on the
+    // frame before the corner, 119.6px on the frame after, a 42px step. That is the
+    // reported sudden shortening, and no amount of making the tail faster removes it,
+    // because the head's jump is the thing that has to be absorbed.
+    //
+    // The stretch itself is what the widget does - `activeHighlight` covers the gap with a
+    // shadow and has always been bounded - so bounding it is faithful rather than a
+    // cap on the effect. Sized above the wake a normal on-panel traverse produces (about
+    // 41px at the catch-up rate below) so an ordinary switch never reaches it, and the
+    // cap is only ever met by the off-panel excursion.
+    readonly property real indicatorWakeCap: indicatorLength * 2.5
+
+    // How much of the remaining gap the tail closes per tick - a first-order follower
+    // with a time constant of roughly 130ms. It replaces a `Behavior` on `_tailY`, and
+    // the reason is arithmetic rather than taste.
+    //
+    // A Behavior is the right tool for a target that moves ONCE. Re-assigning it every
+    // frame restarts its easing every frame, and an easing that has just started is at
+    // the beginning of its curve: `OutSine` covers `sin(0.033 * PI/2)`, about 5% of the
+    // gap, on the first tick of a 480ms flight. With the target itself moving about 5px
+    // per frame, the tail advanced 0.0085px per frame - measured as `tail` sitting at
+    // exactly 60.0 for nineteen consecutive frames of a switch while the head ran from
+    // 137 to 196. The bar's length was therefore the head's motion alone, which is why a
+    // switch had no trail to cut and why the corner's jump had nothing to absorb it.
+    //
+    // A follower does not restart, so it actually moves, and its lag is proportional to
+    // the head's speed - which is the shadow-over-the-gap behaviour rather than a fixed
+    // delay being chased.
+    readonly property real tailCatchUp: 0.12
+
+    // The wake, and the bar's geometry from it. This is deliberately NOT
+    // `min(head, tail)` and `|head - tail|`, which is what it was, and the difference is
+    // the corner.
+    //
+    // The bar's length used to be the raw head-tail separation, which made the frame's
+    // off-panel flight part of the bar: the head would travel 229px out of the panel while
+    // the tail stayed put, and the drawn bar - anchored at whichever end was higher -
+    // covered the whole panel. Bounding the separation is unavoidable; where the bound is
+    // APPLIED is the whole design.
+    //
+    // Clamping the stored tail to `head - cap` looks equivalent and is not. At the corner
+    // the head teleports to the far side of the panel, so the clamp has to move the tail
+    // from one side of it to the other - measured at 242 -> 23, a 219px jump in one frame,
+    // which put a 126px step in the bar's length where the un-clamped version had put 42.
+    // It trades a visible cut for a larger one.
+    //
+    // So the tail is left to follow at its own rate and the CAP IS DRAWN: the bar is
+    // anchored to the head - the frame - and extends backwards by at most the cap. The
+    // head's jump then moves the bar, which is off-panel and invisible, instead of
+    // changing its length. And because the wake is already saturated by the time the
+    // corner arrives - the exit leg runs the head off the bottom of the panel well before
+    // it - nothing visible happens at the corner at all.
+    //
+    // `head > tail` is a downward journey, and the wake trails above the head; upward, the
+    // head leads and the wake trails below. The two agree where they meet, at a wake of
+    // zero, so the direction cannot introduce a step of its own.
+    readonly property real _wake: Math.min(Math.abs(_headY - _tailY), indicatorWakeCap)
+    readonly property real _barTop: _headY - strip.scrollOffset
+        - (_headY > _tailY ? _wake : 0)
+    readonly property real _barLength: indicatorLength + _wake
 
     // Where the bar belongs while the frame is travelling: on the frame, in the bar's own
     // length, measured in the tracker's scrolled coordinates like every other target
@@ -1003,14 +1068,32 @@ Item {
             easing.type: Easing.OutQuad
         }
     }
-    Behavior on _tailY {
-        enabled: root._placed && !MotionTokens.reducedMotion && !root._snapping
-        // 3x the head's flight: the tail lingers long after the head lands, which
-        // is what keeps the stretch readable.
-        NumberAnimation {
-            id: indicatorTailAnimation
-            duration: MotionTokens.slow * 2 * debugTimeScale
-            easing.type: Easing.OutSine
+    // The tail's motion, as a follower rather than an animation - see `tailCatchUp` for why
+    // a Behavior cannot be re-targeted per frame. Written directly, with no `Behavior` to
+    // suppress, which is also why `_snapping` does not appear here.
+    //
+    // Idle when the two are together, so a panel nobody is touching runs no timer. The
+    // tail closing the last half-pixel is what stops it, so there is no separate
+    // "finished" state to get out of step with the head's.
+    Timer {
+        id: tailCatchUpTimer
+        interval: 16
+        repeat: true
+        running: root._placed && Math.abs(root._headY - root._tailY) > 0.5
+        onTriggered: {
+            if (MotionTokens.reducedMotion) {
+                root._tailY = root._headY
+                return
+            }
+            root._tailY += (root._headY - root._tailY) * root.tailCatchUp
+            // ...and the last fraction of a pixel is committed rather than approached. The
+            // timer stops at half a pixel, so a wake that merely tends to zero leaves the
+            // resting bar a fraction long - measured at 26.449 against a resting 26, which
+            // is a resting-length assertion that fails for a third of a pixel. Closing it
+            // here keeps "at rest" an exact state instead of an asymptote, and the step is
+            // sub-pixel so nothing on screen moves.
+            if (Math.abs(root._headY - root._tailY) < 0.5)
+                root._tailY = root._headY
         }
     }
 
@@ -1063,23 +1146,24 @@ Item {
         // and flash the bar back to full length instead of letting the tail finish
         // contracting - the arrival's own motion, cut off by a bookkeeping value.
         _targetKey = String(root.focusedRowIndex)
-        // The head SNAPS and the tail is merely re-targeted, and the asymmetry is the
-        // design rather than an inconsistency. The head is the frame's own position: the
-        // bar has to stay one `markerOffset` below the outline for the whole journey, or
-        // the two stop being one gesture - and a Behavior chasing a target that moves
+        // The head SNAPS and the tail is left entirely alone, and the asymmetry is
+        // the design rather than an inconsistency. The head is the frame's own position:
+        // the bar has to stay one `markerOffset` below the outline for the whole journey,
+        // or the two stop being one gesture - and a Behavior chasing a target that moves
         // every frame is always behind it, which is a lag, not a lead. So the leading end
-        // of the bar is pinned to the frame and only the trailing end flies, three times
-        // the head's flight. `_barTop` is the MINIMUM of the two, so the bar is drawn
-        // upward from the tail to just past the head: the stretch is a wake behind the
-        // frame, and the frame never leaves the bar's leading edge.
+        // of the bar is pinned to the frame and the trailing end is left to the follower,
+        // which lags by an amount set by how fast the head is going rather than by a
+        // fixed duration.
         //
-        // `_snapping` is read at the moment the property changes, which is why it brackets
-        // the head's write rather than being set for the whole function: the tail below it
-        // has to animate.
+        // `_barTop` is the MINIMUM of the two, so the bar is drawn from the tail up to
+        // just past the head: the stretch is a wake behind the frame, and the frame never
+        // leaves the bar's leading edge whichever way the switch went.
+        //
+        // `_snapping` is read at the moment the property changes, which is what stops the
+        // head's own Behavior from starting.
         _snapping = true
         _headY = target
         _snapping = false
-        _tailY = target
     }
 
     // Route every re-anchor through here. A genuine target switch desyncs head and
@@ -1539,7 +1623,20 @@ Item {
     }
 
     onFocusedRowIndexChanged: {
-        _syncIndicator()
+        // The tracker waits a turn, and the ordering is the whole reason. A workspace
+        // switch publishes the arriving hint FIRST and starts the crossing afterwards, so
+        // this handler runs while `_markerCrossing` is still false and
+        // `focusedRowIndex` is already the ARRIVING row. Taking it at face value is a
+        // genuine target switch, which is the branch that commits head and tail together
+        // and blinks once - correct for a focus change inside one workspace, and exactly
+        // wrong here. `_startSlide` then hands the tracker to the frame, which snaps the
+        // head back to the departing card, and the bar is left stretched between two rows
+        // it was never on: measured as a 37px step in the first frame of a switch, against
+        // a 14px ceiling and a wake the whole crossing is not supposed to exceed.
+        //
+        // One turn is enough because everything that decides it - the plan, `swapping`,
+        // `_markerCrossing` - is set synchronously inside the same publish.
+        Qt.callLater(_syncIndicator)
         _revealFocusedRow()
     }
     onHasTargetChanged: _syncIndicator()
@@ -1552,6 +1649,32 @@ Item {
     onCrossingTopChanged: {
         if (root._markerCrossing)
             _followJourney()
+    }
+
+    // The same hand-off when the SCROLL moves, which is the other half of what the
+    // journey's target is derived from and the half that is easy to miss.
+    //
+    // The frame is placed in the strip's drawn coordinates and the tracker's two ends are
+    // not - `_barTop` subtracts the scroll on the way out - so the target has to add it
+    // back on the way in. The reveal scroll that brings the arriving row into view changes
+    // that offset WHILE the journey is running, and `crossingTop` does not move when it
+    // does, so listening only to the frame left the bar a whole scroll behind: measured on
+    // a twelve-window workspace with the focus on row 9, the frame at y 136 with a scroll
+    // of 60 and the head at 137, which is the frame's position minus the scroll exactly.
+    //
+    // It is the fault this test was written for, arriving through the other door - the
+    // original was the bar drawn in the column's unscrolled space, and this is the bar's
+    // TARGET computed from a scroll that had already moved.
+    Connections {
+        // The bare id and not `root.strip`: `strip` is an id, not a property of the
+        // root, so `root.strip` resolved to undefined and this connection silently never
+        // fired - which is exactly the fault it was added for, still present and looking
+        // like the fix had not worked.
+        target: strip
+        function onScrollOffsetChanged() {
+            if (root._markerCrossing)
+                root._followJourney()
+        }
     }
 
     Component.onCompleted: {
