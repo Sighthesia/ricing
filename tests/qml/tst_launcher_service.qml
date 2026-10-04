@@ -120,6 +120,8 @@ Item {
             svc()._metadataRefreshPending = false
             svc().loadingMore = false
             svc()._streamActive = false
+            svc()._inputActive = false
+            svc()._heldBatches = []
             if (_clipboardStub) {
                 _clipboardStub.destroy()
                 _clipboardStub = null
@@ -1013,6 +1015,70 @@ Item {
             svc().primeApps()
             resolveRefresh(apps, 0, { error: "boom" })
             compare(svc().displayPool.length, 1)
+        }
+
+        // --- input priority ---
+
+        function test_tailBatchWaitsForTheInputToSettle() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+            svc().open()
+            wait(0)
+            resolveBatch(apps, 0, [makeItem("a", "Alpha", 0, 0)], false)
+            compare(svc().loadingMore, true)
+
+            // The user starts arrowing through the list, and the tail lands
+            // mid-input: it must not spend the frame the input needs.
+            svc().selectNext()
+            resolveBatch(apps, 0, [makeItem("b", "Beta", 0, 0)], false)
+            compare(svc().results.length, 1)
+            compare(svc().displayPool.length, 1)
+            compare(svc().loadingMore, true)
+
+            svc().drainHeldBatches()
+            compare(svc().displayPool.length, 2)
+            compare(svc().loadingMore, true)
+        }
+
+        function test_firstBatchLandsEvenMidInput() {
+            // A mode switch asks for new content while the user is typing. That
+            // first batch replaces the pool, so holding it would show an empty
+            // list until the input window closed.
+            var apps = makeManualAdapter()
+            var clips = makeManualAdapter()
+            svc()._adapters = { apps: apps, clipboard: clips }
+            svc().open()
+            wait(0)
+            resolveBatch(apps, 0, [makeItem("a", "Alpha", 0, 0)], true)
+            compare(svc().results.length, 1)
+
+            svc().noteInput()
+            svc().query = ">clip "
+            wait(0)
+            resolveBatch(clips, 0, [makeItem("c", "Copied", 0, 0)], true)
+            compare(svc().results.length, 1)
+            compare(svc().results[0].id, "c")
+            compare(svc().displayPool.length, 1)
+        }
+
+        function test_aFreshRefreshDropsHeldBatches() {
+            var apps = makeManualAdapter()
+            svc()._adapters = { apps: apps }
+            svc().open()
+            wait(0)
+            resolveBatch(apps, 0, [makeItem("a", "Alpha", 0, 0)], false)
+            svc().selectNext()
+            resolveBatch(apps, 0, [makeItem("stale", "Stale", 0, 0)], false)
+
+            // A superseding refresh must not be handed the held batch later:
+            // the pool stays on the rows the live refresh last committed, and
+            // the held one never appears.
+            svc().refresh(true)
+            wait(0)
+            svc().drainHeldBatches()
+            compare(svc().displayPool.length, 1)
+            compare(svc().displayPool[0].id, "a")
+            compare(svc().loadingMore, false)
         }
 
         // --- category lens ---

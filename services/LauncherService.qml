@@ -45,6 +45,41 @@ Singleton {
         batchTimer.restart()
     }
 
+    // Foreground priority for the clipboard's background work (metadata counts,
+    // content signatures). Those queues exist to enrich a history that is
+    // already on screen, so an open session holds them off rather than letting
+    // them compete with the frame the user is waiting on.
+    Timer {
+        id: foregroundHoldTimer
+        interval: 400
+        repeat: false
+        onTriggered: session.setForegroundBusy(false)
+    }
+    Connections {
+        target: session
+        function onVisibleChanged() { root._syncForegroundGate() }
+        function onModeChanged() { root._syncForegroundGate() }
+        function onLoadingMoreChanged() { root._syncForegroundGate() }
+    }
+
+    function _syncForegroundGate() {
+        var busy = session.visible
+                && session.mode === "clipboard"
+                && (session.loading || session.loadingMore)
+        root._holdForeground(busy)
+    }
+
+    function _holdForeground(busy) {
+        var backend = Services.ClipboardService
+        if (!backend || typeof backend.setForegroundBusy !== "function")
+            return
+        backend.setForegroundBusy(busy)
+        if (busy)
+            foregroundHoldTimer.restart()
+        else
+            foregroundHoldTimer.stop()
+    }
+
     // Production data-source adapters installed on the session seam: real
     // desktop-entry applications, cliphist clipboard history, and niri
     // shortcut binds. Unavailable sources resolve to explicit errors.

@@ -974,10 +974,12 @@ Item {
             })
 
             // The first batch is handed over synchronously; the rest wait for
-            // the scheduler, so the caller paints before the set is mapped.
+            // the scheduler, so the caller paints before the set is mapped. It
+            // is deliberately small: it is what builds the opening frame's
+            // rows, and the throughput batches follow behind it.
             verify(batches.length === 1)
             compare(batches[0].complete, false)
-            compare(batches[0].items.length, 48)
+            compare(batches[0].items.length, 24)
             compare(batches[0].items[0].id, "app0")
 
             var guard = 0
@@ -1020,11 +1022,14 @@ Item {
                 streamed = streamed.concat(items)
             })
             drain(pending)
-            var oneShot = null
+            // Without a scheduler the batches still arrive one call at a
+            // time, just all within the refresh: collect them the same way.
+            var oneShot = []
             var plain = LauncherAdapters.createAdapters({ appsSource: makeAppsSource(entries) })
-            plain.apps.refresh("", "apps", function(items) { oneShot = items })
+            plain.apps.refresh("", "apps", function(items) { oneShot = oneShot.concat(items) })
 
             compare(ids(streamed), ids(oneShot))
+            compare(oneShot.length, 30)
         }
 
         function test_streamedQueryFiltersEveryBatch() {

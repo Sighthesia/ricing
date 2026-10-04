@@ -39,6 +39,7 @@ QtObject {
     onCategoryChanged: {
         if (root._categoryResetInFlight || !root.visible)
             return
+        root.noteInput()
         // A lens change rides the pooled fast path: the full sorted set for
         // this mode is already here, so no adapter call is needed.
         root.refresh()
@@ -94,6 +95,64 @@ QtObject {
     // pool instead of replacing it. Cleared when the stream completes.
     property bool _streamActive: false
 
+    // ---- Input priority ---------------------------------------------------
+    // An appended batch costs a full re-filter of the pool, a results swap and
+    // a stretch of the row list. Doing that while the user is typing or
+    // arrowing through the list is what makes an open feel heavy under the
+    // fingers, so a tail that lands during input waits for it to settle.
+    property bool _inputActive: false
+    property var _heldBatches: []
+    readonly property int _inputSettleMs: 140
+    property double _inputDeadline: 0
+    property bool _inputWatchScheduled: false
+
+    // Set while a foreground-only read is in flight, so the host can hold its
+    // service's background queues off. Raised for a clipboard session that is
+    // open or still streaming; every other host may ignore it.
+    property bool foregroundBusy: false
+
+    function setForegroundBusy(busy) {
+        root.foregroundBusy = !!busy
+    }
+
+    // Marks the session busy with the user. A QtObject cannot host a Timer
+    // (no default property), and this component deliberately has no children,
+    // so the settle window is polled on the shared call-later queue instead:
+    // the ping only exists for the length of the window.
+    function noteInput() {
+        if (!root.visible)
+            return
+        root._inputActive = true
+        root._inputDeadline = Date.now() + root._inputSettleMs
+        if (root._inputWatchScheduled)
+            return
+        root._inputWatchScheduled = true
+        Qt.callLater(root._checkInputWindow)
+    }
+
+    function _checkInputWindow() {
+        if (!root._inputActive) {
+            root._inputWatchScheduled = false
+            return
+        }
+        if (Date.now() < root._inputDeadline) {
+            Qt.callLater(root._checkInputWindow)
+            return
+        }
+        root._inputWatchScheduled = false
+        root.drainHeldBatches()
+    }
+
+    // Commits everything that waited out the input window, in arrival order.
+    function drainHeldBatches() {
+        var held = root._heldBatches
+        root._heldBatches = []
+        root._inputActive = false
+        for (var index = 0; index < held.length; index++)
+            root._applyBatch(held[index][0], held[index][1], held[index][2],
+                             held[index][3], held[index][4])
+    }
+
     // Monotonic guard: only the newest dispatched refresh, or the session
     // alive when execution started, may commit state.
     property int _refreshToken: 0
@@ -110,8 +169,10 @@ QtObject {
     // Query edits re-request data for the newly parsed mode while open;
     // closed sessions ignore edits until the next open().
     onQueryChanged: {
-        if (root.visible)
+        if (root.visible) {
+            root.noteInput()
             root.refresh()
+        }
     }
 
     // Clipboard history lands asynchronously (5s polling); while a
@@ -239,6 +300,8 @@ QtObject {
         root.loading = false
         root.loadingMore = false
         root._streamActive = false
+        root._heldBatches = []
+        root._inputActive = false
         root.error = ""
         root.selectedIndex = -1
         root._executionInFlight = false
@@ -344,6 +407,7 @@ QtObject {
         root.error = ""
         root.loadingMore = false
         root._streamActive = false
+        root._heldBatches = []
         adapter.refresh("", parsed.mode, function(outcome, complete) {
             root._applyBatch(token, outcome, complete !== false, parsed.mode, parsed.text)
         })
@@ -357,6 +421,14 @@ QtObject {
     function _applyBatch(token, outcome, complete, pooledMode, requestText) {
         if (token !== _refreshToken)
             return
+        // Only a tail append waits. The first batch of a refresh replaces the
+        // pool - it is the content the new query or the new mode asked for -
+        // so it always lands, or a mode switch would show an empty list for
+        // the length of the input window.
+        if (root._inputActive && root._streamActive && root.displayPool.length > 0) {
+            root._heldBatches.push([token, outcome, complete, pooledMode, requestText])
+            return
+        }
         if (outcome && !Array.isArray(outcome)) {
             // A failure is terminal whatever the adapter claimed about the
             // rest of the stream.
@@ -448,10 +520,12 @@ QtObject {
     }
 
     function selectNext() {
+        root.noteInput()
         root.selectedIndex = LauncherLogic.clampSelection(root.selectedIndex + 1, root.results.length)
     }
 
     function selectPrevious() {
+        root.noteInput()
         root.selectedIndex = LauncherLogic.clampSelection(root.selectedIndex - 1, root.results.length)
     }
 
