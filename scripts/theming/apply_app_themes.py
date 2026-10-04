@@ -7,7 +7,6 @@ active palette for the effective light/dark mode, then applies them:
 
 - gsettings org.gnome.desktop.interface color-scheme  -> system light/dark
 - kitty.conf include line + SIGUSR1 reload            -> live kitty colors
-- opencode themes/Afloat.json + SIGUSR2 reload        -> live opencode colors
 - gtk-3.0/gtk-4.0 gtk.css @import                     -> GTK css pickup
 
 Usage:
@@ -320,36 +319,6 @@ def run_hooks(mode: str) -> None:
             print(f"Warning: kitty reload failed: {e}", file=sys.stderr)
 
 
-def notify_opencode_theme_reload() -> bool:
-    """Tell a running opencode that its theme file just changed.
-
-    opencode resolves the active light/dark variant live — `theme.mode` in
-    cli.json only pins it when it reads exactly "dark" or "light", and "system"
-    leaves it following the terminal's reported appearance. But it reads
-    `themes/*.json` once at startup and only re-reads on SIGUSR2, so a rewrite
-    that lands mid-session is invisible until the TUI restarts. Without this
-    signal a desktop light/dark switch repaints the file and the running
-    session keeps rendering the colours it parsed at launch.
-
-    Same mechanism as the kitty SIGUSR1 reload above, for the same reason: the
-    generated config is only half the job, the other half is the live reload.
-
-    Returns True when at least one opencode process was signalled.
-    """
-    if not _which("pkill"):
-        return False
-    try:
-        result = subprocess.run(
-            ["pkill", "-USR2", "-f", "opencode"],
-            capture_output=True, timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired) as e:
-        print(f"Warning: opencode reload failed: {e}", file=sys.stderr)
-        return False
-    # pkill exits 1 when nothing matched, which is the normal idle case.
-    return result.returncode == 0
-
-
 def main() -> int:
     args = parse_args()
 
@@ -419,7 +388,6 @@ def main() -> int:
 
     if args.home_prefix is None:
         notify_kde_theme()
-        notify_opencode_theme_reload()
         run_hooks(args.mode)
         if not reload_niri():
             print("Warning: Niri config reload unavailable", file=sys.stderr)

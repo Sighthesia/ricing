@@ -95,11 +95,10 @@ output_path = "~/.config/fuzzel/Afloat.ini"
 input_path = "./firefox-colors.css"
 output_path = "~/.config/afloat/app-themes/firefox-colors.css"
 
-# opencode: dual dark/light variants in one file. opencode resolves the active
-# variant live (theme.mode only pins it when it is exactly "dark"/"light"), so
-# a desktop switch repaints this file and the running TUI picks the matching
-# half after the SIGUSR2 that apply_app_themes.py sends. Generation only:
-# activate with /theme afloat.
+# opencode: dual dark/light variants in one file, and the file does not depend
+# on --mode (both palettes are always written). opencode picks the half matching
+# its own resolved mode, so a desktop switch needs no file rewrite and no
+# reload signal — do not add one. Generation only: activate with /theme afloat.
 # 键覆盖参考上游: https://github.com/InioX/matugen-themes/blob/main/templates/opencode-colors.json
 # 不要把两套压平成同一份数据：那样模式翻转不会产生任何视觉变化。
 [templates.opencode]

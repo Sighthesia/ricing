@@ -26,6 +26,9 @@ Item {
     final property var palette: ({})
     property Component contentComponent: null
     property string _pendingRoute: ""
+    // Latched the first time the surface opens: from then on the route stays
+    // constructed. See routeLoader.
+    property bool routeRetained: false
     readonly property bool interactive: phase === "opening" || phase === "open"
     readonly property real surfaceWidth: Logic.surfaceWidth(width)
     property alias surface: body
@@ -59,6 +62,9 @@ Item {
             waveProgress = 0
         }
         route = normalized
+        // Past the first open the page is kept, so this only ever decides the
+        // very first construction.
+        root.routeRetained = true
         phase = "opening"
         openBody.restart()
         openWaves.restart()
@@ -212,13 +218,15 @@ Item {
                 Loader {
                     id: routeLoader
                     anchors.fill: parent
-                    // Route pages are cold interactive content. Keeping the
-                    // LauncherPage alive while the wave is closed makes every
-                    // chrome mount compile its delegates, icons and fonts even
-                    // though the launcher is never visible. Retain it during
-                    // the closing animation, but do not construct it at shell
-                    // startup; opening sets phase before the route is needed.
-                    active: root.phase !== "closed"
+                    // A route page is cold interactive content, so nothing is
+                    // built until the first open asks for it - the shell must
+                    // not pay for a launcher nobody has opened. From then on it
+                    // is retained: a launcher open costs a whole screen of row
+                    // delegates, and tearing them down on close meant every
+                    // open rebuilt the chrome, the rows, their shaped text and
+                    // their icons from nothing. Held live behind a closed wave,
+                    // they cost memory and nothing else.
+                    active: root.phase !== "closed" || root.routeRetained
                     sourceComponent: root.contentComponent
                 }
 

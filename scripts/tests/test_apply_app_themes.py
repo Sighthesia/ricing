@@ -383,8 +383,7 @@ def test_opencode_theme_keeps_both_variants(sandbox):
     only pins it when it reads exactly "dark" or "light", and "system" leaves it
     following the terminal's reported appearance. Flattening both slots to the
     desktop's current mode therefore does not "guarantee a match" — it makes
-    the mode flip invisible, because both halves render identically. The live
-    half of the contract is the SIGUSR2 in notify_opencode_theme_reload().
+    the mode flip invisible, because both halves render identically.
     """
     tmp, palette = sandbox
     home = tmp / "home"
@@ -403,47 +402,30 @@ def test_opencode_theme_keeps_both_variants(sandbox):
     assert theme["background"]["light"] != theme["background"]["dark"]
 
 
-def test_opencode_theme_reload_is_signalled(monkeypatch):
-    """A rewrite that nobody announces is invisible to a running TUI.
+def test_opencode_theme_does_not_depend_on_the_mode(sandbox):
+    """Both palettes are always in the file, so a mode switch rewrites nothing.
 
-    opencode parses themes/*.json once at startup and only re-reads on SIGUSR2,
-    so a desktop switch mid-session leaves the TUI on its launch-time colours
-    until it is restarted. The apply must send that signal.
+    This is what makes a live reload unnecessary. opencode re-reads
+    themes/*.json only at startup, so any design that needed the desktop mode
+    baked into the file would also need a signal to announce the rewrite — and
+    signalling opencode is a footgun: `pkill -USR2 -f opencode` also matches
+    `opencode serve --service`, which does not catch SIGUSR2 and dies on it,
+    taking every TUI's server with it. Keeping the file mode-independent
+    removes the need for the signal entirely.
     """
-    import importlib.util
-    from unittest.mock import Mock
+    tmp, palette = sandbox
+    theme_path = ".config/opencode/themes/Afloat.json"
 
-    spec = importlib.util.spec_from_file_location("apply_app_themes", SCRIPT)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    assert run_apply(palette, "dark", tmp / "dark").returncode == 0
+    assert run_apply(palette, "light", tmp / "light").returncode == 0
 
-    calls = []
-    monkeypatch.setattr(module, "_which", lambda name: "/usr/bin/pkill")
-    monkeypatch.setattr(
-        module.subprocess, "run",
-        lambda cmd, **kw: calls.append(cmd) or Mock(returncode=0),
-    )
+    dark = (tmp / "dark" / theme_path).read_text()
+    light = (tmp / "light" / theme_path).read_text()
+    assert dark == light
 
-    assert module.notify_opencode_theme_reload() is True
-    assert calls == [["pkill", "-USR2", "-f", "opencode"]], calls
-
-
-def test_opencode_theme_reload_tolerates_no_opencode(monkeypatch):
-    """No opencode running is the normal case, not an error worth surfacing."""
-    import importlib.util
-    from unittest.mock import Mock
-
-    spec = importlib.util.spec_from_file_location("apply_app_themes", SCRIPT)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    monkeypatch.setattr(module, "_which", lambda name: "/usr/bin/pkill")
-    monkeypatch.setattr(
-        module.subprocess, "run",
-        lambda cmd, **kw: Mock(returncode=1),  # pkill: no processes matched
-    )
-
-    assert module.notify_opencode_theme_reload() is False
+    # Sanity: the shared content really does hold two distinct palettes.
+    tokens = json.loads(dark)["theme"]
+    assert tokens["background"]["light"] != tokens["background"]["dark"]
 
 
 def test_generated_files_are_replaced_atomically(sandbox):

@@ -578,6 +578,16 @@ Item {
     }
     function _holdAndScheduleReleases() {
         var ids = root._windowRowIds()
+        // A hidden list has no entrance to play and nobody to show it to. The
+        // page now outlives the surface it lives in, so a background poll can
+        // land while the launcher is closed: record what arrived and put the
+        // rows straight down, and let the next open find them settled.
+        if (!root.session || !root.session.visible) {
+            root._lastRowIds = ids
+            root._firstFillPending = false
+            root._releaseAllRowsInstantly()
+            return
+        }
         var children = resultsColumn.children
         var freshRows = []
         for (var h = 0; h < children.length; h++) {

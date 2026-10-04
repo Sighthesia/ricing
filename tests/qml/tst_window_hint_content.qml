@@ -2059,6 +2059,37 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                     + wrong.join(", "))
         }
 
+        // ---- TEMPORARY TRACE (removed before commit) ------------------------
+        function test_TRACE_a_horizontal() {
+            body.hint = root.tallFramedHint(2, 2, 6, 1)
+            wait(300)
+            body.hint = root.tallFramedHint(3, 2, 6, 4)
+            wait(20)
+            verify(body._markerCrossing, "travelling")
+            driveSlideTo(0.5)
+            var clocks = [0, 0.1, 0.25, 0.4, 0.49]
+            for (var c = 0; c < clocks.length; ++c) {
+                driveMarkerTo(clocks[c])
+                driveSlideTo(clocks[c])
+                var frame = findByName(strip(), "windowHintFocusFrame")
+                var rows = findAllByName(strip(), "windowHintWindowRow")
+                var labels = findAllByName(strip(), "windowHintNeighbourRow")
+                var card = rows.length > 1 ? rows[1].mapToItem(strip(), 0, 0) : null
+                console.log("TRACE clock=" + clocks[c]
+                    + " frame.x=" + frame.x.toFixed(0)
+                    + " frame.w=" + frame.width.toFixed(0)
+                    + " frame.y=" + frame.y.toFixed(0)
+                    + " card1.x=" + (card ? card.x.toFixed(0) : "-")
+                    + " card1.w=" + (card ? card.width.toFixed(0) : "-")
+                    + " litCards=" + root.litCards().join(",")
+                    + " labels=" + labels.length
+                    + " labelMasks=" + findAllByName(strip(), "windowHintLabelFocusMask").length)
+            }
+            driveSlideTo(1)
+            settleSlide()
+            settleMarker()
+        }
+
         function test_theTintFollowsTheFrameLiveRatherThanAFlag() {
             // The tint is the focus frame's own rectangle, made visible, so the only way
             // to test it is to STOP the frame somewhere and ask which cards are lit. The
