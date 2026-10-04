@@ -177,6 +177,77 @@ function streamMuted(node) {
     return node.audio.muted === true
 }
 
+// The longest leading run of words shared by at least two labels.
+//
+// PipeWire descriptions are dominated by a hardware-card prefix ("Ryzen HD Audio
+// Controller Stereo Microphone"), which on a three-microphone machine pushed the
+// part that actually tells the microphones apart off the end of every row.
+//
+// "At least two, not all" is the load-bearing part. A list of two Ryzen
+// microphones and one Bluetooth headset intersects to nothing at all, so an
+// all-rows rule would decline to hoist anything and put the long name back on
+// every row. The headset is left whole, which is correct - it never had the
+// prefix to lose. Conversely a run only one label carries is not a prefix at
+// all: "Ryzen HD Audio Controller" and "TimeEar BTE-9" must not hoist
+// "Ryzen HD Audio Controller" just because it is the longest thing in common.
+//
+// Returns "" when there is nothing worth hoisting: fewer than two labels, a run
+// shared by fewer than two of them, a run that is the whole of some row (which
+// would leave that row blank), or a one-word majority (see the guard below).
+function sharedLabelPrefix(labels) {
+    var list = labels || []
+    if (list.length < 2)
+        return ""
+    var firstWords = text(list[0]).split(" ")
+    var best = []
+    var bestCount = 0
+    for (var take = 1; take <= firstWords.length; take += 1) {
+        var candidate = firstWords.slice(0, take).join(" ")
+        var count = 0
+        for (var i = 0; i < list.length; i += 1) {
+            var candidateLabel = text(list[i])
+            if (candidateLabel === candidate
+                    || candidateLabel.indexOf(candidate + " ") === 0)
+                count += 1
+        }
+        // `>=`, so the longest run wins a tie: "Razer - BlackWidow" / "Razer -
+        // Naga" hoists the full "Razer -" and the trailing-punctuation strip
+        // below turns it back into "Razer".
+        if (count >= bestCount) {
+            bestCount = count
+            best = firstWords.slice(0, take)
+        }
+    }
+    // Shared by fewer than two labels is not a shared prefix.
+    if (best.length === 0 || bestCount < 2)
+        return ""
+    // A run every row carries may be a single word. A run only some rows carry
+    // must be at least two: one shared word among otherwise unrelated devices
+    // would trim rows into fragments without saying anything true about the
+    // group.
+    if (bestCount < list.length && best.length < 2)
+        return ""
+    // Trailing punctuation would read as a dangling dash in the header.
+    var joined = best.join(" ").replace(/[\s,;:.\-–—]+$/, "")
+    if (joined === "")
+        return ""
+    for (var j = 0; j < list.length; j++) {
+        if (text(list[j]) === joined)
+            return ""
+    }
+    return joined
+}
+
+// The row's own label with the hoisted prefix removed, falling back to the full
+// label when nothing can be trimmed.
+function trimLabelPrefix(label, prefix) {
+    var full = text(label)
+    if (!prefix)
+        return full
+    var trimmed = full.slice(prefix.length).replace(/^[\s,;:.\-–—]+/, "")
+    return trimmed === "" ? full : trimmed
+}
+
 // Device label for the routing chip. Prefers the description the same
 // deviceLabel() uses for the device list, so a name shown in the mixer matches
 // the name shown above it.

@@ -403,9 +403,13 @@ Item {
             compare(slider.value, 0.42)
             verify(slider.muted)
             verify(slider.showMute, "volume exposes mute control")
-            var volMuteBtn = findByName(slider, "sliderMuteButton")
+            // The master row is BarAudioLevelRow: one 38px card with the mute as
+            // a glyph button, not a second settings row underneath the slider.
+            compare(slider.height, 38)
+            var volMuteBtn = findByName(slider, "levelRowMute")
             verify(volMuteBtn !== null, "volume mute button should exist")
-            verify(slider.muteRow.visible, "volume mute button visible")
+            verify(volMuteBtn.visible, "volume mute button visible")
+            compare(findByName(slider, "levelRowValue").text, "42%")
             // Trigger slider interaction via signal emission.
             fake.setCalls = 0
             fake.last = -1
@@ -413,10 +417,63 @@ Item {
             compare(fake.setCalls, 1)
             compare(fake.last, 0.8)
             fake.toggleCalls = 0
-            slider.toggleRequested()
+            volMuteBtn.toggle()
             compare(fake.toggleCalls, 1)
             // Brightness content hidden, media hidden etc.
             verify(!findByName(item, "mediaContent").visible)
+        }
+
+        function test_masterRowKeepsOneRowSystemWithTheLists() {
+            // The reason the master row was rebuilt: it used to be two stacked
+            // settings rows at 112px standing directly above 38px device rows, so
+            // the top of the panel read at a different scale from everything under
+            // it. One row system is the fix, so the heights are part of the
+            // contract rather than an incidental measurement.
+            var speaker = fakeDevice(56, "alsa_output.speaker_sink", "Laptop Speakers", 0.4, false, "sysA")
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted } }',
+                root, "fakeVolRowSystem")
+            fake.sinks = [speaker]
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            var master = findByName(item, "volumeSlider")
+            var deviceList = findByName(item, "outputDeviceList")
+            compare(master.height, deviceList.rowHeight,
+                "master row and device rows must share one row height")
+
+            // Every label in the panel starts on the same vertical line. This was
+            // the other half of the mess: device rows began at 10px while the
+            // master and mixer labels began at 26px.
+            compare(findByName(item, "levelRowLabel").x, 26)
+            compare(findByName(item, "audioDeviceName").x, 26)
+        }
+
+        function test_masterRowControlsDoNotOverlap() {
+            // Laid out from both edges: the label column is fixed, the value and
+            // mute are pinned right, and the slider fills between. Measuring the
+            // boxes is the only way this stays true - a binding change that
+            // widened the value text would silently stack them.
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted } }',
+                root, "fakeVolMasterOverlap")
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            var master = findByName(item, "volumeSlider")
+            var label = findByName(master, "levelRowLabel")
+            var slider = findByName(master, "levelRowSlider")
+            var value = findByName(master, "levelRowValue")
+            var mute = findByName(master, "levelRowMute")
+            verify(label.x + label.width <= slider.x + 0.5, "label must not reach the slider")
+            verify(slider.x + slider.width <= value.x + 0.5, "slider must not reach the value")
+            verify(value.x + value.width <= mute.x + 0.5, "value must not reach the mute button")
+            verify(mute.x + mute.width <= master.width + 0.5, "mute button stays inside the card")
+            verify(slider.width >= 60, "slider keeps a usable drag target")
         }
 
         function test_brightnessExposesSlider() {
@@ -631,15 +688,17 @@ Item {
                 payload: { volumeService: fakeVol, volume: 0.1, muted: false }
             })
             var volumeSlider = findByName(volumeItem, "volumeSlider")
+            var levelSlider = findByName(volumeSlider, "levelRowSlider")
             compare(volumeItem.volumeValue, 0.42)
             compare(volumeSlider.value, 0.42)
-            compare(volumeSlider.sliderControl.value, 42)
+            compare(levelSlider.value, 42)
+            compare(findByName(volumeSlider, "levelRowValue").text, "42%")
             verify(volumeSlider.muted)
             fakeVol.sinkVolume = 0.77
             fakeVol.sinkMuted = false
             compare(volumeItem.volumeValue, 0.77)
             compare(volumeSlider.value, 0.77)
-            compare(volumeSlider.sliderControl.value, 77)
+            compare(levelSlider.value, 77)
             verify(!volumeSlider.muted)
 
             var fakeBright = Qt.createQmlObject('import QtQuick; QtObject { property real brightness: 0.33; function setBrightness(v){ brightness=v } }', root, "fakeBrightLive")
@@ -723,6 +782,49 @@ Item {
             compare(item.audioStreams.length, 0)
         }
 
+        function test_mixerRowBoxesDoNotOverlap() {
+            // The regression the panel screenshot exposed: the media name ran
+            // 26..304, the slider 148..278 and the route chip 222..310 on one
+            // 344px row, so the media name was painted under the slider and the
+            // chip sat across its end. Both lines are now laid out from the edges
+            // they belong to, so the boxes cannot intersect.
+            var stream = fakeStream(112, "Firefox", "\u7f51\u6613\u4e91\u97f3\u4e50", 1, false, "grid")
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted }'
+                + ' function streamAppName(s){ return s && s.properties ? s.properties["application.name"] : "" }'
+                + ' function streamMediaName(s){ return s && s.properties ? s.properties["media.name"] : "" }'
+                + ' function streamLevel(s){ return s && s.audio ? s.audio.volume : 0 }'
+                + ' function streamMuted(s){ return !s || !s.audio ? true : s.audio.muted }'
+                + ' function streamRouteLabel(s){ return "TimeEar BTE-9" } }',
+                root, "fakeVolGrid")
+            fake.streams = [stream]
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            var row = findByName(item, "mixerRow0")
+            verify(row !== null)
+            var appName = findByName(row, "mixerAppName")
+            var media = findByName(row, "mixerMediaName")
+            var mute = findByName(row, "mixerMuteButton")
+            var slider = findByName(row, "mixerSlider0")
+            var percent = findByName(row, "mixerLevelText")
+            var chip = findByName(row, "mixerRouteChip")
+
+            // Identity line: glyph, name, media, then the mute button.
+            verify(appName.x + appName.width <= media.x + 0.5, "app name must not reach the media name")
+            verify(media.x + media.width <= mute.x + 0.5, "media name must not reach the mute button")
+            // Control line: slider, percentage, route chip.
+            verify(slider.x + slider.width <= percent.x + 0.5, "slider must not reach the percentage")
+            verify(percent.x + percent.width <= chip.x + 0.5, "percentage must not reach the route chip")
+            verify(chip.x + chip.width <= row.width + 0.5, "route chip stays inside the card")
+            verify(slider.width >= 60, "slider keeps a usable drag target")
+            // The route belongs on the control line, next to the level it acts
+            // on; on the identity line it read as a subtitle for the application.
+            verify(chip.y > appName.y, "route chip sits on the control line")
+        }
+
         function test_deviceRowsRenderAndSelectTheCurrentDevice() {
             var speaker = fakeDevice(56, "alsa_output.speaker_sink", "Laptop Speakers", 0.4, false, "spk")
             var headset = fakeDevice(73, "bluez_output.94", "TimeEar BTE-9", 0.26, false, "hs")
@@ -765,8 +867,57 @@ Item {
             var item = createTemporaryObject(actionsComp, root, {
                 actionKind: "volume", payload: { volumeService: fake }
             })
-            compare(findByName(item, "audioDeviceList").count, 1)
+            compare(findByName(item, "OutputDeviceListView").count, 1)
             compare(findByName(item, "audioDeviceLevel").text, "Muted")
+        }
+
+        function test_sharedHardwareNameIsHoistedOutOfTheRows() {
+            // On a machine with several devices behind one card, every row used
+            // to begin "Ryzen HD Audio Controller ...", which pushed the only
+            // words that tell the rows apart - Speaker, Stereo Microphone,
+            // Digital Microphone - off the end of every row. The shared run is
+            // stated once in the header instead.
+            var mic1 = fakeDevice(57, "alsa.mic1", "Ryzen HD Audio Controller Stereo Microphone", 1, false, "hoist1")
+            var mic2 = fakeDevice(58, "alsa.mic2", "Ryzen HD Audio Controller Digital Microphone", 1, false, "hoist2")
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted } }',
+                root, "fakeVolHoist")
+            fake.sources = [mic1, mic2]
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            var list = findByName(item, "inputDeviceList")
+            compare(list.sharedPrefix, "Ryzen HD Audio Controller")
+            // Scoped to the input section: the output section comes first in the
+            // tree and legitimately has no scope text, so an unscoped lookup would
+            // read the wrong one.
+            compare(findByName(list, "audioSectionScope").text, "Ryzen HD Audio Controller")
+            var listView = findByName(item, "InputDeviceListView")
+            compare(findByName(listView.itemAtIndex(0), "audioDeviceName").text, "Stereo Microphone")
+            compare(findByName(listView.itemAtIndex(1), "audioDeviceName").text, "Digital Microphone")
+        }
+
+        function test_nothingIsHoistedWhenNamesShareNothing() {
+            // Two unrelated devices must each keep their full name; hoisting a
+            // prefix they do not share would invent a scope that is not there.
+            var speaker = fakeDevice(56, "alsa.sp.sink", "Ryzen HD Audio Controller Speaker", 0.4, false, "noshare1")
+            var headset = fakeDevice(73, "bt.sink", "TimeEar BTE-9", 0.33, false, "noshare2")
+            var fake = Qt.createQmlObject('import QtQuick; QtObject {'
+                + ' property real sinkVolume: 0.5; property bool sinkMuted: false;'
+                + ' property var sinks: []; property var sources: []; property var streams: [];'
+                + ' function setSinkVolume(v){ sinkVolume=v } function toggleSinkMute(){ sinkMuted=!sinkMuted } }',
+                root, "fakeVolNoHoist")
+            fake.sinks = [speaker, headset]
+            var item = createTemporaryObject(actionsComp, root, {
+                actionKind: "volume", payload: { volumeService: fake }
+            })
+            compare(findByName(item, "outputDeviceList").sharedPrefix, "")
+            var listView = findByName(item, "OutputDeviceListView")
+            compare(findByName(listView.itemAtIndex(0), "audioDeviceName").text,
+                "Ryzen HD Audio Controller Speaker")
+            compare(findByName(listView.itemAtIndex(1), "audioDeviceName").text, "TimeEar BTE-9")
         }
 
         function test_mixerRowRendersAppMediaLevelAndRoute() {

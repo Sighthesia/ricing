@@ -240,4 +240,104 @@ Item {
             compare(Logic.sinkLabel("", devices), "")
         }
     }
+
+    TestCase {
+        name: "SharedDeviceNamePrefix"
+        when: windowShown
+
+        function test_hoistsTheHardwareCardNameOutOfEveryRow() {
+            // Verbatim from this machine. Three rows all began "Ryzen HD Audio
+            // Controller", which pushed the only words that tell them apart off
+            // the end of each row - the panel showed three rows that all read the
+            // same and were all elided at the same place.
+            compare(Logic.sharedLabelPrefix([
+                "Ryzen HD Audio Controller Speaker",
+                "TimeEar BTE-9"
+            ]), "", "unrelated names share nothing")
+
+            compare(Logic.sharedLabelPrefix([
+                "Ryzen HD Audio Controller Stereo Microphone",
+                "Ryzen HD Audio Controller Digital Microphone"
+            ]), "Ryzen HD Audio Controller")
+        }
+
+        function test_trimsOnlyTheSharedRun() {
+            var prefix = Logic.sharedLabelPrefix([
+                "Ryzen HD Audio Controller Stereo Microphone",
+                "Ryzen HD Audio Controller Digital Microphone"
+            ])
+            compare(Logic.trimLabelPrefix("Ryzen HD Audio Controller Stereo Microphone", prefix),
+                "Stereo Microphone")
+            compare(Logic.trimLabelPrefix("Ryzen HD Audio Controller Digital Microphone", prefix),
+                "Digital Microphone")
+        }
+
+        function test_aRowOutsideTheSharedRunKeepsItsWholeName() {
+            // A list of three where only two share a prefix: the third must not be
+            // mangled by a prefix it has nothing to do with.
+            var labels = [
+                "Ryzen HD Audio Controller Stereo Microphone",
+                "Ryzen HD Audio Controller Digital Microphone",
+                "TimeEar BTE-9"
+            ]
+            var prefix = Logic.sharedLabelPrefix(labels)
+            compare(prefix, "Ryzen HD Audio Controller")
+            compare(Logic.trimLabelPrefix(labels[2], prefix), "TimeEar BTE-9")
+        }
+
+        function test_nothingIsHoistedForOneRow() {
+            // A single device has nothing to disambiguate against, so hoisting
+            // would strip its only identifying words for no gain.
+            compare(Logic.sharedLabelPrefix(["Ryzen HD Audio Controller Speaker"]), "")
+            compare(Logic.trimLabelPrefix("Ryzen HD Audio Controller Speaker", ""),
+                "Ryzen HD Audio Controller Speaker")
+        }
+
+        function test_aPrefixThatConsumesARowIsRejected() {
+            // If trimming would leave one row blank, the whole hoist is refused -
+            // an empty row is worse than a repeated prefix.
+            compare(Logic.sharedLabelPrefix(["Radeon HD Audio", "Radeon HD Audio"]), "")
+            // Same reason, reached a different way: two rows are literally the
+            // prefix and a third extends it.
+            compare(Logic.sharedLabelPrefix(["Razer", "Razer", "Razer Naga"]), "")
+        }
+
+        function test_oneSharedWordIsNotEnoughForAMajority() {
+            // Three unrelated devices that happen to share one word. The run they
+            // do share ("Mic Input") is the whole of two rows, so hoisting it
+            // would leave those rows nameless and the header would repeat what
+            // the rows already say. Refused.
+            compare(Logic.sharedLabelPrefix(["Mic Input", "Mic Input", "Line Input"]), "")
+            // Every row carries this one and it consumes none of them, so it does
+            // earn its place.
+            compare(Logic.sharedLabelPrefix(["Razer Naga", "Razer Viper"]), "Razer")
+        }
+
+        function test_aRunOnlyOneLabelCarriesIsNotAPrefix() {
+            // "Ryzen HD Audio Controller Speaker" and "TimeEar BTE-9" have a long
+            // run in common in the trivial sense that the first label is entirely
+            // made of it - and hoisting it would leave one row blank while
+            // inventing a hardware scope the second device has nothing to do with.
+            compare(Logic.sharedLabelPrefix(["Ryzen HD Audio Controller Speaker", "TimeEar BTE-9"]), "")
+        }
+
+        function test_partialWordOverlapIsNotAPrefix() {
+            // "Mic" and "Microphone" share three letters but not a word; cutting
+            // mid-word would produce nonsense labels.
+            compare(Logic.sharedLabelPrefix(["Mic Input", "Microphone Input"]), "")
+        }
+
+        function test_trailingPunctuationIsNotCarriedIntoTheHeader() {
+            compare(Logic.sharedLabelPrefix(["Razer - BlackWidow", "Razer - Naga"]), "Razer")
+            compare(Logic.trimLabelPrefix("Razer - Naga", "Razer"), "Naga")
+        }
+
+        function test_emptyAndBlankInputsAreSafe() {
+            compare(Logic.sharedLabelPrefix([]), "")
+            compare(Logic.sharedLabelPrefix(null), "")
+            compare(Logic.sharedLabelPrefix(["", "  "]), "")
+            compare(Logic.trimLabelPrefix("", "Razer"), "")
+            compare(Logic.trimLabelPrefix("Razer Naga", null), "Razer Naga")
+        }
+    }
 }

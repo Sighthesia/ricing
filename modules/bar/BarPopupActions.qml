@@ -142,6 +142,8 @@ Item {
     // outside the component that declares it.
     readonly property Item volumeContentItem: volumeContent
     readonly property Item volumeScrollItem: volumeScroll
+    readonly property Item volumeLevelRowItem: volumeSlider
+    readonly property Item volumeDeviceListItem: outputDeviceList
     readonly property real volumeViewportCap: volumeContent.viewportCap
 
     // Thin pass-throughs so the mixer component stays free of service imports.
@@ -1098,7 +1100,7 @@ Item {
             // app starts playing). The height follows one bounded number, so
             // the host sees a single geometry change per step rather than a
             // cascade of per-section ones.
-            readonly property real viewportCap: 430
+            readonly property real viewportCap: 470
 
             // Bounded scroll body. `interactive` only when it actually
             // overflows, so a short panel leaves the wheel to the bar widget's

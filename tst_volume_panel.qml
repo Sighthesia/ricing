@@ -122,6 +122,11 @@ Item {
         case 5:
             root.check("volume panel is wide enough for a mixer row",
                 root.panel.implicitWidth === 360)
+            // One row system: the master row and the device rows must be the same
+            // height. They were 112px and 38px once, which is what made the top of
+            // the panel read at a different scale from everything under it.
+            root.check("master row and device rows share one height",
+                root.panel.volumeLevelRowItem.height === root.panel.volumeDeviceListItem.rowHeight)
             root.check("volume content has a finite height",
                 root.panel.volumeContentItem.height > 0
                     && root.panel.volumeContentItem.height <= root.panel.volumeViewportCap)

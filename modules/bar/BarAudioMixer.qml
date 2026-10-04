@@ -34,16 +34,21 @@ Item {
     readonly property bool routeMode: routeTarget !== null
     property var routeTarget: null
 
-    readonly property int rowHeight: 52
+    readonly property int rowHeight: 48
     readonly property int rowGap: 4
     readonly property int headerHeight: 16
     readonly property int headerGap: 6
-    readonly property int rowPadding: 8
-    readonly property int muteButtonSize: 20
-    readonly property int routeChipWidth: 88
-    readonly property int valueTextWidth: 26
-    readonly property int sliderWidth: 130
-    readonly property int textLeft: 26
+    // Matches BarAudioLevelRow and BarAudioDeviceList: 8px inset, 14px glyph, 4px
+    // to the text column. Every label in the panel shares this line.
+    readonly property int cardPadding: 8
+    readonly property int glyphSize: 14
+    readonly property int textLeft: cardPadding + glyphSize + 4
+    readonly property int muteSize: 20
+    readonly property int routeChipWidth: 104
+    readonly property int valueTextWidth: 30
+    // The name column is capped so a long application name cannot push the
+    // mute button off the row.
+    readonly property real nameColumnRatio: 0.62
 
     readonly property int listCount: routeMode ? (root.sinks ? root.sinks.length : 0)
                                                : (root.streams ? root.streams.length : 0)
@@ -200,7 +205,17 @@ Item {
         delegate: root.routeMode ? sinkPickerDelegate : streamRowDelegate
     }
 
-    // One application: identity, mute, level, and where its audio is going.
+    // One application, on a fixed two-line grid:
+    //
+    //   [glyph] Application - what it is playing            [mute]
+    //   [========== level ==========]  100%   [output: Device]
+    //
+    // Identity reads first and the controls sit on the second line, so the two
+    // never compete for the same pixels. The earlier arrangement ran the media
+    // name under the slider and the route chip across the slider's right end -
+    // three overlapping boxes on a 344px row, which measured as media 26..304,
+    // slider 148..278, chip 222..310. Everything is laid out from both edges of
+    // the row now, and nothing overlaps by construction.
     Component {
         id: streamRowDelegate
 
@@ -210,10 +225,10 @@ Item {
             required property var modelData
             required property int index
 
-            // A stream that quits while the panel is open makes the model hand this
-            // delegate an undefined role for a frame. Every derived read is
+            // A stream that quits while the panel is open makes the model hand
+            // this delegate an undefined role for a frame. Every derived read is
             // gated on `valid` so that frame paints an empty card instead of
-            // logging "Unable to assign [undefined]" per property.
+            // logging a property warning per field.
             readonly property bool valid: streamRow.modelData !== undefined && streamRow.modelData !== null
             readonly property bool muted: streamRow.valid
                 && typeof root.mutedOf === "function" && root.mutedOf(streamRow.modelData)
@@ -241,10 +256,10 @@ Item {
             BarIcon {
                 id: streamGlyph
                 objectName: "mixerGlyph"
-                x: root.rowPadding
-                width: 14
-                height: 14
-                y: 7
+                x: root.cardPadding
+                y: 6
+                width: root.glyphSize
+                height: root.glyphSize
                 source: Qt.resolvedUrl("icons/" + (streamRow.muted ? "volume-muted.svg" : "volume.svg"))
                 tint: streamRow.muted ? LazerTheme.textMuted : LazerTheme.textPrimary
                 opacity: streamRow.muted ? 0.55 : 0.9
@@ -252,15 +267,20 @@ Item {
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
             }
 
-            // Identity line.
+            // Identity: the application name, then what it is playing after a
+            // muted separator. The media half is elidable and the name is capped,
+            // so a long title degrades the secondary text rather than the primary
+            // one or the mute button.
             Text {
+                id: mixerAppName
                 objectName: "mixerAppName"
                 x: root.textLeft
-                y: 7
+                y: 6
                 height: 14
-                width: routeChip.x - root.textLeft - 6
+                width: Math.min(implicitWidth, (mixerMute.x - root.textLeft - 8) * root.nameColumnRatio)
                 verticalAlignment: Text.AlignVCenter
-                text: streamRow.valid && typeof root.appNameOf === "function" ? root.appNameOf(streamRow.modelData) : ""
+                text: streamRow.valid && typeof root.appNameOf === "function"
+                    ? root.appNameOf(streamRow.modelData) : ""
                 color: LazerTheme.textPrimary
                 font.pixelSize: 11
                 font.bold: true
@@ -268,61 +288,31 @@ Item {
                 maximumLineCount: 1
             }
 
-            // Where this application's audio is going. Tapping it swaps the
-            // section for the picker; an unread route disables the chip rather
-            // than showing a device it cannot vouch for.
-            Rectangle {
-                id: routeChip
-                objectName: "mixerRouteChip"
-                x: mixerMute.x - root.routeChipWidth - 6
-                y: 5
-                width: root.routeChipWidth
-                height: 18
-                radius: 4
-                enabled: streamRow.routeText !== ""
-                opacity: enabled ? 1 : LazerTheme.settingsDisabledAlpha
-                color: routeChipHover.hovered ? LazerTheme.settingsMenuHover : "transparent"
-
-                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-                Behavior on opacity { ColorAnimation { duration: MotionTokens.fast } }
-
-                Text {
-                    objectName: "mixerRouteLabel"
-                    anchors.left: parent.left
-                    anchors.leftMargin: 5
-                    anchors.right: parent.right
-                    anchors.rightMargin: 5
-                    anchors.verticalCenter: parent.verticalCenter
-                    // An unread route is stated as such. Naming the default
-                    // device here would be a claim the panel cannot back yet.
-                    text: streamRow.routeText === "" ? "Reading…" : streamRow.routeText
-                    color: LazerTheme.textMuted
-                    font.pixelSize: 10
-                    horizontalAlignment: Text.AlignRight
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
-                }
-
-                function openPicker() { root.openRoutePicker(streamRow.modelData) }
-
-                HoverHandler { id: routeChipHover; enabled: routeChip.enabled }
-                TapHandler {
-                    objectName: "mixerRouteTap" + streamRow.index
-                    enabled: routeChip.enabled
-                    onTapped: routeChip.openPicker()
-                }
+            Text {
+                objectName: "mixerMediaName"
+                x: mixerAppName.x + mixerAppName.width + 6
+                y: 6
+                height: 14
+                width: Math.max(0, mixerMute.x - x - 6)
+                visible: width > 12
+                verticalAlignment: Text.AlignVCenter
+                text: streamRow.mediaText
+                color: LazerTheme.textMuted
+                font.pixelSize: 11
+                elide: Text.ElideRight
+                maximumLineCount: 1
             }
 
-            // Per-application mute. A glyph swap rather than a toggle switch:
-            // the row already carries a slider, and a second control shape on
-            // one row reads as two competing settings.
+            // Per-application mute. A glyph button rather than a toggle switch:
+            // the row already carries a slider, and a second control shape on one
+            // row reads as two competing settings.
             Rectangle {
                 id: mixerMute
                 objectName: "mixerMuteButton"
-                x: streamRow.width - root.rowPadding - root.muteButtonSize
-                y: 5
-                width: root.muteButtonSize
-                height: root.muteButtonSize
+                x: streamRow.width - root.cardPadding - root.muteSize
+                y: 4
+                width: root.muteSize
+                height: root.muteSize
                 radius: 4
                 color: mixerMuteHover.hovered ? LazerTheme.settingsMenuHover : "transparent"
 
@@ -330,8 +320,8 @@ Item {
 
                 BarIcon {
                     anchors.centerIn: parent
-                    width: 14
-                    height: 14
+                    width: root.glyphSize
+                    height: root.glyphSize
                     source: Qt.resolvedUrl("icons/" + (streamRow.muted ? "volume-muted.svg" : "volume.svg"))
                     tint: streamRow.muted ? LazerTheme.settingsAccent : LazerTheme.textMuted
                 }
@@ -348,28 +338,75 @@ Item {
                 }
             }
 
-            // Media line: what the application is playing, when it says.
-            Text {
-                objectName: "mixerMediaName"
-                x: root.textLeft
-                y: 25
-                height: 13
-                width: mixerPercent.x - root.textLeft - 6
-                verticalAlignment: Text.AlignVCenter
-                text: streamRow.mediaText
-                color: LazerTheme.textMuted
-                font.pixelSize: 10
-                elide: Text.ElideRight
-                maximumLineCount: 1
+            // Where this application's audio is going. On the control line, next
+            // to the level it is acting on, rather than on the identity line
+            // where it read as a subtitle for the application. An unread route
+            // disables the chip rather than showing a device it cannot vouch for.
+            Rectangle {
+                id: routeChip
+                objectName: "mixerRouteChip"
+                x: streamRow.width - root.cardPadding - root.routeChipWidth
+                y: 26
+                width: root.routeChipWidth
+                height: 18
+                radius: 4
+                enabled: streamRow.routeText !== ""
+                opacity: enabled ? 1 : LazerTheme.settingsDisabledAlpha
+                color: routeChipHover.hovered ? LazerTheme.settingsMenuHover : "transparent"
+
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                Behavior on opacity { ColorAnimation { duration: MotionTokens.fast } }
+
+                Row {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 5
+                    anchors.right: parent.right
+                    anchors.rightMargin: 5
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 4
+
+                    BarIcon {
+                        id: routeChipGlyph
+                        objectName: "mixerRouteGlyph"
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 11
+                        height: 11
+                        source: Qt.resolvedUrl("icons/volume.svg")
+                        tint: LazerTheme.textMuted
+                    }
+
+                    Text {
+                        objectName: "mixerRouteLabel"
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.max(0, parent.width - routeChipGlyph.width - parent.spacing)
+                        // An unread route is stated as such. Naming the default
+                        // device here would be a claim the panel cannot back yet.
+                        text: streamRow.routeText === "" ? "Reading…" : streamRow.routeText
+                        color: LazerTheme.textMuted
+                        font.pixelSize: 10
+                        horizontalAlignment: Text.AlignRight
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+                }
+
+                function openPicker() { root.openRoutePicker(streamRow.modelData) }
+
+                HoverHandler { id: routeChipHover; enabled: routeChip.enabled }
+                TapHandler {
+                    objectName: "mixerRouteTap" + streamRow.index
+                    enabled: routeChip.enabled
+                    onTapped: routeChip.openPicker()
+                }
             }
 
-            // Level readout, then the slider itself. The number comes first in
-            // reading order because the slider is the thing being dragged.
+            // Level readout, then the slider to its left - both pinned to the
+            // route chip so the number can never be pushed off the row.
             Text {
                 id: mixerPercent
                 objectName: "mixerLevelText"
-                x: streamRow.width - root.rowPadding - root.valueTextWidth
-                y: 25
+                x: routeChip.x - 8 - root.valueTextWidth
+                y: 28
                 width: root.valueTextWidth
                 height: 13
                 verticalAlignment: Text.AlignVCenter
@@ -382,9 +419,11 @@ Item {
             LazerSettingsSlider {
                 id: mixerSlider
                 objectName: "mixerSlider" + streamRow.index
-                x: mixerPercent.x - root.valueTextWidth - 6 - root.sliderWidth
-                y: 23
-                width: root.sliderWidth
+                x: root.cardPadding
+                y: 24
+                // The settings slider's own width binding falls back to its 220px
+                // implicit width, so an explicit width is what sizes it here.
+                width: Math.max(60, mixerPercent.x - root.cardPadding - 8)
                 // The settings slider is built for a 30px settings row; a mixer
                 // row is denser, so the trough is shortened rather than a second
                 // slider component being invented for this one place.
@@ -404,7 +443,9 @@ Item {
         }
     }
 
-    // Output picker for the application the mixer is currently routing.
+    // Output picker for the application the mixer is currently routing. Same
+    // row metrics and the same selection band as the device list, so the two
+    // pickers read as one control used twice.
     Component {
         id: sinkPickerDelegate
 
@@ -414,9 +455,9 @@ Item {
             required property var modelData
             required property int index
 
-            // A device unplugged while the picker is open hands this delegate an undefined
-            // role for a frame; gate every derived read the same way the stream
-            // row does.
+            // A device unplugged while the picker is open hands this delegate an
+            // undefined role for a frame; gate every derived read the same way
+            // the stream row does.
             readonly property bool valid: pickerRow.modelData !== undefined && pickerRow.modelData !== null
             readonly property bool isDefault: pickerRow.valid
                 && root.defaultSink !== null
@@ -435,8 +476,6 @@ Item {
 
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
-            // Same selection band as the device list, so the two pickers read
-            // as one control used twice.
             Rectangle {
                 objectName: "mixerSinkSelectedBar"
                 anchors.left: parent.left
@@ -448,11 +487,22 @@ Item {
                 Behavior on opacity { ColorAnimation { duration: MotionTokens.fast } }
             }
 
+            BarIcon {
+                id: pickerGlyph
+                objectName: "mixerSinkGlyph"
+                x: root.cardPadding
+                anchors.verticalCenter: parent.verticalCenter
+                width: root.glyphSize
+                height: root.glyphSize
+                source: Qt.resolvedUrl("icons/volume.svg")
+                tint: pickerRow.isCurrent ? LazerTheme.settingsAccent : LazerTheme.textMuted
+            }
+
             function choose() {
                 if (pickerRow.valid && typeof root.routeMoveSink === "function")
                     root.routeMoveSink(root.routeTarget, pickerRow.modelData)
-                // Return to the mixer either way: a refused move must not
-                // leave the user staring at a list that did nothing.
+                // Return to the mixer either way: a refused move must not leave
+                // the user staring at a list that did nothing.
                 root.closeRoutePicker()
             }
 
@@ -465,11 +515,9 @@ Item {
 
             Text {
                 objectName: "mixerSinkName"
-                anchors.left: parent.left
-                anchors.leftMargin: 10
-                anchors.right: sinkState.left
-                anchors.rightMargin: 8
+                x: root.textLeft
                 anchors.verticalCenter: parent.verticalCenter
+                width: Math.max(0, sinkState.x - root.textLeft - 8)
                 height: 14
                 verticalAlignment: Text.AlignVCenter
                 text: pickerRow.valid ? root.sinkLabel(pickerRow.modelData) : ""
@@ -484,8 +532,10 @@ Item {
                 id: sinkState
                 objectName: "mixerSinkState"
                 anchors.right: parent.right
-                anchors.rightMargin: 10
+                anchors.rightMargin: root.cardPadding
                 anchors.verticalCenter: parent.verticalCenter
+                width: implicitWidth
+                horizontalAlignment: Text.AlignRight
                 text: {
                     if (pickerRow.isCurrent)
                         return "Current"
