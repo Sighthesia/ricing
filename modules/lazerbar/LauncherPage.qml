@@ -524,16 +524,38 @@ Item {
     // Coalesce the commit choreography across the display-pool and results
     // writes landing in one refresh so hold/wave/cascade plays exactly once.
     property bool _rowsCommitScheduled: false
+    // The commit is deferred on a child Timer, not with Qt.callLater. The wave
+    // host swaps route pages by swapping its Loader's sourceComponent, which
+    // destroys the outgoing page SYNCHRONOUSLY; a queued closure or a queued
+    // method reference is then still delivered against a dead QML context and
+    // throws ("Property '_holdAndScheduleReleases' is not a function"). A Timer
+    // is a child of this page, so it dies with it and the pending frame is
+    // dropped - the correct outcome for a page that no longer exists.
+    //
+    // Only this one deferral is a Timer. The page's other Qt.callLater sites
+    // stay callLaters: a Timer competes with the thumbnail pacer for the timer
+    // queue, and routing row commits through one shifted the pacer's phase
+    // enough to make it catch up two ticks inside one interval.
+    Timer {
+        id: rowsCommitTimer
+        interval: 0
+        repeat: false
+        onTriggered: root._commitRows()
+    }
+
     function _scheduleRowsCommit() {
         if (root._rowsCommitScheduled)
             return
         root._rowsCommitScheduled = true
-        Qt.callLater(function () {
-            root._rowsCommitScheduled = false
-            root._holdAndScheduleReleases()
-            resultsView.syncSelectionFrame()
-            resultsView.normalizeViewport()
-        })
+        rowsCommitTimer.restart()
+    }
+
+    // The deferred half of _scheduleRowsCommit.
+    function _commitRows() {
+        root._rowsCommitScheduled = false
+        root._holdAndScheduleReleases()
+        resultsView.syncSelectionFrame()
+        resultsView.normalizeViewport()
     }
 
     // Route each commit to exactly one animation path. Window growth

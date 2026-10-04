@@ -26,6 +26,11 @@ Item {
     // Opener Item awaiting the coordinated open dispatch (bar entry path).
     property Item pendingOpener: null
 
+    // The route the newest open intent asked for. The session mirror reacts to
+    // this rather than assuming the launcher, so a control-center open is not
+    // turned back into a launcher open by the session turning visible.
+    property string requestedRoute: "launcher"
+
     // Launcher palette anchored on the osu pink family; the wave bands come
     // from the shared LazerTheme.wavePalette so the launcher and the lock
     // screen sweep the same pinks. Independent of the retired
@@ -46,7 +51,16 @@ Item {
 
     LauncherSession { id: embeddedSession }
 
-    function page() { return waveHost.contentItem }
+    function page() { return root.launcherPage }
+
+    // The page the shared wave host currently holds, whatever route it serves.
+    // This is the route-safe accessor: `page()` answers only for the launcher.
+    function activePage() { return waveHost.routePage }
+
+    // The launcher page, and only while the launcher route owns the surface: a
+    // control-center open replaces the retained page, and a stale launcher
+    // reference would then be a destroyed object.
+    readonly property Item launcherPage: waveHost.loadedRoute === "launcher" ? waveHost.routePage : null
 
     function snapshot() {
         return {
@@ -54,21 +68,45 @@ Item {
             hostPhase: waveHost.phase,
             activeTarget: root.coordinator ? root.coordinator.activeTarget : "",
             transitioning: root.coordinator ? root.coordinator.transitioning : false,
-            pendingTarget: root.coordinator ? root.coordinator.pendingTarget : ""
+            pendingTarget: root.coordinator ? root.coordinator.pendingTarget : "",
+            requestedRoute: root.requestedRoute
         }
     }
 
     // Land typing in the live search session of the current page instance.
     function focusSearch() {
-        var currentPage = page()
+        var currentPage = root.launcherPage
         if (currentPage)
+            currentPage.focusSearch()
+    }
+
+    // Focus the active route's own default target: the launcher's search field,
+    // a sibling route's page decides through the same contract. A control-center
+    // open must never steal the launcher's search box.
+    function focusActivePage() {
+        var currentPage = root.activePage()
+        if (!currentPage)
+            return
+        if (typeof currentPage.focusDefault === "function")
+            currentPage.focusDefault()
+        else if (typeof currentPage.focusSearch === "function")
             currentPage.focusSearch()
     }
 
     // Every launcher activation funnels here: bar entry, IPC open, or a
     // session-visible flip. The opener Item is recorded so focus returns to
     // it once the surface closes.
-    function requestOpen(opener) {
+    function requestOpen(opener) { requestRoute("launcher", opener) }
+
+    // The control center is a sibling route on this same surface and session, not
+    // a second overlay: one coordinator, one retained Loader, one opener.
+    function requestControlCenter(opener) { requestRoute("control-center", opener) }
+
+    // Every activation funnels through one route-parameterised path: bar entry,
+    // IPC open, or a session-visible flip. The opener Item is recorded so focus
+    // returns to it once the surface closes.
+    function requestRoute(route, opener) {
+        root.requestedRoute = route
         var action = Logic.openAction(snapshot())
         if (action === "open-session") {
             pendingOpener = opener || null
@@ -77,29 +115,29 @@ Item {
             return
         }
         if (action === "refocus-search") {
-            focusSearch()
+            focusActivePage()
             return
         }
         if (action === "reopen-host") {
-            reopenHost(opener)
+            reopenHost(route, opener)
             return
         }
         if (root.coordinator)
-            root.coordinator.request("launcher", opener, true, true)
+            root.coordinator.request(route, opener, true, true)
     }
 
     // Recall the same live instance while it is mid-close (or queued behind
     // another owner's close): stop the close, drop any superseded hand-off,
     // record the newest opener for restoration, and reopen in place so the
     // latest open request is never swallowed.
-    function reopenHost(opener) {
+    function reopenHost(route, opener) {
         pendingOpener = opener || null
         if (root.coordinator) {
             if (root.coordinator.transitioning)
                 root.coordinator.cancelPending()
             root.coordinator.opener = opener || null
         }
-        waveHost.openRoute("launcher", null)
+        waveHost.openRoute(route, null)
     }
 
     // Mirror session visibility onto the surface; also runs for programmatic
@@ -108,11 +146,11 @@ Item {
         if (!root.session)
             return
         if (root.session.visible) {
-            requestOpen(pendingOpener)
+            requestRoute(root.requestedRoute, pendingOpener)
         } else {
             var action = Logic.closeAction(snapshot())
             if (action === "request-coordinated-close" && root.coordinator)
-                root.coordinator.request("launcher")
+                root.coordinator.request(root.requestedRoute)
             else if (action === "cancel-stale-open" && root.coordinator)
                 root.coordinator.pendingTarget = ""
         }
@@ -127,11 +165,12 @@ Item {
     Connections {
         target: waveHost
         function onOpened() {
-            // The surface grabbed focus on dispatch; land search only when
-            // the launcher genuinely owns the coordinator now, which covers
-            // both direct opens and opens queued behind another owner's close.
-            if (root.coordinator && root.coordinator.activeTarget === "launcher")
-                root.focusSearch()
+            // The surface grabbed focus on dispatch; land the route's own focus
+            // target only when it genuinely owns the coordinator now, which
+            // covers both direct opens and opens queued behind another owner's
+            // close.
+            if (root.coordinator && root.coordinator.activeTarget === waveHost.route)
+                root.focusActivePage()
         }
         function onClosed() {
             if (root.coordinator)
@@ -209,19 +248,56 @@ Item {
     WaveSurfaceHost {
         id: waveHost
         anchors.fill: parent
-        title: root.page() ? root.page().title : "Launcher"
-        description: root.page() ? root.page().description : ""
-        sidebarEntries: root.page() ? root.page().sidebarEntries : []
-        activeSidebarId: root.page() ? root.page().activeMode : "apps"
+        // Chrome is read from the active route page through the shared page
+        // contract, so a sibling route renders its own header without the host
+        // knowing anything about it.
+        title: {
+            var currentPage = root.activePage()
+            return currentPage && currentPage.title !== undefined
+                    ? String(currentPage.title) : "Launcher"
+        }
+        description: {
+            var currentPage = root.activePage()
+            return currentPage && currentPage.description !== undefined
+                    ? String(currentPage.description) : ""
+        }
+        sidebarEntries: {
+            var currentPage = root.activePage()
+            return currentPage && currentPage.sidebarEntries !== undefined
+                    ? currentPage.sidebarEntries : []
+        }
+        activeSidebarId: {
+            var currentPage = root.activePage()
+            if (!currentPage)
+                return ""
+            if (currentPage.activeSidebarId !== undefined)
+                return String(currentPage.activeSidebarId)
+            return currentPage.activeMode !== undefined ? String(currentPage.activeMode) : ""
+        }
         palette: root.launcherPalette
         contentComponent: launcherPageComponent
+        routeComponents: root.routeComponents
 
         onSidebarSelected: id => {
-            var currentPage = root.page()
-            if (currentPage)
+            // Contract first, launcher spelling second: the sidebar rail is
+            // shared chrome, so the mounted page decides what an id means.
+            var currentPage = root.activePage()
+            if (!currentPage)
+                return
+            if (typeof currentPage.handleSidebarSelected === "function")
+                currentPage.handleSidebarSelected(id)
+            else if (typeof currentPage.handleModeSelected === "function")
                 currentPage.handleModeSelected(id)
         }
     }
+
+    // Page components for every sibling route this surface serves. Registering a
+    // route is the entire wiring: the host selects by route name and keeps one
+    // retained Loader across all of them.
+    readonly property var routeComponents: ({
+        "launcher": launcherPageComponent,
+        "control-center": controlCenterPageComponent
+    })
 
     Component {
         id: launcherPageComponent
@@ -229,6 +305,11 @@ Item {
             session: root.session
             onExitFlingRequested: spec => root.spawnExitCard(spec)
         }
+    }
+
+    Component {
+        id: controlCenterPageComponent
+        ControlCenter {}
     }
 
     // Ghost layer above the wave host: exit cards continue their parabolic

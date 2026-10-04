@@ -57,6 +57,7 @@ LauncherSurface 1.0 LauncherSurface.qml
 FullscreenHeader 1.0 FullscreenHeader.qml
 FullscreenSidebar 1.0 FullscreenSidebar.qml
 LauncherPage 1.0 LauncherPage.qml
+ControlCenter 1.0 ControlCenter.qml
 LauncherCategoryBar 1.0 LauncherCategoryBar.qml
 LauncherCategoryChip 1.0 LauncherCategoryChip.qml
 LauncherListFooter 1.0 LauncherListFooter.qml

@@ -82,6 +82,52 @@ Item {
             tryVerify(function() { return host.page().searchField.activeFocus }, 300)
         }
 
+        function test_controlCenterIsASiblingRouteOnTheSameWaveOwner() {
+            launcherSurface.requestControlCenter(opener)
+
+            // One owner, one dispatch: the control center is a route on the wave
+            // surface, not a second overlay or a second coordinator.
+            compare(openSpy.count, 1)
+            compare(openSpy.signalArguments[0][0], "wave")
+            compare(openSpy.signalArguments[0][1], "control-center")
+            compare(coordinator.activeOwner, "wave")
+            compare(coordinator.activeTarget, "control-center")
+
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            compare(launcherSurface.host.route, "control-center")
+            verify(launcherSurface.activePage() !== null,
+                   "the control center must own a page on the shared surface")
+            compare(launcherSurface.activePage().objectName, "controlCenterPage",
+                    "the route must mount its own page, not the launcher's")
+            verify(launcherSurface.page() === null,
+                   "the launcher accessor must not answer for another route")
+
+            // The route's own focus target is used, and the launcher's search
+            // field is not: the launcher page is not even mounted here, so a
+            // hard-coded focusSearch would either no-op or, once the launcher
+            // comes back, steal focus from a control center that never had it.
+            tryCompare(launcherSurface.activePage(), "focusDefaultCount", 1, 500)
+            verify(launcherSurface.page() === null)
+
+            // Opener restoration is the launcher's existing contract, shared.
+            keyClick(Qt.Key_Escape)
+            tryCompare(launcherSurface.host, "phase", "closed", 800)
+            compare(coordinator.activeTarget, "")
+            verify(opener.activeFocus)
+        }
+
+        function test_launcherIsStillTheDefaultRouteAfterAControlCenterOpen() {
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+
+            launcherSurface.requestOpen(opener)
+
+            tryCompare(launcherSurface.host, "route", "launcher", 1600)
+            verify(launcherSurface.page() !== null)
+            verify(launcherSurface.activePage() === launcherSurface.page(),
+                   "the active page is the launcher page on the launcher route")
+        }
+
         function test_deprecatedWaveTargetsAreRejectedEverywhere() {
             verify(!coordinator.request("wiki", opener))
             verify(!coordinator.request("news", opener))

@@ -49,6 +49,61 @@ Item {
             }
         }
 
+        // The same snapshot plus the route the caller asked for. An absent
+        // requestedRoute means "launcher", which is what every launcher-only
+        // caller and test above relies on.
+        function routeSnapshot(sessionVisible, hostPhase, activeTarget, transitioning, pendingTarget, requestedRoute) {
+            var state = snapshot(sessionVisible, hostPhase, activeTarget, transitioning, pendingTarget)
+            state.requestedRoute = requestedRoute
+            return state
+        }
+
+        function test_openAction_followsTheRequestedRouteNotAHardCodedLauncher() {
+            // The control center is a sibling route on the same wave owner, so
+            // every decision has to read the requested route: a launcher-only
+            // comparison would send a control-center open back down the launcher
+            // path and refocus a search field that is not on screen.
+            compare(SurfaceLogic.openAction(
+                routeSnapshot(true, "closed", "", false, "", "control-center")),
+                "request-coordinated-open")
+            compare(SurfaceLogic.openAction(
+                routeSnapshot(true, "closed", "control-center", false, "", "launcher")),
+                "request-coordinated-open")
+            compare(SurfaceLogic.openAction(
+                routeSnapshot(true, "open", "control-center", false, "", "control-center")),
+                "refocus-search")
+            compare(SurfaceLogic.openAction(
+                routeSnapshot(true, "closing", "control-center", false, "", "control-center")),
+                "reopen-host")
+        }
+
+        function test_closeAction_cancelsAndClosesOnTheRequestedRoute() {
+            compare(SurfaceLogic.closeAction(
+                routeSnapshot(false, "open", "control-center", false, "", "control-center")),
+                "request-coordinated-close")
+            compare(SurfaceLogic.closeAction(
+                routeSnapshot(false, "closed", "settings", true, "control-center", "control-center")),
+                "cancel-stale-open")
+            // A stale queued launcher must not be cancelled by a control-center
+            // hide: they are different routes with different owners' work at stake.
+            compare(SurfaceLogic.closeAction(
+                routeSnapshot(false, "closed", "settings", true, "launcher", "control-center")),
+                "none")
+            // And the launcher default is unchanged for a launcher snapshot.
+            compare(SurfaceLogic.closeAction(
+                snapshot(false, "open", "launcher", false, "")),
+                "request-coordinated-close")
+        }
+
+        function test_anAbsentRequestedRouteMeansLauncher() {
+            compare(SurfaceLogic.openAction(
+                routeSnapshot(true, "open", "launcher", false, "", "")),
+                "refocus-search")
+            compare(SurfaceLogic.closeAction(
+                routeSnapshot(false, "open", "launcher", false, "", undefined)),
+                "request-coordinated-close")
+        }
+
         function test_openAction_hiddenSessionOpensStandaloneSession() {
             compare(SurfaceLogic.openAction(
                 snapshot(false, "closed", "", false, "")), "open-session")
