@@ -607,5 +607,89 @@ Item {
             compare(host.phase, "closing", "and the overview still declines back, so the host closes")
             host.destroy()
         }
+
+        // The brief's acceptance case, with the press delivered as a KEY rather
+        // than as a call.
+        //
+        // `handleEscape()` is the host's own function, so calling it proves only
+        // that it works when called. A real press has to travel through the host's
+        // `Keys.onEscapePressed` with the mounted detail page in the focus chain -
+        // which is exactly where a page-local claim would intercept it, and
+        // exactly what the password-prompt test above depends on being narrow.
+        //
+        // The claim asserted after the press is the host's COMPUTED `canGoBack`,
+        // not its manual `pageCanGoBack` flag: the brief's sample reads the manual
+        // flag, but a contract page owns that answer outright, so the manual flag
+        // is never written and would be vacuously false. `canGoBack` is what
+        // `handleEscape()` actually consults.
+        function test_detailEscapeReturnsBeforeSurfaceClose() {
+            var host = openControlCenterWithDetails()
+            var page = host.contentItem
+
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            verify(host.canGoBack, "the mounted sub-page must be offered back first")
+            tryVerify(function() { return host.activeFocus === true }, 1000,
+                "the press must reach the surface the way a user's would")
+
+            keyClick(Qt.Key_Escape)
+
+            tryVerify(function() { return page.activeSubPage === "" }, 1000)
+            compare(host.route, "control-center",
+                "a detail back returns to the overview, not to the launcher")
+            tryVerify(function() { return host.canGoBack === false }, 500)
+            verify(host.visible, "the surface must still be on screen")
+            compare(host.phase, "open")
+            verify(host.contentItem === page, "the overview is restored, not rebuilt")
+
+            // And the press that returned must not have cost the surface its own
+            // close: the next one is the overview's, which declines back.
+            keyClick(Qt.Key_Escape)
+            compare(host.phase, "closing")
+            tryCompare(host, "phase", "closed", 2000)
+            host.destroy()
+        }
+
+        // "Entering a detail page retains the overview snapshot for immediate back
+        // navigation" - asserted as IDENTITY plus geometry, not as "the overview
+        // still shows the same values".
+        //
+        // The weaker reading is also true of a page that tore itself down and
+        // rebuilt from the same services one turn later, which is the cost the
+        // retention exists to avoid. So this pins that the card and the calendar
+        // are the SAME objects before and after, that the overview keeps its
+        // geometry while it is hidden, and that only the sub-page is torn down.
+        function test_theOverviewIsRestoredNotRebuiltOnReturnFromADetailPage() {
+            var host = openControlCenterWithDetails()
+            var page = host.contentItem
+            tryVerify(function() { return page.networkCard.width > 0 }, 2000)
+            var networkCardBefore = page.networkCard
+            var calendarBefore = page.calendarItem
+
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            verify(page.detailPageItem !== null, "the sub-page must be mounted")
+
+            // `visible` rather than `active`: the overview YIELDS without being
+            // rebuilt, so it keeps a real box even while it is not on screen.
+            tryVerify(function() { return page.overviewItem.visible === false }, 500)
+            verify(page.networkCard === networkCardBefore,
+                "the retained overview must not be rebuilt while hidden")
+            verify(page.calendarItem === calendarBefore)
+            verify(page.networkCard.width > 0,
+                "a hidden-but-retained overview keeps its geometry")
+
+            verify(page.handleBack())
+
+            tryVerify(function() { return page.overviewItem.visible === true }, 500)
+            verify(page.networkCard === networkCardBefore,
+                "back restores the retained overview; it must not build a new one")
+            verify(page.calendarItem === calendarBefore)
+            tryVerify(function() { return page.detailPageItem === null }, 1000,
+                "the sub-page is torn down; the overview is not")
+            compare(host.route, "control-center")
+            compare(host.phase, "open")
+            host.destroy()
+        }
     }
 }

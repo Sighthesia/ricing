@@ -3628,5 +3628,194 @@ Item {
             none.scan()
             verify(none.stateLabel.length > 0)
         }
+
+        // --- Acceptance: optional services, narrow geometry, route defaults ---
+
+        // The brief's optional-service acceptance case: three services all
+        // reporting themselves unavailable at once still leave the whole overview
+        // usable (acceptance 7, "Optional service failures leave the rest of the
+        // surface usable").
+        //
+        // Assigned onto a LIVE page rather than into the constructor. Three failing
+        // at construction is one shape; a service that answered correctly on mount
+        // and then stops answering is the real one, and a constructor-only fixture
+        // would pass even if the page read each optional service once at
+        // construction and cached the answer forever.
+        function test_optionalServicesDoNotBlockOverview() {
+            var page = makePage({
+                networkService: seededNetwork(makeFake(fakeNetworkComponent), [
+                    { ssid: "Home", connected: true }]),
+                weatherService: makeFake(fakeWeatherComponent),
+                batteryService: makeFake(fakeBatteryComponent)
+            })
+            tryVerify(function() { return page.visible && page.controlCardCount === 4 }, 1000)
+            // Pinned first, so the fixture is proved to have been the healthy one:
+            // without these the assertions below would also pass on a page whose
+            // weather header had never rendered.
+            compare(page.weatherState, "ready")
+            compare(page.networkCard.status, "ready")
+            compare(page.networkCard.summary, "Home")
+
+            page.weatherService = makeFake(fakeWeatherComponent, {
+                available: false, loading: false, temperature: Number.NaN,
+                isStale: false, lastError: "DNS lookup failed" })
+            page.batteryService = makeFake(fakeBatteryComponent, {
+                available: false, ready: false, percentage: 0, charging: false,
+                pluggedIn: false, iconText: "" })
+            page.networkService = makeFake(fakeNetworkComponent, {
+                wifiEnabled: true, wifiConnected: false, networks: ({}),
+                lastError: "NetworkManager is not responding" })
+
+            // The brief's assertion, verbatim in intent: still on screen, still
+            // exactly the four core controls.
+            tryVerify(function() { return page.visible && page.controlCardCount === 4 }, 1000)
+
+            // Each failure lands on its own card or its own header band, and on
+            // nothing else: no service's failure removed the header, a sibling
+            // card, or the information column.
+            compare(page.weatherState, "unavailable")
+            compare(page.networkCard.status, "error")
+            compare(page.networkCard.error, "NetworkManager is not responding")
+            compare(page.batteryReady, false)
+            verify(page.clockTextItem.text.length > 0,
+                "the clock is local time, not a service: it must not go blank")
+            verify(page.batteryTextItem.text.length > 0,
+                "an absent battery renders a word, not an empty band")
+            verify(page.calendarItem.visible,
+                "the calendar is local date math and must survive every failure")
+            compare(page.entryCount, 0)
+            for (var i = 0; i < page.controlCards.length; i++)
+                verify(page.controlCards[i].visible,
+                    "card " + i + " stays painted while another service has failed")
+
+            // ...and the cards whose services did NOT fail are still actionable,
+            // which is the half of acceptance 7 that "still renders" misses.
+            var volume = makeFake(fakeVolumeComponent)
+            var media = makeFake(fakeMediaComponent)
+            page.volumeService = volume
+            page.mediaService = media
+            tryCompare(page.volumeCard, "status", "ready", 500)
+            tryCompare(page.mediaCard, "status", "ready", 500)
+            page.toggleMute()
+            compare(volume.muteCalls, 1,
+                "volume stays directly actionable next to two failed services")
+            page.mediaAction("next")
+            compare(media.nextCalls, 1,
+                "media stays directly actionable next to two failed services")
+
+            // The failed network card is inert, not broken: no detail page may be
+            // mounted for a service that reported an error.
+            var requests = 0
+            page.networkDetailsRequested.connect(function() { requests++ })
+            page.openNetworkDetails()
+            compare(requests, 0, "a failed card must not hand off to its detail page")
+            compare(page.activeSubPage, "")
+        }
+
+        // The narrow half of acceptance 4: "The narrow layout remains usable
+        // without horizontal scrolling" is only half a claim unless the controls
+        // are still ON SCREEN. A stack that quietly dropped the media card below a
+        // scroll limit would keep every scroll assertion green.
+        //
+        // The width here is deliberately far below the module's 760px breakpoint,
+        // so this is the worst case rather than the boundary.
+        function test_everyCoreCardStaysReachableInTheNarrowLayout() {
+            var page = makePage({
+                width: 420, height: 1600,
+                // Healthy services, so "reachable" can mean enabled rather than
+                // merely present: an inert control on a collapsed row looks
+                // identical to a working one in a geometry assertion.
+                volumeService: makeFake(fakeVolumeComponent),
+                mediaService: makeFake(fakeMediaComponent)
+            })
+            tryVerify(function() { return page.layoutMode === "narrow" }, 1000)
+            tryVerify(function() { return page.mediaCard.width > 0 }, 1000)
+            verify(420 < CcLogic.minimumTwoColumnWidth,
+                "the fixture must actually be below the two-column breakpoint")
+
+            compare(page.controlCardCount, 4)
+            for (var i = 0; i < page.controlCards.length; i++) {
+                var card = page.controlCards[i]
+                verify(card.visible, "card " + i + " must stay visible when stacked")
+                verify(card.width > 0 && card.height > 0, "card " + i + " must keep a real box")
+                // The spec's own floor: reachable "without reducing interactive
+                // targets to an unusable size". 48px is the bar's target size
+                // (LazerTheme.targetSize), and the cards are declared at 88.
+                verify(card.height >= 48,
+                    "card " + i + " is " + card.height + "px tall, under a usable target")
+                verify(card.width >= 48, "card " + i + " is only " + card.width + "px wide")
+                var left = card.mapToItem(page, 0, 0).x
+                verify(left >= -0.5 && left + card.width <= page.width + 0.5,
+                    "card " + i + " leaves the narrow panel horizontally")
+            }
+
+            // The two DIRECT controls have to be reachable too, not just framed:
+            // a card can keep its box while the control inside it collapses.
+            verify(page.volumeSliderItem.width > 0, "the volume slider survives the stack")
+            verify(page.volumeSliderItem.height > 0)
+            verify(page.muteButtonItem.width > 0 && page.muteButtonItem.height > 0)
+            compare(page.muteButtonItem.enabled, true)
+            var ids = ["previous", "toggle", "next"]
+            for (var j = 0; j < ids.length; j++) {
+                var button = page.transportItem(ids[j])
+                verify(button !== null, "transport " + ids[j] + " survives the stack")
+                verify(button.width > 0 && button.height > 0)
+                compare(button.enabled, true,
+                    "transport " + ids[j] + " must stay actionable when stacked")
+            }
+
+            // And the stack still has exactly one scroll surface, vertical only.
+            var scrollers = scrollContainers(page)
+            compare(scrollers.length, 1, "the page has exactly one scroll surface")
+            compare(scrollers[0].flickableDirection, Flickable.VerticalFlick)
+        }
+
+        // The route default, asserted from the live page rather than from the
+        // module: the host decides what a route page looks like from `title`,
+        // `description`, `sidebarEntries`, `activeSidebarId`, `canGoBack`,
+        // `focusDefault()` and `handleBack()`, so a page that drifted on any of
+        // them would render the launcher's chrome on the control center.
+        //
+        // The empty rail is the load-bearing half: with entries, the shared host
+        // mounts FullscreenSidebar and every section of the page loses 196px of
+        // width - which is exactly what would break the B1 two-column layout.
+        function test_theRoutePageContractIsWhatTheSharedHostReads() {
+            var page = makePage({ width: 900, height: 720 })
+            tryVerify(function() { return page.layoutMode === "wide" }, 1000)
+
+            compare(page.title, "Control Center")
+            compare(page.description.length > 0, true)
+            compare(page.sidebarEntries.length, 0,
+                "an entry here would steal the B1 layout's right column")
+            compare(page.activeSidebarId, "")
+
+            // Every section the wide arrangement names must resolve to a real,
+            // shown item - the overview band plus both columns. `visibleSectionCount`
+            // is deliberately not asked here: it counts the module's STACKED order,
+            // which is empty by construction in the wide arrangement.
+            var wideNames = ["overview"].concat(page.sections.left, page.sections.right)
+            compare(wideNames.length, 4)
+            for (var i = 0; i < wideNames.length; i++) {
+                var item = page.sectionItem(wideNames[i])
+                verify(item !== null, "wide section " + wideNames[i] + " must resolve")
+                verify(item.visible, "wide section " + wideNames[i] + " must be shown")
+            }
+
+            // Back precedence, from the live page: nothing to pop on the overview,
+            // one step to pop while a detail page is mounted, and a real refusal
+            // in between so the host's fall-through-to-close stays reachable.
+            compare(page.canGoBack, false)
+            compare(page.handleBack(), false, "the overview declines back")
+            page.requestSubPage(CcLogic.detailRoutes.network)
+            tryVerify(function() { return page.activeSubPage !== "" }, 500)
+            compare(page.canGoBack, true)
+            compare(page.handleBack(), true, "a mounted sub-page consumes back")
+            tryVerify(function() { return page.canGoBack === false }, 500)
+
+            // An unknown sub-page name mounts nothing, so a caller typo cannot
+            // produce a blank viewport that looks like a load failure.
+            compare(page.requestSubPage("nope"), false)
+            compare(page.activeSubPage, "")
+        }
     }
 }

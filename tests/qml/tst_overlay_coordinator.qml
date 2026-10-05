@@ -725,5 +725,135 @@ Item {
             compare(CoordLogic.dispatchFor("settings", launcherSurface).route, "coordinator")
             compare(CoordLogic.dispatchFor("music", launcherSurface).route, "coordinator")
         }
+
+        // --- Acceptance: the control center coexists with settings and music ---
+        //
+        // One walk through all three owners, because the parts that only fail are
+        // the seams BETWEEN them: a control center that took the surface and did
+        // not give it back strands the next open, and one that gave it back to the
+        // LAUNCHER instead of to itself looks fine until the user notices they
+        // landed somewhere they did not ask for.
+        //
+        // Acceptance 8 ("the settings center remains the destination for
+        // long-lived configuration") is the settings leg: a settings request from
+        // the control center must be dispatched to the settings OWNER, never into
+        // the wave surface as a control-center category.
+
+        function test_theControlCenterCoexistsWithSettingsAndMusicAndComesBackOnItsOwnRoute() {
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            compare(launcherSurface.host.route, "control-center")
+            compare(coordinator.activeOwner, "wave")
+
+            // --- Leg 1: settings takes the surface from the control center ---
+            verify(coordinator.request("settings", alternateOpener))
+            compare(coordinator.pendingTarget, "settings")
+            verify(coordinator.transitioning)
+            tryCompare(launcherSurface.host, "phase", "closed", 1600)
+            compare(coordinator.activeOwner, "settings",
+                "settings keeps its own owner; the control center is not a settings category")
+            compare(coordinator.activeTarget, "settings")
+            compare(host.session().visible, false,
+                "the wave's mirror is hidden once another owner owns the surface")
+            compare(launcherSurface.requestedRoute, "launcher",
+                "a genuine close drops the sticky route")
+
+            // No wave open was dispatched for the settings target: the two
+            // owners stay serialized instead of racing for one surface. The
+            // dispatch that DOES happen is ("settings", "settings") - the
+            // settings owner serving its own target.
+            for (var i = 0; i < openSpy.count; i++) {
+                var dispatchedOwner = openSpy.signalArguments[i][0]
+                var dispatchedTarget = openSpy.signalArguments[i][1]
+                verify(!(dispatchedTarget === "settings" && dispatchedOwner !== "settings"),
+                    "a settings target was dispatched to the wrong owner: " + dispatchedOwner)
+            }
+
+            // --- Leg 2: music takes over from settings ---
+            verify(coordinator.request("music", alternateOpener))
+            compare(coordinator.pendingTarget, "music")
+            compare(coordinator.ownerClosed("settings"), "released")
+            compare(coordinator.activeOwner, "music")
+            compare(coordinator.activeTarget, "music")
+            compare(openSpy.signalArguments[openSpy.count - 1][0], "music")
+            compare(launcherSurface.host.phase, "closed",
+                "the wave owner must stay released while another owner owns the surface")
+
+            // Music closes and releases itself on its own terms, restoring its own
+            // opener - the control center must not be caught in that release.
+            coordinator.ownerClosed("music")
+            compare(coordinator.activeOwner, "")
+            compare(coordinator.activeTarget, "")
+            verify(alternateOpener.activeFocus)
+
+            // --- Leg 3: back to the control center, on its own route ---
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            compare(coordinator.activeOwner, "wave")
+            compare(coordinator.activeTarget, "control-center")
+            compare(launcherSurface.host.route, "control-center",
+                "returning must land on the control center, not on the launcher")
+            compare(host.session().visible, true,
+                "the session mirror comes back with the wave owner")
+            verify(launcherSurface.activePage() !== null)
+            compare(launcherSurface.activePage().objectName, "controlCenterPage")
+            verify(launcherSurface.page() === null,
+                "the launcher accessor must not answer for the control-center route")
+            // The route's own focus target, asked for again on the way back. The
+            // count is cumulative on the RETAINED page instance, so this asks that
+            // it grew rather than that it equals a number.
+            tryVerify(function() {
+                var page = launcherSurface.activePage()
+                return page !== null && page.focusDefaultCount >= 1
+            }, 800)
+            verify(launcherSurface.activePage().activeFocus,
+                "the control center takes focus on the way back, not the launcher")
+
+            for (var j = 0; j < openSpy.count; j++) {
+                var owner = openSpy.signalArguments[j][0]
+                verify(owner === "wave" || owner === "music" || owner === "settings",
+                    "no unknown owner was ever dispatched: " + owner)
+            }
+        }
+
+        // The other direction of the same seam: while the control center owns the
+        // surface, a SIBLING wave route is handed over without releasing the owner
+        // at all. The launcher must come back on its own route, and the control
+        // center must not be the route that survives a genuine user close.
+        function test_aControlCenterAndALauncherShareOneOwnerInBothDirections() {
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            var center = launcherSurface.activePage()
+
+            // Control center -> launcher: same owner, no release.
+            verify(coordinator.request("launcher", alternateOpener))
+            compare(coordinator.ownerClosed("wave"), "reopened")
+            tryCompare(launcherSurface.host, "route", "launcher", 2000)
+            compare(coordinator.activeOwner, "wave",
+                "a sibling route must not release the owner that serves both")
+            verify(launcherSurface.page() !== null)
+            verify(launcherSurface.activePage() === launcherSurface.page())
+            compare(center.visible, false,
+                "the replaced route page is no longer the active one")
+
+            // A genuine user close must leave nothing behind: the next plain open
+            // is the launcher, not a replay of the control center.
+            keyClick(Qt.Key_Escape)
+            tryCompare(launcherSurface.host, "phase", "closed", 1200)
+            compare(coordinator.activeTarget, "")
+
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "route", "control-center", 2000)
+            wait(400)
+            compare(launcherSurface.host.phase, "open",
+                "returning to the control center settles open")
+
+            keyClick(Qt.Key_Escape)
+            tryCompare(launcherSurface.host, "phase", "closed", 1200)
+            host.session().open()
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            compare(launcherSurface.host.route, "launcher",
+                "a session open carries no route, so it must not inherit the control center")
+        }
     }
 }
