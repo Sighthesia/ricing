@@ -592,6 +592,17 @@ Item {
         }
         return true
     }
+    function _sameIdSet(ids, prev) {
+        if (ids.length !== prev.length)
+            return false
+        var seen = ({})
+        for (var i = 0; i < prev.length; i++)
+            seen[prev[i]] = true
+        for (var j = 0; j < ids.length; j++)
+            if (!seen[ids[j]])
+                return false
+        return true
+    }
     function _holdAndScheduleReleases() {
         var ids = root._windowRowIds()
         // A hidden list has no entrance to play and nobody to show it to. The
@@ -674,9 +685,30 @@ Item {
                     grown.holdInstantly()
             }
             root.playRefillCascade(newcomers > 0)
+        } else if (root._sameIdSet(ids, prev)) {
+            // A new clipboard copy can reorder the window without changing
+            // which rows it contains. Releasing all 96 rows here made every
+            // idle reopen pay the full refill cascade even though every row
+            // was already settled and only its result binding changed.
+            if (freshRows.length > 0)
+                root._releaseAllRowsInstantly()
         } else {
-            root._holdAllRowsInstantly()
-            root.playRefillCascade()
+            // Hold only genuinely new ids. Existing rows keep their settled
+            // geometry when a pool refresh removes or replaces a small tail.
+            var previousIds = ({})
+            for (var p = 0; p < prev.length; p++)
+                previousIds[prev[p]] = true
+            var newcomers = 0
+            for (var n = 0; n < ids.length; n++) {
+                if (previousIds[ids[n]])
+                    continue
+                var newcomer = resultsRepeater.itemAt(n)
+                if (!newcomer || typeof newcomer.holdInstantly !== "function")
+                    continue
+                newcomers++
+                newcomer.holdInstantly()
+            }
+            root.playRefillCascade(newcomers > 0)
         }
     }
 

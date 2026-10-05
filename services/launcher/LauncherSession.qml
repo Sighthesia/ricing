@@ -506,6 +506,10 @@ QtObject {
         root._heldBatches = []
         root._staleRefresh = hasStaleRows
         root._staleRefreshItems = []
+        if (hasStaleRows) {
+            root._streamActive = true
+            root.loadingMore = true
+        }
         adapter.refresh("", parsed.mode, function(outcome, complete) {
             root._applyBatch(token, outcome, complete !== false, parsed.mode, parsed.text)
         })
@@ -526,9 +530,9 @@ QtObject {
             if (outcome && !Array.isArray(outcome)) {
                 root._staleRefresh = false
                 root._staleRefreshItems = []
+                root._streamActive = false
                 root.loading = false
                 root.loadingMore = false
-                root._streamActive = false
                 root.error = _messageOr(outcome.error, "data source failed")
                 return
             }
@@ -538,6 +542,8 @@ QtObject {
             outcome = root._staleRefreshItems
             root._staleRefreshItems = []
             root._staleRefresh = false
+            root._streamActive = false
+            root.loadingMore = false
             complete = true
         }
         // Only a tail append waits. The first batch of a refresh replaces the

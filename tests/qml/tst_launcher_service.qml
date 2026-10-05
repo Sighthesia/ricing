@@ -785,6 +785,31 @@ Item {
             compare(svc().results[1].id, "new2")
         }
 
+        function test_clipboardReopenMarksOneFreshPullAsLoadingMore() {
+            var clips = makeManualAdapter()
+            svc()._adapters = { clipboard: clips }
+
+            svc().openClipboard()
+            wait(0)
+            resolveRefresh(clips, 0, [makeItem("old", "Old", 0, 10)])
+            svc().close()
+            svc().openClipboard()
+            wait(0)
+
+            compare(clips.queries.length, 2)
+            verify(svc().loadingMore, "stale reopen did not mark its pull active")
+            svc()._applyBatch(svc()._refreshToken,
+                              [makeItem("new", "New", 0, 11)], false,
+                              "clipboard", "")
+            compare(clips.queries.length, 2,
+                    "a poll-like completion started a duplicate reopen pull")
+            verify(svc().loadingMore)
+            svc()._applyBatch(svc()._refreshToken,
+                              [makeItem("new2", "New two", 0, 10)], true,
+                              "clipboard", "")
+            compare(svc().loadingMore, false)
+        }
+
         function test_closeDuringClipboardLoadKeepsTruthfulPoolMarker() {
             // Switching to clipboard then closing before the pull resolves:
             // the pool still holds apps rows, so the marker must stay "apps"

@@ -706,6 +706,31 @@ function test_streamedFirstFillLeavesTheViewportScrollable() {
         verify(page.resultsView.interactive)
     }
 
+    function test_shiftedIdsKeepSettledSurvivorsUnheld() {
+        var initial = []
+        for (var i = 0; i < 96; i++)
+            initial.push(makeItem("clip" + i, "Clip " + i, 0, 1000 - i))
+        openWithResults(initial)
+        tryVerify(function() { return !page.rowsAnimatingIn }, 3000)
+
+        var shifted = [makeItem("new", "New copy", 0, 2000)]
+        for (var j = 0; j < 95; j++)
+            shifted.push(makeItem("clip" + j, "Clip " + j, 0, 1000 - j))
+        page.session.results = shifted
+        page.session.displayPool = shifted
+        page._scheduleRowsCommit()
+        wait(100)
+
+        var held = 0
+        for (var k = 0; k < page.resultCount; k++) {
+            var row = page.resultAt(k)
+            if (row && row.revealHeld)
+                held++
+        }
+        verify(held <= 1, "shifted survivors triggered a full-window hold: " + held)
+        verify(page.resultsView.interactive)
+    }
+
     // --- progressive loading ---
 
         function test_settledListShowsNoFooter() {
