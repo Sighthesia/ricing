@@ -1980,6 +1980,40 @@ Item {
             : root.noRowTop + strip.scrollOffset + root.markerOffset
     }
 
+    // Is any part of the bar's motion in flight RIGHT NOW?
+    //
+    // A FUNCTION over three reads of the mechanism itself, and none of them is a flag -
+    // which is the whole of it, and it is why this cannot be `_markerCrossing`. A flag
+    // here can only report what the branch deciding what to do last decided, so it can
+    // never be the input to that decision; and "a journey is placing the frame" is not
+    // the same question anyway, because a publish reaches the no-target branch with NO
+    // crossing running. Measured on a plain focus change, every one of the three calls
+    // `_syncIndicator` makes inside a single assignment reads `_markerCrossing` false -
+    // the transient happens on the way to a crossing and on the way out of one.
+    //
+    // The three terms are what a trail is, read from the two ends and from the two
+    // animations that move them:
+    //
+    //   the ends are APART      - a wake is open, and a wake is the one thing this file
+    //                             has no cap on and no excuse to close early
+    //   either end is ANIMATING - the ends are together but not home, which is the
+    //                             first tick of every flight and the tick after the last
+    //   a crossing is PLACING the frame - the crossing's own branch above answers this
+    //                             one first, so the term is redundant on today's control
+    //                             flow and is here so the predicate means what it says
+    //                             on its own rather than only in the order it is called
+    //
+    // Measured, so the second term is not redundant either: with `MotionTokens.slow * 2`
+    // at 480ms, a publish landing 16ms into a flight finds 16.9px of wake, and one landing
+    // on the frame before the tail leaves finds the ends together with both animations
+    // still running - and parking there is just as much a cut.
+    function _barInFlight() {
+        return root._markerCrossing
+            || Math.abs(root._headY - root._tailY) > 0.5
+            || root.indicatorHeadMotion.running
+            || root.indicatorTailMotion.running
+    }
+
     // The tracker's one entry point, and it routes the two mechanisms by asking which one
     // is running. A crossing owns the POSITION and this routine only maintains the
     // bookkeeping the landing needs; everything else is the widget's pair, aimed at the
@@ -2005,9 +2039,68 @@ Item {
             return
         }
         if (!root.hasTarget) {
-            // No target: the bar is hidden, so it must not be left mid-trail either
-            // - a trail still in flight when the next target arrives would stretch
-            // out of the wrong place.
+            // A MOMENT WITH NO TARGET IS NOT A CANCELLATION, and this is where the trail
+            // used to die.
+            //
+            // The reasoning this branch was built on is sound and is kept below: a bar
+            // that is genuinely hidden has no business stretching. What was wrong is the
+            // assumption underneath it - that "hidden" and "not travelling" are the same
+            // moment. They are not, and the gap between them is a publish: every
+            // `_commitHint` sets `plan = null` before it builds the rest plan, and
+            // `activeColumn` is `columns[plan.activeSlot]`, so that one line takes
+            // `hasTarget` false for the length of a synchronous block and puts it back.
+            // Watched through `onHasTargetChanged` on an ordinary focus change from row 1
+            // to row 3, one assignment produces three park-and-unpark round trips: no
+            // target (both ends on the off-panel coordinate), row 3 of the OLD columns
+            // (both ends snapped back), row 3 of the new columns, and then the retarget a
+            // turn later. Nothing had gone wrong at any of those instants.
+            //
+            // Invisible while the retarget follows in the same block, because no frame is
+            // rendered inside it. NOT invisible when a trail was already open - the wake
+            // that was mid-flight is snapped shut by the first of those three, and the
+            // third finds `_placed` false and snaps the next target home instead of flying
+            // to it. And not invisible when the arriving content has not resolved its
+            // focused row, which is what niri sends while a workspace is still coming up
+            // and what parks the bar for whole frames rather than for one block. Measured
+            // in the running shell, read at every `_syncIndicator`: 16.9px of wake at one
+            // call, 0.0 at the next with `head` at -34.0 - the parking coordinate - and an
+            // 8.9px trail destroyed the same way one call earlier. That is the report,
+            // 已复现切换窗口拖尾复位, and it is also the user's standing observation that
+            // anything interrupting a bar before its animation finishes goes wrong.
+            //
+            // And it is the ONLY window, which bounds the gate below as much as the report
+            // does. `onHasTargetChanged`, `onFocusedRowIndexChanged` and
+            // `onFocusedWindowKeyChanged` are all CHANGE hooks, so a publish that leaves all
+            // three exactly as they were runs nothing at all: measured, a `focusAt: -1`
+            // publish issued into an interval that was already `focusAt: -1` produced zero
+            // calls here, with the gate and without it. The park is reachable only on an
+            // edge - and while a crossing is running it is not reachable at all, because the
+            // branch above has already returned. So the state this gate guards is a state
+            // one publish creates and a later publish has to take away again.
+            //
+            // So: nothing is written. The bar keeps whatever position the mechanism
+            // already in charge has given it, keeps its committed target, keeps its
+            // identity and keeps its PLACEMENT - and the target that arrives next is
+            // re-aimed from wherever the trail had got to, which is `retargetEdges`'
+            // answer and the only one of the widget's four responses that a journey in
+            // flight can use. `_pendingTop` goes, because a same-anchor drift belongs to
+            // the target that has just gone and applying it later would be a second
+            // discontinuity.
+            //
+            // The bar is not drawn for the whole of this interval - `focusUnderline` is
+            // gated on `markerHasTarget`, which is `hasTarget || _departingRowIndex >= 0`
+            // - so nothing here is visible while it lasts. That is the answer to whether a
+            // wake should persist through a no-target interval: it cannot be seen, and
+            // what it buys is the frame after, where the bar re-appears already travelling
+            // instead of already arrived.
+            if (root._barInFlight()) {
+                root._pendingTop = -1
+                return
+            }
+            // No target and nothing travelling: the bar is hidden with no journey under
+            // it, so it must not be left mid-trail either - there is nothing left to be
+            // mid, and a bar resting at a coordinate that named a row would fly from that
+            // row when the next target arrives.
             //
             // Snap to the resting position for NO row rather than to
             // `_targetYFor(-1)`. That expression is `index * rowPitch + ...`, so an
@@ -2038,7 +2131,9 @@ Item {
             //
             // So this branch is not only "no row, park it" - it is also the statement
             // that the marker is not currently on a row, which is what the stretch needs
-            // to know and had no way to ask.
+            // to know and had no way to ask. The gate above is what keeps that statement
+            // TRUE: it declines to make it while the bar is still travelling, because a
+            // target that has not resolved yet is not a target that has gone.
             root._placed = false
             return
         }

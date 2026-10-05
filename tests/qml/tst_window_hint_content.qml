@@ -2674,6 +2674,439 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             settleSlide()
         }
 
+        // A MOMENT WITH NO TARGET IS NOT A CANCELLATION.
+        //
+        // The `!hasTarget` branch parks the bar, and "parked" is two destructive writes,
+        // not one: `_snapIndicator` puts BOTH ends on the off-panel coordinate, and
+        // `_placed = false` hands the next real target to the FIRST-PLACEMENT branch,
+        // which snaps where it lands instead of flying to it. Both are right for a bar
+        // that is genuinely hidden with nothing travelling, and both are wrong in the
+        // middle of a publish - and a publish reaches this branch on its own, twice,
+        // before any snapshot has done anything wrong.
+        //
+        // `_commitHint` sets `plan = null` and only then builds the rest plan, and
+        // `activeColumn` is `columns[plan.activeSlot]`, so that one line takes
+        // `hasTarget` false for the length of a synchronous block and puts it back.
+        // Watched through `onHasTargetChanged` on a plain focus change from row 1 to
+        // row 3, the whole cascade is: no target (parked, head and tail on -42) -> row
+        // 3 of the OLD columns (both ends snapped to 35) -> row 3 of the new columns ->
+        // the retarget a turn later. Three park-and-unpark round trips inside one
+        // assignment, on every publish, whether or not anything was moving.
+        //
+        // It is invisible when the retarget follows in the same block, because no frame
+        // is rendered inside it. It is NOT invisible when the bar had already opened a
+        // trail, and it is not invisible when the arriving content has not resolved its
+        // focused row yet - which is what niri sends while a workspace is still coming
+        // up, and which parks the bar for whole frames rather than for a synchronous
+        // block. Measured in the running shell, sampled at every `_syncIndicator`: a
+        // 16.9px trail at one call, 0.0 at the next, with `head` at -34.0 - the parking
+        // coordinate - and again a 8.9px trail destroyed the same way one call earlier.
+        // That is the report, verbatim: 已复现切换窗口拖尾复位.
+        //
+        // So the branch is not deleted - its reasoning is sound for a bar with nothing
+        // travelling - it is given a question it can answer. And the question is asked of
+        // the STATE, not of a flag that means one thing at rest and another mid-journey:
+        // `is either end still being animated, or are the two of them apart`. Both are
+        // reads of the mechanism itself, which is what makes them honest - a flag set by
+        // the branch that is being decided cannot be, because the only writer of such a
+        // flag is the code whose decision is in question. `_markerCrossing` is not the
+        // answer either, and the reason is the point: a publish's transient has no
+        // crossing at all (every call in the cascade above reads `cross=false`), so
+        // "a journey is running" is false precisely when the reset happens.
+        //
+        // Four clauses, and the ORDER carries half the argument: the resting case first, so
+        // a fix that simply never parked anything again cannot pass; then the carry held
+        // across ten frames; then the arrival that follows it. The step bound inside that
+        // middle stretch is the NARROWEST claim here and deliberately not the one that
+        // proves the carry - a park is a teleport that sits well inside any allowance this
+        // mechanism has, so the clauses that catch a park are `parkedSamples === 0` and
+        // `_placed`, and both of those were red before the carry existed.
+        function test_aMomentWithNoTargetIsNotACancellation() {
+            // THE RESTING CASE FIRST, and it is the half that has to keep working. With
+            // nothing travelling there is no trail to preserve, so an empty workspace
+            // still parks - off the panel, contracted, and unplaced. Stated here rather
+            // than left to `test_anEmptyWorkspaceParksTheIndicatorRatherThanPointingAtRowMinusOne`
+            // because the whole of this test is the DISTINCTION between the two states,
+            // and a test that only proved the carry half would pass on a fix that simply
+            // never parked anything again.
+            body.hint = root.makeHint({ windows: [] })
+            wait(16)
+            var parked = body.noRowTop + body.markerOffset
+            compare(body._barTop, parked,
+                "a genuinely empty workspace still parks the bar off the panel, at "
+                    + body._barTop.toFixed(1) + " against " + parked.toFixed(1))
+            compare(body._barLength, body.indicatorLength,
+                "and contracted rather than left stretched from a target that is gone")
+            verify(!body._placed,
+                "and it is no longer placed, so the next real target snaps rather than "
+                    + "flying in from a coordinate that never named a row")
+
+            // Back onto a row, then OFF it again while the tail is still flying. `init()`
+            // has already left the bar settled on row 1, and this publish snaps it to row
+            // 1 of a five-row column - no settle needed, because a first placement snaps.
+            body.hint = root.tallFramedHint(2, 2, 5, 1)
+            wait(16)
+            // ...and this one is a genuine focus change, so the widget's own two curves
+            // are the mechanism in charge and the trail is a displacement's hump.
+            body.hint = root.tallFramedHint(2, 2, 5, 3)
+            wait(16)
+            var wakeBefore = body._wake
+            verify(wakeBefore > 4,
+                "the trail is open when the publish arrives: " + wakeBefore.toFixed(1)
+                    + "px of wake on a " + body.indicatorLength + "px bar, head "
+                    + body._headY.toFixed(1) + " against tail " + body._tailY.toFixed(1))
+
+            // THE PUBLISH. Same workspace, and the arriving frame's rows carry no focused
+            // window at all - the snapshot a workspace switch produces while the new
+            // workspace's windows are still coming up, and the state every publish in
+            // this file passes through twice on its own.
+            body.hint = root.tallFramedHint(2, 2, 5, -1)
+            verify(!body.hasTarget,
+                "the arriving frame really has no focused row, so the no-target branch "
+                    + "really is the one under test")
+            var parkedSamples = 0
+            var openSamples = 0
+            var worstStep = 0
+            var worstDetail = ""
+            var previousLength = body._barLength
+            var previousTop = body._barTop
+            var previousHead = body._headY
+            var previousTail = body._tailY
+            var previousAnchor = body._anchorY
+            var previousScroll = strip().scrollOffset
+            var samples = 10
+            for (var i = 0; i < samples; ++i) {
+                wait(16)
+                if (Math.abs(body._barTop - parked) < 0.5)
+                    ++parkedSamples
+                if (body._barLength > body.indicatorLength + 0.5)
+                    ++openSamples
+                // What the drawn bar is allowed to do in one interval, and it is BOTH
+                // clauses of the rule `endTravelAllowance` states rather than only the one
+                // the helper returns.
+                //
+                // The rule: an end eases toward the committed target and an easing toward a
+                // target never overshoots it, so in one interval an end travels at most
+                // what it had LEFT - plus however far the target itself moved, because a
+                // retarget re-aims it. `endTravelAllowance` is the second clause alone
+                // (`|Δanchor| + 1`), and every other call site writes the first clause
+                // itself, because a helper cannot know where the ends were: `sampleWakeFlight`
+                // at :1531, `test_neitherEndOfTheWakeEverJumpsFurtherThanItsOwnFlight` at
+                // :2440 and `test_aSwitchInTheMiddleOfATrailReAimsItRatherThanCuttingIt` at
+                // :2523 all read `- Math.abs(previousHead - previousAnchor)` next to
+                // `- reaim`. This call site did not, and the bound was therefore unsatisfiable
+                // by the mechanism's own resting rate rather than by anything the carry did.
+                //
+                // Measured, over ten intervals of exactly this flight - the drawn bar moved
+                // 9.5, 2.4, 5.9, 4.2, 3.6, 3.6, 3.5, 3.2, 3.3 and 5.0px, against a
+                // single-clause allowance of 1.0px on EVERY one of them. 3.6px is the tail's
+                // own answer: `slow * 2` OutSine over 68px of travel is `(π/2) × 68 / 480` =
+                // 0.2225 px/ms, so 3.6px per 16ms tick. A bound under a flight's resting rate
+                // is not tight, it is wrong. The spread across runs - 12.8px, 7.1px, 0.5px of
+                // excess - is only how the 16ms wait happens to land against the animation's
+                // clock, and that spread is the tell: an honest bound does not move with it.
+                //
+                // So the first clause is added, and in the form the sibling sites use: the
+                // distance each end had left AT THE START of the interval. Both ends' halves
+                // are summed because the bar's LENGTH is the difference of the two ends and
+                // so needs the sum of both flights, while its POSITION is one of them and
+                // needs only one - one sum covers the larger of the two claims, which is how
+                // `Math.max` of the two steps below can share a single allowance.
+                //
+                // `barLengthAllowance()` is the helper for that sum and is deliberately NOT
+                // used here, because it reads the ends where they are at the END of the
+                // interval. It is the right read at :2443, where the quantity bounded is the
+                // bar alone; here the claim is about a step, and a step is allowed the
+                // distance left BEFORE it, so reading afterwards silently charges the step
+                // for its own travel twice over - 116.6px of distance left at the start of
+                // the first interval against 99.2px at its end. Measured as an allowance
+                // that under-counts, it holds this flight by 24.6px at its tightest; written
+                // from the start of the interval as above it holds it by 29.6px, and it is the
+                // form the rule implies rather than the form that happens to clear.
+                //
+                // The re-aim term appears ONCE, which is exact here and would not be if a
+                // retarget ever landed inside a sampled interval: a committed target that
+                // moves re-aims BOTH ends, so the length's bound wants the term twice. It
+                // read 1.0 on all ten samples, which is `|Δanchor| + 1` with `|Δanchor|` at
+                // zero - the anchor is steady for the whole of a no-target interval, because
+                // the branch that carries the bar is precisely the one that does not write it.
+                //
+                // The strip's scroll is the third writer of the drawn bar's position -
+                // `_barTop` is `min(head, tail) - scrollOffset` - and it is a legitimate
+                // step that has nothing to do with either end, so it is in the allowance
+                // rather than assumed away. It read 0.00 across the interval: five rows in a
+                // panel that fits them all, which is why the claim can be made in drawn
+                // coordinates at all.
+                var allowance = endTravelAllowance(previousAnchor)
+                    + Math.abs(previousHead - previousAnchor)
+                    + Math.abs(previousTail - previousAnchor)
+                    + Math.abs(strip().scrollOffset - previousScroll)
+                var moved = Math.max(Math.abs(body._barLength - previousLength),
+                    Math.abs(body._barTop - previousTop))
+                var step = moved - allowance
+                if (step > worstStep) {
+                    worstStep = step
+                    worstDetail = "the drawn bar moved " + Math.abs(body._barTop
+                        - previousTop).toFixed(1) + "px in position and "
+                        + Math.abs(body._barLength - previousLength).toFixed(1)
+                        + "px in length where the mechanism allows " + allowance.toFixed(1)
+                        + "px"
+                }
+                previousLength = body._barLength
+                previousTop = body._barTop
+                previousHead = body._headY
+                previousTail = body._tailY
+                previousAnchor = body._anchorY
+                previousScroll = strip().scrollOffset
+            }
+            verify(parkedSamples === 0,
+                "the bar was not PARKED across the interval: it stood on the off-panel "
+                    + "coordinate " + parked.toFixed(1) + " on " + parkedSamples + " of "
+                    + samples + " samples, having left the panel entirely and been sent "
+                    + "back. Measured in the running shell this is the 16.9px of wake at "
+                    + "one call and 0.0 at the next with `head` at -34.0")
+            verify(openSamples > samples / 2,
+                "and the trail SURVIVED it rather than being reset: the drawn bar was "
+                    + "longer than its resting " + body.indicatorLength + "px on "
+                    + openSamples + " of " + samples + " samples, having opened at "
+                    + wakeBefore.toFixed(1) + "px")
+            verify(worstStep <= 0,
+                "with nothing stepping further than the mechanism's own allowance, by "
+                    + worstStep.toFixed(1) + "px where " + worstDetail
+                    + ". NOTE WHAT THIS DOES NOT PROVE: it does not prove the carry, and it "
+                    + "could not. A park is a teleport to " + parked.toFixed(1) + ", which "
+                    + "puts `|head − anchor|` at about 145px - INSIDE this allowance, so a "
+                    + "parked bar satisfies it comfortably. What catches the park is the "
+                    + "`parkedSamples` clause above and the `_placed` clause below, and BOTH "
+                    + "of those were red before the carry existed: 0.0px of wake with `head` "
+                    + "at -34.0, and `placed=false` handing the next target to the snap. This "
+                    + "bound is the claim that the carry did not break the mechanism's own "
+                    + "law on its way through")
+            verify(body._placed,
+                "and the bar is still PLACED, which is the state the next real target "
+                    + "reads: unplaced, it arrives by snapping onto its row instead of "
+                    + "re-aiming from where the trail had got to")
+
+            // ...and the target that resolves afterwards. A re-aim flies; a snap does not.
+            body.hint = root.tallFramedHint(2, 2, 5, 4)
+            wait(16)
+            var landing = body._targetYFor(4)
+            verify(body._barLength > body.indicatorLength + 0.5,
+                "so the target that resolves afterwards is FLOWED TO: the drawn bar is "
+                    + body._barLength.toFixed(1) + "px against a resting "
+                    + body.indicatorLength + "px, with its head at " + body._headY.toFixed(1)
+                    + " on the way to " + landing.toFixed(1) + ". Unplaced, it would have "
+                    + "snapped there with no trail at all - which is what the live "
+                    + "instrument measured: 0.0px of wake on every sample of the arrival")
+            verify(Math.abs(body._barTop - parked) > 0.5,
+                "and the bar never went off the panel to get there")
+        }
+
+        // A NO-TARGET INTERVAL THAT OUTLASTS ITS PUBLISH.
+        //
+        // The test above holds `hasTarget` false across ten frames too, and this one exists
+        // because of what is underneath that: a DISPLACEMENT. Everything in the first test is
+        // the widget's own pair of `Behavior`s converging on a row, and there the no-target
+        // state begins with the bar mid-glide. This one starts it with a SWEEP in flight -
+        // the workspace the user actually switched into - and keeps it in force across the
+        // crossing's LANDING, which is the shape niri produces while a workspace is still
+        // coming up: the arriving frame's windows are in the snapshot but their focus is not
+        // resolved yet, so `hasTarget` is false for whole frames rather than for the
+        // synchronous block a publish takes.
+        //
+        // What the interval must not become is a cancellation, and the sample count is the
+        // part that is load-bearing rather than decorative: `focusAt: -1` puts no `isFocused`
+        // on any row, so `focusedIndexIn` has nothing to find and returns -1 on EVERY read.
+        // There is no fallback anywhere - `HintLogic.focusedIndexIn` scans and gives up -
+        // so the state cannot resolve itself, and the test asserts on every sample that it
+        // did not. A fixture that resolved it would pass this while testing nothing.
+        //
+        // The discriminator is `_placed`, NOT the parking coordinate. During a sweep the bar
+        // legitimately leaves the panel and passes the off-panel coordinate on its way out -
+        // measured at head -42.0 with the tail at -151.4, so `_barTop` reads -151.4 on one
+        // side of the panel and the head sits exactly on -42.0 - and a `_barTop`-equals-parked
+        // test would both miss a park and trip on the sweep. `_placed` is exact: the park
+        // branch is the only writer that clears it.
+        //
+        // Two things this test is NOT about, both measured here at 16ms and neither touched,
+        // because folding either into `_barInFlight` would give it two unrelated jobs:
+        //
+        //   The CORNER flings the tail. Between the last frame in flight and the first one
+        //   past the corner the head goes 134.4 -> -42.0 and the tail is left at -151.4,
+        //   which is 109.4px of wake in one 16ms step - and then FROZEN at exactly 109.4 for
+        //   ten consecutive samples while the crossing finishes, because the tail is chasing
+        //   an anchor that is itself at the no-row coordinate. `_offTop`, `_offBottom`,
+        //   `exitFrom`, `exitTo`, `from` and `to` are all unchanged across the step, so it is
+        //   not a retarget; it is the 16ms sample straddling a teleport the driver would
+        //   have taken in zero time. `sampleSweepFlight` cannot see it, because
+        //   `driveMarkerTo` walks the clock 24 steps with no wall time between them. It is
+        //   invisible: the whole of that bar is above the panel's top and is clipped.
+        //
+        //   A LANDED bar re-aims with no travel. The publish after the landing puts the head
+        //   at 168.0 from -42.0 - 210px in one frame - while the wake is UNCHANGED at 109.4,
+        //   which is a rigid translation of both ends rather than a re-aim of either. That is
+        //   "no journey is running, and a target arrived anyway", the opposite situation to
+        //   this test's "a journey is in flight and no target arrived".
+        function test_aNoTargetIntervalThatOutlastsItsPublishIsNotACancellation() {
+            body.hint = root.tallFramedHint(2, 2, 4, 1)
+            settleIndicator()
+            // A real switch between two workspaces, so the mechanism in charge is the sweep
+            // and the trail is the frame's speed rather than a displacement's hump.
+            startCrossingOverTwoRows(2, 1, 3, 4)
+            // Wait for the trail to EXIST, not for a duration - the sweep's wake opens within
+            // a frame or two of the switch and its flight is a different length again.
+            var wakeAtPublish = 0
+            for (var i = 0; i < 10 && wakeAtPublish <= 2; ++i) {
+                wait(16)
+                wakeAtPublish = barVersusFrame().stretch
+            }
+            verify(wakeAtPublish > 2, "the sweep has a trail to lose: "
+                + wakeAtPublish.toFixed(1) + "px of wake on a "
+                + body.indicatorLength + "px bar")
+
+            // THE REPLACEMENT. Same workspace and the same move as the switch that is already
+            // running, so this publishes no new crossing - it only replaces the content, and
+            // the replacement has not resolved a focused row. The no-target state starts here
+            // and nothing in this test ends it until the last two lines.
+            body.hint = root.tallFramedHint(3, 2, 4, -1)
+            verify(!body.hasTarget, "the arriving content has no focused row, so the "
+                + "no-target branch is genuinely the one under test")
+            verify(body._markerCrossing, "and the sweep is still in flight when it arrives")
+
+            var samples = 8
+            var resolved = 0
+            var unplaced = 0
+            var cutSamples = 0
+            var frames = 0
+            var sawCrossing = false
+            for (var s = 0; s < samples; ++s) {
+                wait(16)
+                ++frames
+                if (body._markerCrossing)
+                    sawCrossing = true
+                if (body.hasTarget)
+                    ++resolved
+                if (!body._placed)
+                    ++unplaced
+                if (body._wake < 0.5)
+                    ++cutSamples
+            }
+            verify(sawCrossing,
+                "so the interval opened while the sweep was still in flight, which is the "
+                    + "mechanism in charge for the frames that follow")
+
+            // The landing is what this interval has to survive, and the tail is still three
+            // times the head's flight when the sweep hands over - so the bar is mid-trail,
+            // out of every mechanism, and with no target. That is the state the carry exists
+            // for and the state a publish has to leave alone.
+            for (var g = 0; g < 400 && body._markerCrossing; ++g)
+                wait(4)
+            verify(!body._markerCrossing, "and the sweep lands inside the budget")
+            ++frames
+            verify(!body.hasTarget, "with the no-target state still in force across the "
+                + "landing")
+            verify(body.indicatorTailMotion.running,
+                "and the bar mid-trail when it does: the tail is still flying, so there is a "
+                    + "wake to carry rather than nothing to leave alone")
+            var wakeAtLanding = body._wake
+            verify(wakeAtLanding > 2,
+                "worth " + wakeAtLanding.toFixed(1) + "px")
+
+            // THE PUBLISH THAT INTERRUPTS IT. Nothing has resolved, the sweep is over, and
+            // the tail is still flying - so this reaches the no-target branch with a trail in
+            // flight, which is the whole of the distinction the carry draws.
+            body.hint = root.tallFramedHint(3, 2, 4, -1)
+            for (var t = 0; t < samples; ++t) {
+                wait(16)
+                ++frames
+                if (body.hasTarget)
+                    ++resolved
+                if (!body._placed)
+                    ++unplaced
+                if (body._wake < 0.5)
+                    ++cutSamples
+            }
+            verify(resolved === 0,
+                "the no-target state was HELD rather than resolving itself: it was true on "
+                    + resolved + " of " + frames + " samples, which is what `focusAt: -1` "
+                    + "cannot do on its own and what this interval exists to reproduce")
+            verify(unplaced === 0,
+                "and the bar stayed PLACED throughout the crossing and its landing: "
+                    + "`_placed` went false on " + unplaced + " of " + frames + " samples")
+            verify(cutSamples === 0,
+                "with the trail intact rather than cut: the wake stood at nothing on "
+                    + cutSamples + " of " + frames + " samples, having been "
+                    + wakeAtLanding.toFixed(1) + "px when the sweep landed. This is the "
+                    + "report - a trail destroyed, not slowed")
+
+            // The strip back to rest, so the publishes below report no movement and are
+            // therefore FOCUS changes - the widget's own pair, and the mechanism that can
+            // actually reach the park. Without this the next publish re-expands a narrowed
+            // strip, reports a move, and starts a second crossing, whose branch absorbs the
+            // no-target edge and hides everything below.
+            settleSlide()
+            verify(!body.swapping && !body._markerCrossing,
+                "the panel is at rest again after the landing")
+            var lostSamples = 0
+            var lostPlaced = 0
+            var resolvedAgain = 0
+            // A focus change inside the arriving workspace, so a trail is in flight...
+            body.hint = root.tallFramedHint(3, 3, 4, 1)
+            wait(16)
+            body.hint = root.tallFramedHint(3, 3, 4, 3)
+            wait(16)
+            var wakeAfterResolve = body._wake
+            verify(body._placed && wakeAfterResolve > 0.5,
+                "so the row that does resolve is FLOWED TO from wherever the sweep left the "
+                    + "bar: the drawn bar is " + body._barLength.toFixed(1) + "px against a "
+                    + "resting " + body.indicatorLength + "px with "
+                    + wakeAfterResolve.toFixed(1) + "px of wake")
+            // ...and then it is gone again, which is the shape niri produces when a window
+            // closes or focus moves to something the hint has not resolved yet, inside the
+            // 300ms the tail is still contracting after a switch. `_markerCrossing` is false,
+            // nothing absorbs the false edge, and the bar is mid-trail: a trail in flight
+            // with no target, which is the whole of the distinction the carry draws.
+            body.hint = root.tallFramedHint(3, 3, 4, -1)
+            for (var u = 0; u < samples; ++u) {
+                wait(16)
+                ++frames
+                if (body.hasTarget)
+                    ++resolvedAgain
+                if (!body._placed)
+                    ++lostPlaced
+                if (body._wake < 0.5)
+                    ++lostSamples
+            }
+            verify(resolvedAgain === 0,
+                "and the state is HELD again rather than resolving itself: `hasTarget` read "
+                    + "true on " + resolvedAgain + " of " + samples + " samples")
+            verify(lostPlaced === 0,
+                "and losing the row does not UNPLACE the bar: `_placed` went false on "
+                    + lostPlaced + " samples. This is the clause that is red without the "
+                    + "carry - both ends committed to the off-panel coordinate on that "
+                    + "publish's own transient, and the next real target handed to the "
+                    + "first-placement branch, which snaps instead of flying")
+            verify(lostSamples === 0,
+                "and the trail it was carrying survives that too: the wake stood at nothing "
+                    + "on " + lostSamples + " samples, having been "
+                    + wakeAfterResolve.toFixed(1) + "px while the row was still resolved")
+
+            // ...and the row comes back, which is what the placement is for.
+            body.hint = root.tallFramedHint(3, 3, 4, 2)
+            wait(16)
+            verify(body._placed && body._barLength > body.indicatorLength + 0.5,
+                "and the row that comes back afterwards is FLOWED TO again: the drawn bar is "
+                    + body._barLength.toFixed(1) + "px against a resting "
+                    + body.indicatorLength + "px with its head at " + body._headY.toFixed(1)
+                    + " on the way to " + body._targetYFor(2).toFixed(1)
+                    + ". Unplaced, it would have snapped there with no trail at all")
+            verify(resolved === 0,
+                "and across the crossing and its landing the no-target state was HELD "
+                    + "throughout: `hasTarget` read true on " + resolved + " of the " + frames
+                    + " frames sampled while it was supposed to be false")
+            settleSlide()
+        }
+
         function test_theJourneyLandsAndStays() {
             // The landing, and specifically that it STAYS. The two placements of the
             // marker used to be chosen by a `Behavior`'s `enabled` and a binding in the
