@@ -96,6 +96,12 @@ QtObject {
     // pool instead of replacing it. Cleared when the stream completes.
     property bool _streamActive: false
 
+    // A pooled clipboard reopen keeps its old rows visible while the fresh
+    // history stream is collected. Replacing the pool with its first batch
+    // made the opening animation visibly shrink and rebuild the list.
+    property bool _staleRefresh: false
+    property var _staleRefreshItems: []
+
     // ---- Input priority ---------------------------------------------------
     // An appended batch costs a full re-filter of the pool, a results swap and
     // a stretch of the row list. Doing that while the user is typing or
@@ -386,6 +392,8 @@ QtObject {
         root.loadingMore = false
         root._streamActive = false
         root._heldBatches = []
+        root._staleRefresh = false
+        root._staleRefreshItems = []
         root._inputActive = false
         root._metadataQuietDeadline = 0
         root.error = ""
@@ -495,6 +503,8 @@ QtObject {
         root.loadingMore = false
         root._streamActive = false
         root._heldBatches = []
+        root._staleRefresh = hasStaleRows
+        root._staleRefreshItems = []
         adapter.refresh("", parsed.mode, function(outcome, complete) {
             root._applyBatch(token, outcome, complete !== false, parsed.mode, parsed.text)
         })
@@ -508,6 +518,27 @@ QtObject {
     function _applyBatch(token, outcome, complete, pooledMode, requestText) {
         if (token !== _refreshToken)
             return
+        // A stale clipboard pool is already useful content. Collect the fresh
+        // stream off to the side and commit it only once it is complete, so a
+        // small head never replaces a full visible history during an open.
+        if (root._staleRefresh) {
+            if (outcome && !Array.isArray(outcome)) {
+                root._staleRefresh = false
+                root._staleRefreshItems = []
+                root.loading = false
+                root.loadingMore = false
+                root._streamActive = false
+                root.error = _messageOr(outcome.error, "data source failed")
+                return
+            }
+            root._staleRefreshItems = root._staleRefreshItems.concat(outcome || [])
+            if (complete !== true)
+                return
+            outcome = root._staleRefreshItems
+            root._staleRefreshItems = []
+            root._staleRefresh = false
+            complete = true
+        }
         // Only a tail append waits. The first batch of a refresh replaces the
         // pool - it is the content the new query or the new mode asked for -
         // so it always lands, or a mode switch would show an empty list for

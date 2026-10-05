@@ -41,8 +41,8 @@ Item {
     }
 
     Timer {
-        // Disabled copies (the surface's prewarm page shares this session)
-        // must never steal keyboard ownership.
+        // A prewarmed page stays mounted behind the closed wave and must never
+        // steal keyboard ownership.
         running: !!root.session && root.session.visible === true && root.enabled
         interval: 250
         repeat: true
@@ -345,10 +345,9 @@ Item {
     }
 
     function focusSearch() {
-        // Same contract as the reclaim timer above: a disabled copy (the
-        // surface's prewarm page shares this session) must never steal
-        // keyboard ownership. Without this guard the hidden copy focuses its
-        // own invisible editor when the session turns visible, which Qt
+        // Same contract as the reclaim timer above: a prewarmed page must never
+        // steal keyboard ownership. Without this guard the retained page
+        // focuses its invisible editor when the session turns visible, which Qt
         // answers by clearing the window's active focus — the visible
         // launcher then opens with no focused search box, and Escape reaches
         // nothing at all.
@@ -1015,10 +1014,8 @@ Item {
     }
 
     // The decode queue: viewport priority, one in flight, paced one per tick.
-    // Same contract as the keyboard reclaim timer at the top of the page: a
-    // closed launcher spawns nothing, and a disabled prewarm copy of the page
-    // stays inert even though it shares the session - two live copies would
-    // each own a decode slot.
+    // A closed launcher stays inert even though its real page remains mounted
+    // for the next open.
     LauncherThumbScheduler {
         id: thumbQueue
         active: !!root.session && root.session.visible === true && root.enabled

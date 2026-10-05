@@ -23,16 +23,23 @@ Item {
     TestCase {
         name: "StartupColdPaths"
 
-        function test_closedWaveDoesNotConstructRoutePage() {
+        function test_closedWaveCanKeepAnIdlePrewarmedRoute() {
             verify(root.waveHost.length > 1000)
-            verify(root.waveHost.indexOf('active: root.phase !== "closed"') >= 0,
-                   "route content must not load while the wave is closed")
+            verify(root.waveHost.indexOf(
+                       'active: root.phase !== "closed" || root.routeRetained') >= 0,
+                   "route content must stay inactive until an open or idle prewarm")
+            verify(root.waveHost.indexOf("function prewarmRoute()") >= 0,
+                   "the host needs an explicit idle prewarm seam")
         }
 
         function test_launcherPrewarmWaitsForExplicitStartupGate() {
             verify(root.launcher.indexOf("startupPrewarmAllowed") >= 0)
             verify(root.launcher.indexOf(
                        "running: !!root.session && root.startupPrewarmAllowed === true") >= 0)
+            verify(root.launcher.indexOf("onTriggered: waveHost.prewarmRoute()") >= 0,
+                   "the idle prewarm must retain the real route")
+            verify(root.launcher.indexOf("prewarmLoader") < 0,
+                   "a duplicate hidden page must not be constructed")
             verify(root.shell.indexOf("startupPrewarmAllowed: root.startupWorkFinished") >= 0)
         }
 

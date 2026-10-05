@@ -42,6 +42,13 @@ Item {
     signal opened()
     signal sidebarSelected(string id)
 
+    // Construct the real route during the shell's idle window. The host stays
+    // invisible and disabled while closed, so cold QML and delegate work is
+    // paid before the first visible opening instead of during it.
+    function prewarmRoute() {
+        root.routeRetained = true
+    }
+
     function openRoute(nextRoute, source) {        var normalized = Logic.normalizeRoute(nextRoute)
         if (!normalized)
             return false

@@ -144,67 +144,20 @@ Item {
     // Probe/test access to the hosted page.
     property alias waveHostItem: waveHost
 
-    // Cold-path prewarm: the first open pays LauncherPage compilation plus
-    // delegate/icon/font warmup all at once and visibly stalls. Arm a
-    // hidden, disabled copy at idle shortly after startup, let the engine
-    // caches fill, then release it; the real open path is untouched.
-    Loader {
-        id: prewarmLoader
-        active: false
-        visible: false
-        enabled: false
-        opacity: 0
-        x: -10000
-        y: -10000
-        width: 480
-        height: 640
-
-        sourceComponent: LauncherPage {
-            session: root.session
-            enabled: false
-        }
-    }
-
-    // The pool fills asynchronously (desktop-entry scan, 5s clipboard poll),
-    // usually well after arm time — releasing before the first data landed
-    // would tear the hidden page down with zero rows built and the first
-    // open would pay the delegate cold path anyway. Start the release
-    // countdown only once the pool can actually materialize rows.
-    readonly property bool prewarmPoolReady: !!root.session
-            && root.session.displayPool != null && root.session.displayPool.length > 0
-
     Timer {
         id: prewarmArmTimer
         interval: 0
         repeat: false
-        // The launcher page is a cold-path prewarm, not startup chrome. Hold it
-        // until the shell's quiet-ready window so its delegates cannot compete
-        // with wallpaper reveal, lock wave, or first bar staging.
+        // The launcher page is a cold-path prewarm, not startup chrome. Hold
+        // it until the shell's quiet-ready window so its delegate construction
+        // cannot compete with wallpaper reveal or first bar staging.
         running: !!root.session && root.startupPrewarmAllowed === true
-        onTriggered: prewarmLoader.active = true
+        onTriggered: waveHost.prewarmRoute()
     }
 
     // Production owners set this after quiet-ready; standalone tests keep the
     // historical default so the component remains self-contained.
     property bool startupPrewarmAllowed: true
-
-    Timer {
-        id: prewarmReleaseTimer
-        interval: 4000
-        repeat: false
-        running: prewarmLoader.active && root.prewarmPoolReady
-        onTriggered: prewarmLoader.active = false
-    }
-
-    // Hard cap: a session that never yields data has nothing to warm, so
-    // the hidden page must not outlive the startup window indefinitely.
-    Timer {
-        id: prewarmCapTimer
-        interval: 30000
-        repeat: false
-        running: prewarmLoader.active && !root.prewarmPoolReady
-        onTriggered: prewarmLoader.active = false
-    }
 
     WaveSurfaceHost {
         id: waveHost
