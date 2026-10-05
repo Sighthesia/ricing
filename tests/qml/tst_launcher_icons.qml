@@ -290,5 +290,20 @@ Item {
             verify(bare.iconItem.paintedWidth > 0, "a real source paints the icon")
             bare.destroy()
         }
+
+        function test_aFailedAppIconCanBeRearmed() {
+            ignoreWarning(/QML Image: Cannot open: .*afloat-no-such-thumbnail\.svg$/)
+            var row = rowComponent.createObject(testRoot, {
+                result: { id: "broken-app", displayName: "Broken", description: "",
+                          icon: brokenPath }
+            })
+            verify(row)
+            tryVerify(function() { return row.iconItem.status === Image.Error }, 3000)
+            verify(row.iconFailed, "the failed app icon was not recorded")
+            row.retryIcon()
+            tryVerify(function() { return row.iconItem.status === Image.Error }, 3000)
+            verify(row.iconFailed, "the retry did not re-arm the Image failure path")
+            row.destroy()
+        }
     }
 }

@@ -345,7 +345,12 @@ function createAppsAdapter(config) {
         var key = rawIcon == null ? "" : String(rawIcon)
         if (Object.prototype.hasOwnProperty.call(iconCache, key))
             return iconCache[key]
-        var resolved = iconResolver ? String(iconResolver(key)) : directIconPath(key)
+        // Absolute and file URLs already identify the image. Sending them to
+        // QIcon::fromTheme treats a valid file path as a theme name and turns
+        // it into an empty result.
+        var resolved = directIconPath(key)
+        if (!resolved && iconResolver)
+            resolved = String(iconResolver(key))
         if (resolved)
             iconCache[key] = resolved
         return resolved

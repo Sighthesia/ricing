@@ -440,5 +440,21 @@ Item {
             compare(queue.issuedCount - base, issued)
             compare(backend.requests.length, issued)
         }
+
+        function test_thumbnailQueueWaitsForTheExplicitSurfaceGate() {
+            var base = queueBase()
+            page.thumbnailsActive = false
+            openRows(20, 7000)
+            wait(500)
+            compare(page.thumbScheduler.active, false)
+            compare(page.thumbScheduler.issuedCount, base,
+                    "a closed wave must not start thumbnail processes")
+
+            page.thumbnailsActive = true
+            tryVerify(function() { return page.thumbScheduler.issuedCount > base }, 3000)
+            backend.flush()
+            page.session.close()
+            page.thumbnailsActive = true
+        }
     }
 }

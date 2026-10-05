@@ -758,6 +758,58 @@ Item {
             compare(svc().results.length, 2)
         }
 
+        function test_clipboardReopenKeepsTheFullPoolUntilFreshStreamCompletes() {
+            var clips = makeManualAdapter()
+            svc()._adapters = { clipboard: clips }
+
+            svc().openClipboard()
+            wait(0)
+            resolveRefresh(clips, 0, [makeItem("old1", "Old one", 0, 10),
+                                      makeItem("old2", "Old two", 0, 9)], true)
+            compare(svc().results.length, 2)
+
+            svc().close()
+            svc().openClipboard()
+            wait(0)
+            compare(clips.queries.length, 2)
+
+            // The first fresh batch must not collapse the visible stale pool.
+            clips.pendingRefreshes[1]([makeItem("new1", "New one", 0, 12)], false)
+            compare(svc().results.length, 2,
+                    "stale clipboard rows disappeared at the first fresh batch")
+            compare(svc().results[0].id, "old1")
+
+            clips.pendingRefreshes[1]([makeItem("new2", "New two", 0, 11)], true)
+            compare(svc().results.length, 2)
+            compare(svc().results[0].id, "new1")
+            compare(svc().results[1].id, "new2")
+        }
+
+        function test_clipboardReopenMarksOneFreshPullAsLoadingMore() {
+            var clips = makeManualAdapter()
+            svc()._adapters = { clipboard: clips }
+
+            svc().openClipboard()
+            wait(0)
+            resolveRefresh(clips, 0, [makeItem("old", "Old", 0, 10)])
+            svc().close()
+            svc().openClipboard()
+            wait(0)
+
+            compare(clips.queries.length, 2)
+            verify(svc().loadingMore, "stale reopen did not mark its pull active")
+            svc()._applyBatch(svc()._refreshToken,
+                              [makeItem("new", "New", 0, 11)], false,
+                              "clipboard", "")
+            compare(clips.queries.length, 2,
+                    "a poll-like completion started a duplicate reopen pull")
+            verify(svc().loadingMore)
+            svc()._applyBatch(svc()._refreshToken,
+                              [makeItem("new2", "New two", 0, 10)], true,
+                              "clipboard", "")
+            compare(svc().loadingMore, false)
+        }
+
         function test_closeDuringClipboardLoadKeepsTruthfulPoolMarker() {
             // Switching to clipboard then closing before the pull resolves:
             // the pool still holds apps rows, so the marker must stay "apps"

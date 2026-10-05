@@ -139,6 +139,13 @@ Item {
             + ' function isCredentialFailure(m) { return m === "Incorrect password" }'
             + ' function getStatusText() { return "HomeWifi" }'
             + ' function getSignalLabel(s) { return s >= 80 ? "Excellent" : "Good" }'
+            // The service owns the precedence; a real carrier-off port outranks a
+            // stale "connected" from NetworkManager.
+            + ' function wiredPortState(g) {'
+            + '   if (!g) return { text: "", tone: "idle" }'
+            + '   if (g.carrier === "off") return { text: "No cable", tone: "idle" }'
+            + '   if (g.connected) return { text: "Connected", tone: "active" }'
+            + '   return { text: "Disconnected", tone: "idle" } }'
             + ' function isSecured(s) { return s && s !== "--" && s !== "open" }'
             + ' function connect(ssid, password, hidden, security) { connectCalls++; lastSsid = ssid; lastPassword = password; lastSecurity = security }'
             + ' function disconnect(ssid) { disconnectCalls++; lastSsid = ssid }'
@@ -160,12 +167,15 @@ Item {
                 ]
             },
             {
-                device: "enp2s0", connected: false, carrier: "off",
-                reason: "40 (Carrier/link changed)", connection: "", uuid: "", ip4: "",
+                // This machine's actual enp2s0 state: NM holds the profile up,
+                // the kernel reports no carrier. The header must say "No cable".
+                device: "enp2s0", connected: true, carrier: "off",
+                reason: "0 (No reason given)", connection: "SDS804X-HD直连",
+                uuid: "uuid-static", ip4: "192.168.10.1",
                 profiles: [
                     { uuid: "uuid-static", name: "SDS804X-HD直连", method: "manual",
                       methodLabel: "Manual", addresses: ["192.168.10.1"],
-                      active: false, stalePin: false }
+                      active: true, stalePin: false }
                 ]
             }
         ]
@@ -568,15 +578,17 @@ Item {
             verify(spare !== null, "the idle port has a card too — it is where the profile lives")
             compare(findByName(item, "wiredPortNameText0").text, "enp117s0f3u1")
             compare(findByName(item, "wiredPortStateText0").text, "Connected")
-            // A present but silent port must not read as "disconnected": those
-            // are two different problems with two different fixes.
+            // A present but silent port must not read as "disconnected", and it
+            // must not read as "connected" either when NetworkManager is only
+            // holding a profile up: those are three different problems.
             compare(findByName(item, "wiredPortNameText1").text, "enp2s0")
             compare(findByName(item, "wiredPortStateText1").text, "No cable")
             // The static profile states its address before it is up, because
             // the address is the reason the profile exists.
             compare(findByName(item, "wiredProfileNameText1_0").text, "SDS804X-HD直连")
             compare(findByName(item, "wiredProfileMetaText1_0").text, "192.168.10.1")
-            compare(findByName(item, "wiredProfileStateText1_0").text, "Connect")
+            // NM holds this one up, so the row offers to take it down.
+            compare(findByName(item, "wiredProfileStateText1_0").text, "Disconnect")
             // A DHCP profile has no address yet, so its row names the method
             // instead of reading empty.
             compare(findByName(item, "wiredProfileNameText0_0").text, "有线连接 1")

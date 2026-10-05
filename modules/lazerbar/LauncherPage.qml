@@ -19,6 +19,16 @@ Item {
     // Services.LauncherService; tests inject deterministic sessions. The
     // embedded default keeps the page self-contained without Quickshell.
     property var session: embeddedSession
+    // Thumbnail decodes are deliberately held until the wave has finished
+    // entering. The first cliphist decode spawns a process and competes with
+    // the opening frame; the queue remains viewport-prioritized once this gate
+    // opens. Standalone page tests keep the gate open by default.
+    property bool thumbnailsActive: true
+    // The real page is retained before the first open. Reserve its fixed row
+    // window during that idle prewarm too, so the first clipboard batch fills
+    // existing delegates instead of constructing the whole 96-row tree in the
+    // opening frame.
+    property bool prewarmSlots: false
 
     // Fallback keyboard owner: click-away can strand the surface with no
     // focused item, and then Escape would reach no handler at all. While
@@ -41,8 +51,8 @@ Item {
     }
 
     Timer {
-        // Disabled copies (the surface's prewarm page shares this session)
-        // must never steal keyboard ownership.
+        // A prewarmed page stays mounted behind the closed wave and must never
+        // steal keyboard ownership.
         running: !!root.session && root.session.visible === true && root.enabled
         interval: 250
         repeat: true
@@ -155,8 +165,12 @@ Item {
                 // though its result still matches. Clear it before focusing.
                 for (var i = 0; i < resultsRepeater.count; i++) {
                     var row = resultsRepeater.itemAt(i)
-                    if (row)
+                    if (row) {
                         row.restoreFromClosing()
+                        if (row.result && row.revealHeld === true
+                                && typeof row.releaseInstantly === "function")
+                            row.releaseInstantly()
+                    }
                 }
                 root.focusSearch()
                 // The full entrance wave is for a genuinely first paint; when
@@ -183,6 +197,7 @@ Item {
                 // next open: the decoded-path cache is permanent, so nothing
                 // else can ever hand that row a fresh one.
                 root.rearmFailedThumbs()
+                root.rearmFailedIcons()
             }
         }
         function onSelectedIndexChanged() {
@@ -219,6 +234,8 @@ Item {
             resultsView.syncSelectionFrame()
         }
     }
+
+    onThumbnailsActiveChanged: thumbQueue.wake()
 
     // Fallback key handling for focus held by the page itself or by rows;
     // the search field handles its own keys first and stops propagation.
@@ -345,10 +362,9 @@ Item {
     }
 
     function focusSearch() {
-        // Same contract as the reclaim timer above: a disabled copy (the
-        // surface's prewarm page shares this session) must never steal
-        // keyboard ownership. Without this guard the hidden copy focuses its
-        // own invisible editor when the session turns visible, which Qt
+        // Same contract as the reclaim timer above: a prewarmed page must never
+        // steal keyboard ownership. Without this guard the retained page
+        // focuses its invisible editor when the session turns visible, which Qt
         // answers by clearing the window's active focus — the visible
         // launcher then opens with no focused search box, and Escape reaches
         // nothing at all.
@@ -579,6 +595,15 @@ Item {
                 children[i].releaseInstantly()
         }
     }
+    function _releaseHeldRowsInstantly() {
+        var children = resultsColumn.children
+        for (var i = 0; i < children.length; i++) {
+            var row = children[i]
+            if (row && row.releaseInstantly !== undefined
+                    && (row.revealHeld === true || row.snapTransitions === true))
+                row.releaseInstantly()
+        }
+    }
     function _holdAllRowsInstantly() {
         var children = resultsColumn.children
         for (var i = 0; i < children.length; i++) {
@@ -600,6 +625,17 @@ Item {
             if (ids[i] !== prev[i])
                 return false
         }
+        return true
+    }
+    function _sameIdSet(ids, prev) {
+        if (ids.length !== prev.length)
+            return false
+        var seen = ({})
+        for (var i = 0; i < prev.length; i++)
+            seen[prev[i]] = true
+        for (var j = 0; j < ids.length; j++)
+            if (!seen[ids[j]])
+                return false
         return true
     }
     function _holdAndScheduleReleases() {
@@ -646,8 +682,8 @@ Item {
         // exactly as they are. No wave, no re-hold - re-releasing a settled
         // list would snap its transitions and kill the fold/glide.
         if (sameIds) {
-            if (freshRows.length > 0)
-                root._releaseAllRowsInstantly()
+            if (freshRows.length > 0 || root._anyRowHeld())
+                root._releaseHeldRowsInstantly()
             return
         }
         root._lastRowIds = ids
@@ -684,9 +720,34 @@ Item {
                     grown.holdInstantly()
             }
             root.playRefillCascade(newcomers > 0)
+        } else if (root._sameIdSet(ids, prev)) {
+            // A new clipboard copy can reorder the window without changing
+            // which rows it contains. Releasing all 96 rows here made every
+            // idle reopen pay the full refill cascade even though every row
+            // was already settled and only its result binding changed.
+            root._releaseHeldRowsInstantly()
         } else {
-            root._holdAllRowsInstantly()
-            root.playRefillCascade()
+            // Hold only genuinely new ids. Existing rows keep their settled
+            // geometry when a pool refresh removes or replaces a small tail.
+            var previousIds = ({})
+            for (var p = 0; p < prev.length; p++)
+                previousIds[prev[p]] = true
+            var newcomers = 0
+            for (var n = 0; n < ids.length; n++) {
+                var survivor = resultsRepeater.itemAt(n)
+                if (previousIds[ids[n]]) {
+                    if (survivor && survivor.releaseInstantly !== undefined
+                            && (survivor.revealHeld === true || survivor.snapTransitions === true))
+                        survivor.releaseInstantly()
+                    continue
+                }
+                var newcomer = survivor
+                if (!newcomer || typeof newcomer.holdInstantly !== "function")
+                    continue
+                newcomers++
+                newcomer.holdInstantly()
+            }
+            root.playRefillCascade(newcomers > 0)
         }
     }
 
@@ -793,7 +854,8 @@ Item {
     // through on a clipboard open, both of them right after the open and both
     // visible as the list twitching as it fills. A slot with no result yet is
     // collapsed and inert (see LauncherResultRow.slotEmpty).
-    readonly property int rowSlotCount: windowedResults.length > 0 ? _resultWindowLimit : 0
+    readonly property int rowSlotCount: windowedResults.length > 0 || root.prewarmSlots
+            ? _resultWindowLimit : 0
     // Stretch the materialized window past the base slice only when a query
     // actually matches rows beyond it. This runs in two phases: the query
     // first folds the current window in place (persisted delegates glide,
@@ -870,6 +932,7 @@ Item {
     // rows and the preview pane share the exact same proven path.
     readonly property var _thumbPaths: ({})
     property int _thumbRev: 0
+    property int _iconRetryRev: 0
     // Entry ids whose thumbnail a row reported as unloadable. The decoded path
     // cache is keyed by id and never invalidated, so without this a single
     // failed load was final: the same path came back on every later commit, so
@@ -948,6 +1011,15 @@ Item {
         if (dropped > 0)
             root._thumbRev++
         return dropped
+    }
+
+    // App icons have the same one-way Image.Error failure mode as thumbnails,
+    // but their source is carried by the pooled result. Re-arm failed rows once
+    // per open so a transient provider/file failure cannot strand a fixed set
+    // of apps forever, while a genuinely missing icon does not spin per tick.
+    function rearmFailedIcons() {
+        root._iconRetryRev++
+        return root._iconRetryRev
     }
     function _issueThumbDecode(id, mime, done) {
         var service = root.session
@@ -1037,13 +1109,12 @@ Item {
     }
 
     // The decode queue: viewport priority, one in flight, paced one per tick.
-    // Same contract as the keyboard reclaim timer at the top of the page: a
-    // closed launcher spawns nothing, and a disabled prewarm copy of the page
-    // stays inert even though it shares the session - two live copies would
-    // each own a decode slot.
+    // A closed launcher stays inert even though its real page remains mounted
+    // for the next open.
     LauncherThumbScheduler {
         id: thumbQueue
-        active: !!root.session && root.session.visible === true && root.enabled
+        active: root.thumbnailsActive && !!root.session
+                && root.session.visible === true && root.enabled
         candidates: root._thumbCandidates
         decode: root._issueThumbDecode
         decoded: root._thumbDecoded
@@ -1632,6 +1703,7 @@ Item {
                     onResultChanged: root.requestClipThumb(result)
                     thumbPath: root._thumbRev >= 0 ? root.clipThumbPath(result) : ""
                     metaStamp: root._clipMetaRev
+                    iconRetryRevision: root._iconRetryRev
                     searchQuery: root.activeSearchText
                     categoryFilter: root.activeCategory
                     // The shared rect's band, so this row lights the slice of itself the

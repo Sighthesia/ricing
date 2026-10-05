@@ -40,6 +40,10 @@ function identifierOf(item) {
     return item == null || item.id == null ? "" : String(item.id)
 }
 
+function iconOf(item) {
+    return item == null || item.icon == null ? "" : String(item.icon)
+}
+
 function sortResults(items) {
     if (!items || !items.length)
         return []
@@ -274,16 +278,39 @@ function preservedSelection(items, index, nextItems) {
     return clampSelection(index, count)
 }
 
-// Content equality by ordered ids: lets the session keep the same pooled
-// array (and therefore the same live delegates) when a pull returns data
-// identical to what is already rendered.
+// Content equality by ordered ids and icons: lets the session keep the same
+// pooled array (and therefore the same live delegates) when a pull returns
+// data identical to what is already rendered, while still allowing a late
+// icon-theme lookup to replace an earlier empty icon.
 function poolMatches(left, right) {
     if (left === right)
         return true
     if (!left || !right || left.length !== right.length)
         return false
     for (var i = 0; i < left.length; i++)
-        if (identifierOf(left[i]) !== identifierOf(right[i]))
+        if (identifierOf(left[i]) !== identifierOf(right[i])
+                || iconOf(left[i]) !== iconOf(right[i]))
             return false
     return true
+}
+
+// Preserve a known-good icon when a later desktop-entry pull transiently
+// resolves the same app to an empty source. A later successful lookup still
+// replaces an empty icon, while id/order changes remain untouched.
+function preferStableIcons(previous, next) {
+    if (!previous || !next || previous.length !== next.length)
+        return next
+    var merged = next.slice()
+    for (var i = 0; i < next.length; i++) {
+        if (identifierOf(previous[i]) !== identifierOf(next[i]))
+            continue
+        if (iconOf(merged[i]) === "" && iconOf(previous[i]) !== "") {
+            var replacement = ({})
+            for (var key in next[i])
+                replacement[key] = next[i][key]
+            replacement.icon = iconOf(previous[i])
+            merged[i] = replacement
+        }
+    }
+    return merged
 }

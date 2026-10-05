@@ -43,10 +43,8 @@ QtObject {
     // its cache and bumps its revision; an empty path records nothing.
     property var decoded: null
 
-    // Gate from the page: false while the launcher is closed, or while a
-    // sibling prewarm copy of the page is mounted but disabled. A closed
-    // launcher must not be spawning decode processes, and two live copies
-    // would each own a slot.
+    // Gate from the page: false while the launcher is closed. A prewarmed page
+    // remains mounted but disabled, so it must not spawn decode processes.
     property bool active: true
 
     // --- pacing -----------------------------------------------------------

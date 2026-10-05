@@ -71,6 +71,15 @@ Item {
     signal routeSwapped(string route)
     signal sidebarSelected(string id)
 
+    // Construct the real route during the shell's idle window. The host stays
+    // invisible and disabled while closed, so cold QML and delegate work is
+    // paid before the first visible opening instead of during it.
+    function prewarmRoute() {
+        root.routeRetained = true
+        if (routeLoader.item && routeLoader.item.prewarmSlots !== undefined)
+            routeLoader.item.prewarmSlots = true
+    }
+
     function openRoute(nextRoute, source) {
         var normalized = Logic.normalizeRoute(nextRoute)
         if (!normalized)
@@ -308,6 +317,10 @@ Item {
                     // sibling route; swapping routes swaps the component
                     // without a second window or a second Loader.
                     sourceComponent: root.loadedComponent
+                    onLoaded: {
+                        if (root.routeRetained && item && item.prewarmSlots !== undefined)
+                            item.prewarmSlots = true
+                    }
                 }
 
                 Rectangle {

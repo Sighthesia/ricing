@@ -906,17 +906,20 @@ Item {
         return method
     }
 
-    // A port's header state. "No cable" is the answer a present-but-silent port
-    // needs: it separates "nothing plugged in" from "plugged in, nothing
-    // activated", which is the difference between fetching a cable and tapping
-    // a profile.
+    // A port's header state, from the service so the precedence lives in one
+    // place. The fallback keeps a service that predates it readable: "No cable"
+    // is the answer a present-but-silent port needs, because it separates
+    // "nothing plugged in" from "plugged in, nothing activated".
     function wiredPortState(group) {
+        if (root.networkService && typeof root.networkService.wiredPortState === "function") {
+            try { return root.networkService.wiredPortState(group) } catch (e) {}
+        }
         if (!group)
             return { text: "", tone: "idle" }
-        if (group.connected)
-            return { text: "Connected", tone: "active" }
         if (String(group.carrier || "") === "off")
             return { text: "No cable", tone: "idle" }
+        if (group.connected)
+            return { text: "Connected", tone: "active" }
         var reason = String(group.reason || "")
         if (reason.indexOf("Carrier") !== -1 || reason.indexOf("40 ") === 0)
             return { text: "No cable", tone: "idle" }

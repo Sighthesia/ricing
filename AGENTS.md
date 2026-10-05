@@ -28,20 +28,37 @@ It exits non-zero when there is a QML diagnostic naming a file in this repo, or
 one of our services reporting a failure, so it gates a commit the way a test run
 did. It never starts a second shell over a live one — restart your own, then read.
 
-Why this is the default rather than the suite: a desktop shell mostly fails in
-ways no assertion can reach. Reading the live log on this branch found a
-`NiriService` that could not write its kdl file, an `Image` that could not open a
-lock asset, and two `TypeError`s in the window-hint file — each recurring dozens
-of times, none covered by any test. The suite still earns its keep on logic with
-no runtime, so keep using it for that:
+### Do not run the test suite
 
-- **Pure logic** (a `.js`, a geometry formula, a state machine): run the relevant
-  file — `scripts/run-tests.sh <name-substring>`, or `scripts/qmltest.sh <file>`
-  for one. Whole suite: `scripts/run-tests.sh` (~5 min; `--suite` for the QtTest
-  tier in one process, ~5x faster). `python3 -m pytest scripts/tests/` for the
-  bridges.
-- Everything else — bindings, assets, services, compositor calls — is the log's
-  job. A green suite says nothing about any of it.
+**Do not run `scripts/run-tests.sh`, `scripts/qmltest.sh` or pytest to verify a
+change unless the user explicitly asks for it.** Run `scripts/check-shell.sh`
+instead. This is not a preference about speed — the suite is the wrong instrument
+for most of this codebase:
+
+- A desktop shell mostly fails in ways no assertion can reach. Reading the live
+  log on this branch found a `NiriService` that could not write its kdl file, an
+  `Image` that could not open a lock asset, and two `TypeError`s in the
+  window-hint file — each recurring dozens of times, none covered by any test.
+- The suite's own track record is worse than its coverage suggests: 8 files /
+  113 test functions had **never executed** while being counted as coverage,
+  and `tst_lazer_settings_controls` had been red on 15 of 36 functions since
+  August. A red suite is evidence about the tests, not the product.
+- It is disruptive by construction. Every `tests/qml/` file is its own process,
+  and on a graphical platform each one maps a window and takes keyboard focus
+  (measured: 1228 fcitx5 `FocusOut` in one batch).
+
+So: shell log first, always. If a change is pure logic and you believe a test
+would genuinely catch a regression, **say so and let the user decide** — offer to
+run the relevant file rather than running it unprompted.
+
+When the user does ask for the suite:
+
+- One file: `scripts/qmltest.sh <name-substring>` (resolves under `tests/qml/`).
+- Whole suite: `scripts/run-tests.sh` (~5 min; `--suite` puts the QtTest tier in
+  one process, ~5x faster). `-g` also runs the window-only harnesses — ask first,
+  they paint on the live desktop.
+- Python bridges: `python3 -m pytest scripts/tests/`.
+- Never invoke `qmltestrunner` directly; see "Never disturb the live session".
 
 Launch: `qs -p /path/to/afloat`. IPC: `scripts/afloat-ipc <target> <function> [args...]`.
 - Logic tests (pure `.js`, in `tests/qml/`) run under QtTest, which `scripts/qmltest.sh` wraps. The raw form, if you ever need it, is `QML_IMPORT_PATH=/usr/lib/qt6/qml /usr/lib/qt6/bin/qmltestrunner -input tests/qml/tst_bar_layout.qml -o -,txt` — **and it must carry `QT_QPA_PLATFORM=offscreen`**, or it will steal keyboard focus.
@@ -49,7 +66,8 @@ Launch: `qs -p /path/to/afloat`. IPC: `scripts/afloat-ipc <target> <function> [a
 - Service-behavior harnesses (need Quickshell singletons) live in the **repo root**: `qs -p tst_media_binding.qml` (from repo root). Under the offscreen platform a harness that instantiates a `PanelWindow` cannot load (`No PanelWindow backend loaded`) — the runner classifies that as window-only and skips it.
 - Python: `python3 -m pytest scripts/tests/`.
 - **After every QML change**, run `scripts/check-shell.sh` and fix what it reports
-  before finishing. Add the relevant test file when the change is pure logic.
+  before finishing. Do not run the suite for this; offer it if you believe a test
+  would catch something the log cannot.
 
 ## Never disturb the live session (read before running anything)
 
@@ -88,7 +106,30 @@ root `tst_*.qml` harnesses, and the ad-hoc probes (`ghost_race_harness.qml`,
 `launcher_rewrite_stress.qml`, `launcher_launch_e2e.qml` — the last three only
 write inside `/tmp/opencode/xdg-data/`, never your real desktop entries).
 
-Rules when **adding** a test:
+## Adding a test
+
+**Default: do not add one.** A test is a permanent liability — it costs a process
+spawn per run, it rots the moment the implementation moves, and a test that
+cannot fail is worse than no test because it reads as coverage. The log gate
+covers bindings, assets, services and compositor calls; a test only earns its
+place for **pure logic** whose failure would be silent and obvious in the log.
+
+Before writing one, answer all three. If any answer is "no", do not add it:
+
+1. **Would this fail if the logic broke?** Name the mutation that makes it red.
+   If you cannot name one, you are writing a coverage marker, not a test.
+2. **Can it decide without a live compositor?** If it needs `Quickshell.*`, it
+   cannot run under `tests/qml/` at all — it goes to the repo root as a `qs -p`
+   harness, which cannot be verified in CI and costs seconds per run. 8 files
+   and 113 functions are sitting in exactly that state right now: written,
+   counted as coverage, never executed.
+3. **Is the assertion about the contract, not a snapshot?** Assert the product's
+   own expression (`optionListHeight`, `bodyHeight`,
+   `MotionTokens.popupFromScale`), never a copied literal. Copying a constant
+   desyncs silently on the next deliberate retune, and the retune reads as a
+   broken test rather than a changed design.
+
+Then, mechanically:
 
 - Root-level `tst_*.qml` only, and only if it needs Quickshell singletons; a
   pure-logic test belongs in `tests/qml/`.

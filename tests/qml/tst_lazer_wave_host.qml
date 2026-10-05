@@ -134,6 +134,17 @@ Item {
             host.destroy()
         }
 
+        function test_idlePrewarmBuildsThePageWithoutOpeningTheSurface() {
+            var host = testRoot.createHost()
+            host.prewarmRoute()
+            tryVerify(function() { return host.contentItem !== null }, 2000)
+            compare(host.phase, "closed")
+            verify(host.visible === false)
+            verify(host.interactive === false)
+            verify(host.routeRetained)
+            host.destroy()
+        }
+
         function test_thePageSurvivesTheClose() {
             var host = testRoot.createHost()
             verify(host.openRoute("launcher"), "the route must be accepted")

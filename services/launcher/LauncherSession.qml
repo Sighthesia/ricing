@@ -96,6 +96,12 @@ QtObject {
     // pool instead of replacing it. Cleared when the stream completes.
     property bool _streamActive: false
 
+    // A pooled clipboard reopen keeps its old rows visible while the fresh
+    // history stream is collected. Replacing the pool with its first batch
+    // made the opening animation visibly shrink and rebuild the list.
+    property bool _staleRefresh: false
+    property var _staleRefreshItems: []
+
     // ---- Input priority ---------------------------------------------------
     // An appended batch costs a full re-filter of the pool, a results swap and
     // a stretch of the row list. Doing that while the user is typing or
@@ -271,6 +277,16 @@ QtObject {
             Qt.callLater(root._checkMetadataQuiet)
             return
         }
+        // Metadata is enrichment, not the foreground list. During an initial
+        // or stale clipboard stream the page is already committing the full
+        // history; starting another adapter refresh here would map that same
+        // history a second time into the opening frame. Keep the quiet watcher
+        // alive and merge only after the visible stream has settled.
+        if (root.loading || root.loadingMore || root._streamActive || root._staleRefresh) {
+            root._metadataQuietDeadline = Date.now() + root._metadataQuietMs
+            Qt.callLater(root._checkMetadataQuiet)
+            return
+        }
         root._metadataWatchScheduled = false
         // A merge round still in flight means the rows it is reading are the
         // ones being enriched; wait for it rather than dropping the window on
@@ -297,6 +313,14 @@ QtObject {
     function _mergeClipboardMetadata() {
         if (!root.visible || LauncherLogic.parseQuery(root.query).mode !== "clipboard")
             return
+        if (root.loading || root.loadingMore || root._streamActive || root._staleRefresh) {
+            root._metadataQuietDeadline = Date.now() + root._metadataQuietMs
+            if (!root._metadataWatchScheduled) {
+                root._metadataWatchScheduled = true
+                Qt.callLater(root._checkMetadataQuiet)
+            }
+            return
+        }
         var adapter = _adapterFor("clipboard")
         // The metadata merge needs every row, not just the first batch, so it
         // accumulates the stream before touching the pool.
@@ -386,6 +410,8 @@ QtObject {
         root.loadingMore = false
         root._streamActive = false
         root._heldBatches = []
+        root._staleRefresh = false
+        root._staleRefreshItems = []
         root._inputActive = false
         root._metadataQuietDeadline = 0
         root.error = ""
@@ -419,7 +445,8 @@ QtObject {
             root._appsPrimeInFlight = false
             if (root.visible || !answered)
                 return
-            var sorted = LauncherLogic.sortResults(collected)
+            var sorted = LauncherLogic.preferStableIcons(
+                root.displayPool, LauncherLogic.sortResults(collected))
             root.displayPool = sorted
             root._pooledMode = "apps"
             root.publishCategorySummary(true)
@@ -495,6 +522,12 @@ QtObject {
         root.loadingMore = false
         root._streamActive = false
         root._heldBatches = []
+        root._staleRefresh = hasStaleRows
+        root._staleRefreshItems = []
+        if (hasStaleRows) {
+            root._streamActive = true
+            root.loadingMore = true
+        }
         adapter.refresh("", parsed.mode, function(outcome, complete) {
             root._applyBatch(token, outcome, complete !== false, parsed.mode, parsed.text)
         })
@@ -508,6 +541,29 @@ QtObject {
     function _applyBatch(token, outcome, complete, pooledMode, requestText) {
         if (token !== _refreshToken)
             return
+        // A stale clipboard pool is already useful content. Collect the fresh
+        // stream off to the side and commit it only once it is complete, so a
+        // small head never replaces a full visible history during an open.
+        if (root._staleRefresh) {
+            if (outcome && !Array.isArray(outcome)) {
+                root._staleRefresh = false
+                root._staleRefreshItems = []
+                root._streamActive = false
+                root.loading = false
+                root.loadingMore = false
+                root.error = _messageOr(outcome.error, "data source failed")
+                return
+            }
+            root._staleRefreshItems = root._staleRefreshItems.concat(outcome || [])
+            if (complete !== true)
+                return
+            outcome = root._staleRefreshItems
+            root._staleRefreshItems = []
+            root._staleRefresh = false
+            root._streamActive = false
+            root.loadingMore = false
+            complete = true
+        }
         // Only a tail append waits. The first batch of a refresh replaces the
         // pool - it is the content the new query or the new mode asked for -
         // so it always lands, or a mode switch would show an empty list for
@@ -537,6 +593,7 @@ QtObject {
         // the same ordered ids, so redundant refreshes never rebuild the list.
         var sorted = appending ? root.displayPool.concat(batch)
                                 : (complete ? LauncherLogic.sortResults(batch) : batch)
+        sorted = LauncherLogic.preferStableIcons(root.displayPool, sorted)
         var poolStable = appending ? false : LauncherLogic.poolMatches(sorted, root.displayPool)
         var previous = root.results
         if (!poolStable)

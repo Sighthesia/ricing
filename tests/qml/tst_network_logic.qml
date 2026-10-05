@@ -362,6 +362,32 @@ Item {
                 "Connected")
         }
 
+        // The state this machine actually reports for enp2s0: NM holds the
+        // profile up, the kernel says there is no link. Reading that as
+        // "Connected" is how a panel tells the user a cable is fine when it is
+        // not.
+        function test_linkStateLabelPrefersCarrierOverNmsConnected() {
+            compare(Logic.linkStateLabel({
+                connected: true, carrier: "off", connection: "SDS804X-HD直连"
+            }).text, "No cable")
+            compare(Logic.linkStateLabel({
+                connected: true, carrier: "off"
+            }).tone, "idle", "a port with no link is not an active link")
+        }
+
+        // The leash on an activation, and why it is not NM's own number: NM
+        // queues a no-cable activation for carrier-wait-timeout (120s), so the
+        // panel needs its own bound, and a much tighter one when nothing is
+        // plugged in.
+        function test_wiredActivationTimeout() {
+            compare(Logic.wiredActivationTimeout("off"), 4000)
+            compare(Logic.wiredActivationTimeout("on"), 30000)
+            // An unreported carrier is not a claim that there is no cable.
+            compare(Logic.wiredActivationTimeout(""), 30000)
+            compare(Logic.wiredActivationTimeout(undefined), 30000)
+            verify(Logic.wiredActivationTimeout("off") < Logic.wiredActivationTimeout("on"))
+        }
+
         // Grouping is what turns two independent reads into rows the user can
         // act on: each profile must land under the port it belongs to.
         function test_groupWiredProfilesPlacesEachProfileOnItsPort() {

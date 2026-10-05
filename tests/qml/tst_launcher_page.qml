@@ -618,6 +618,15 @@ function test_streamedFirstFillLeavesTheViewportScrollable() {
         }, 3000)
     }
 
+    function test_prewarmSlotsReserveTheFixedWindowBeforeResultsArrive() {
+        page.prewarmSlots = true
+        compare(page.resultCount, 0)
+        compare(page.rowSlotCount, page._resultWindowLimit)
+        tryVerify(function() { return page.resultsView.slotCount === page.rowSlotCount }, 2000)
+        page.prewarmSlots = false
+        tryVerify(function() { return page.rowSlotCount === 0 }, 2000)
+    }
+
     function test_windowGrowthReleasesItsNewRowsAndKeepsScrolling() {
         // Growing the materialized window builds fresh delegates. Nothing
         // releases them but the commit that growth schedules, and a held row is
@@ -694,6 +703,31 @@ function test_streamedFirstFillLeavesTheViewportScrollable() {
         tryVerify(function() { return page.resultCount === 200 }, 2000)
         // The delegates the growth built must be released, not stranded.
         tryVerify(function() { return !page.rowsAnimatingIn }, 3000)
+        verify(page.resultsView.interactive)
+    }
+
+    function test_shiftedIdsKeepSettledSurvivorsUnheld() {
+        var initial = []
+        for (var i = 0; i < 96; i++)
+            initial.push(makeItem("clip" + i, "Clip " + i, 0, 1000 - i))
+        openWithResults(initial)
+        tryVerify(function() { return !page.rowsAnimatingIn }, 3000)
+
+        var shifted = [makeItem("new", "New copy", 0, 2000)]
+        for (var j = 0; j < 95; j++)
+            shifted.push(makeItem("clip" + j, "Clip " + j, 0, 1000 - j))
+        page.session.results = shifted
+        page.session.displayPool = shifted
+        page._scheduleRowsCommit()
+        wait(100)
+
+        var held = 0
+        for (var k = 0; k < page.resultCount; k++) {
+            var row = page.resultAt(k)
+            if (row && row.revealHeld)
+                held++
+        }
+        verify(held <= 1, "shifted survivors triggered a full-window hold: " + held)
         verify(page.resultsView.interactive)
     }
 
