@@ -389,30 +389,123 @@ Item {
     readonly property bool warmServicesFirst:
         String(Quickshell.env("AFLOAT_COST_FIRST") || "") === "services"
 
-    // Every service the shipped widgets bind to. Media is the expensive one:
-    // MediaControlService pulls in the netease python3 bridge, MediaService reads
-    // a JSON cache with blockLoading, and Media's own completion registers with
-    // SpectrumService, which starts cava and the beat tracker.
+    // Every service the production bar constructs at startup: the ones the
+    // shipped widgets bind to, plus the ones the bar injects into its wave
+    // surface for the control-center route. The second group is here because the
+    // owner edge binds them at bar construction whether or not the route is ever
+    // opened - WeatherService most of all, since a cached read plus a first-refresh
+    // timer is real work the probe would otherwise charge to the bar fill.
+    //
+    // Named rather than held as objects, so the coverage check below can compare
+    // this list against the bindings in modules/bar/TopBar.qml instead of against
+    // a copy of itself. Media is the expensive one: MediaControlService pulls in
+    // the netease python3 bridge, MediaService reads a JSON cache with
+    // blockLoading, and Media's own completion registers with SpectrumService,
+    // which starts cava and the beat tracker.
+    readonly property var startupServiceNames: [
+        "NiriService", "SettingsService", "LauncherService",
+        "ClipboardService", "WindowHintService", "MediaService",
+        "MediaControlService", "NeteaseWebLyricsService",
+        "NetworkService", "VolumeService", "BrightnessService",
+        "BatteryService", "BluetoothService", "WeatherService",
+        "NotificationService", "BarLayoutService",
+    ]
+
+    // Name to singleton, spelled out. A lookup through the module namespace by
+    // string must NOT be used here: it answers an object for a name that does not
+    // exist, so a typo would count as covered and the probe would report a warm
+    // number for a service it never warmed. `default: null` is what keeps a typo
+    // visible: warmAllServices stops counting it, and the warm run asserts the
+    // count.
+    function serviceFor(name) {
+        switch (name) {
+        case "NiriService": return Services.NiriService
+        case "SettingsService": return Services.SettingsService
+        case "LauncherService": return Services.LauncherService
+        case "ClipboardService": return Services.ClipboardService
+        case "WindowHintService": return Services.WindowHintService
+        case "MediaService": return Services.MediaService
+        case "MediaControlService": return Services.MediaControlService
+        case "NeteaseWebLyricsService": return Services.NeteaseWebLyricsService
+        case "NetworkService": return Services.NetworkService
+        case "VolumeService": return Services.VolumeService
+        case "BrightnessService": return Services.BrightnessService
+        case "BatteryService": return Services.BatteryService
+        case "BluetoothService": return Services.BluetoothService
+        case "WeatherService": return Services.WeatherService
+        case "NotificationService": return Services.NotificationService
+        case "BarLayoutService": return Services.BarLayoutService
+        default: return null
+        }
+    }
+
+    // Returns how many of the names above resolved to a singleton, so a typo shows
+    // up as a run that did not warm what it claims to have warmed. A null from
+    // serviceFor is otherwise silent in two places at once: the coverage check
+    // only compares strings, and the warm numbers would just be that much
+    // warmer.
     function warmAllServices() {
-        const touched = [
-            Services.NiriService, Services.SettingsService, Services.LauncherService,
-            Services.ClipboardService, Services.WindowHintService, Services.MediaService,
-            Services.MediaControlService, Services.NeteaseWebLyricsService,
-            Services.NetworkService, Services.VolumeService, Services.BrightnessService,
-            Services.BatteryService, Services.BluetoothService,
-            Services.NotificationService, Services.BarLayoutService,
-        ]
-        // Reading a property is what forces a lazy singleton to instantiate.
-        let sink = 0
-        for (let i = 0; i < touched.length; i++) {
-            if (touched[i])
-                sink++
+        // Reading a property is what forces a lazy singleton to instantiate, so this is
+        // the only place in the probe that touches one - except for the coverage
+        // check, which must stay name-only or it would pay the cost being measured.
+        let resolved = 0
+        for (let i = 0; i < root.startupServiceNames.length; i++) {
+            if (root.serviceFor(root.startupServiceNames[i]))
+                resolved++
         }
         // MediaControlService.hasMedia is the binding Media.qml itself reads, and
         // it is what constructs the lyrics bridge chain.
+        let bridgeWarm = 0
         if (Services.MediaControlService)
-            sink += Number(Services.MediaControlService.hasMedia === true ? 1 : 0)
-        return sink
+            bridgeWarm = Number(Services.MediaControlService.hasMedia === true ? 1 : 0)
+        return { resolved: resolved, bridgeWarm: bridgeWarm }
+    }
+
+    // The services the production bar injects into its wave surface, read from the
+    // bar's own source rather than retyped here: a hand-typed copy of that list
+    // would only prove the copy agrees with itself, and the list is exactly the
+    // thing that drifts when a new service is bound at the owner edge.
+    function injectedWaveServiceNames(source) {
+        const start = source.indexOf("LauncherSurface {")
+        if (start < 0)
+            return []
+        const next = source.indexOf("PanelWindow {", start)
+        const block = source.slice(start, next < 0 ? start + 4000 : next)
+        const found = []
+        const pattern = /([A-Za-z]+Service):[ \t]*Services\.([A-Za-z]+)/g
+        let match = pattern.exec(block)
+        while (match !== null) {
+            found.push(match[2])
+            match = pattern.exec(block)
+        }
+        return found
+    }
+
+    // Coverage, asserted before anything is warmed: a service injected at the
+    // owner edge and missing from the list above would silently move its cold
+    // cost into the bar fill this probe exists to attribute.
+    function checkWarmCoverage() {
+        const source = root.readText("./modules/bar/TopBar.qml")
+        root.check("the production bar source is readable", source !== "")
+        const injected = root.injectedWaveServiceNames(source)
+        root.check("the production bar injects services into its wave surface",
+                   injected.length > 0, "found " + injected.length)
+        // Compared by name, never by resolving: reading a singleton is what
+        // instantiates it, and only the warm run is allowed to pay that before it
+        // starts measuring. That each name is real is proved there instead, by the
+        // resolved count.
+        const missing = injected.filter(function(name) {
+            return root.startupServiceNames.indexOf(name) < 0
+        })
+        root.check("every service the bar injects into the wave surface is warmed",
+                   missing.length === 0, "not warmed: " + missing.join(", "))
+    }
+
+    function readText(path) {
+        const xhr = new XMLHttpRequest()
+        xhr.open("GET", Qt.resolvedUrl(path), false)
+        xhr.send(null)
+        return xhr.status === 200 ? xhr.responseText : ""
     }
 
     function firstPhase() {
@@ -427,18 +520,27 @@ Item {
     function warmThenStaged() {
         root.phase = "warm-services"
         const started = Date.now()
-        const sink = root.warmAllServices()
-        console.log("[cost] warmed " + sink + " services before the staged run")
+        const warmed = root.warmAllServices()
+        console.log("[cost] warmed " + warmed.resolved + " services before the staged run")
+        // Every name has to have resolved, or the warm run is not warm: a name
+        // `serviceFor` does not know returns null and is silently not counted,
+        // which hands this run back the very cold cost it exists to separate out.
+        root.check("every named warm-up service resolved to a singleton",
+                   warmed.resolved === root.startupServiceNames.length,
+                   "resolved " + warmed.resolved + " of " + root.startupServiceNames.length)
         // One turn, so the spawns the services just started are forked and the
         // staged fill is not measured against their fork cost.
         Qt.callLater(function() {
-            console.log("[cost] service warm took " + root.ms(Date.now() - started) + " ms")
+            console.log("[cost] lyrics bridge constructed: " + (warmed.bridgeWarm ? "yes" : "no"))
+        console.log("[cost] service warm took " + root.ms(Date.now() - started) + " ms")
             Qt.callLater(root.startPhaseA)
         })
     }
 
     Component.onCompleted: {
         giveUp.restart()
+        // Before anything is measured or warmed: is the list complete?
+        checkWarmCoverage()
         // Settings decide the layout, so the probe waits for the real load
         // rather than measuring an empty tree.
         if (Services.SettingsService.settingsReady)

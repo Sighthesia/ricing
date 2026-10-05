@@ -60,6 +60,56 @@ Item {
                     WaveLogic.routes[route] + " is a mounted route the coordinator cannot route")
         }
 
+        // The screen-scoped entry asks this instead of branching per route. A
+        // plain record stands in for the surface on purpose: the decision reads
+        // only the presence of the named method, never the identity of the owner,
+        // so a literal cannot make this pass for the wrong reason.
+        function test_dispatchSendsWaveTargetsToTheOwnerAndTheRestToTheCoordinator() {
+            var owner = {
+                requestOpen: function() {},
+                requestControlCenter: function() {}
+            }
+            var launcher = Logic.dispatchFor("launcher", owner)
+            compare(launcher.route, "wave")
+            compare(launcher.method, "requestOpen")
+            var controlCenter = Logic.dispatchFor("control-center", owner)
+            compare(controlCenter.route, "wave")
+            compare(controlCenter.method, "requestControlCenter")
+
+            // Settings and music have their own owners and are untouched by any of
+            // this: whatever the wave owner implements, they go to the coordinator.
+            compare(Logic.dispatchFor("settings", owner).route, "coordinator")
+            compare(Logic.dispatchFor("music", owner).route, "coordinator")
+            // An unroutable target is the coordinator's to reject, as before.
+            compare(Logic.dispatchFor("wiki", owner).route, "coordinator")
+        }
+
+        // The failure this guards is silent: a wave target whose entry method the
+        // owner does not implement used to fall through to the coordinator, which
+        // opens the host with no session mirror, no requestedRoute and no opener.
+        // The route is then on screen while every later decision - close, refocus,
+        // the next open intent - still believes it is closed.
+        function test_aWaveTargetTheOwnerDoesNotImplementIsRefusedNotDispatched() {
+            // Drift between the route registry and the surface: the registry names
+            // a method, the owner has not got it.
+            var stale = { requestOpen: function() {} }
+            var plan = Logic.dispatchFor("control-center", stale)
+            compare(plan.route, "refuse",
+                "a wave target with no entry method must not be dispatched at all")
+            compare(plan.method, "requestControlCenter",
+                "the refusal must still name the method that is missing")
+
+            // No owner at all is the same refusal, not a coordinator dispatch.
+            compare(Logic.dispatchFor("launcher", null).route, "refuse")
+            compare(Logic.dispatchFor("launcher", undefined).route, "refuse")
+            // A member of the right name that is not callable is not an entry
+            // method either: it would be called as though it opened a route.
+            compare(Logic.dispatchFor("launcher", { requestOpen: "nope" }).route, "refuse")
+            // Spelling the same route as a non-wave target does not smuggle it past
+            // the refusal either - it lands on the coordinator, which rejects it.
+            compare(Logic.dispatchFor("wiki", stale).route, "coordinator")
+        }
+
         function test_deprecatedWaveTargetsAreRejected() {
             compare(Logic.normalizeTarget("wiki"), "")
             compare(Logic.normalizeTarget("news"), "")

@@ -185,9 +185,15 @@ Item {
             verify(bar.indexOf('requestOverlay("control-center", controlCenterEntry)') !== -1,
                    "the entry must ask for the route through the screen scope, by name")
             verify(bar.indexOf("function requestOverlay(target, opener)") !== -1,
-                   "the screen scope must own the overlay entry point")
-            verify(bar.indexOf("CoordLogic.entryMethodFor(target)") !== -1,
-                   "the entry point must read the wave dispatch from the coordinator registry")
+                   "the screen scope must own the shared overlay seam")
+            verify(bar.indexOf("CoordLogic.dispatchFor(target, launcherSurface)") !== -1,
+                   "the seam must read one dispatch decision from the coordinator registry")
+            // One decision, one place. A second lookup of the entry method inside the
+            // bar would be a second dispatch table, and the shape it took last time -
+            // a missing method quietly handed to the coordinator - is exactly the
+            // silent failure the shared decision refuses.
+            verify(bar.indexOf("CoordLogic.entryMethodFor(") < 0,
+                   "the bar must not re-derive the wave entry method itself")
 
             // One wave owner, one route registry, no second window: the file must
             // mount exactly one LauncherSurface and exactly one OverlayCoordinator.

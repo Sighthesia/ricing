@@ -29,20 +29,30 @@ Variants {
         property bool musicTooltipOpen: false
         property bool shuffleActive: false
 
-        // One screen's overlay entry point. The wave's routes go through the
+        // One screen's targeted overlay requests, dispatched exactly as
+        // modules/bar/TopBar.qml does it: the wave's routes go through the
         // launcher surface, which owns the session, the opener record and the
-        // focus hand-off for both of them; which of its two methods answers is
-        // read from the coordinator's own registry rather than hard-coded per
-        // route. Everything else is a separate owner and goes straight to the
-        // coordinator.
+        // focus hand-off for both of them, and everything else goes straight to
+        // the coordinator. A wave target the surface does not implement is
+        // refused rather than dispatched, because the coordinator would open the
+        // host with none of that bookkeeping. See OverlayCoordinatorLogic.js.
         function requestOverlay(target, opener) {
             musicTooltipOpen = false
-            var waveEntry = CoordLogic.entryMethodFor(target)
-            if (waveEntry !== "" && launcherSurface[waveEntry] !== undefined) {
-                launcherSurface[waveEntry](opener)
+            var plan = CoordLogic.dispatchFor(target, launcherSurface)
+            if (plan.route === "wave") {
+                launcherSurface[plan.method](opener)
                 return
             }
-            overlayCoordinator.request(target, opener)
+            if (plan.route === "coordinator") {
+                overlayCoordinator.request(target, opener)
+                return
+            }
+            // Named in the message, as in modules/bar/TopBar.qml: QML's
+            // console.warn carries no source location, so without the path this
+            // diagnostic never reaches scripts/check-shell.sh.
+            console.warn("modules/lazerbar/TopBar.qml: refused wave target '" + target
+                + "', the wave owner has no '" + plan.method
+                + "' entry method and the coordinator cannot open it either")
         }
 
         // Route explicit diagnostics through the same coordinator as the bar button.

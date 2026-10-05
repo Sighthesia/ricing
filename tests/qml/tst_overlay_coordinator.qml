@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import "../../modules/lazerbar" as Lazer
+import "../../modules/lazerbar/OverlayCoordinatorLogic.js" as CoordLogic
 
 // Exercise mutual exclusion, pending transitions, final focus restoration,
 // and the direct launcher opener path by instantiating the real production
@@ -701,6 +702,28 @@ Item {
             coordinator.ownerClosed("settings")
             compare(coordinator.activeTarget, "")
             compare(openSpy.count, 1)
+        }
+
+        // The screen-scoped entry refuses a wave target whose entry method this
+        // surface does not implement, because the alternative - handing it to the
+        // coordinator - opens the host with no session mirror, no requestedRoute
+        // and no opener. So the route registry and this surface must agree, and
+        // the only way to know that for the real object is to ask it.
+        function test_everyWaveTargetResolvesToAMethodOnThisSurface() {
+            var waveTargets = CoordLogic.waveTargets
+            verify(waveTargets.length > 0, "the wave route registry must not be empty")
+            for (var index = 0; index < waveTargets.length; index++) {
+                var target = waveTargets[index]
+                var plan = CoordLogic.dispatchFor(target, launcherSurface)
+                compare(plan.route, "wave",
+                    target + " must dispatch to this surface, which has no '" + plan.method + "'")
+                compare(typeof launcherSurface[plan.method], "function")
+            }
+
+            // The other owners are untouched by the wave registry: neither of their
+            // targets may reach a method on this surface.
+            compare(CoordLogic.dispatchFor("settings", launcherSurface).route, "coordinator")
+            compare(CoordLogic.dispatchFor("music", launcherSurface).route, "coordinator")
         }
     }
 }

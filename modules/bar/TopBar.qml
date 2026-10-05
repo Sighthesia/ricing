@@ -390,25 +390,59 @@ Variants {
             Services.SettingsService.settingsMaskOverride !== "off"
             && settingsOverlay.blocksDesktop
 
-        // One screen's overlay entry point, and the only way any bar affordance
-        // asks for one. The wave's two routes go through the launcher surface
-        // rather than through the coordinator, because that surface owns the
-        // session mirror, the opener record and the focus hand-off for both of
-        // them; the coordinator would open the host with none of that. Which of
-        // its two methods answers is read from the coordinator's own registry
-        // (`entryMethodFor`), so the launcher and the control center cannot be
-        // reached by two spellings of one owner.
+        // The shared seam for one screen's *targeted* overlay requests. The
+        // control-center entry goes through it, and so will every future bar
+        // affordance that names an overlay target, so a wave route cannot end up
+        // reachable by two different spellings.
+        //
+        // It is NOT the only way an overlay opens, and nothing here may be built
+        // on that assumption. These each ask one owner they already know:
+        //
+        //   - the launcher entry and the launcher's keybind/IPC drive
+        //     Services.LauncherService, which reaches this surface as session
+        //     visibility and is mirrored by LauncherSurface.syncVisibility
+        //   - the gear entry and a widget's settings action ask
+        //     SettingsOverlayBridge.requestOpen()
+        //   - the island-settings mirror and a widget settings open, further down
+        //     this file, ask overlayCoordinator.request("settings", ...) directly,
+        //     because they must dismiss the popup host on the way
+        //
+        // Those are owner-specific paths, not a second dispatch table. What
+        // belongs here is a request that has to *choose* between owners.
+        //
+        // The wave's two routes are exactly that case: they go through the
+        // launcher surface rather than through the coordinator, because that
+        // surface owns the session mirror, the opener record and the focus
+        // hand-off for both of them; the coordinator would open the host with
+        // none of that. Which of its two methods answers is read from the
+        // coordinator's own registry, so the launcher and the control center
+        // cannot be reached by two spellings of one owner.
         //
         // Everything else is a separate owner and goes straight to the
         // coordinator, which keeps its existing mutual exclusion and opener
         // restoration untouched.
         function requestOverlay(target, opener) {
-            var waveEntry = CoordLogic.entryMethodFor(target)
-            if (waveEntry !== "" && launcherSurface[waveEntry] !== undefined) {
-                launcherSurface[waveEntry](opener)
+            var plan = CoordLogic.dispatchFor(target, launcherSurface)
+            if (plan.route === "wave") {
+                launcherSurface[plan.method](opener)
                 return
             }
-            overlayCoordinator.request(target, opener)
+            if (plan.route === "coordinator") {
+                overlayCoordinator.request(target, opener)
+                return
+            }
+            // A wave target the owner does not implement: the route registry and
+            // the surface have drifted. Report it rather than dispatching it,
+            // because the coordinator would open the host with no session mirror,
+            // no requestedRoute and no opener - a route on screen that every
+            // later decision still believes is closed.
+            //
+            // This file is named in the message on purpose: QML's console.warn
+            // carries no source location, so without it the diagnostic never
+            // reaches scripts/check-shell.sh, which classifies on a repo path.
+            console.warn("modules/bar/TopBar.qml: refused wave target '" + target
+                + "', the wave owner has no '" + plan.method
+                + "' entry method and the coordinator cannot open it either")
         }
 
         // Serialize launcher transitions; settings/music owners live elsewhere.
