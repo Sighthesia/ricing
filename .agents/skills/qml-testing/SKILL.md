@@ -1,9 +1,37 @@
 ---
 name: qml-testing
-description: Running or writing Afloat's QML/JS tests. Load before running tests, adding test files, or trusting a "green" test result. Covers why `qs -p tst_*.qml` does NOT run QtTest, the Qt5/Qt6 qmltestrunner trap, the import-blackholing gotcha, and the qs-host behavioral harness pattern.
+description: Running or writing Afloat's QML/JS tests. Load before running tests, adding test files, or trusting a "green" test result. Covers the project rule not to run the suite unprompted, the bar for adding a test, why `qs -p tst_*.qml` does NOT run QtTest, the Qt5/Qt6 qmltestrunner trap, the import-blackholing gotcha, and the qs-host behavioral harness pattern.
 ---
 
 # QML Testing Infrastructure
+
+## Do not run the suite unprompted
+
+Verify with `scripts/check-shell.sh` (see below), not with a test run. Run the
+suite only when the user asks for it. Offer it — do not assume.
+
+Two reasons, both measured here. The suite cannot see most of what breaks in a
+shell: the live log held a `NiriService` that could not write its kdl file, an
+`Image` that could not open an asset, and two `TypeError`s, none asserted. And
+the suite's own record undercuts its coverage: 8 files / 113 functions had never
+executed while being counted as coverage, and one file had been red on 15 of 36
+functions since August. A red suite is evidence about the tests.
+
+## The bar for adding a test
+
+Default is no. A test is a permanent liability: a process spawn per run, rot the
+moment the implementation moves, and a test that cannot fail reads as coverage.
+Write one only for pure logic whose breakage would be silent and obvious in the
+log, and only after answering:
+
+1. **What mutation makes it red?** Unanswerable means it is a coverage marker.
+2. **Can it decide without a compositor?** If it needs `Quickshell.*` it cannot
+   run under `tests/qml/` at all — it becomes a root-level `qs -p` harness, which
+   nothing verifies automatically. That is where the 113 dead functions live.
+3. **Contract or snapshot?** Assert the product's own expression
+   (`MotionTokens.popupFromScale`, `row.bodyHeight`), never a copied literal —
+   a copy desyncs on the next deliberate retune and the retune then reads as a
+   broken test.
 
 ## The trap: `qs -p tests/qml/tst_*.qml` runs NO tests
 
@@ -14,9 +42,9 @@ command is void.
 
 ## How to actually run tests
 
-**Always go through `scripts/run-tests.sh`.** It runs both tiers on the
-offscreen platform, so a test run never maps a window over the user's live
-desktop.
+(When the user has asked for them.) **Go through `scripts/run-tests.sh`** or
+`scripts/qmltest.sh`. Both run on the offscreen platform, so a test run never
+maps a window over the user's live desktop and never takes keyboard focus.
 
 ```sh
 scripts/run-tests.sh                  # whole suite, zero windows
