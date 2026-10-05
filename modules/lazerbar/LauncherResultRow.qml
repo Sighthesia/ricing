@@ -55,6 +55,11 @@ Item {
     }
     onResultChanged: {
         root.iconFailed = false
+        // A count-model delegate can receive a new result after its previous
+        // app was flung out. Do not let that old exit state keep the new card
+        // displaced, disabled, or visually folded.
+        if (root._closing)
+            root._closing = false
         if (root.iconReloadToken % 2 !== 0)
             root.iconReloadToken++
     }
@@ -393,6 +398,7 @@ Item {
             id: titleText
             x: 52
             width: Math.max(0, parent.width - x - 12)
+            visible: root.displayName.length > 0
             anchors.top: root.descriptionText.length > 0 ? parent.top : undefined
             anchors.topMargin: 12
             anchors.verticalCenter: root.descriptionText.length > 0 ? undefined : parent.verticalCenter
@@ -409,8 +415,9 @@ Item {
             id: descriptionLabel
             x: titleText.x
             width: titleText.width
-            anchors.top: titleText.bottom
-            anchors.topMargin: 2
+            anchors.top: root.displayName.length > 0 ? titleText.bottom : undefined
+            anchors.topMargin: root.displayName.length > 0 ? 2 : 0
+            anchors.verticalCenter: root.displayName.length > 0 ? undefined : parent.verticalCenter
             visible: root.descriptionText.length > 0
             text: root.descriptionText
             color: LazerTheme.textMuted
