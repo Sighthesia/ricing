@@ -7,11 +7,32 @@ Afloat is a Wayland desktop shell built with **Quickshell** (QML), targeting the
 ## Architecture
 
 - `shell.qml` — entrypoint. Mounts wallpaper, top bar, notification host, session lock. Must run from repo root: `qs -p /path/to/afloat`.
-- `services/` — QML **singletons** (registered in `services/qmldir`, imported as `Services.*`). Pure logic lives in sibling `.js` files (e.g. `barlayout/`, `launcher/`) so it can be tested without instantiating QML.
+- `services/` — QML **singletons** (registered in `services/qmldir`, imported as `Services.*`). Pure logic lives in sibling `.js` files (e.g. `barlayout/`, `launcher/`) so it can be read and reasoned about without instantiating QML.
 - `modules/bar/` — layout-driven top bar (`TopBar`, `BarContent`, `widgets/`). `modules/lazerbar/` — lazer surfaces (settings panel, launcher, notifications, overlays; singletons `LazerTheme`, `MotionTokens`, `SettingsOverlayBridge` via its own `qmldir`). `modules/lock/` — session lock. `modules/shared/glsl/` — shaders.
-- `scripts/` — `afloat-ipc <target> <function> [args...]` wraps `qs ipc`; Python bridges tested under `scripts/tests/`. `docs/superpowers/` — dated design-intent plans.
+- `scripts/` — `afloat-ipc <target> <function> [args...]` wraps `qs ipc`; `check-shell.sh` is the verification gate. `docs/superpowers/` — dated design-intent plans.
 
 ## Running & verifying
+
+### Do not test unless it is necessary
+
+**Do not write, run, or restore automated tests on your own initiative.** Verify
+by running the shell and reading its log. Treat "add a test for it" as something
+to raise with the user, not something to do.
+
+A desktop shell breaks in ways assertions do not reach: a null binding, an asset
+that will not open, a service that silently fails to write its config. The live
+log shows all three on demand; a test only ever covers what someone already
+suspected. The suite that used to live here had stopped being able to report on
+its own honesty — 8 files and 113 functions had never executed while being
+counted as coverage, and one file sat red on 15 of 36 functions for months
+without anyone noticing. Meanwhile `check-shell.sh` surfaced a kdl file that was
+never written, an image that could not open, and an invalid alias reference, none
+of which any test would have caught.
+
+So the burden of proof is on the test, not on the change: if you think a
+regression is possible and the log cannot show it, say so and let the user decide
+whether to spend a test on it. Reading the code and watching the surface is the
+job.
 
 **Default verification: run the shell and read its log.** `scripts/check-shell.sh`
 reports what went wrong since the last time you asked, grouped so the two lines
@@ -27,14 +48,6 @@ scripts/check-shell.sh --launch 20    # no shell running: start one for 20s
 It exits non-zero when there is a QML diagnostic naming a file in this repo, or
 one of our services reporting a failure, so it gates a commit. It never starts a
 second shell over a live one — restart your own, then read.
-
-**This is the only verification instrument in the project.** There is no test
-suite: it was removed because it had stopped being able to report on its own
-honesty — 8 files / 113 functions had never executed while being counted as
-coverage, and one file sat red on 15 of 36 functions for months. Meanwhile the
-live log was showing a `NiriService` that could not write its kdl file, an `Image`
-that could not open an asset, and two `TypeError`s, none of them asserted. A
-shell is verified by running it.
 
 Launch: `qs -p /path/to/afloat`. IPC: `scripts/afloat-ipc <target> <function> [args...]`.
 `lock-test.qml` is a product self-test, not part of any framework: with

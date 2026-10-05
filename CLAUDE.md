@@ -3,6 +3,10 @@ Read [AGENTS.md](AGENTS.md) before starting any task.
 This branch (`lazer`) contains the full shell: osu!lazer-styled frontend (`modules/`, `shell.qml`) plus the service/backend layer (`services/`, `scripts/`). Verification is
 `scripts/check-shell.sh`: run the shell, read its log.
 
+**Do not write or run automated tests unless it is necessary.** There is no test
+suite here by choice. Verify by running the shell and reading the log; if you think
+a change needs a test to be safe, raise it with the user first.
+
 ## Skills
 
 Load these for detailed context on specific topics:
