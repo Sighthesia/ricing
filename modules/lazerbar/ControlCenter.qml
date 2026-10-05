@@ -79,26 +79,115 @@ Item {
     // fills the full width instead of reserving an empty 176px column.
     readonly property var sidebarEntries: []
     readonly property string activeSidebarId: ""
-    // The overview is a top-level route with nothing to pop; a same-surface
-    // detail sub-page publishes `true` here instead.
-    readonly property bool canGoBack: false
 
-    // Back is route-local. The overview reports it cannot handle a back press,
-    // which is what lets the host fall through to closing the surface.
-    function handleBack() { return false }
+    // --- Same-surface sub-pages ---
+    //
+    // The network and Bluetooth details are SUB-PAGES of this route, not sibling
+    // Wave routes: the host keeps ONE Loader on ONE surface, and this page swaps
+    // what that Loader shows. So the names come from the module - which is where
+    // they are declared - and a name the module does not declare mounts nothing.
+    //
+    // Empty string is the overview. It is not a route name, so it can never be
+    // confused with one, and no caller has to invent a third vocabulary.
+    property string activeSubPage: ""
+    readonly property bool detailActive: root.activeSubPage !== ""
+
+    // The overview is a top-level route with nothing to pop, and a sub-page
+    // always has the overview to pop back to. So this is exactly the mirror of
+    // `detailActive`: it is the ONE place that decides whether a back press
+    // belongs to this page or to the surface.
+    readonly property bool canGoBack: root.detailActive
+
+    // Back is route-local. With no sub-page mounted there is nothing to pop, so
+    // the page reports it cannot handle the press - which is what lets the host
+    // fall through to closing the surface. With one mounted, it pops it and
+    // reports the refresh for the next turn.
+    function handleBack() {
+        if (!root.detailActive)
+            return false
+        root.closeSubPage()
+        return true
+    }
 
     // Where keyboard focus lands when this route opens. The page itself, never a
     // control: the cards join the tab chain on their own, so Tab moves from here
     // into the first ready card without the host having to know which that is.
+    //
+    // While a sub-page is mounted, the focus target is that page's own: a card
+    // under an invisible overview must not swallow the keystroke meant for the
+    // password field.
     function focusDefault() {
         root._focusDefaultCount++
+        if (root.detailActive && root.detailPageItem !== null
+                && typeof root.detailPageItem.focusDefault === "function") {
+            root.detailPageItem.focusDefault()
+            return
+        }
         root.forceActiveFocus()
+    }
+
+    // Switch to one same-surface sub-page by name. An unknown name opens nothing
+    // rather than an empty page, so a typo in a caller cannot produce a blank
+    // viewport that looks like a load failure.
+    function requestSubPage(route) {
+        if (!CcLogic.isDetailRoute(route))
+            return false
+        root._subPageOpenCount++
+        root.activeSubPage = route
+        // Hand focus to the page that just mounted, one turn later: a Loader
+        // builds its item ASYNCHRONOUSLY, so reading `detailPageItem` in the
+        // same turn as the route change reads null (or the page being replaced),
+        // and focusing the outgoing one would put the caret in an invisible page.
+        subPageFocusTimer.restart()
+        return true
+    }
+
+    Timer {
+        id: subPageFocusTimer
+        interval: 0
+        repeat: false
+        onTriggered: {
+            var page = root.detailPageItem
+            if (page !== null && typeof page.focusDefault === "function")
+                page.focusDefault()
+        }
+    }
+
+    // Pop the sub-page. The overview is restored in THIS turn - the retained
+    // layout is never torn down - and the status refresh is scheduled for the
+    // next one.
+    function closeSubPage() {
+        root.activeSubPage = ""
+        returnRefreshTimer.restart()
+    }
+
+    // The deferred refresh, deferred because doing it in the same turn as the pop
+    // meant the overview's own cards were still bound to the pre-return state:
+    // the summary lagged a whole frame behind the operation that caused it.
+    //
+    // A Timer rather than Qt.callLater for the reason LauncherPage gives: a
+    // queued closure can outlive the page it belongs to.
+    function refreshAfterReturn() {
+        root._returnRefreshCount++
+        var service = root.networkService
+        if (service && typeof service.refreshForOpen === "function")
+            service.refreshForOpen()
+    }
+
+    // One turn of separation between restoring the overview and refreshing it.
+    // The overview is the owner, so this timer outlives the sub-page it was
+    // scheduled alongside.
+    Timer {
+        id: returnRefreshTimer
+        interval: 0
+        repeat: false
+        onTriggered: root.refreshAfterReturn()
     }
 
     // --- Requests out of the page ---
     //
-    // The page owns no navigation. Task 7's detail pages are wired from here.
-
+    // A card's activation is a REQUEST, and this page is also the component that
+    // answers it: the details live here, so the request never leaves the route.
     signal networkDetailsRequested()
     signal bluetoothDetailsRequested()
     signal notificationsOpenRequested()
@@ -390,6 +479,12 @@ Item {
     Flickable {
         id: layoutSurface
         objectName: "layoutSurface"
+        // The overview yields the viewport while a same-surface sub-page is up,
+        // and is RESTORED - not rebuilt - on the way back: it stays laid out and
+        // retained behind an invisible flag, so returning costs one property
+        // write instead of a whole screen of card, calendar and summary
+        // delegates. `visible` rather than `active` is what makes that possible.
+        visible: !root.detailActive
         x: root.pagePadding
         // The scroller starts at the page padding in BOTH arrangements, because the
         // header is not in a strip above it: it is the first section of the content
@@ -896,6 +991,50 @@ Item {
         }
     }
 
+    // --- Same-surface sub-page slot ---
+    //
+    // ONE Loader for the whole route, holding whichever detail page is active.
+    // It is inside this page, not inside the wave host, which is what makes the
+    // details sub-pages: the host keeps a single retained Loader on a single
+    // surface, and this swaps its content without a route change, a cross-fade,
+    // a second window, or a coordinator hand-off.
+    //
+    // `active` is bound to the active sub-page, so a page with none mounted pays
+    // for nothing, and the two Components are created lazily on first use rather
+    // than at the shell's startup.
+    Loader {
+        id: subPageLoader
+        objectName: "controlCenterSubPage"
+        anchors.fill: parent
+        active: root.detailActive
+        visible: root.detailActive
+        // Route-selected by name from the module's own detail routes, so a caller
+        // cannot mount an arbitrary component under a detail route's name.
+        sourceComponent: root.activeSubPage === CcLogic.detailRoutes.network
+            ? networkDetailComponent
+            : (root.activeSubPage === CcLogic.detailRoutes.bluetooth
+               ? bluetoothDetailComponent : null)
+    }
+
+    // The network detail sub-page. It receives the SAME injected service the
+    // overview reads, so the two pages can never disagree about the state.
+    Component {
+        id: networkDetailComponent
+        ControlCenterNetwork {
+            networkService: root.networkService
+            onBackRequested: root.closeSubPage()
+        }
+    }
+
+    // The Bluetooth detail sub-page, same arrangement.
+    Component {
+        id: bluetoothDetailComponent
+        ControlCenterBluetooth {
+            bluetoothService: root.bluetoothService
+            onBackRequested: root.closeSubPage()
+        }
+    }
+
     // The slider's own height, so the volume card can place it against its bottom
     // edge without hardcoding the component's 30px.
     readonly property int volumeSliderHeight: volumeSlider.height > 0
@@ -989,18 +1128,21 @@ Item {
 
     // --- Detail-page requests ---
     //
-    // A request, not a navigation: the overview does not own the detail pages, and
-    // it must not open an overlay or a window to show them.
+    // The overview's own answer to a detail request: announce it, then mount the
+    // page. The card's activation is gated on the module's action, so an inert
+    // card - loading, empty or failed - neither announces nor mounts anything.
     function openNetworkDetails() {
         if (root.networkCardData.action !== "detail")
             return
         root.networkDetailsRequested()
+        root.requestSubPage(CcLogic.detailRoutes.network)
     }
 
     function openBluetoothDetails() {
         if (root.bluetoothCardData.action !== "detail")
             return
         root.bluetoothDetailsRequested()
+        root.requestSubPage(CcLogic.detailRoutes.bluetooth)
     }
 
     // --- Test and host seams ---
@@ -1049,6 +1191,22 @@ Item {
     readonly property Item leftColumnItem: controlsColumn
     readonly property Item layoutSurfaceItem: layoutSurface
     readonly property Item layoutContentItem: layoutContent
+    // The overview's own scroller, published as one name because "is the
+    // overview on screen" is the other half of "is a sub-page on screen" - two
+    // separate items flipping independently is how a page ends up showing both
+    // or neither.
+    readonly property Item overviewItem: layoutSurface
+    // The mounted sub-page, or null when the overview is showing. Read through
+    // this one accessor so a caller never has to know which page is mounted or
+    // how the Loader spells it.
+    readonly property Item detailPageItem: subPageLoader.item
+    readonly property Item subPageLoaderItem: subPageLoader
+    // Counters for the refresh handshake, so the deferral is observable rather
+    // than inferred from a service's side effects.
+    readonly property int returnRefreshCount: _returnRefreshCount
+    property int _returnRefreshCount: 0
+    readonly property int subPageOpenCount: _subPageOpenCount
+    property int _subPageOpenCount: 0
     readonly property Item calendarItem: calendarSection
     readonly property Item notificationsItem: notificationsSection
 

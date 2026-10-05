@@ -39,6 +39,18 @@ Item {
         Lazer.ControlCenter {}
     }
 
+    // The two same-surface detail pages, built through Components exactly as the
+    // overview is, so each test owns a fresh instance with its own state.
+    Component {
+        id: networkPageComponent
+        Lazer.ControlCenterNetwork {}
+    }
+
+    Component {
+        id: bluetoothPageComponent
+        Lazer.ControlCenterBluetooth {}
+    }
+
     // --- Injected service fakes ---
     //
     // Each fake declares ONLY the properties and functions the page is
@@ -104,6 +116,200 @@ Item {
             property bool scanningActive: false
             property bool connecting: false
             property string lastError: ""
+        }
+    }
+
+    // The network service contract a detail page is documented to read: the
+    // scan map, the interaction flags, the error pair, and every action method.
+    // Call arguments are recorded, not just counts, so "the page asked for this
+    // SSID" and "the page passed a password" are both observable.
+    Component {
+        id: fakeNetworkDetailComponent
+        QtObject {
+            property bool wifiConnected: true
+            property bool wifiEnabled: true
+            property var networks: ({
+                "Home": { ssid: "Home", security: "WPA2", signal: 78,
+                    connected: true, existing: true },
+                "Neighbour 5G": { ssid: "Neighbour 5G", security: "WPA2",
+                    signal: 55, connected: false, existing: false }
+            })
+            property bool ethernetAvailable: false
+            property bool ethernetConnected: false
+            property string activeEthernetIf: ""
+            property string activeEthernetConnection: ""
+            property var wiredGroups: []
+            property var linkDetails: ({ device: "", type: "", connection: "",
+                ip4: "", gateway: "", dns: [] })
+            property bool scanningActive: false
+            property bool connecting: false
+            property string connectingTo: ""
+            property string disconnectingFrom: ""
+            property string lastError: ""
+            property string lastErrorSsid: ""
+            // Recorded calls. `passwordRequired` decides what needsPasswordFor()
+            // answers, and `credentialFailure` decides isCredentialFailure(), so
+            // one fake covers every branch without a second shape.
+            property var calls: []
+            property var passwordRequiredFor: "Neighbour 5G"
+            property bool credentialFailure: false
+
+            function record(name) {
+                var args = Array.prototype.slice.call(arguments, 1)
+                calls.push({ name: name, args: args })
+            }
+            function callCount(name) {
+                var total = 0
+                for (var i = 0; i < calls.length; i++)
+                    if (calls[i].name === name)
+                        total++
+                return total
+            }
+            // The FIRST call's argument at `index`. Deliberately not "the last":
+            // the newest call is what a reader expects, but a second call to the
+            // same method would then silently satisfy the assertion written for
+            // the first one.
+            function callArgs(name, index) {
+                for (var i = 0; i < calls.length; i++)
+                    if (calls[i].name === name)
+                        return index === undefined ? calls[i].args : calls[i].args[index]
+                return undefined
+            }
+
+            // The NEWEST call to one method, by index. Needed wherever a method is
+            // legitimately called twice and the second call is the one under
+            // test - a toggle pressed on and off again.
+            function lastCallArgs(name, index) {
+                for (var i = calls.length - 1; i >= 0; i--)
+                    if (calls[i].name === name)
+                        return calls[i].args[index]
+                return undefined
+            }
+
+            function setWifiMap(entries) {
+                var map = ({})
+                for (var i = 0; i < entries.length; i++)
+                    map[entries[i].ssid] = entries[i]
+                networks = map
+            }
+            function setWifiEnabled(enabled) {
+                wifiEnabled = enabled
+                record("setWifiEnabled", enabled)
+            }
+            function refreshForOpen() { record("refreshForOpen") }
+            function requestScan(rescan, clearError) { record("requestScan", rescan, clearError) }
+            function connect(ssid, password, isHidden, securityKey) {
+                connecting = true
+                connectingTo = ssid
+                record("connect", ssid, password, isHidden, securityKey)
+            }
+            function disconnect(ssid) { record("disconnect", ssid) }
+            function forget(ssid) { record("forget", ssid) }
+            function needsPasswordFor(ssid) { return ssid === passwordRequiredFor }
+            function isCredentialFailure(message) {
+                return credentialFailure && String(message || "").indexOf("password") >= 0
+            }
+            function isSecured(security) {
+                var word = String(security || "")
+                return word !== "" && word !== "--"
+            }
+        }
+    }
+
+    // A network fake that reports nothing at all: no scan map, no flags, no
+    // methods. The detail page must render an unavailable state rather than
+    // throw when the service is thinner than documented.
+    Component {
+        id: fakeBareNetworkComponent
+        QtObject {
+            property bool wifiConnected: false
+            property bool wifiEnabled: false
+        }
+    }
+
+    // The Bluetooth service contract a detail page is documented to read.
+    // `devices` is shaped as the real one hands over - a list object with
+    // `.values` - so the page's own read path is exercised, not a plain array
+    // that would quietly accept an adapter-shaped binding forever.
+    Component {
+        id: fakeBluetoothDetailComponent
+        QtObject {
+            property bool bluetoothAvailable: true
+            property bool enabled: true
+            property bool blocked: false
+            property bool scanningActive: false
+            property var devices: null
+            property var connectedDevices: []
+            property var calls: []
+
+            function deviceList(values) {
+                var list = ({ values: values })
+                devices = list
+                connectedDevices = []
+                for (var i = 0; i < values.length; i++) {
+                    if (values[i].connected)
+                        connectedDevices.push(values[i])
+                }
+            }
+            function record(name) {
+                var args = Array.prototype.slice.call(arguments, 1)
+                calls.push({ name: name, args: args })
+            }
+            function callCount(name) {
+                var total = 0
+                for (var i = 0; i < calls.length; i++)
+                    if (calls[i].name === name)
+                        total++
+                return total
+            }
+            function callArg(name, index) {
+                for (var i = 0; i < calls.length; i++)
+                    if (calls[i].name === name)
+                        return calls[i].args[index]
+                return undefined
+            }
+
+            function setBluetoothEnabled(state) {
+                enabled = state
+                record("setBluetoothEnabled", state)
+            }
+            function startScan() { scanningActive = true; record("startScan") }
+            function pairDevice(device) { record("pairDevice", device) }
+            function connectDeviceWithTrust(device) { record("connectDeviceWithTrust", device) }
+            function disconnectDevice(device) { record("disconnectDevice", device) }
+            function forgetDevice(device) { record("forgetDevice", device) }
+            function canPair(device) {
+                return !device.connected && !device.paired && !device.trusted
+            }
+            function canConnect(device) {
+                return !device.connected && (device.paired || device.trusted)
+            }
+            function canDisconnect(device) { return device.connected === true }
+            function isDeviceBusy(device) { return device.pairing === true }
+            function getDeviceIcon(device) {
+                return String(device.name || "").indexOf("Speaker") >= 0
+                    ? "audio-card" : "bluetooth"
+            }
+            function getSignalPercent(device) {
+                return device.signalStrength == null ? null : device.signalStrength
+            }
+            function deviceKey(device) {
+                return device.address || device.name || device.path || ""
+            }
+        }
+    }
+
+    // A Bluetooth fake with no adapter at all, which is the real
+    // `bluetoothAvailable: false` production state.
+    Component {
+        id: fakeNoAdapterComponent
+        QtObject {
+            property bool bluetoothAvailable: false
+            property bool enabled: false
+            property bool blocked: false
+            property bool scanningActive: false
+            property var devices: null
+            property var connectedDevices: []
         }
     }
 
@@ -368,6 +574,94 @@ Item {
             var fake = component.createObject(root.testHost, args)
             registerFake(fake)
             return fake
+        }
+
+        // A detail page with its own injected service, sized like the route
+        // viewport the host would give it. Separate builders from makePage
+        // because these are sub-pages, not the route page: they are mounted
+        // INSIDE the overview rather than by the wave host's Loader.
+        function makeNetworkPage(properties) {
+            var args = { x: 0, y: 0, width: 1024, height: 720 }
+            for (var key in (properties || {}))
+                args[key] = properties[key]
+            return networkPageComponent.createObject(root.testHost, args)
+        }
+
+        function makeBluetoothPage(properties) {
+            var args = { x: 0, y: 0, width: 1024, height: 720 }
+            for (var key in (properties || {}))
+                args[key] = properties[key]
+            return bluetoothPageComponent.createObject(root.testHost, args)
+        }
+
+        // Seed the network detail fake's scan map, in the real service's shape.
+        function seededNetworkDetail(fake, entries) {
+            var list = []
+            for (var i = 0; i < entries.length; i++) {
+                list.push({
+                    ssid: entries[i].ssid,
+                    security: entries[i].security == null ? "WPA2" : entries[i].security,
+                    signal: entries[i].signal == null ? 70 : entries[i].signal,
+                    connected: entries[i].connected === true,
+                    existing: entries[i].existing !== false
+                })
+            }
+            fake.setWifiMap(list)
+            return fake
+        }
+
+        // Seed the Bluetooth fake with plain device records. Passed as an
+        // argument rather than as a createObject property because a list object
+        // has to be REPLACED to invalidate a binding, and a literal would be
+        // copied element-wise - the same trap the volume sink hits.
+        function seededBluetooth(fake, devices) {
+            fake.deviceList(devices)
+            return fake
+        }
+
+        // A row by its stable key, addressed through the PAGE's own accessor rather
+        // than by sweeping a list's `children`.
+        //
+        // The sweep cannot work here, and the reason is worth stating: the list
+        // is a Flickable, and a Flickable re-parents its declarative children
+        // into its own contentItem - so the row Column is not a child of the
+        // list at all, and a walk of `list.children` finds no rows. The page
+        // resolving its own rows is also the contract its activation path uses,
+        // so a test and a tap always act on the same record.
+        function wifiRow(page, ssid) { return page.wifiRowItem(ssid) }
+
+        function bluetoothRow(page, key) { return page.deviceRowItem(key) }
+
+        // Every row of a page's list, in order, ignoring the Repeater's
+        // role-less placeholder. Reads the page's own row seam rather than the
+        // list's children, for the re-parenting reason above.
+        function wifiRows(page) {
+            var kept = []
+            // contentItem -> the row Column -> the delegates: two hops, because
+            // the Flickable owns the first re-parenting and the Column owns the
+            // Repeater's.
+            var all = page.listItem.contentItem.children
+            for (var i = 0; i < all.length; i++) {
+                var kids = all[i].children
+                for (var j = 0; j < kids.length; j++) {
+                    if (kids[j].rowKey !== undefined)
+                        kept.push(kids[j])
+                }
+            }
+            return kept
+        }
+
+        // Every row in a list, in order, ignoring the Repeater's placeholder.
+        function rowsOf(list) {
+            var kept = []
+            if (!list)
+                return kept
+            var kids = list.children
+            for (var i = 0; i < kids.length; i++) {
+                if (kids[i].rowKey !== undefined)
+                    kept.push(kids[i])
+            }
+            return kept
         }
 
         // Fakes live in the per-test host's own list, so destroying the host
@@ -1047,6 +1341,16 @@ Item {
             return ""
         }
 
+        // A file's code with its // and /* */ comments removed, for source assertions
+        // that must survive documentation. Both pages say out loud that they do
+        // not shell out to anything, and a check over the raw text would flag
+        // the very sentence documenting the rule it enforces.
+        function stripComments(text) {
+            return String(text)
+                .replace(/\/\*[\s\S]*?\*\//g, " ")
+                .replace(/\/\/[^\n]*/g, " ")
+        }
+
         // The month grid must render the bar module's math, not a second copy of
         // it. No runtime assertion can see a forked helper - a private
         // daysInMonth() would satisfy every behavioural check above while
@@ -1225,6 +1529,8 @@ Item {
             verify(bottomIn(busy.entryItem(1), busy) <= topIn(busy.viewAllItem, busy) + 0.5,
                 "a nine-entry history overlaps its own action row")
         }
+
+        // The summary reads a bounded prefix of the history through the
         // historyList loop, deduplicating the overlap between the two. No
         // unbounded walk of the history is allowed.
         function test_theSummaryPrefersTheLatestEntryAndDeduplicatesTheHistory() {
@@ -1385,8 +1691,16 @@ Item {
             compare(networkRequests, 2, "a host may call the request directly on a ready card")
             compare(bluetoothRequests, 2)
 
+            // Back to the overview before clicking: a card under a mounted
+            // detail page is not what the user is looking at, so a synthetic
+            // click there would prove nothing about the card.
+            compare(page.handleBack(), true)
+            tryVerify(function() { return page.activeSubPage === "" }, 1000)
+
             mouseClick(page.networkCard, page.networkCard.width / 2, page.networkCard.height / 2)
             tryVerify(function() { return networkRequests === 3 }, 800)
+            compare(page.handleBack(), true)
+            tryVerify(function() { return page.activeSubPage === "" }, 1000)
             mouseClick(page.bluetoothCard, page.bluetoothCard.width / 2,
                        page.bluetoothCard.height / 2)
             tryVerify(function() { return bluetoothRequests === 3 }, 800)
@@ -2197,6 +2511,885 @@ Item {
             verify(file.text.indexOf("CcLogic.minimumTwoColumnWidth") >= 0,
                 "the breakpoint value must be the module's own constant")
             verify(file.text.indexOf("CcLogic.weatherState") >= 0)
+        }
+
+        // --- Detail pages: the same-surface contract ---
+        //
+        // The routing shape first, because it is the part a detail page's own
+        // behaviour cannot prove. Both pages are tested standalone below; this
+        // section is about the overview mounting them INSIDE itself.
+
+        // The brief's own assertion, verbatim in shape: a card activation is a
+        // request, and the request reaches the same surface's sub-page stack.
+        function test_networkCardRequestsSameSurfaceDetail() {
+            var page = makePage({
+                networkService: makeFake(fakeNetworkComponent),
+                bluetoothService: makeFake(fakeBluetoothComponent)
+            })
+            // Counted from OUTSIDE the page, through the emitted signal, rather
+            // than from an internal flag: the assertion is about the request that
+            // leaves the card, not about a variable the page maintains itself.
+            var requests = 0
+            page.networkDetailsRequested.connect(function() { requests++ })
+            tryVerify(function() { return page.networkCard.width > 0 }, 1000)
+
+            page.networkCard.activate()
+            tryVerify(function() { return requests === 1 }, 1000)
+
+            // The request is answered in-surface: the same page now holds the
+            // detail page, and the route offers back because it has something to
+            // pop. Back needs a callable handler, not just a published flag.
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            compare(page.canGoBack, true,
+                "a page holding a sub-page offers back")
+            verify(typeof page.handleBack === "function",
+                "back needs a callable handler, not just a published flag")
+            compare(page.canGoBack === (typeof page.handleBack === "function"), true,
+                "both halves of the host's back contract, or neither")
+        }
+
+        function test_openingADetailPageMountsItInsideTheOverview() {
+            var page = makePage({
+                networkService: makeFake(fakeNetworkComponent),
+                bluetoothService: makeFake(fakeBluetoothComponent)
+            })
+            tryVerify(function() { return page.controlCardCount === 4 }, 1000)
+            compare(page.activeSubPage, "",
+                "the overview shows no sub-page to begin with")
+            compare(page.detailPageItem, null)
+            verify(page.overviewItem.visible,
+                "the overview is what is on screen before a request")
+
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            var detail = page.detailPageItem
+            verify(detail !== null, "the network detail page must be mounted")
+            compare(detail.objectName, "controlCenterNetworkDetail")
+            tryVerify(function() { return detail.width > 0 && detail.height > 0 }, 1000)
+            verify(!page.overviewItem.visible,
+                "the overview yields the viewport while a detail page is up")
+            verify(page.visible, "the route page itself is still alive")
+
+            page.openBluetoothDetails()
+            tryVerify(function() { return page.activeSubPage === "bluetooth-detail" }, 1000)
+            compare(page.detailPageItem.objectName, "controlCenterBluetoothDetail")
+        }
+
+        // Focus follows the mounted page. While a sub-page is up, a keystroke meant for
+        // its controls must not be eaten by a card under an invisible overview -
+        // and the hand-off has to be DEFERRED, because a Loader builds its item
+        // asynchronously: reading `detailPageItem` in the same turn as the route
+        // change reads null, and focusing the outgoing page would put the caret
+        // in an invisible one.
+        function test_focusFollowsTheMountedSubPage() {
+            var page = makePage({
+                networkService: makeFake(fakeNetworkDetailComponent),
+                bluetoothService: makeFake(fakeBluetoothDetailComponent)
+            })
+            tryVerify(function() { return page.controlCardCount === 4 }, 1000)
+
+            page.focusDefault()
+            tryVerify(function() { return page.activeFocus === true }, 1000)
+            var overviewFocused = page.focusDefaultCount
+
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            var detail = page.detailPageItem
+            verify(detail !== null, "the network detail page must be mounted")
+
+            // A later press lands on the sub-page, not the overview. The counter
+            // is a CALL count, so it still increments - what must not happen is
+            // the overview keeping focus, and that is what the two focus flags
+            // say: the sub-page holds it and the overview no longer does.
+            page.focusDefault()
+            tryVerify(function() { return detail.activeFocus === true }, 1000,
+                "focus must land on the mounted sub-page")
+            verify(page.activeFocus !== true,
+                "the overview must not keep focus behind a mounted sub-page")
+            verify(page.focusDefaultCount > overviewFocused,
+                "the press must have reached the route, not been dropped")
+
+            // And after a return, on the overview again - the same one press both
+            // ways, which is what a user would expect from one route.
+            verify(page.handleBack())
+            tryVerify(function() { return page.activeSubPage === "" }, 1000)
+            page.focusDefault()
+            tryVerify(function() { return page.activeFocus === true }, 1000,
+                "back on the overview, focus returns to it")
+        }
+
+        // The module owns the sub-page names, so no caller can invent a fourth
+        // destination and no detail page can be reached by a name the module
+        // does not declare.
+        function test_theSubPageNamesComeFromTheModule() {
+            var page = makePage({
+                networkService: makeFake(fakeNetworkComponent),
+                bluetoothService: makeFake(fakeBluetoothComponent)
+            })
+            tryVerify(function() { return page.controlCardCount === 4 }, 1000)
+
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            compare(page.activeSubPage, CcLogic.detailRoutes.network)
+
+            page.openBluetoothDetails()
+            tryVerify(function() { return page.activeSubPage === "bluetooth-detail" }, 1000)
+            compare(page.activeSubPage, CcLogic.detailRoutes.bluetooth)
+
+            // An unknown name mounts nothing and REFUSES, so a caller cannot
+            // replace a mounted page with an empty viewport by typo. Refusing is
+            // also strictly better than clearing: a rejected request leaves what
+            // was on screen alone, which is what the user was looking at.
+            compare(page.requestSubPage("settings-center"), false,
+                "a name the module does not declare is refused")
+            compare(page.activeSubPage, "bluetooth-detail",
+                "a refused request leaves the mounted page alone")
+            compare(page.requestSubPage(""), false)
+            compare(page.requestSubPage(undefined), false)
+            compare(page.requestSubPage(CcLogic.detailRoutes.volume), false,
+                "volume has no detail route, so it has no sub-page either")
+
+            // ...and the module's own helper agrees with what the page accepts,
+            // so the two cannot drift into accepting different sets.
+            compare(CcLogic.isDetailRoute(page.activeSubPage), true)
+            compare(CcLogic.isDetailRoute("settings-center"), false)
+            compare(CcLogic.isDetailRoute(CcLogic.detailRoutes.network), true)
+            compare(CcLogic.isDetailRoute(CcLogic.detailRoutes.bluetooth), true)
+        }
+
+        // Back restores the retained overview, and the refresh lands ONE event
+        // loop turn later - not in the same turn that hid the sub-page.
+        //
+        // Same-turn is the bug this guards: `refreshForOpen()` throttles itself
+        // and re-reads the device table, and doing that while the overview's own
+        // cards are still bound to the pre-return state made the summary lag a
+        // whole frame behind the operation that caused it.
+        function test_backRestoresTheOverviewThenRefreshesOneTurnLater() {
+            var network = makeFake(fakeNetworkDetailComponent)
+            var bluetooth = makeFake(fakeBluetoothDetailComponent)
+            var page = makePage({
+                networkService: network, bluetoothService: bluetooth
+            })
+            tryVerify(function() { return page.controlCardCount === 4 }, 1000)
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            compare(page.returnRefreshCount, 0,
+                "opening a sub-page reads what the service already has")
+
+            verify(page.handleBack(), "back must be consumed, not declined")
+            // Same turn: the overview is already back and the refresh has NOT
+            // happened. This is the whole point of the deferral.
+            compare(page.activeSubPage, "")
+            verify(page.overviewItem.visible)
+            compare(page.returnRefreshCount, 0,
+                "restoring the overview and refreshing it are different turns")
+        }
+
+        // The deferral itself, asserted as its own thing: same turn restores the
+        // overview, the NEXT turn refreshes it - exactly once per return.
+        function test_theDeferredRefreshRunsOnTheNextEventLoopTurn() {
+            var network = makeFake(fakeNetworkDetailComponent)
+            var page = makePage({ networkService: network })
+            tryVerify(function() { return page.controlCardCount === 4 }, 1000)
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            compare(network.callCount("refreshForOpen"), 0)
+
+            verify(page.handleBack())
+            compare(page.activeSubPage, "")
+            compare(page.returnRefreshCount, 0,
+                "the hook has not run yet, one turn after the pop")
+
+            tryCompare(page, "returnRefreshCount", 1, 1000)
+            // The hook reaches the service, and reaches it through its own
+            // method: the page must not re-read the adapter itself.
+            tryVerify(function() { return network.callCount("refreshForOpen") === 1 }, 1000)
+            compare(network.callCount("refreshForOpen"), 1)
+
+            // Exactly one refresh: the deferral must not become a loop.
+            compare(page.returnRefreshCount, 1)
+            wait(50)
+            compare(page.returnRefreshCount, 1, "one return, one refresh")
+
+            // A second back with nothing to pop must not refresh: the overview
+            // declines, and a decline is not a return.
+            compare(page.handleBack(), false)
+            wait(50)
+            compare(page.returnRefreshCount, 1,
+                "a declined press is not a return and refreshes nothing")
+        }
+
+        // The deferred refresh is the page's own hook, so the overview stays a
+        // report and the services stay the only owners of side effects.
+        function test_theReturnRefreshIsAHookTheOverviewExposes() {
+            var page = makePage({ networkService: makeFake(fakeNetworkDetailComponent) })
+            tryVerify(function() { return page.controlCardCount === 4 }, 1000)
+            verify(typeof page.refreshAfterReturn === "function",
+                "the return refresh must be a hook a test can drive")
+            compare(typeof page.refreshAfterReturn, "function")
+
+            // Driving it directly with no service at all must be a no-op, not a
+            // throw: the production page starts with every service null.
+            var bare = makePage({})
+            tryVerify(function() { return bare.controlCardCount === 4 }, 1000)
+            bare.refreshAfterReturn()
+        }
+
+        // A detail page must not be reachable as a top-level Wave route. That is
+        // the whole point of the same-surface ruling, and it is invisible from
+        // behaviour alone: a second route would open its own Loader item and
+        // still look correct to every test above.
+        function test_detailPagesAreNotTopLevelWaveRoutes() {
+            var routes = readRepoFile("modules/lazerbar/WaveSurfaceLogic.js")
+            compare(routes.status, 200, "the route registry must be readable")
+            verify(routes.text.indexOf('"network-detail"') < 0,
+                "a detail page must never be registered as a Wave route")
+            verify(routes.text.indexOf('"bluetooth-detail"') < 0,
+                "a detail page must never be registered as a Wave route")
+
+            var host = readRepoFile("modules/lazerbar/WaveSurfaceHost.qml")
+            compare(host.status, 200, "the host source must be readable")
+            verify(host.text.indexOf("ControlCenterNetwork") < 0
+                    && host.text.indexOf("ControlCenterBluetooth") < 0,
+                "the host must know nothing about any route's sub-pages")
+            verify(host.text.indexOf("PanelWindow") < 0,
+                "the host must not create a second window")
+        }
+
+        // The detail pages are content, not services: no window, no second
+        // service, no direct tool invocation. Asserted on the source because no
+        // runtime assertion can see a Process that is merely never triggered.
+        function test_theDetailPagesReuseTheServicesInsteadOfReimplementingThem() {
+            var files = ["modules/lazerbar/ControlCenterNetwork.qml",
+                "modules/lazerbar/ControlCenterBluetooth.qml"]
+            for (var i = 0; i < files.length; i++) {
+                var file = readRepoFile(files[i])
+                compare(file.status, 200, files[i] + " must be readable")
+                // Comments are stripped first, because both pages have to be able
+                // to SAY that they shell out to nothing: a check over the raw text
+                // would flag the sentence that documents the rule it enforces.
+                var code = stripComments(file.text)
+                verify(code.indexOf("PanelWindow") < 0,
+                    files[i] + " must not create a window")
+                verify(code.indexOf("PopupWindow") < 0,
+                    files[i] + " must not create an overlay")
+                verify(code.indexOf("nmcli") < 0,
+                    files[i] + " must not shell out to nmcli itself")
+                verify(code.indexOf("bluetoothctl") < 0,
+                    files[i] + " must not shell out to bluetoothctl itself")
+                verify(code.indexOf("Process") < 0,
+                    files[i] + " must not run its own process")
+                verify(code.indexOf("Quickshell") < 0,
+                    files[i] + " must not import Quickshell to reach a service")
+                verify(code.indexOf("../services") < 0,
+                    files[i] + " must not import a service directly")
+            }
+        }
+
+        // --- Network detail page ---
+
+        function test_theNetworkDetailPagePublishesTheBackContract() {
+            var page = makeNetworkPage({ networkService: makeFake(fakeNetworkDetailComponent) })
+            tryVerify(function() { return page.width > 0 }, 1000)
+            compare(page.objectName, "controlCenterNetworkDetail")
+            verify(page.title.length > 0)
+            verify(page.description.length > 0)
+            // A detail page is a sub-page by definition, so it always has
+            // something to pop - the overview is the thing it pops back to.
+            compare(page.canGoBack, true)
+
+            var backs = 0
+            page.backRequested.connect(function() { backs++ })
+            // Unlike the overview, this one takes the press: returning false
+            // would make the host close the whole surface instead.
+            verify(page.handleBack())
+            compare(backs, 1)
+            compare(page.canGoBack, true,
+                "the page stays a sub-page, so a second press is still a back")
+        }
+
+        function test_theNetworkDetailPageShowsTheWifiPowerAndWiredState() {
+            var fake = seededNetworkDetail(makeFake(fakeNetworkDetailComponent), [
+                { ssid: "Home", connected: true },
+                { ssid: "Neighbour 5G", connected: false }
+            ])
+            fake.ethernetAvailable = true
+            fake.ethernetConnected = true
+            fake.activeEthernetIf = "enp3s0"
+            fake.activeEthernetConnection = "Office LAN"
+            var page = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return page.listItem.width > 0 }, 1000)
+
+            compare(page.wifiEnabled, true)
+            compare(page.wifiToggleItem.checked, true)
+            compare(page.wifiRowCount, 2)
+            compare(page.connectedSsid, "Home",
+                "the connected name comes off the connected entry of the scan map")
+            verify(page.wiredStatusText.length > 0,
+                "a live wired link must report its own profile name")
+            verify(page.wiredStatusText.indexOf("Office LAN") >= 0)
+            compare(page.errorText, "", "no failure means no inline error")
+
+            // The row order is the radio's own priority: connected first, then
+            // by signal. "Home" is connected, so it leads regardless of signal.
+            var rows = wifiRows(page)
+            compare(rows.length, 2, "both reported networks must exist as rows")
+            compare(String(rows[0].rowKey), "Home",
+                "a connected network leads regardless of signal")
+        }
+
+        // The power toggle and the rescan are the page's only service calls, and
+        // construction must make none of them.
+        function test_theNetworkDetailPagePowerToggleCallsTheService() {
+            var fake = makeFake(fakeNetworkDetailComponent)
+            var page = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return page.wifiToggleItem.width > 0 }, 1000)
+            compare(fake.callCount("setWifiEnabled"), 0,
+                "construction must not touch radio power")
+
+            page.wifiToggleItem.activate()
+            tryCompare(fake, "wifiEnabled", false, 1000)
+            compare(fake.callArgs("setWifiEnabled", 0), false,
+                "the page asks the service for the state it wants, not the inverse")
+
+            // Pressed again, and the SECOND call is the one under test: the
+            // toggle has to ask for "on" now, not repeat "off".
+            page.wifiToggleItem.activate()
+            tryCompare(fake, "wifiEnabled", true, 1000)
+            compare(fake.lastCallArgs("setWifiEnabled", 0), true,
+                "the second press asks for power on, not a repeat of power off")
+            compare(fake.callCount("setWifiEnabled"), 2)
+        }
+
+        function test_theNetworkDetailPageRescanRequestsAFreshRead() {
+            var fake = makeFake(fakeNetworkDetailComponent)
+            var page = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return page.listItem.width > 0 }, 1000)
+            compare(fake.callCount("requestScan"), 0,
+                "construction must not scan")
+
+            page.rescan()
+            tryVerify(function() { return fake.callCount("requestScan") === 1 }, 1000)
+            compare(fake.callArgs("requestScan", 0), true,
+                "an explicit rescan asks for a fresh radio scan")
+        }
+
+        // Connect on an open network goes straight through, with no password
+        // step - the prompt is for secured networks only.
+        function test_connectingAnOpenNetworkCallsTheServiceDirectly() {
+            var fake = seededNetworkDetail(makeFake(fakeNetworkDetailComponent), [
+                { ssid: "Home", connected: false, security: "--", signal: 60 }
+            ])
+            fake.passwordRequiredFor = ""
+            var page = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return page.wifiRowCount === 1 }, 1000)
+            compare(page.passwordSsid, "",
+                "an open network must not raise a password prompt")
+
+            page.activateNetwork("Home")
+            tryVerify(function() { return fake.callCount("connect") === 1 }, 1000)
+            compare(fake.callArgs("connect", 0), "Home")
+            compare(fake.callArgs("connect", 1), "",
+                "an open network connects without a password")
+            compare(fake.callArgs("connect", 3), "--",
+                "the row's own security word rides along, so a profile is created right")
+        }
+
+        // The connected row disconnects rather than reconnects.
+        function test_tappingTheConnectedNetworkDisconnectsIt() {
+            var fake = seededNetworkDetail(makeFake(fakeNetworkDetailComponent), [
+                { ssid: "Home", connected: true, signal: 78 }
+            ])
+            var page = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return page.wifiRowCount === 1 }, 1000)
+
+            page.activateNetwork("Home")
+            tryVerify(function() { return fake.callCount("disconnect") === 1 }, 1000)
+            compare(fake.callArgs("disconnect", 0), "Home")
+            compare(fake.callCount("connect"), 0,
+                "the connected row must not also try to connect")
+        }
+
+        // A secured network collects its password first, and the field owns
+        // focus only while it is open. Focus is the part that matters: a field
+        // that keeps focus after the prompt closes swallows the next keystroke
+        // into a password nobody is looking at.
+        function test_aSecuredNetworkPromptsForAPasswordBeforeConnecting() {
+            var fake = seededNetworkDetail(makeFake(fakeNetworkDetailComponent), [
+                { ssid: "Home", connected: false, security: "WPA2", signal: 60 }
+            ])
+            fake.passwordRequiredFor = "Home"
+            var page = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return page.wifiRowCount === 1 }, 1000)
+            compare(fake.callCount("connect"), 0)
+
+            page.activateNetwork("Home")
+            tryVerify(function() { return page.passwordSsid === "Home" }, 1000)
+            compare(fake.callCount("connect"), 0,
+                "the prompt must gate the connect, not follow it")
+            tryVerify(function() { return page.passwordItem.visible }, 1000)
+            tryVerify(function() { return page.passwordItem.activeFocus }, 1000,
+                "an open prompt takes focus so the user can just type")
+
+            page.password = "hunter2"
+            page.submitPassword()
+            tryVerify(function() { return fake.callCount("connect") === 1 }, 1000)
+            compare(fake.callArgs("connect", 0), "Home")
+            compare(fake.callArgs("connect", 1), "hunter2",
+                "the typed password reaches the service")
+            tryVerify(function() { return page.passwordSsid === "" }, 1000)
+            compare(page.passwordItem.activeFocus, false,
+                "a closed prompt must give focus back")
+        }
+
+        function test_cancellingThePasswordPromptReleasesFocusAndConnectsNothing() {
+            var fake = seededNetworkDetail(makeFake(fakeNetworkDetailComponent), [
+                { ssid: "Home", connected: false, security: "WPA2" }
+            ])
+            fake.passwordRequiredFor = "Home"
+            var page = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return page.wifiRowCount === 1 }, 1000)
+            page.activateNetwork("Home")
+            tryVerify(function() { return page.passwordSsid === "Home" }, 1000)
+
+            page.password = "hunter2"
+            page.cancelPassword()
+            tryVerify(function() { return page.passwordSsid === "" }, 1000)
+            compare(page.password, "", "a cancelled secret must not linger in the page")
+            compare(page.passwordItem.activeFocus, false)
+            compare(fake.callCount("connect"), 0,
+                "cancelling changes no network state")
+        }
+
+        // A rejected secret is the recovery path, not a dead end: the service's
+        // own credential classification decides whether the row asks again.
+        function test_aCredentialFailureIsShownInlineAndKeepsThePasswordPathOpen() {
+            var fake = seededNetworkDetail(makeFake(fakeNetworkDetailComponent), [
+                { ssid: "Home", connected: false, security: "WPA2", existing: true }
+            ])
+            fake.lastError = "Incorrect password"
+            fake.lastErrorSsid = "Home"
+            fake.credentialFailure = true
+            var page = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return page.wifiRowCount === 1 }, 1000)
+
+            compare(page.errorText, "Incorrect password",
+                "the service's own classified words, unedited")
+            compare(page.errorIsCredential, true)
+            verify(page.errorForSsid === "Home",
+                "the error has to name the row it belongs to")
+
+            // ...and asking again still opens the prompt instead of failing
+            // silently against the rejected profile.
+            fake.passwordRequiredFor = "Home"
+            page.activateNetwork("Home")
+            tryVerify(function() { return page.passwordSsid === "Home" }, 1000)
+        }
+
+        // A non-credential failure is reported and offers no recovery that would
+        // not work.
+        function test_aNonCredentialFailureIsShownWithoutAPasswordPrompt() {
+            var fake = seededNetworkDetail(makeFake(fakeNetworkDetailComponent), [
+                { ssid: "Home", connected: false, security: "WPA2" }
+            ])
+            fake.lastError = "Connection timeout"
+            fake.lastErrorSsid = "Home"
+            fake.credentialFailure = false
+            var page = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return page.wifiRowCount === 1 }, 1000)
+
+            compare(page.errorText, "Connection timeout")
+            compare(page.errorIsCredential, false,
+                "a timeout is not a credential problem and must not ask for a password")
+        }
+
+        // An in-flight attempt marks its own row, so the user can see which
+        // network the shell is working on.
+        function test_anInFlightAttemptMarksItsRow() {
+            var fake = seededNetworkDetail(makeFake(fakeNetworkDetailComponent), [
+                { ssid: "Home", connected: false, security: "--" },
+                { ssid: "Neighbour 5G", connected: false, security: "--" }
+            ])
+            fake.passwordRequiredFor = ""
+            var page = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return page.wifiRowCount === 2 }, 1000)
+            compare(page.busySsid, "")
+
+            fake.connecting = true
+            fake.connectingTo = "Neighbour 5G"
+            tryVerify(function() { return page.busySsid === "Neighbour 5G" }, 1000)
+            var busy = wifiRow(page, "Neighbour 5G")
+            verify(busy !== null, "the busy row must be addressable by its own name")
+            verify(busy.busy, "the in-flight row is marked busy")
+            var idle = wifiRow(page, "Home")
+            verify(idle !== null && !idle.busy,
+                "an unrelated row must not be marked busy too")
+        }
+
+        // A service thinner than documented is the production null case, and it
+        // renders a state rather than throwing.
+        function test_theNetworkDetailPageSurvivesAThinService() {
+            var page = makeNetworkPage({ networkService: makeFake(fakeBareNetworkComponent) })
+            tryVerify(function() { return page.width > 0 }, 1000)
+            compare(page.errorText, "")
+            compare(page.wifiRowCount, 0)
+            verify(page.stateLabel.length > 0, "an absent radio must still say so")
+            verify(page.listItem.width > 0, "the page must still lay out")
+
+            // Every action is a guarded call, so a bare service cannot throw.
+            page.rescan()
+            page.setWifiEnabled(true)
+            page.activateNetwork("anything")
+            page.cancelPassword()
+            page.submitPassword()
+
+            // No service at all is the state the production page starts in.
+            var none = makeNetworkPage({})
+            tryVerify(function() { return none.width > 0 }, 1000)
+            none.rescan()
+            none.setWifiEnabled(false)
+            verify(none.stateLabel.length > 0)
+        }
+
+        // The visible list is bounded: a dense band scrolls inside the page
+        // instead of stretching the wave surface.
+        function test_theNetworkListIsABoundedScrollableArea() {
+            var entries = []
+            for (var i = 0; i < 40; i++)
+                entries.push({ ssid: "Net " + i, security: "WPA2",
+                    signal: 40 + i, connected: false })
+            var fake = seededNetworkDetail(makeFake(fakeNetworkDetailComponent), entries)
+            var page = makeNetworkPage({ networkService: fake, height: 480 })
+            tryVerify(function() { return page.wifiRowCount === 40 }, 2000)
+            tryVerify(function() { return page.listItem.height > 0 }, 1000)
+
+            // Every reported network is reachable by row key, not just the first
+            // few: the bound is on the VIEWPORT, never on the data.
+            var last = wifiRow(page, "Net 39")
+            verify(last !== null, "the 40th network must exist as a row target")
+            compare(page.listItem.flickableDirection, Flickable.VerticalFlick)
+            verify(page.listItem.contentHeight > page.listItem.height,
+                "an overlong list must actually scroll")
+            verify(page.listItem.height <= page.height,
+                "the list may not grow past the page it lives in")
+            verify(page.listItem.interactive, "an overlong list takes the wheel")
+        }
+
+        // A short list does not swallow the wheel, and nothing scrolls sideways.
+        function test_aShortNetworkListDoesNotScroll() {
+            var fake = seededNetworkDetail(makeFake(fakeNetworkDetailComponent), [
+                { ssid: "Home", connected: true },
+                { ssid: "Neighbour 5G", connected: false }
+            ])
+            var page = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return page.wifiRowCount === 2 }, 1000)
+            tryVerify(function() { return page.listItem.height > 0 }, 1000)
+
+            compare(page.listItem.contentHeight <= page.listItem.height, true,
+                "a list that already fits has nothing to scroll")
+            compare(page.listItem.interactive, false,
+                "a list that fits must leave the wheel to the page")
+            compare(page.listItem.flickableDirection, Flickable.VerticalFlick,
+                "the detail list never scrolls sideways")
+            compare(page.listItem.contentWidth, page.listItem.width,
+                "horizontal content is pinned to the viewport")
+        }
+
+        // --- Bluetooth detail page ---
+
+        function test_theBluetoothDetailPagePublishesTheBackContract() {
+            var page = makeBluetoothPage({
+                bluetoothService: seededBluetooth(makeFake(fakeBluetoothDetailComponent), []) })
+            tryVerify(function() { return page.width > 0 }, 1000)
+            compare(page.objectName, "controlCenterBluetoothDetail")
+            verify(page.title.length > 0)
+            verify(page.description.length > 0)
+            compare(page.canGoBack, true)
+
+            var backs = 0
+            page.backRequested.connect(function() { backs++ })
+            verify(page.handleBack())
+            compare(backs, 1)
+        }
+
+        function test_theBluetoothDetailPageShowsEveryAdapterStateInline() {
+            var states = [
+                { name: "no adapter", service: { bluetoothAvailable: false } },
+                { name: "blocked", service: { blocked: true } },
+                { name: "off", service: { enabled: false } },
+                { name: "scanning", service: { scanningActive: true } },
+                { name: "on", service: { enabled: true } }
+            ]
+            // Stated as the five words the page itself computes, so this asserts
+            // the module's precedence rather than five hand-typed phrases: a
+            // blocked radio outranks "off", and no adapter outranks both.
+            var expected = ["unavailable", "blocked", "off", "loading", "ready"]
+            for (var i = 0; i < states.length; i++) {
+                var fake = makeFake(fakeBluetoothDetailComponent, states[i].service)
+                seededBluetooth(fake, i === 0 ? [] : [
+                    { name: "Studio Speaker", address: "AA:BB:00:00:00:01",
+                      connected: true, paired: true, signalStrength: 80 }])
+                var page = makeBluetoothPage({ bluetoothService: fake })
+                tryVerify(function() { return page.width > 0 }, 1000)
+                compare(page.state, expected[i],
+                    "adapter state '" + states[i].name + "' must resolve to its own word")
+                verify(page.stateLabel.length > 0,
+                    "state '" + states[i].name + "' must render a readable label")
+                verify(page.visible, "state '" + states[i].name + "' keeps the page")
+                verify(page.deviceListViewportItem.height > 0,
+                    "state '" + states[i].name + "' keeps the list's shape")
+            }
+
+            // No service at all is the production start state and reports itself
+            // rather than throwing.
+            var none = makeBluetoothPage({})
+            tryVerify(function() { return none.width > 0 }, 1000)
+            compare(none.state, "unavailable")
+            verify(none.stateLabel.length > 0)
+        }
+
+        // An absent adapter is not a missing page: the power control has nothing
+        // to switch, so it must not offer to switch it.
+        function test_theBluetoothPowerToggleIsInertWithoutAnAdapter() {
+            var fake = makeFake(fakeNoAdapterComponent)
+            var page = makeBluetoothPage({ bluetoothService: fake })
+            tryVerify(function() { return page.powerToggleItem.width > 0 }, 1000)
+
+            compare(page.powerAvailable, false)
+            verify(!page.powerToggleItem.enabled,
+                "there is no adapter to power, so nothing may be offered")
+            compare(page.powerToggleItem.activeFocusOnTab, false)
+            compare(page.deviceCount, 0)
+        }
+
+        function test_theBluetoothPowerToggleAsksTheServiceToSwitchOff() {
+            var fake = makeFake(fakeBluetoothDetailComponent)
+            var page = makeBluetoothPage({ bluetoothService: fake })
+            tryVerify(function() { return page.powerToggleItem.width > 0 }, 1000)
+            compare(page.powerAvailable, true)
+            compare(fake.calls.length, 0, "construction must not touch adapter power")
+
+            page.powerToggleItem.activate()
+            tryCompare(fake, "enabled", false, 1000)
+            verify(fake.calls.length > 0 && fake.calls[0].name === "setBluetoothEnabled")
+            compare(fake.calls[0].args[0], false,
+                "the page asks for the state it wants, not the inverse")
+        }
+
+        function test_theBluetoothScanButtonStartsTheServiceScan() {
+            var fake = makeFake(fakeBluetoothDetailComponent)
+            var page = makeBluetoothPage({ bluetoothService: fake })
+            tryVerify(function() { return page.scanButtonItem.width > 0 }, 1000)
+            compare(fake.callCount("startScan"), 0, "construction must not scan")
+
+            page.scanButtonItem.activate()
+            tryVerify(function() { return fake.callCount("startScan") === 1 }, 1000)
+        }
+
+        // Every device action routes to the service method that owns it. One
+        // table, four cases, because these four are exactly the states a device
+        // can be in and a mixed-up dispatch is invisible until it does damage.
+        function test_everyDeviceActionRoutesToItsOwnServiceMethod() {
+            var unpaired = { name: "New Speaker", address: "AA:BB:00:00:00:02",
+                connected: false, paired: false, trusted: false }
+            var paired = { name: "Studio Speaker", address: "AA:BB:00:00:00:01",
+                connected: false, paired: true, trusted: true }
+            var connected = { name: "Headphones", address: "AA:BB:00:00:00:03",
+                connected: true, paired: true, trusted: true }
+            var fake = seededBluetooth(makeFake(fakeBluetoothDetailComponent),
+                [unpaired, paired, connected])
+            var page = makeBluetoothPage({ bluetoothService: fake })
+            tryVerify(function() { return page.deviceCount === 3 }, 1000)
+
+            page.activateDevice("AA:BB:00:00:00:02")
+            tryVerify(function() { return fake.callCount("pairDevice") === 1 }, 1000)
+            compare(fake.callCount("connectDeviceWithTrust"), 0,
+                "an unpaired device is paired, never connected blind")
+
+            page.activateDevice("AA:BB:00:00:00:01")
+            tryVerify(function() { return fake.callCount("connectDeviceWithTrust") === 1 }, 1000)
+            compare(fake.callCount("pairDevice"), 1,
+                "a paired device connects; the earlier pair must not repeat")
+
+            page.activateDevice("AA:BB:00:00:00:03")
+            tryVerify(function() { return fake.callCount("disconnectDevice") === 1 }, 1000)
+            compare(fake.callCount("connectDeviceWithTrust"), 1,
+                "a connected device disconnects; it must not also reconnect")
+        }
+
+        function test_forgettingADeviceIsASeparateExplicitAction() {
+            var paired = { name: "Studio Speaker", address: "AA:BB:00:00:00:01",
+                connected: false, paired: true, trusted: true }
+            var fake = seededBluetooth(makeFake(fakeBluetoothDetailComponent), [paired])
+            var page = makeBluetoothPage({ bluetoothService: fake })
+            tryVerify(function() { return page.deviceCount === 1 }, 1000)
+
+            // Forget is not the primary row action: it is destructive, so it
+            // lives behind its own target and never rides the connect path.
+            page.forgetDevice("AA:BB:00:00:00:01")
+            tryVerify(function() { return fake.callCount("forgetDevice") === 1 }, 1000)
+            compare(fake.callCount("connectDeviceWithTrust"), 0,
+                "forgetting a device must not also connect it")
+
+            // And that target is offered at all. This assertion exists because the
+            // button's gate once came out `undefined` and left it permanently
+            // disabled, while every dispatch check above still passed - a
+            // destructive action that could not be reached.
+            var row = bluetoothRow(page, "AA:BB:00:00:00:01")
+            verify(row !== null)
+            compare(page.isForgetable(row.device), true,
+                "a live device may be forgotten")
+            verify(row.forgetButton.visible && row.forgetButton.width > 0,
+                "the Forget target must actually exist on the row")
+            compare(row.forgetButton.enabled, true,
+                "the Forget target must be enabled for a live device")
+            compare(row.forgetButton.opacity, 1,
+                "an enabled Forget target must not render in the disabled shape")
+        }
+
+        // A device mid-pairing offers nothing at all, so neither target does.
+        function test_aBusyDeviceOffersNeitherTarget() {
+            var fake = seededBluetooth(makeFake(fakeBluetoothDetailComponent), [
+                { name: "Studio Speaker", address: "AA:BB:00:00:00:01",
+                    connected: false, paired: true, trusted: true, pairing: true }])
+            var page = makeBluetoothPage({ bluetoothService: fake })
+            tryVerify(function() { return page.deviceCount === 1 }, 1000)
+
+            var row = bluetoothRow(page, "AA:BB:00:00:00:01")
+            verify(row !== null)
+            compare(page.isForgetable(row.device), false,
+                "nothing may be forgotten while the adapter is working on it")
+            compare(row.forgetButton.enabled, false,
+                "a mid-pairing device must not offer Forget")
+            verify(!row.deviceActionButton.enabled,
+                "nor the primary action, or a second call would race the first")
+        }
+
+        // A device row is addressed by the adapter's own stable key, never by
+        // its position: a scan that returns the same devices in a different
+        // order must not turn the action buttons around.
+        function test_deviceRowsAreAddressedByAStableKey() {
+            var first = { name: "Studio Speaker", address: "AA:BB:00:00:00:01",
+                connected: true, paired: true, signalStrength: 80 }
+            var second = { name: "Headphones", address: "AA:BB:00:00:00:03",
+                connected: false, paired: true, signalStrength: 40 }
+            var fake = seededBluetooth(makeFake(fakeBluetoothDetailComponent), [first, second])
+            var page = makeBluetoothPage({ bluetoothService: fake })
+            tryVerify(function() { return page.deviceCount === 2 }, 1000)
+
+            var row = bluetoothRow(page, "AA:BB:00:00:00:01")
+            verify(row !== null, "the connected device must be addressable by its address")
+            compare(String(row.rowKey), "AA:BB:00:00:00:01")
+            compare(row.rowLabel, "Studio Speaker")
+            verify(bluetoothRow(page, "nope") === null,
+                "an unknown key resolves to no row rather than to the first one")
+
+            // Reordering the adapter's list keeps every key pointing at the same
+            // device, which is the whole point of keying on the address.
+            seededBluetooth(fake, [second, first])
+            tryVerify(function() { return page.deviceCount === 2 }, 1000)
+            var swapped = bluetoothRow(page, "AA:BB:00:00:00:01")
+            verify(swapped !== null && swapped.rowLabel === "Studio Speaker",
+                "a reordering must not move an action onto another device")
+        }
+
+        function test_aBusyDeviceRefusesEveryAction() {
+            var busy = { name: "Studio Speaker", address: "AA:BB:00:00:00:01",
+                connected: false, paired: true, trusted: true, pairing: true }
+            var fake = seededBluetooth(makeFake(fakeBluetoothDetailComponent), [busy])
+            var page = makeBluetoothPage({ bluetoothService: fake })
+            tryVerify(function() { return page.deviceCount === 1 }, 1000)
+
+            var row = bluetoothRow(page, "AA:BB:00:00:00:01")
+            verify(row !== null)
+            verify(row.busy, "the service's own busy answer drives the row")
+            page.activateDevice("AA:BB:00:00:00:01")
+            page.forgetDevice("AA:BB:00:00:00:01")
+            compare(fake.calls.length, 0,
+                "a device mid-pairing accepts nothing; a second call would race the first")
+        }
+
+        function test_theBluetoothDetailPageRendersEveryDeviceState() {
+            var fake = seededBluetooth(makeFake(fakeBluetoothDetailComponent), [
+                { name: "Studio Speaker", address: "AA:BB:00:00:00:01",
+                    connected: true, paired: true, signalStrength: 80 },
+                { name: "Headphones", address: "AA:BB:00:00:00:03",
+                    connected: false, paired: true, signalStrength: null },
+                { name: "New Keyboard", address: "AA:BB:00:00:00:04",
+                    connected: false, paired: false }
+            ])
+            var page = makeBluetoothPage({ bluetoothService: fake })
+            tryVerify(function() { return page.deviceCount === 3 }, 1000)
+
+            var connected = bluetoothRow(page, "AA:BB:00:00:00:01")
+            var paired = bluetoothRow(page, "AA:BB:00:00:00:03")
+            var fresh = bluetoothRow(page, "AA:BB:00:00:00:04")
+            verify(connected !== null && paired !== null && fresh !== null)
+            verify(connected.connected, "a connected row says so")
+            verify(!paired.connected)
+            // An unknown signal strength renders as unknown, not as zero bars -
+            // "0%" on a device that never reported strength is a false reading.
+            compare(paired.signalPercent, -1)
+            compare(connected.signalPercent, 80)
+            verify(fresh.signalPercent === -1)
+            verify(connected.rowIcon.length > 0,
+                "the service's own icon mapping is used, not a local guess")
+        }
+
+        function test_theBluetoothDeviceListIsABoundedScrollableArea() {
+            var devices = []
+            for (var i = 0; i < 30; i++)
+                devices.push({ name: "Device " + i,
+                    address: "AA:BB:00:00:00:" + (10 + i),
+                    connected: false, paired: false })
+            var fake = seededBluetooth(makeFake(fakeBluetoothDetailComponent), devices)
+            var page = makeBluetoothPage({ bluetoothService: fake, height: 480 })
+            tryVerify(function() { return page.deviceCount === 30 }, 2000)
+            tryVerify(function() { return page.deviceListItem.height > 0 }, 1000)
+
+            verify(bluetoothRow(page, "AA:BB:00:00:00:39") !== null,
+                "the 30th device must exist as a row target")
+            compare(page.deviceListItem.flickableDirection, Flickable.VerticalFlick)
+            verify(page.deviceListItem.contentHeight > page.deviceListItem.height,
+                "an overlong device list must actually scroll")
+            verify(page.deviceListItem.height <= page.height,
+                "the list may not grow past the page it lives in")
+        }
+
+        function test_aShortBluetoothDeviceListDoesNotScroll() {
+            var fake = seededBluetooth(makeFake(fakeBluetoothDetailComponent), [
+                { name: "Studio Speaker", address: "AA:BB:00:00:00:01",
+                    connected: true, paired: true, signalStrength: 80 }])
+            var page = makeBluetoothPage({ bluetoothService: fake })
+            tryVerify(function() { return page.deviceCount === 1 }, 1000)
+            tryVerify(function() { return page.deviceListItem.height > 0 }, 1000)
+
+            compare(page.deviceListItem.contentHeight <= page.deviceListItem.height, true)
+            compare(page.deviceListItem.interactive, false)
+            compare(page.deviceListItem.flickableDirection, Flickable.VerticalFlick)
+        }
+
+        // No adapter, no scan, no devices: the real production state of a
+        // machine with no Bluetooth hardware, which must not throw.
+        function test_theBluetoothDetailPageSurvivesAnAbsentAdapter() {
+            var page = makeBluetoothPage({ bluetoothService: makeFake(fakeNoAdapterComponent) })
+            tryVerify(function() { return page.width > 0 }, 1000)
+            compare(page.deviceCount, 0)
+            compare(page.powerAvailable, false)
+            verify(page.stateLabel.length > 0)
+            verify(page.visible, "an absent adapter keeps the page legible")
+
+            // Every action is guarded, so a bare service cannot throw.
+            page.scan()
+            page.setBluetoothEnabled(true)
+            page.activateDevice("anything")
+            page.forgetDevice("anything")
+
+            // No service at all is what the production page starts with.
+            var none = makeBluetoothPage({})
+            tryVerify(function() { return none.width > 0 }, 1000)
+            none.scan()
+            verify(none.stateLabel.length > 0)
         }
     }
 }

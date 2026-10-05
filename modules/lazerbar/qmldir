@@ -58,6 +58,8 @@ FullscreenHeader 1.0 FullscreenHeader.qml
 FullscreenSidebar 1.0 FullscreenSidebar.qml
 LauncherPage 1.0 LauncherPage.qml
 ControlCenter 1.0 ControlCenter.qml
+ControlCenterNetwork 1.0 ControlCenterNetwork.qml
+ControlCenterBluetooth 1.0 ControlCenterBluetooth.qml
 ControlCenterCard 1.0 ControlCenterCard.qml
 ControlCenterCalendar 1.0 ControlCenterCalendar.qml
 ControlCenterNotifications 1.0 ControlCenterNotifications.qml

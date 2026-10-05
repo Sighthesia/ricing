@@ -83,6 +83,12 @@ Item {
         // they belong to this guard even before the wiring task passes the
         // singletons in.
         "modules/lazerbar/ControlCenter.qml",
+        // The two same-surface sub-pages the overview mounts inside its own
+        // viewport. They are built the moment a detail request arrives, so a
+        // compile error here would blank the page rather than merely fail a
+        // test.
+        "modules/lazerbar/ControlCenterNetwork.qml",
+        "modules/lazerbar/ControlCenterBluetooth.qml",
         "modules/lazerbar/ControlCenterCard.qml",
         "modules/lazerbar/ControlCenterCalendar.qml",
         "modules/lazerbar/ControlCenterNotifications.qml",
