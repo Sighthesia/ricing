@@ -18,6 +18,7 @@ Item {
     }
 
     SignalSpy { id: modeSpy; target: page; signalName: "modeChangeRequested" }
+    SignalSpy { id: controlCenterSpy; target: page; signalName: "controlCenterRequested" }
 
     // Standalone result-row probe for thumbnail failure behavior.
     Component {
@@ -106,6 +107,7 @@ Item {
         function init() {
             Lazer.MotionTokens.reducedMotionOverride = false
             modeSpy.clear()
+            controlCenterSpy.clear()
             resetSession()
             // Park focus away from the page so focus-on-open assertions start clean.
             testRoot.forceActiveFocus()
@@ -117,11 +119,15 @@ Item {
 
         // --- header and sidebar data provided to the wave shell ---
 
-        function test_providesTitleDescriptionAndThreeSidebarEntries() {
+        function test_providesTitleDescriptionAndTheThreeModeEntriesInOrder() {
             compare(page.title, "Launcher")
             verify(page.description.length > 0)
 
-            compare(page.sidebarEntries.length, 3)
+            // The three primaries keep their order and labels; the rail's footer
+            // action is asserted separately, because it is a different KIND of
+            // entry and folding it in here would hide the split this test exists
+            // to protect.
+            compare(page.sidebarEntries.length, 4)
             compare(page.sidebarEntries[0].id, "apps")
             compare(page.sidebarEntries[0].label, "Apps")
             compare(page.sidebarEntries[1].id, "clipboard")
@@ -229,6 +235,79 @@ Item {
             compare(svc().mode, "apps")
             compare(modeSpy.count, 3)
             tryVerify(function() { return page.searchField.activeFocus }, 300)
+        }
+
+        // --- the rail's two kinds of entry ---
+
+        // The rail now carries a footer action alongside the three mode filters.
+        // The load-bearing behaviour is the SPLIT, not the new item: a footer id
+        // must not be answerable as a query mode, because handleModeSelected
+        // would otherwise build a prefix for a data source that does not exist and
+        // the page would report a mode change for a route switch.
+        function test_theRailSeparatesItsFooterActionFromTheModeFilters() {
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+
+            var footerId = ""
+            var footerMarked = false
+            var primaryIds = []
+            for (var i = 0; i < page.sidebarEntries.length; i++) {
+                var entry = page.sidebarEntries[i]
+                if (String(entry.section || "") === "footer") {
+                    footerId = String(entry.id)
+                    footerMarked = true
+                } else {
+                    primaryIds.push(String(entry.id))
+                }
+            }
+
+            verify(footerMarked, "the rail must declare exactly one footer action")
+            compare(footerId, "control-center")
+            compare(primaryIds, ["apps", "clipboard", "shortcuts"])
+
+            // A footer id is not a mode, so the query-prefix path rejects it.
+            verify(!page.isKnownMode(footerId),
+                   "a footer action must not be answerable as a query mode")
+        }
+
+        // Selecting the footer action asks for the route; it must not rewrite the
+        // query, steal search focus, or emit a mode change.
+        function test_selectingTheFooterActionAsksForTheControlCenterRoute() {
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+            tryVerify(function() { return page.searchField.activeFocus }, 300)
+
+            page.handleSidebarSelected("control-center")
+
+            compare(controlCenterSpy.count, 1)
+            compare(modeSpy.count, 0)
+            compare(svc().query, "")
+            compare(svc().mode, "apps")
+            verify(page.searchField.activeFocus,
+                   "a route switch must not take the search field's focus with it")
+        }
+
+        // The other three ids must keep working through the same entry point -
+        // the split is a dispatch, not a second list.
+        function test_theModeFiltersStillAnswerThroughTheRailEntryPoint() {
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+
+            page.handleSidebarSelected("clipboard")
+
+            compare(svc().query, ">clip ")
+            compare(svc().mode, "clipboard")
+            compare(modeSpy.count, 1)
+            compare(modeSpy.signalArguments[0][0], "clipboard")
+            compare(controlCenterSpy.count, 0)
+        }
+
+        // An unknown id stays inert rather than falling into a mode rewrite.
+        function test_anUnknownRailIdChangesNothing() {
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+
+            page.handleSidebarSelected("not-a-mode")
+
+            compare(modeSpy.count, 0)
+            compare(controlCenterSpy.count, 0)
+            compare(svc().query, "")
         }
 
         // --- result presentation and selection ---

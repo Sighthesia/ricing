@@ -164,6 +164,22 @@ Item {
         requestRoute(root.defaultRoute, root.coordinator ? root.coordinator.opener : null)
     }
 
+    // The launcher's rail entry for the control center. This is the SAME open
+    // continuing on the SAME surface, not a new open intent, so it must not
+    // replace the opener record - exactly the rule `returnToDefaultRoute`
+    // follows. The record is read back off the coordinator, where the focus
+    // hand-off was settled: passing the same Item changes nothing, and an open
+    // that never had one still passes null, so a rail switch never invents an
+    // opener either.
+    //
+    // Going through `requestRoute` rather than reaching for the host is what
+    // keeps the switch inside the one funnel: it settles to `reopen-host`
+    // because this surface is already open, so the route changes on the live
+    // host with no coordinator round trip and no second window.
+    function requestControlCenterFromLauncher() {
+        requestRoute("control-center", root.coordinator ? root.coordinator.opener : null)
+    }
+
     // Every activation funnels through one route-parameterised path: bar entry,
     // IPC open, or a session-visible flip. The opener Item is recorded so focus
     // returns to it once the surface closes.
@@ -362,6 +378,10 @@ Item {
             prewarmSlots: root.startupPrewarmAllowed === true
             thumbnailsActive: waveHost.phase === "open"
             onExitFlingRequested: spec => root.spawnExitCard(spec)
+            // The rail's footer action. The page owns what the id MEANS; the
+            // surface owns what it DOES, because only this surface can switch
+            // its own route.
+            onControlCenterRequested: root.requestControlCenterFromLauncher()
         }
     }
 

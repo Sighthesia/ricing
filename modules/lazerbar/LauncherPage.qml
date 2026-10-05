@@ -62,10 +62,18 @@ Item {
     // Data surfaced to the wave shell header and sidebar.
     readonly property string title: "Launcher"
     readonly property string description: root.modeDescription(activeMode)
+    // The rail carries two kinds of entry. The three primaries are FILTERS of
+    // this page: they rewrite the query and change what the list shows. The
+    // footer entry is not a filter - it leaves the rail's own section and
+    // switches this surface to the control-center route, which is why it is
+    // marked `section: "footer"` and answered by a different handler below.
+    // Declaring them in one list is deliberate: they share one rail and one
+    // accent indicator, and the hairline is what tells them apart.
     readonly property var sidebarEntries: [
         { id: "apps", label: "Apps", icon: "icons/apps.svg" },
         { id: "clipboard", label: "Clipboard", icon: "icons/clipboard.svg" },
-        { id: "shortcuts", label: "Shortcuts", icon: "icons/keyboard.svg" }
+        { id: "shortcuts", label: "Shortcuts", icon: "icons/keyboard.svg" },
+        { id: "control-center", label: "Control Center", icon: "icons/control-center.svg", section: "footer" }
     ]
     readonly property string activeMode: root.session && root.session.mode != null ? String(root.session.mode) : ""
 
@@ -100,6 +108,11 @@ Item {
 
     // Emitted when a sidebar-driven mode change is applied to the session.
     signal modeChangeRequested(string mode)
+    // Emitted when the rail's footer action is chosen. A page switch, not a
+    // filter, so it travels as its own signal rather than riding the mode one:
+    // the owner changes this surface's route, which the session knows nothing
+    // about.
+    signal controlCenterRequested()
     // Bubbled from the activated result row so the owning surface can replay
     // the card's parabolic exit in a layer above the closing panel.
     signal exitFlingRequested(var spec)
@@ -268,6 +281,18 @@ Item {
         return "Search applications"
     }
 
+    // The rail's contract entry point: the surface asks this, never the mode
+    // handler directly, because one rail now carries two kinds of entry. A
+    // footer id is an action on the surface and is answered here; everything
+    // else is a filter on this page and falls through unchanged.
+    function handleSidebarSelected(id) {
+        if (id === "control-center") {
+            root.controlCenterRequested()
+            return
+        }
+        root.handleModeSelected(id)
+    }
+
     // Rewrite the current search text under the requested mode's prefix so
     // switching modes reuses the same data-source seam without reopening.
     function handleModeSelected(modeId) {
@@ -282,10 +307,17 @@ Item {
         root.modeChangeRequested(modeId)
     }
 
+    // Only the primary entries are query modes. The footer entry shares this
+    // list but answers a different question, so admitting it here would let a
+    // mode prefix be built for an id that names no data source.
     function isKnownMode(modeId) {
-        for (var i = 0; i < root.sidebarEntries.length; i++)
-            if (root.sidebarEntries[i].id === modeId)
-                return true
+        for (var i = 0; i < root.sidebarEntries.length; i++) {
+            if (root.sidebarEntries[i].id !== modeId)
+                continue
+            if (String(root.sidebarEntries[i].section || "") === "footer")
+                return false
+            return true
+        }
         return false
     }
 

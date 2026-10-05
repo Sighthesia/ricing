@@ -168,24 +168,27 @@ Item {
                    "launcher bar entry must drive the launcher session")
         }
 
-        // The control-center entry is the one bar affordance whose whole job is
-        // to ask the shared wave owner for a route, so its wiring is asserted on
-        // the production bar's source: the entry must go through the screen
-        // scope's requestOverlay (which owns the coordinator hand-off and the
-        // opener), and it must not mount a surface of its own. A second window
-        // here would be invisible to every behavioural test in the suite and
-        // would silently become the owner the coordinator does not know about.
-        function test_controlCenterEntry_requestsTheWaveRouteAndAddsNoSurface() {
+        // The control center is reached from the launcher's rail, not from the bar.
+        // Nothing on the bar may name it any more: a second entry would give the
+        // same surface two spellings again, and the one it replaces would sit on
+        // every screen as an affordance the launcher already carries. The seam
+        // itself stays, because the coordinator registry still names both wave
+        // routes and a wave target refused there must fail loudly rather than
+        // open a route without the surface's session and opener bookkeeping.
+        function test_theControlCenterHasNoBarEntryAndTheSeamSurvives() {
             var bar = fileText("../../modules/bar/TopBar.qml")
             if (bar === "")
                 skip("local file reads disabled; run with QML_XHR_ALLOW_FILE_READ=1")
 
-            verify(bar.indexOf('id: controlCenterEntry') !== -1,
-                   "the bar must declare one control-center entry")
-            verify(bar.indexOf('requestOverlay("control-center", controlCenterEntry)') !== -1,
-                   "the entry must ask for the route through the screen scope, by name")
+            verify(bar.indexOf('controlCenterEntry') < 0,
+                   "the bar must not declare a control-center entry")
+            verify(bar.indexOf('requestOverlay("control-center"') < 0,
+                   "the bar must not ask for the control-center route")
+            verify(bar.indexOf('rightEdgeInset') < 0,
+                   "the trailing inset existed only to yield space to that entry")
+
             verify(bar.indexOf("function requestOverlay(target, opener)") !== -1,
-                   "the screen scope must own the shared overlay seam")
+                   "the screen scope must keep the shared overlay seam")
             verify(bar.indexOf("CoordLogic.dispatchFor(target, launcherSurface)") !== -1,
                    "the seam must read one dispatch decision from the coordinator registry")
             // One decision, one place. A second lookup of the entry method inside the

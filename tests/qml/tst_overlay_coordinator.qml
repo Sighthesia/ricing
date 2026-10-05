@@ -651,7 +651,69 @@ function test_theEntryContextDoesNotSurviveAClose() {
             compare(launcherSurface.requestedFromLauncher, false)
         }
 
-// The context also dies when another owner takes the surface over, not only
+// --- the launcher's rail entry: the same open, continuing ---
+
+        // The rail's footer action is not a new open intent - the surface is
+        // already open on the launcher. It must therefore switch the route on the
+        // LIVE host rather than hand the coordinator a fresh open, and it must
+        // leave the opener record standing so the final close still restores
+        // focus to whatever this open began from.
+        function test_theRailFooterSwitchKeepsTheOpenAndItsOpener() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            wait(300)
+            compare(coordinator.activeTarget, "launcher")
+            compare(coordinator.opener, opener)
+
+            openSpy.clear()
+            launcherSurface.requestControlCenterFromLauncher()
+
+            // One route change on the same host, and no coordinator re-open.
+            compare(openSpy.count, 0,
+                    "a route switch on an open surface must not re-open through the coordinator")
+            tryCompare(launcherSurface.host, "route", "control-center", 2000)
+            compare(coordinator.activeTarget, "control-center")
+            compare(coordinator.activeOwner, "wave")
+            // The route swaps inside the host's own entrance, so the phase reads
+            // `opening` here and reaches `open` when that entrance lands. The
+            // load-bearing claim is that it never goes back to `closed`: a close
+            // in the middle would mean the switch tore the surface down and
+            // rebuilt it instead of continuing this open.
+            verify(launcherSurface.host.phase !== "closed",
+                   "the switch must not close the surface it is switching")
+            tryCompare(launcherSurface.host, "phase", "open", 2000)
+
+            // The opener survives the switch, and the close restores it.
+            compare(coordinator.opener, opener,
+                    "the rail switch must not discard the opener record")
+            launcherSurface.host.requestPageBack()
+            tryCompare(launcherSurface.host, "route", "launcher", 2000)
+            keyClick(Qt.Key_Escape)
+            tryCompare(launcherSurface.host, "phase", "closed", 1200)
+            tryVerify(function() { return opener.activeFocus })
+        }
+
+        // The rail switch is a page switch, so it must not consume or rewrite the
+        // launcher's live query: coming back must show what the user had typed.
+        function test_theRailFooterSwitchDoesNotDisturbTheLauncherQuery() {
+            var s = host.session()
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            wait(200)
+            keyClick(Qt.Key_H)
+            tryCompare(s, "query", "h")
+
+            launcherSurface.requestControlCenterFromLauncher()
+            tryCompare(launcherSurface.host, "route", "control-center", 2000)
+
+            launcherSurface.host.requestPageBack()
+            tryCompare(launcherSurface.host, "route", "launcher", 2000)
+            wait(200)
+            compare(s.query, "h",
+                    "returning to the launcher must show the query the user left behind")
+        }
+
+        // The context also dies when another owner takes the surface over, not only
         // when the surface hides. A wave surface that handed its route to settings
         // has ended that open, so nothing about "came from the launcher" is still
         // true - and the sticky route beside it is dropped on exactly the same path,
