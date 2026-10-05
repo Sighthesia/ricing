@@ -165,8 +165,12 @@ Item {
                 // though its result still matches. Clear it before focusing.
                 for (var i = 0; i < resultsRepeater.count; i++) {
                     var row = resultsRepeater.itemAt(i)
-                    if (row)
+                    if (row) {
                         row.restoreFromClosing()
+                        if (row.result && row.revealHeld === true
+                                && typeof row.releaseInstantly === "function")
+                            row.releaseInstantly()
+                    }
                 }
                 root.focusSearch()
                 // The full entrance wave is for a genuinely first paint; when
@@ -569,6 +573,15 @@ Item {
                 children[i].releaseInstantly()
         }
     }
+    function _releaseHeldRowsInstantly() {
+        var children = resultsColumn.children
+        for (var i = 0; i < children.length; i++) {
+            var row = children[i]
+            if (row && row.releaseInstantly !== undefined
+                    && (row.revealHeld === true || row.snapTransitions === true))
+                row.releaseInstantly()
+        }
+    }
     function _holdAllRowsInstantly() {
         var children = resultsColumn.children
         for (var i = 0; i < children.length; i++) {
@@ -647,8 +660,8 @@ Item {
         // exactly as they are. No wave, no re-hold - re-releasing a settled
         // list would snap its transitions and kill the fold/glide.
         if (sameIds) {
-            if (freshRows.length > 0)
-                root._releaseAllRowsInstantly()
+            if (freshRows.length > 0 || root._anyRowHeld())
+                root._releaseHeldRowsInstantly()
             return
         }
         root._lastRowIds = ids
@@ -690,8 +703,7 @@ Item {
             // which rows it contains. Releasing all 96 rows here made every
             // idle reopen pay the full refill cascade even though every row
             // was already settled and only its result binding changed.
-            if (freshRows.length > 0)
-                root._releaseAllRowsInstantly()
+            root._releaseHeldRowsInstantly()
         } else {
             // Hold only genuinely new ids. Existing rows keep their settled
             // geometry when a pool refresh removes or replaces a small tail.
@@ -700,9 +712,14 @@ Item {
                 previousIds[prev[p]] = true
             var newcomers = 0
             for (var n = 0; n < ids.length; n++) {
-                if (previousIds[ids[n]])
+                var survivor = resultsRepeater.itemAt(n)
+                if (previousIds[ids[n]]) {
+                    if (survivor && survivor.releaseInstantly !== undefined
+                            && (survivor.revealHeld === true || survivor.snapTransitions === true))
+                        survivor.releaseInstantly()
                     continue
-                var newcomer = resultsRepeater.itemAt(n)
+                }
+                var newcomer = survivor
                 if (!newcomer || typeof newcomer.holdInstantly !== "function")
                     continue
                 newcomers++
