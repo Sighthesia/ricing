@@ -277,6 +277,16 @@ QtObject {
             Qt.callLater(root._checkMetadataQuiet)
             return
         }
+        // Metadata is enrichment, not the foreground list. During an initial
+        // or stale clipboard stream the page is already committing the full
+        // history; starting another adapter refresh here would map that same
+        // history a second time into the opening frame. Keep the quiet watcher
+        // alive and merge only after the visible stream has settled.
+        if (root.loading || root.loadingMore || root._streamActive || root._staleRefresh) {
+            root._metadataQuietDeadline = Date.now() + root._metadataQuietMs
+            Qt.callLater(root._checkMetadataQuiet)
+            return
+        }
         root._metadataWatchScheduled = false
         // A merge round still in flight means the rows it is reading are the
         // ones being enriched; wait for it rather than dropping the window on
@@ -303,6 +313,14 @@ QtObject {
     function _mergeClipboardMetadata() {
         if (!root.visible || LauncherLogic.parseQuery(root.query).mode !== "clipboard")
             return
+        if (root.loading || root.loadingMore || root._streamActive || root._staleRefresh) {
+            root._metadataQuietDeadline = Date.now() + root._metadataQuietMs
+            if (!root._metadataWatchScheduled) {
+                root._metadataWatchScheduled = true
+                Qt.callLater(root._checkMetadataQuiet)
+            }
+            return
+        }
         var adapter = _adapterFor("clipboard")
         // The metadata merge needs every row, not just the first batch, so it
         // accumulates the stream before touching the pool.
