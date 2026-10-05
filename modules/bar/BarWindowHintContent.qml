@@ -74,26 +74,29 @@ Item {
     // animation to fall out of step.
     // ---- OBSERVATION SLOW-MOTION -------------------------------------------
     // Every duration on the focus marker's path is multiplied by this, so the sequence
-    // can be watched rather than inferred. 6 is slow enough to see a card light up in
-    // the same frame its frame lands, rather than after it.
+    // can be watched rather than inferred.
     //
     // It is a WRITABLE property, not a constant, for one reason: the suite waits in
     // wall-clock time, so a slowed build turns every timing assertion red and makes a
     // diagnostic nobody can run. `tst_window_hint_content`'s `init()` sets this back to
     // 1, so the tests always measure the real recipes and the live shell is the only
-    // thing that is slow. Set it to 1 to get normal motion back.
-    // Observation slow-motion for the hint's own motion, which is what a 6x here is for:
-// it multiplies every duration on the marker's path so the crossing can be read frame by
-// frame. Back to normal speed now that the crossing reads correctly.
-//
-// The multiplier is not cosmetic for the indicator: `trailCatchUp` divides by it, so the
-// trail is NOT the same thickness at every setting. The wake is the head's per-tick travel
-// times `(1 - k) / k`, and with `k = 0.7 / debugTimeScale` that is `1.262 * v` at 6x against
-// `0.429 * v` at 1x - roughly a third as thick at normal speed, measured live at 6x as a
-// 26px bar growing to 27.3. If the trail reads too thin at normal speed, `trailCatchUp`'s
-// numerator is the one number to change; it is set for the normal-speed case and the
-// denominator exists only so slow motion stays representative.
-property real debugTimeScale: 1
+    // thing that is slow.
+    //
+    // Observation slow-motion for the hint's own motion: it multiplies every duration on the
+    // marker's path so a crossing can be read frame by frame. Back to normal speed now that
+    // the crossing reads correctly, and it is not for the trail.
+    //
+    // It IS for the trail, in one direction only, and that is worth being exact about.
+    // `trailCatchUp` divides by it, so the two cancel: at scale S the head's speed falls by S
+    // and the rate falls by S, and the wake - the head's travel over the last `interval / k`
+    // of wall time - is the SAME thickness watched in slow motion as at normal speed. That is
+    // the whole purpose of having the multiplier at all, and it means the multiplier is not a
+    // second dial on the trail: there is exactly one number, and it is `trailCatchUp`'s
+    // numerator. An earlier note here claimed the trail was a third as thick at 1x as at 6x
+    // and measured a 26px bar growing to 27.3; that was the follower being tuned per FRAME
+    // against a multiplier that stretches the crossing over six times as many frames, and the
+    // follower is per TICK now.
+    property real debugTimeScale: 1
 
     property real slideProgress: 1
     // A crossing is under way. A FLAG, not `slideProgress < 1`.
@@ -340,7 +343,7 @@ property real debugTimeScale: 1
             root.viewportHeight)
     }
 
-    // --- indicator: the workspace widget's dual-speed edge tracker, rotated ---
+    // --- indicator: a head and a trailing wake, rotated 90 degrees from the widget's ---
     // The workspace indicator is `barWidgetHeight - 16` long and `barIndicatorHeight`
     // thick - 26x3 on a 48px bar - and its head/tail stretch lengthens it along its
     // own long axis so it stays a bar. This list runs down a column, so the indicator
@@ -356,12 +359,16 @@ property real debugTimeScale: 1
     // Stretching the WRONG axis would have turned a 3px bar into a tall rectangle
     // mid-flight, which is a shape change rather than a bar growing.
     //
-    // `Workspaces.qml`'s own name for this number is `indicatorBarWidth`, and everything
-    // about how it stretches lives in that file: `_edgeX` on `medium`/OutQuad,
-    // `_edgeShadowX` on `slow * 2`/OutSine, a raw `_edgeSpan` with no bound on it, and
-    // `retargetEdges` handing both ends ONE committed target and blinking once when the
-    // identity changes. This is that tracker, rotated. Where the two disagree is a bug in
-    // one of them, and "consistent with the workspace widget" is the test for it.
+    // `Workspaces.qml`'s own name for this number is `indicatorBarWidth`, and the SHAPE of what
+    // it draws - a bar that stretches along its long axis and contracts on arrival - is that
+    // file's: `_edgeX` on `medium`/OutQuad, `_edgeShadowX` on `slow * 2`/OutSine, a raw
+    // `_edgeSpan` with no bound on it, and `retargetEdges` handing both ends ONE committed
+    // target and blinking once when the identity changes. This is that tracker, rotated, and
+    // one half of it still is: the HEAD is `medium`/OutQuad toward a single committed target,
+    // the span is the raw separation with no cap, and a genuine change of identity still
+    // blinks once. The TAIL is not the widget's - it is `trailCatchUp`'s follower on one 16ms
+    // tick, for both this panel's two paths - and where the two now disagree is recorded at
+    // the trail's own definition rather than left to be rediscovered.
     readonly property int indicatorLength: LazerTheme.barWidgetHeight - 16
 
     property real _headY: 0
@@ -702,13 +709,14 @@ property real debugTimeScale: 1
         //
         // The streak is the worse half, and it is why this was reported as the
         // indicator rather than as the frame. `_commitHint` clears `_markerCrossing`,
-        // and that flag is the load-bearing term in BOTH of the tracker's Behaviors -
-        // so a commit in the dead window handed the head and the tail their animations
-        // back in the middle of a switch, and the refresh's own correction to the
-        // focused row then ran as a full genuine streak. Measured peak: 37.6px at
-        // scale 1 and 37.7px at scale 6, growing the drawn bar from `indicatorLength`
-        // (26) to 64 - on a switch, whose whole design is that the frame IS the
-        // motion and a stretch underneath it would be a second motion on one marker.
+        // and that flag is the load-bearing term in the tracker's head `Behavior` and
+        // in the follower's `running` - so a commit in the dead window handed the head
+        // its animation back in the middle of a switch while the wake was still the
+        // pin's to close, and the refresh's own correction to the focused row then ran
+        // as a full genuine streak. Measured peak: 37.6px at scale 1 and 37.7px at
+        // scale 6, growing the drawn bar from `indicatorLength` (26) to 64 - on a
+        // switch, whose whole design is that the frame IS the motion and a stretch
+        // underneath it would be a second motion on one marker.
         //
         // And the length of that streak is not the switch's to decide: it is how far
         // the refresh's focused row is from the row the switch had already put the bar
@@ -793,12 +801,13 @@ property real debugTimeScale: 1
         // drop it onto a card it had already been told about.
         crossingRun.stop()
         root._markerCrossing = false
-        // ...and the trail goes back to the tracker, because clearing the flag is what
-        // abandons the pin's last write. A commit that never showed the marker travelling
-        // can arrive at any point in a journey, so this is the ordinary case of the
-        // hand-back and not an edge: `_closeTrail` is a no-op when both ends are already
-        // home, which is every commit that did not interrupt one. See the note there.
-        Qt.callLater(root._closeTrail)
+        // ...and the HEAD goes back to the tracker's own curve, because clearing the flag is
+        // what abandons the pin's last write. A commit that never showed the marker travelling
+        // can arrive at any point in a journey, so this is the ordinary case of the hand-back
+        // and not an edge: `_reanchorHead` is a no-op when the head is already on the anchor,
+        // which is every commit that did not interrupt one. The tail needs no hand-back - the
+        // follower keeps closing on its own clock. See the note there.
+        Qt.callLater(root._reanchorHead)
         root._departingRowIndex = -1
         root._departingScroll = 0
         root._exitFrom = 0
@@ -971,8 +980,11 @@ property real debugTimeScale: 1
     // BOTH ends, and not just the tail, and that is measured rather than tidiness: carrying only
     // the tail and leaving the head for the pin's next tick still read 157% and 279% of the
     // trail's own length on the second and third publishes. The head's write is wrapped in
-    // `_snapping` for the ordinary reason - the `Behavior`s are disabled during a crossing, and
-    // this is the idiom the rest of the file uses for a write that must not be eased.
+    // `_snapping` for the ordinary reason - the head's `Behavior` is disabled during a
+    // crossing, and this is the idiom the rest of the file uses for a write that must not be
+    // eased. The tail's is not wrapped and does not need to be: the follower's step is not a
+    // `Behavior` and has no `enabled` to suppress, which is one of the reasons a carry like
+    // this is expressible at all now that the tail is a rate.
     //
     // `_journeyScroll` goes with them, because the target carries the scroll and the pin's own
     // re-base would otherwise hand the tail the same difference twice. And the carry is skipped
@@ -1014,13 +1026,13 @@ property real debugTimeScale: 1
             // No settle here, and nothing to settle. The head has been PINNED to the frame
             // for the whole journey and the frame has just landed on the card, so the head is
             // already exactly where the tracker's committed target has been since the switch
-            // was published. What is left is the trail: the tail is `head - d/k` behind, and
-            // the hand-back below closes it on the widget's own `slow * 2`/OutSine - which
-            // makes the wake's contraction the last 320ms of the switch rather than a second
-            // event bolted onto the frame's landing. Snapping it away here used to be
-            // deliberate, to hand over a bar at rest at exactly the moment the motion
-            // finished, but it is the same snap that made a switch cut a trail short, just at
-            // the other end.
+            // was published. What is left is the trail: the tail is `head - v/k` behind, and
+            // the follower goes on closing it at `k` of what is left per tick - which is the
+            // same tick, and the same rate, that a focus glide's tail closes on, so the wake's
+            // contraction is the same event on both paths rather than the widget's own
+            // `slow * 2` curve on one of them. Snapping it away here used to be deliberate, to
+            // hand over a bar at rest at exactly the moment the motion finished, but it is the
+            // same snap that made a switch cut a trail short, just at the other end.
             //
             // The frame lands. There is
             // nothing to hold the tint back for here any more: the tint has been
@@ -1033,9 +1045,11 @@ property real debugTimeScale: 1
             root._departingScroll = 0
             root._exitFrom = 0
             root._journeyScroll = strip.scrollOffset
-            // ...and the tail goes back to the `Behavior` on the next turn, because a
-            // `Behavior` captures its target when `enabled` goes true. See `_closeTrail`.
-            Qt.callLater(root._closeTrail)
+            // ...and the head is re-aimed at the committed target on the next turn, because a
+            // `Behavior` captures its target when `enabled` goes true. The tail needs nothing:
+            // the open wake is a term in `_barInFlight`, so the follower is still ticking.
+            // See `_reanchorHead`.
+            Qt.callLater(root._reanchorHead)
             root._journeyDirection = 1
         }
     }
@@ -1152,56 +1166,68 @@ property real debugTimeScale: 1
     // motions in the widget are already separate and deliberate. This panel is that widget
     // magnified, and the frame is the magnified highlight.
     //
-    // ---- TWO MECHANISMS, AND WHICH ONE OWNS THE POSITION ------------------
+    // ---- TWO LAWS FOR THE HEAD, ONE FOR THE TAIL ---------------------------
     //
-    // The bar travels two different ways, and the conflict between them is the design, so
-    // it is stated here rather than discovered later.
+    // The bar travels two different ways, and that difference is real, so it is stated here
+    // rather than discovered later. What is NOT real is the tail having two answers to it, and
+    // that is what this section used to say: there were two mechanisms here, and the same mark
+    // had two length laws and two lifetimes depending on which gesture produced the motion.
     //
-    // AT REST, and on a focus change inside one workspace, the bar is `Workspaces.qml`'s
-    // indicator and nothing else: ONE committed target - the focused row - head on
-    // `medium`/OutQuad, tail on `slow * 2`/OutSine, wake the raw separation, no bound,
-    // one blink per change of identity. That is a DISPLACEMENT, so the wake is a FRACTION
-    // of how far the bar is going: 55.5% analytically, 55.3% measured across a 4.7x range
-    // of travel, 55.2% of a 646px journey. Correct, and the widget's own answer.
+    // THE HEAD HAS TWO LAWS, and it always has. AT REST, and on a focus change inside one
+    // workspace, the head is `Workspaces.qml`'s head: `medium`/OutQuad toward ONE committed
+    // target - the focused row. That is a DISPLACEMENT, and a `Behavior` is exactly the right
+    // tool for it, because the target moves once. DURING A CROSSING the head is PINNED to the
+    // frame's own position. That is not a displacement but a SWEEP - down off the panel, back
+    // in through the other edge, onto the card - and a sweep has no fixed target for anything
+    // to fly to.
     //
-    // DURING A CROSSING the target is the frame's own journey, and that is not a
-    // displacement but a SWEEP: down off the panel, back in through the other edge, onto
-    // the card. A sweep has no end for the widget's pair to fly to, so it needs a follower.
-    //
-    // And what was got wrong is the TARGET, not the follower. Two workspaces focused on the
-    // SAME row are the SAME row, so a fixed target gives the bar nowhere to go at all -
-    // which is the report, and which is not a defect of a travelling target but a defect of
-    // this one. Measured with the bar aimed at the landing row across such a switch: the
-    // drawn bar's top read 137.0 on every one of 60 samples and the wake 0.0 on every one,
-    // while the frame it is supposed to be travelling with ran
+    // And what was got wrong there was the TARGET, not the mechanism. Two workspaces focused
+    // on the SAME row are the SAME row, so a fixed target gives the bar nowhere to go at all -
+    // which was the report, and which is not a defect of a travelling target but a defect of
+    // that one. Measured with the bar aimed at the landing row across such a switch: the drawn
+    // bar's top read 137.0 on every one of 60 samples and the wake 0.0 on every one, while the
+    // frame it is supposed to be travelling with ran
     // 139.3, 146.7, 146.7, 160.4, 160.4, 178.9, 190.1, -38.6, 40.3, 60.4, 83.1, 101.7,
-    // 115.6, 126.4, 129.7, 134.6 and then sat at 136. The frame crossed the panel twice
-    // and the bar did not move by one pixel. That is "the indicator does not move at all,
-    // it teleports", in numbers.
+    // 115.6, 126.4, 129.7, 134.6 and then sat at 136. The frame crossed the panel twice and the
+    // bar did not move by one pixel. That is "the indicator does not move at all, it
+    // teleports", in numbers.
     //
-    // So during a crossing the HEAD IS PINNED to the frame and the TAIL FOLLOWS it. The
-    // pin is not only where the trail comes from; it is what hides BOTH of the crossing's
-    // discontinuities. The frame's corner teleport is off-panel VERTICALLY by construction
-    // - `_offTop` and `_offBottom` are a whole card past each edge - so a bar travelling
-    // with the frame is off-panel at the corner too, and the COLUMN swap underneath it is
-    // invisible. Un-pinned, the bar sits on the landing row through the corner and the
-    // swap becomes a visible horizontal jump: measured on that same switch, the bar's x ran
-    // 119.7, 92.7, 72.2, 36.8, 23.4, 14.1, 9.2, then 194.0 - a 185px step in one frame, at
-    // a y that never moved.
+    // The pin is not only where the trail comes from; it is what hides BOTH of the crossing's
+    // discontinuities. The frame's corner teleport is off-panel VERTICALLY by construction -
+    // `_offTop` and `_offBottom` are a whole card past each edge - so a bar travelling with the
+    // frame is off-panel at the corner too, and the COLUMN swap underneath it is invisible.
+    // Un-pinned, the bar sits on the landing row through the corner and the swap becomes a
+    // visible horizontal jump: measured on that same switch, the bar's x ran
+    // 119.7, 92.7, 72.2, 36.8, 23.4, 14.1, 9.2, then 194.0 - a 185px step in one frame, at a y
+    // that never moved.
     //
-    // THE CONFLICT, named: `_retargetIndicator` commits BOTH ends to one target and
-    // blinks. That is the widget's answer to a change of identity, it is right at rest, and
-    // it is wrong during a crossing - where it would hand both ends to the landing row on
-    // the switch's first frame and leave the bar sitting still under a frame that is
-    // already leaving the panel. So the PIN owns the position for the whole crossing, the
-    // commit does not run there at all (`_syncIndicator` returns before reaching it), and
-    // the only part of the widget's response a crossing keeps is the BLINK, which changes
-    // an overlay's opacity and has nothing to do with where the bar is.
+    // THE TAIL HAS ONE LAW, and that is the change. It is `trailCatchUp`'s follower on one
+    // 16ms tick, whatever the head is doing: `_stepTrail` is called from exactly one place and
+    // is not reachable from either path's own machinery. It used to be reachable from both -
+    // a `slow * 2`/OutSine `Behavior` at rest and this follower during a crossing - and the
+    // two answers did not agree: at rest a `Behavior`'s wake is a FRACTION of its travel
+    // (55.5% analytically, 55.3% measured), during a crossing a follower's is the head's SPEED
+    // over the last `interval / k` of wall time. Measured on the same panel, the same
+    // instrument, one publish of each kind: 55.3% of 204px and 480ms on the focus path, and
+    // on the workspace path a wake that is 114px of the frame's fastest tick closing over
+    // 700ms. Two laws, two lifetimes, one mark, and the user watching both and asking why they
+    // are not the same.
     //
-    // The two are not two tunings of one mechanism, which is why neither can be asserted
-    // as the other. A DISPLACEMENT's wake is a fraction of its travel; a SWEEP's wake is
-    // proportional to the head's SPEED, because speed is all a lag can know. Different
-    // laws, so the suite samples them with two separate instruments.
+    // The cost of choosing the follower's law over the `Behavior`'s is that it is the widget's
+    // SHAPE rather than the widget's arithmetic: the wake is no longer a fixed fraction of the
+    // travel, so a six-row focus change peaks at 47% of its travel where the widget's would
+    // have peaked at 55.5%. The measured ladder on `trailCatchUp` puts 0.15 within a point and
+    // a half of the widget's figure on that same six-row change, so the widget's answer is a
+    // setting of the one dial rather than a second mechanism - which is the whole reason the
+    // dial is the right thing to have kept.
+    //
+    // THE CONFLICT THAT REMAINS, named: `_retargetIndicator` commits BOTH ends to one target
+    // and blinks, in the widget. It is right about the blink on both paths and wrong about the
+    // commit on both - the tail is a rate now, and writing it to a target hands it a whole
+    // journey at once - so the commit re-aims the head only, and during a crossing it does not
+    // run at all (`_syncIndicator` returns before reaching it), leaving the pin in charge of
+    // the position and the blink as the only part of the widget's response a crossing keeps.
+    // Blinking changes an overlay's opacity and has nothing to do with where the bar is.
     //
     // `head > tail` is a downward journey, and the wake trails above the head; upward, the
     // head leads and the wake trails below. `Math.min` agrees with both at a wake of zero,
@@ -1214,128 +1240,125 @@ property real debugTimeScale: 1
             && activeColumn
             && focusedRowIndex < activeColumn.rows.length
 
-    // The two ends AT REST, and they are `Workspaces.qml`'s two ends: the head on
-    // `medium`/OutQuad, the tail on `slow * 2`/OutSine - three times the head's flight,
-    // which is what makes the stretch readable rather than a blur. Both are gated on the
-    // same terms and both are handed to a SINGLE committed target, so neither can be
-    // re-targeted per frame.
+    // The HEAD at rest, and it is `Workspaces.qml`'s head verbatim: `medium`/OutQuad, 160ms,
+    // toward ONE committed target. It is the only `Behavior` left on either end of the wake.
     //
-    // A `Behavior` really is the wrong tool for a target that moves every frame, and that
-    // was measured rather than assumed: re-assigning one every frame restarts its easing
-    // every frame, and an easing that has just started is at the beginning of its curve.
-    // `OutSine` covered `sin(0.033 * PI/2)`, about 5% of the gap, on the first tick of a
-    // 480ms flight, so the tail sat at exactly 60.0 for nineteen consecutive frames of a
-    // switch while the head ran from 137 to 196 - frozen, and the bar's length was the
-    // head's motion alone. That is why a crossing uses the follower below instead of
-    // these two, and it is not a reason for these two to be wrong at rest: at rest the
-    // target moves ONCE, which is the one thing a `Behavior` is for.
+    // The tail was the widget's too - `slow * 2`/OutSine, three times the head's flight, which
+    // is what made the stretch readable rather than a blur - and it is not any more. Not
+    // because the recipe is wrong but because it cannot answer the question the tail is asked
+    // here: a `Behavior` needs a target that does not move, and the tail's target is a head
+    // that is written to a new position on every frame of a crossing and re-targeted on every
+    // frame of a focus glide. Re-assigning one every frame restarts its easing every frame,
+    // and an easing that has just started is at the beginning of its curve: `OutSine` covered
+    // `sin(0.033 * PI/2)`, about 5% of the gap, on the first tick of a 480ms flight, so the
+    // tail sat at exactly 60.0 for nineteen consecutive frames while the head ran from 137 to
+    // 196. Frozen. So the tail is `trailCatchUp`'s follower instead - see the timer below -
+    // and what is left of the widget's pair is its shape and its head.
     //
-    // `!_markerCrossing` on both gates is the handover between the two mechanisms, and it
-    // has to be `enabled` rather than only `_snapping`: setting a `Behavior`'s `enabled`
+    // WHAT THAT COSTS, stated rather than discovered: the widget's conclusion was a wake of
+    // 55.5% of the travel at 121ms, closing exactly at 480ms, and a follower produces neither
+    // of those numbers. Its wake is a function of the head's SPEED and its closing is a
+    // function of how big the wake was - so a focus change of six rows peaks at 47% of its
+    // own travel and closes in about 320ms rather than 480ms. The trade is deliberate: one
+    // length law for both paths is worth more than the widget's exact figure on one of them,
+    // and both new figures are on `trailCatchUp` below, so the judgement can be reversed with
+    // one edit rather than re-derived.
+    //
+    // `!_markerCrossing` on the gate is the handover between the head's two mechanisms, and
+    // it has to be `enabled` rather than only `_snapping`: setting a `Behavior`'s `enabled`
     // false stops an animation already in flight, while `_snapping` only prevents a new one
     // from starting. Without it, a focus glide that was still running when a switch was
-    // published would keep writing one of the two ends every tick underneath the pin, which
-    // is the frozen-tail fault arriving through the other door.
+    // published would keep writing the head every tick underneath the pin, and the bar would
+    // be chasing two positions at once.
     //
-    // The recipes are exposed, because "the hint's tail runs the widget's tail" is a claim
+    // The recipe is exposed, because "the hint's head runs the widget's head" is a claim
     // about numbers and a suite that re-read `MotionTokens` would only be checking that a
-    // token exists somewhere in the file. Both are asserted, including the two-speed ratio
-    // that makes the shape the widget's rather than merely similar - and both are claimed
-    // of the AT REST mechanism only. During a crossing neither of these animations runs at
-    // all; the number that governs the bar then is `trailCatchUp`.
+    // token exists somewhere in the file. Asserted of the AT REST mechanism only: during a
+    // crossing this animation does not run at all, because the head is pinned to the frame.
+    // The tail has no recipe of its own to expose - it is a rate, and the rate is
+    // `trailCatchUp`, which is a number rather than a `Behavior`.
     readonly property alias indicatorHeadMotion: indicatorHeadAnimation
-    readonly property alias indicatorTailMotion: indicatorTailAnimation
 
-    // How much of its gap the trail's tail closes per FRAME while the frame is travelling,
-    // and the only number that sets the wake during a crossing. Per frame and not per
-    // millisecond because the pin runs from `onCrossingTopChanged` - once per frame of the
-    // journey - so a frame is this mechanism's tick, and a rate per millisecond would be a
-    // second number to keep true of a clock this file does not own.
+    // How much of its gap the trail's tail closes per TICK, and the only number that sets
+    // the wake - on a workspace switch and on a focus change inside one workspace alike,
+    // because it is the same tick. `interval` below is the tick, and the tick is wall clock,
+    // which is what makes the wake a statement about the head's SPEED in px/ms rather than
+    // about however many frames the display happened to draw.
     //
-    // A follower at rate k lags a head moving d px per frame by exactly d/k, so the wake IS
-    // the head's own per-frame travel divided by this - the length of the shadow is how far
-    // the thing moved, which is what a motion trail IS. Verified exactly, stepping the
-    // marker's clock so each step is one tick of the follower: the wake settled at 24.0px
-    // against a 16.8px step and at 21.3px against a 14.9px one, which is 16.8 / 0.7 and
-    // 14.9 / 0.7 to a tenth of a pixel.
-    //
-    // There is therefore no way to make it short by choosing k: at k = 1 the tail is one
-    // tick behind and the shortest wake this mechanism can produce is one frame of the
-    // head's own travel.
+    // A follower at rate k lags a head moving v px per tick by exactly v/k, so the wake IS
+    // the head's own per-tick travel divided by this - the length of the shadow is how far
+    // the thing moved, which is what a motion trail IS. So there is no way to make it short
+    // by choosing k: at k = 1 the tail is one tick behind and the shortest wake this
+    // mechanism can produce is one tick of the head's own travel.
     //
     // THE NUMBER IS A FRACTION OF THE MOTION'S OWN TIME, not of wall clock, and that is what
     // `debugTimeScale` in the denominator is for. The wake is the head's travel over the last
-    // `1 / k` frames, so a per-frame rate measures the shadow in FRAMES - and this panel is
-    // mounted with an observation slow-motion multiplier of 6, which stretches the crossing
-    // over six times as many frames and divides every one of them by six. A flat 0.7 was
-    // therefore tuned against a frame the live shell does not draw: measured there, the
-    // trail was 1.6px over the calmer half of a crossing and 3.2px at InOutQuad's peak on a
-    // 26px bar - a bar 1.2% to 12% longer than its resting length, which is the "there is no
-    // trail" the report is about. Dividing by the scale says the opposite and is the honest
-    // statement: the trail is however far the frame has moved in the last `scale / k` of the
-    // motion's own milliseconds, so it looks the same watched in slow motion as it would at
-    // normal speed, which is the whole purpose of the multiplier.
-    //
-    // So 0.7 is a claim about the motion and the shell's own figure is 0.117. Against the
-    // per-frame travel the LIVE shell produces - instrumented in place, 16ms wall-clock
-    // samples through one whole crossing, whose exit leg covered 96px in 896ms and whose
-    // last samples moved 2.0-2.4px per 10-12ms, i.e. 0.11px per ms over the leg and 0.20 at
-    // InOutQuad's peak, on a panel at the display's 90Hz:
-    //
-    //   a two-row panel (the one that log crossed)   1.2px/frame .. 2.2px/frame
-    //   a five-row panel, the leg is twice as long   2.6px/frame .. 4.7px/frame
-    //
-    //   at 0.117    10px .. 19px  of wake on the two-row panel   (the bar 36 .. 45px)
-    //               22px .. 40px  of wake on the five-row panel  (the bar 48 .. 66px)
-    //   at a flat 0.7  1.6px .. 3.2px                              (the bar 27.6 .. 29.2px)
-    //
-    // The first row is a readable trail - the bar between one and a half and two and a half
-    // times its resting length, tapering with the frame's own speed, which is the motion
-    // trail the widget's own indicator draws at 148.9px of wake on the same 26px bar. The
-    // second row is the fault, and it is why the number is not a constant.
-    //
-    // The per-frame number came first, at 0.12, a 131ms time constant, which put the wake at
-    // 2.5 times the head's travel - 333px at the fastest point of a sweep, thirteen times the
-    // bar's resting length, and the plateau the report calls 异常地长. Two things have changed
-    // since: the corner is CARRIED across instead of being read as travel (see
-    // `_followJourney`), so the number no longer has to defend against a 227px teleport, and
-    // the reading above is from the running shell rather than from a clock the suite steps.
+    // `interval / k` of wall time, and the multiplier stretches the head's own durations over
+    // S times as many milliseconds - so it divides the numerator to keep the shadow the same
+    // thickness watched in slow motion as at normal speed.
     //
     // At normal speed (the multiplier is 1) the wake is the head's per-tick travel times
-    // `(1 - k) / k`, so this number sets BOTH how long the trail is and how long it takes
-    // to close, and it sets them in the same direction: the tail keeps `k` of the
-    // remaining gap per 16ms tick, so the gap shrinks by `(1 - k)` per tick.
+    // `1 / k`, so this number sets BOTH how long the trail is and how long it takes to close,
+    // and it sets them in the same direction: the tail keeps `k` of the remaining gap per
+    // tick, so the gap shrinks by `(1 - k)` per tick.
     //
     //   k     length    closes in
     //   0.7     0.43x      ~67ms   barely there, gone before it can be read
     //   0.35    1.86x     ~203ms
     //   0.2     4.0x      ~328ms
     //   0.15    5.7x      ~460ms   about the widget's own `slow * 2` shadow flight
+    //   0.1     9.0x      ~690ms
     //
-    // The user has watched this on the live shell twice and asked for more both times -
-    // first "not prominent enough, lengthen it", then "it disappears too fast". Both are
-    // this one number, so both are answered by stepping it down rather than by adding a
-    // second mechanism that would have to be kept consistent with this one.
+    // MEASURED, both paths, one instrument and one table - the same harness driving a real
+    // publish of each kind (a focus move of six rows, and a workspace switch of the same
+    // panel), sampled every 16ms in wall clock, so the two rows are directly comparable and
+    // were not before. At k = 0.2, multiplier 1, 26px resting bar:
     //
-    // What makes a long trail safe here, and what did not before: the wake is proportional
-    // to the head's SPEED, not to the journey's length, because the head is pinned rather
-    // than flying toward a fixed target. So there is no journey long enough to make it
-    // runaway - the widget's own 55%-of-travel rule cannot apply to a pinned head, because
-    // that rule comes from two `Behavior`s chasing one target over a known distance and
-    // there is no such target here. It also stays bounded by `min(1, ...)` because a k
-    // above 1 makes the follower overshoot the head and oscillate, and a clamped k is a
-    // too-long trail where an unstable one is a bar that wobbles.
+    //                          peak wake    of the head's travel   wake closed at
+    //   focus change, 204px       96.6px              47%              ~510ms
+    //   workspace switch         113.7px        5.6x its fastest tick   ~700ms
     //
-    // One cost of a slow k, worth knowing before stepping further: the wake freezes at
-    // whatever it was when the frame stops moving, and then takes `(1 - k)` per tick to
-    // come back. At 0.2 the bar therefore sits long for a third of a second while the
-    // panel is otherwise still.
+    // The lengths differ because the two heads move at different SPEEDS - 204px spread over
+    // the head's 160ms flight against a frame sweeping a panel's height at InOutQuad's peak -
+    // and that is the point of a follower: one length law, read against whatever the head is
+    // doing. The lifetimes differ for the same reason plus one: the crossing's head keeps
+    // moving for 320ms while the focus glide's stops at 160ms. What they no longer disagree
+    // about is the LAW - every sample of both series satisfies
+    // `wake = the head's travel + (1 - k) * the previous wake` to within a pixel on the same
+    // 16ms tick, the residue being the sampler's own tick landing either side of the
+    // follower's, and afterwards both close at `(1 - k)` per tick. The only sample of either
+    // that breaks it is the corner, which is carried on purpose.
+    //
+    // Before this was one mechanism they did not agree at all: the focus glide's tail was a
+    // `slow * 2`/OutSine `Behavior` whose wake was 55.3% of the travel closing at 480ms, and
+    // the crossing's tail was this follower closing at `k` per tick and then, after the
+    // landing, on that same 480ms OutSine - so the same mark had two length laws and two
+    // lifetimes and the user could watch both.
+    //
+    // ONE cost of a slow k, worth knowing before stepping further: the wake freezes at
+    // whatever it was when the head stops, and then takes `(1 - k)` per tick to come back, so
+    // a slow k is also a long tail hanging over a still panel. And the closing time is a
+    // LOGARITHM of the wake, not a constant: `interval * ln(wake / 0.5) / -ln(1 - k)`. A wake
+    // of 114px and one of 20px close in 285ms and 199ms at k = 0.2, so no value of k gives one
+    // lifetime for every length - which is the one respect in which this is not the widget's
+    // `slow * 2` shadow, and the reason the ladder above is the honest description of it.
+    //
+    // The ladder, measured the same way rather than derived, because it is what the user will
+    // be choosing between:
+    //
+    //   k      focus change          workspace switch
+    //   0.2    96px, 47%, ~510ms     114px, ~700ms
+    //   0.15  110px, 54%, ~670ms     133px, ~870ms
+    //
+    // 0.15 on a six-row focus change lands within a point and a half of the widget's own
+    // 55.5% - so "as long as the workspace widget's" is a setting of this dial rather than a
+    // second mechanism, which is the whole reason it is worth having one dial.
     readonly property real trailCatchUp: Math.min(1, 0.2 / Math.max(0.01, debugTimeScale))
 
-    // `_snapping` is the load-bearing gate on both of these, and it is a
-    // property rather than anything about the crossing, so a `Behavior` sees it at the
-    // moment the property CHANGES - which is what a write inside `_snapIndicator` needs
-    // and a flag read inside `_syncIndicator` would arrive a step too late for.
+    // `_snapping` is the load-bearing gate on this, and it is a property rather than
+    // anything about the crossing, so the `Behavior` sees it at the moment the property
+    // CHANGES - which is what a write inside `_snapIndicator` needs and a flag read inside
+    // `_syncIndicator` would arrive a step too late for.
     Behavior on _headY {
         enabled: root._placed && !root._markerCrossing
             && !MotionTokens.reducedMotion && !root._snapping
@@ -1345,17 +1368,78 @@ property real debugTimeScale: 1
             easing.type: Easing.OutQuad
         }
     }
-    // Three times the head's flight: the tail lingers long after the head lands, and that
-    // lingering is the stretch. Its recipe is the widget's verbatim, which is why the wake
-    // is worth measuring rather than tuning - a fixed point gives this curve a fixed shape.
-    Behavior on _tailY {
-        enabled: root._placed && !root._markerCrossing
-            && !MotionTokens.reducedMotion && !root._snapping
-        NumberAnimation {
-            id: indicatorTailAnimation
-            duration: MotionTokens.slow * 2 * debugTimeScale
-            easing.type: Easing.OutSine
-        }
+
+    // The trail's tail, and the ONLY clock either end of the wake runs on.
+    //
+    // ONE timer for both paths, and that is the whole of the unification. The head has two
+    // laws - the widget's `medium`/OutQuad at rest, the pin's write during a crossing - and
+    // the tail has exactly one: this. A window switch and a workspace switch differ in how
+    // their heads move and agree, tick for tick, in how their tails follow.
+    //
+    // It replaced a `Behavior` on `_tailY` on `slow * 2`/OutSine, and the widget's recipe
+    // cannot be used for a tail whose head is moving every frame: re-assigning a `Behavior`
+    // each frame restarts its easing each frame, and `OutSine` covers
+    // `sin(0.033 * PI/2)`, about 5% of the gap, on the first tick of a 480ms flight. That
+    // was measured as the tail sitting at exactly 60.0 for nineteen consecutive frames while
+    // the head ran 137 -> 196. A follower has no curve to restart, which is why a target
+    // that moves every frame is the case it exists for.
+    //
+    // `running` is `_barInFlight` - "is any part of this bar's motion in flight RIGHT NOW" -
+    // and NOT a condition on the gap alone, which is the latch this file has already shipped
+    // once: the head is PINNED during a crossing, written straight to the frame's position,
+    // so both ends hold the same value on any tick the follower does not run, the gap is
+    // identically zero, and a gap-gated follower can therefore never start. The wake is then
+    // zero for the whole transition, which was the report. It cannot latch here because the
+    // gap is only one of three OR-ed terms and is never the only one: a crossing is covered by
+    // `_markerCrossing`, and a focus glide is covered by the head's own animation being
+    // running - on the tick that commits a new target, when the ends are still equal and the
+    // gap term is at its least. The step is read for nothing either: a threshold on it is
+    // skill item 3, because `InOutQuad` has no derivative at t=0, so a leg's first ticks move
+    // the frame by less than half a pixel while it is very much travelling.
+    //
+    // The tick is wall clock, which is what makes the wake frame-rate independent: the head's
+    // travel per tick is its speed times `interval`, so the wake is the head's speed times
+    // `interval / k` however many frames the display drew to get there. Measured against the
+    // per-frame follower this replaces: the same law with the same k gave a wake of 113.9px at
+    // InOutQuad's fastest on a crossing whose fastest tick was 34.2px - 3.3x that tick rather
+    // than the 5.0x of a steady head, and short of 5.0x precisely because the head is still
+    // accelerating through the peak.
+    //
+    // One consequence of a timer that a per-frame driver did not have: a MISSED tick is a
+    // longer bar for one frame, because the wake is however far the head has moved since the
+    // last one. Measured at k = 0.15, where the tail moves slowly enough for a 31ms gap
+    // between sampler ticks to swallow one: 110.5px on a clean run and 180.8px on the run that
+    // dropped two. It is bounded by the head's speed over the gap rather than growing without
+    // limit, and it lasts one tick, but it is a jitter the per-frame pin could not have - the
+    // price of one clock for both paths, paid knowingly.
+    //
+    // Reduced motion stops it, so "no trail at all" survives as the file's meaning of reduced
+    // motion: with the tail not following and the head not easing, there is nothing to trail
+    // and nothing to draw one from.
+    Timer {
+        id: trailTick
+        interval: 16
+        repeat: true
+        running: root._barInFlight() && !MotionTokens.reducedMotion
+        onTriggered: _stepTrail()
+    }
+
+    // One tick of the tail, and the only place `_tailY` is moved by the follower.
+    //
+    // It reads the head's CURRENT value, so the step it takes is `k` of the gap as it stands
+    // now. Written with the step inline rather than as a rate against a timestamp because the
+    // tick is the clock: there is no elapsed time to divide by, and a rate per millisecond
+    // would be a second number to keep true of a clock this file does not own.
+    //
+    // It converges rather than arriving: the gap shrinks by `(1 - k)` per tick and the tail
+    // stops when the gap is inside the half-pixel that this file has always read as "the ends
+    // are together" - `_retargetIndicator`'s drift branch and the `_pendingTop` timer use the
+    // same figure. So a settled bar is 0.44px over its resting length rather than exactly it,
+    // measured on both paths identically. Half a pixel on a 3px bar is not a thing anyone can
+    // see, and tightening the tolerance here would mean a fourth number for "how far apart is
+    // too far apart".
+    function _stepTrail() {
+        _tailY += (_headY - _tailY) * trailCatchUp
     }
 
     // Where the bar belongs while the frame is travelling: on the frame, in the bar's own
@@ -1399,25 +1483,31 @@ property real debugTimeScale: 1
     // function is the whole of why it exists.
     property bool _aiming: false
 
-    // Hand the tracker to the crossing, and give the trail its follower - in one function,
-    // on one clock.
+    // Hand the HEAD to the crossing. The tail is not here at all: it follows the head on
+    // `trailTick`, which is the same tick it follows a focus glide's head on.
     //
-    // The head SNAPS to the frame's position and the tail closes `trailCatchUp` of what is
-    // left, and the asymmetry is the design rather than an inconsistency. The head has to be
-    // the frame: the bar stays one `markerOffset` below the outline for the whole journey or
-    // the two stop being one gesture, and an easing chasing a target that moves every frame
-    // is always behind it - a lag, not a lead. The tail then has nothing to chase but the
-    // head, so it trails by the head's own speed times `trailCatchUp`'s time constant.
+    // The head SNAPS to the frame's position, and the asymmetry with the tail's follower is
+    // the design rather than an inconsistency. The head has to BE the frame: the bar stays one
+    // `markerOffset` below the outline for the whole journey or the two stop being one
+    // gesture, and an easing chasing a target that moves every frame is always behind it - a
+    // lag, not a lead. The tail then has nothing to chase but the head, so it trails by the
+    // head's own speed times `trailCatchUp`'s time constant, which is a law that needs no
+    // target to be fixed.
     //
-    // BOTH WRITES ARE IN HERE RATHER THAN THE TAIL'S IN A TIMER, and the reason is that
-    // there is only one clock in a crossing: the frame's. A separate 16ms timer would have
-    // its own tick, and two clocks means the tail's rate is multiplied by however much
-    // faster the frame is drawn than the timer fires - which is exactly what the frozen
-    // 60.0 was, before the two were on one clock.
+    // The tick this function does NOT run on is deliberate, and it reverses an earlier note
+    // here. The tail's step used to be in this function, on the frame's own clock, so that
+    // "there is only one clock in a crossing". That was right while the two mechanisms were
+    // two: the per-frame follower could only be driven by the frame, because the frame was
+    // the only thing that moved. Now the tail is one mechanism for both paths, and a clock
+    // that only exists during a crossing is a second rate by another name - the window
+    // switch's tail would have to be driven by the head's `Behavior` instead, on a different
+    // tick, and the two paths' lengths and lifetimes would differ by however much faster the
+    // display drew one than the other. One timer, for both, is what makes them comparable at
+    // all; see `trailTick`.
     //
     // `_anchorY` is NOT written. The committed target stays the landing row, because that is
     // what `_syncIndicator` maintains during the crossing, what the landing dedupes against,
-    // and what makes `_closeTrail` a re-aim rather than a second retarget.
+    // and what makes `_reanchorHead` a re-aim rather than a second retarget.
     function _followJourney() {
         // The pin only writes while it is in charge. `crossingTop` is a function of the
         // clock AND of the focused row, so a reveal scroll moves it after the flag is down -
@@ -1475,62 +1565,56 @@ property real debugTimeScale: 1
         // and back on one frame. Both are the same fault in the pin's terms: a step the
         // frame's own motion cannot produce.
         //
-        // THE LATCH, and the condition it used to be is the whole of this fault. It read
-        // `Math.abs(_headY - _tailY) < 0.5` - "if there is no gap, glue the tail to the
-        // target" - and looks obviously right: a tail already home should follow the head
-        // rather than fall behind it for no reason. But the gap is not a thing that happens
-        // to the follower, it is the ONLY thing the follower produces: the head is PINNED
-        // here, written straight to the frame's position rather than eased toward it, so
-        // head and tail are written the same value on every tick and the gap is identically
-        // zero from the first tick of a crossing to the last. So the branch always ran, the
-        // follower never ran, and no wake could ever open.
+        // THE LATCH is gone, and both of the conditions that replaced it were measured here
+        // first, because they are the two that look right.
         //
+        // It used to read `Math.abs(_headY - _tailY) < 0.5` - "if there is no gap, glue the
+        // tail to the target" - which looks obviously right: a tail already home should
+        // follow the head rather than fall behind it for no reason. But the gap is not a
+        // thing that happens to the follower, it is the ONLY thing the follower produces:
+        // the head is PINNED here, written straight to the frame's position rather than eased
+        // toward it, so head and tail are written the same value on every tick the follower
+        // does not run and the gap is identically zero from the first tick of a crossing to
+        // the last. The branch always ran, the follower never ran, and no wake could open.
         // Instrumented in the live shell, sampled every 16ms across a whole crossing: head
         // 1.3, 1.5, 1.8, 2.1 ... with the tail identical to one decimal on all 56 samples and
-        // `barH` 26.0 on all 56 - 890ms of crossing with no trail at all, which is the report.
-        // Nothing about the suite caught it because every way this file published a crossing
-        // published it while a focus glide was still in flight, which opens a gap before the
-        // pin takes over, and a follower that already has a gap is the easy case.
+        // `barH` 26.0 on all 56 - 890ms of crossing with no trail at all, which was the
+        // report. Nothing about the suite caught it because every way this file published a
+        // crossing published it while a focus glide was still in flight, which opens a gap
+        // before the pin takes over, and a follower that already has a gap is the easy case.
         //
-        // So THE FOLLOWER RUNS WHENEVER THE PIN IS IN CHARGE, with no condition on it at all,
-        // and that is not a simplification - it is the only predicate that survives contact
-        // with this clock. The obvious replacement - "run it when the head is MOVING" - was
-        // written and measured here first, as `Math.abs(step) > 0.5`, and it is the same
-        // latch with a different threshold: `crossingTop` is a leg's linear travel times
-        // `crossingClock`, and `InOutQuad` has zero derivative at the start of the journey,
-        // so a leg's first ticks move the frame by LESS than half a pixel while it is very
-        // much travelling. Measured, a second switch landing mid-crossing: tail 72.2 with
-        // 66.7px of wake on one tick, and tail 139.1 with 0.0px on the next, whose step was
-        // 0.2px. The trail was cut at the exact instant it was widest, which is the report
+        // The second was `Math.abs(step) > 0.5` - "run it when the head is MOVING" - and it
+        // is the same latch with a different threshold: `crossingTop` is a leg's linear travel
+        // times `crossingClock`, and `InOutQuad` has zero derivative at the start of the
+        // journey, so a leg's first ticks move the frame by LESS than half a pixel while it
+        // is very much travelling. Measured, a second switch landing mid-crossing: tail 72.2
+        // with 66.7px of wake on one tick, and tail 139.1 with 0.0px on the next, whose step
+        // was 0.2px. The trail was cut at the exact instant it was widest, which is the report
         // again - "the trail is reset when I switch repeatedly" - in a different costume.
         //
-        // Any threshold on the step has that shape, because the step is the easing's
-        // derivative and the easing is slowest exactly where a crossing starts and stops.
-        // There is nothing to threshold ON: the pin only runs while `_markerCrossing` is set,
-        // which already means a journey is placing the frame, and a follower asked to follow
-        // does the right thing unasked at both ends. With the frame at rest its gap has a
-        // fixed point of zero, so a parked frame's shadow CLOSES - 30% of what is left per
-        // tick - rather than snapping, which is what a trail settling should look like and is
-        // what happens to a journey that has degenerated (no departing row to leave, an
-        // arriving workspace with nothing focused).
+        // So NEITHER condition belongs here any more, and that is the whole of this function's
+        // tail handling: the follower's `running` is `_barInFlight`, it ticks on its own
+        // 16ms clock, and it is the same clock on both paths - so a crossing cannot be the
+        // one case where the tail moves and a focus glide the one where it does not. What is
+        // left below is the pin's OWN business: two carries, and one write.
         //
-        // The step is read for its SIGN only and never for its size, and one more
+        // THE STEP IS READ FOR ITS SIGN ONLY, never for its size. Against the journey's
+        // direction means the corner, plus the two nobody scheduled: `_offBottom` momentarily
+        // collapsing mid-crossing because it is the panel's own live height. One more
         // discontinuity is not the pin's to find: a publish replaces the frame's position
         // three times inside one synchronous block, and it carries the trail across all three
-        // itself. See `_carryAcrossPublish`, which is why nothing here needs to know a publish
-        // happened.
+        // itself - see `_carryAcrossPublish`, which is why nothing here needs to know a
+        // publish happened.
         //
-        // A step against the direction is the corner, plus the two nobody scheduled: the
-        // corner itself, and `_offBottom` momentarily collapsing mid-crossing because it is
-        // the panel's own live height.
-        //
-        // A zero step is not a discontinuity and is not treated as one: wherever a journey
-        // degenerates the frame is stationary, and it goes to the follower.
+        // A step WITH the direction is motion and belongs to the follower alone, and a zero
+        // step is not a discontinuity: wherever a journey degenerates - no departing row to
+        // leave, an arriving workspace with nothing focused - the frame is stationary, and a
+        // stationary frame's shadow CLOSES rather than snapping, which is what a trail
+        // settling should look like. The follower does that on its own, because a stationary
+        // head is a head with a gap and a gap is one of the three terms in `_barInFlight`.
         const step = target - _pinHead
         if (_pinArmed && step * root._journeyDirection < 0)
             _tailY += step
-        else
-            _tailY += (_headY - _tailY) * trailCatchUp
         _pinArmed = true
         _pinHead = target
         _snapping = true
@@ -1538,19 +1622,24 @@ property real debugTimeScale: 1
         _snapping = false
     }
 
-    // The crossing's other end: hand BOTH ends back to the widget's own curves once the
-    // frame has landed.
+    // The crossing's other end: put the HEAD back on the committed target once the frame has
+    // landed, and let the follower close the tail on its own clock.
+    //
+    // Only the head, and that is what the mechanism now is. The tail has no hand-back: it is
+    // `trailCatchUp`'s follower, its `running` is `_barInFlight` - and the wake the pin left
+    // open is a term in that predicate - so it goes on closing at `k` of the remainder per
+    // 16ms tick, on the same tick a focus glide's tail closes on. Writing the tail here at all
+    // would be the divergence this replaced, arriving through the last remaining door.
     //
     // Deferred a turn, and the deferral is load-bearing. A `Behavior` captures its target
     // when its `enabled` goes true, so a write made in the same turn as the flag would be
     // made while the `Behavior` is still disabled - and a write to a disabled `Behavior`'s
     // property is a positional snap, which is a cut of exactly the width the follower left.
-    // By the next turn `enabled` has been re-evaluated and each assignment is a re-aim: the
-    // `Behavior` takes its `from` from wherever the pin and the follower stopped and eases
-    // home, the tail on `slow * 2`/OutSine and the head on `medium`/OutQuad - which are the
-    // widget's own closing curve and its own arrival.
+    // By the next turn `enabled` has been re-evaluated and the assignment is a re-aim: the
+    // head takes its `from` from wherever the pin stopped and eases home on the widget's own
+    // `medium`/OutQuad.
     //
-    // THE HEAD IS WRITTEN TOO, and that is not tidiness. On a landing the pin's last write
+    // THE HEAD IS WRITTEN AT ALL, and that is not tidiness. On a landing the pin's last write
     // already left the head ON `_anchorY` - the frame lands on the card and the journey
     // target is that card - so re-assigning the same value starts nothing, and the call is a
     // no-op on every crossing that ends the way it is meant to. It is the CANCELLED crossing
@@ -1564,24 +1653,31 @@ property real debugTimeScale: 1
     //
     // It also fires when the follower already converged and both ends are home, which is the
     // whole of a switch that did not travel: no spurious flight from a gap that is not there.
-    function _closeTrail() {
+    function _reanchorHead() {
         if (_markerCrossing || !_placed)
             return
         _headY = _anchorY
-        _tailY = _anchorY
     }
 
-    // Commit head and tail together with the Behaviors suppressed. Both writes use
+    // Commit head and tail together with the head's `Behavior` suppressed. Both writes use
     // a precomputed target: reading _headY back would return the animation frame,
     // not the committed value.
     //
+    // BOTH ENDS, and the tail's write is what makes this a CUT rather than a retarget - which
+    // is the point of this function and the reason the wake has a floor at zero here. Every
+    // caller wants the bar to stop stretching NOW: the first placement (there is nothing to
+    // travel from), the no-row park (nothing to be mid-trail about), and a same-anchor drift
+    // that landed while a trail was open (content churn must not stretch the bar). The
+    // follower cannot express any of them - it has no notion of "stop" - so the cut is written
+    // here, once, where the three reasons for it are visible.
+    //
     // NEVER DURING A CROSSING, and the pin is what stops it: `_syncIndicator` returns
     // before it can reach here while `_markerCrossing` is set, so a journey's ends are
-    // only ever written by `_followJourney`. The comment above the two `Behavior`s records
-    // why the flag has to gate on `enabled` rather than on `_snapping` alone - `_snapping`
-    // cannot end an animation already in flight, and these two are declared inside
-    // `Behavior` blocks, so they are not root nodes and `stop()` on them warns and does
-    // nothing.
+    // only ever written by `_followJourney` and `_carryAcrossPublish`. The comment above the
+    // head's `Behavior` records why the flag has to gate on `enabled` rather than on
+    // `_snapping` alone - `_snapping` cannot end an animation already in flight, and the
+    // animation is declared inside a `Behavior` block, so it is not a root node and `stop()`
+    // on it warns and does nothing.
     function _snapIndicator(top) {
         _snapping = true
         _anchorY = top
@@ -1591,17 +1687,24 @@ property real debugTimeScale: 1
     }
 
     // Route every re-anchor through here, which is `Workspaces.qml`'s `retargetEdges`
-    // with the numbers renamed: a genuine target switch commits the anchor, desyncs the
-    // two ends into the wake and blinks once; same-target layout drift snaps both so
-    // content churn never stretches the bar; the first placement snaps so it never slides
-    // in from zero.
+    // with the numbers renamed: a genuine target switch commits the anchor, re-aims the head
+    // and blinks once; same-target layout drift snaps both ends so content churn never
+    // stretches the bar; the first placement snaps so it never slides in from zero.
     //
-    // The commit writes BOTH ends to the target, and that is not a contradiction of the
-    // wake: a `Behavior` animates from the value the property holds when the write
-    // arrives, so each end flies from wherever it actually was to the one place they now
-    // share. Writing them is how the widget says "these two are aimed at one target", and
-    // it is why a switch arriving mid-wake continues the wake instead of cutting it -
-    // there is nothing here that can shorten the bar, only retarget it.
+    // THE GENUINE SWITCH DOES NOT TOUCH THE TAIL, and the widget's `retargetEdges` writes
+    // both ends - so this is the one place the two mechanisms genuinely disagree, and it is
+    // worth being exact about why the widget is right there and this file is not.
+    //
+    // `retargetEdges` writes both ends because both ends are `Behavior`s: each one animates
+    // from wherever it happens to be to the one place they now share, and two different curves
+    // leaving the same pair of positions is what produces the widget's 55% stretch. Here the
+    // tail is not a curve, it is a rate, and writing it to the target would hand it the
+    // journey's whole travel at once: the bar would be drawn at full length on the retarget's
+    // own first frame and then shrink, instead of stretching as it moves. So the head is
+    // re-aimed and the tail is left where the follower has it, which is what "the wake is the
+    // head's distance from where it was 1/k ticks ago" means when the target moves - and it
+    // is also why a retarget arriving mid-wake CONTINUES that wake: there is nothing here that
+    // can shorten the bar, only re-aim it.
     function _retargetIndicator(top, key) {
         if (!isFinite(top))
             return
@@ -1610,7 +1713,6 @@ property real debugTimeScale: 1
             _targetKey = key
             _anchorY = top
             _headY = top
-            _tailY = top
             _flashIndicator.restart()
             return
         }
@@ -1626,6 +1728,11 @@ property real debugTimeScale: 1
     // Apply a drift that landed mid-trail, once the tail has caught up. The widget's
     // `_edgePendingCenterX` timer, and for the same reason: it waits on the TAIL rather
     // than on a duration, so a trail is never cut short by the wait's own length.
+    //
+    // It waits on the tail in the strict sense - the gap, not the tail's own motion - so the
+    // threshold here is the same 0.5 the predicate in `_barInFlight` uses, and the two agree
+    // about the instant the bar stops moving: when this timer fires, the follower's is no
+    // longer running, so the snap below cannot be undone by a step on the same tick.
     Timer {
         interval: 16
         repeat: true
@@ -1856,9 +1963,8 @@ property real debugTimeScale: 1
     // The focus indicator, in the workspace widget's vocabulary and motion, turned
     // 90 degrees for a list that runs down a column: a short green bar in the band's
     // left padding, `barIndicatorHeight` thick with the same radius, in `osuGreen`.
-    // One instance for the whole list, driven by the dual-speed tracker above so a
-    // switch elongates along the bar's long axis and contracts on arrival rather than
-    // sliding at one rate.
+    // One instance for the whole list, driven by the tracker above so a switch elongates
+    // along the bar's long axis and contracts on arrival rather than sliding at one rate.
     //
     // Beside the card, not inside it. The widget's indicator is outside the marked
     // square - under it, in the bar's gap - and this one was 4px in from the card's
@@ -1911,7 +2017,7 @@ property real debugTimeScale: 1
             : strip.activeColumnX) + root.indicatorInset
         // The tracker's two ends, ALWAYS - and on a switch that means the two ends of a TRAIL
         // behind the frame, not two ends easing onto a row: the stretch is the bar's own
-        // dual-speed motion, on a workspace switch as much as on a focus change inside one
+        // head-and-tail motion, on a workspace switch as much as on a focus change inside one
         // workspace, and it is drawn from the LOWER of the two through the higher -
         // `Workspaces.qml`'s `_edgeRectLeft` and `_edgeSpan` read down a column instead of
         // across a row.
@@ -2028,33 +2134,43 @@ property real debugTimeScale: 1
     // `_syncIndicator` makes inside a single assignment reads `_markerCrossing` false -
     // the transient happens on the way to a crossing and on the way out of one.
     //
-    // The three terms are what a trail is, read from the two ends and from the two
-    // animations that move them:
+    // It is also the follower's `running`, which makes this one question asked once instead of
+    // two predicates that could disagree - and the three terms are OR-ed, never nested, so it
+    // cannot latch. That is the load-bearing property and it is not obvious: a tail-gated
+    // follower is the fault this file shipped once. The head here is PINNED during a crossing,
+    // written straight to the frame's position, so on any tick the follower does not run both
+    // ends hold the same value and the gap term reads false - the gap is the follower's own
+    // OUTPUT, never a precondition. `_markerCrossing` covers that case and the head's own
+    // animation covers a focus glide's, including the tick that commits a new target, when the
+    // ends are still equal and the gap is at its least.
     //
-    //   the ends are APART      - a wake is open, and a wake is the one thing this file
-    //                             has no cap on and no excuse to close early
-    //   either end is ANIMATING - the ends are together but not home, which is the
-    //                             first tick of every flight and the tick after the last
-    //   a crossing is PLACING the frame - the crossing's own branch above answers this
-    //                             one first, so the term is redundant on today's control
-    //                             flow and is here so the predicate means what it says
-    //                             on its own rather than only in the order it is called
+    // The three terms are what a trail is, read from the two ends and from the animation that
+    // moves one of them:
     //
-    // Measured, so the second term is not redundant either: with `MotionTokens.slow * 2`
-    // at 480ms, a publish landing 16ms into a flight finds 16.9px of wake, and one landing
-    // on the frame before the tail leaves finds the ends together with both animations
-    // still running - and parking there is just as much a cut.
+    //   the ends are APART   - a wake is open, and a wake is the one thing this file has no
+    //                          cap on and no excuse to close early. This is also the term
+    //                          that keeps the follower ticking after the head has landed,
+    //                          which is where a crossing's wake spends half its life.
+    //   the head is ANIMATING - the ends are together but the head is not home, which is the
+    //                          first tick of every flight and the tick after the last.
+    //                          Measured, so this term is not redundant: a publish landing
+    //                          16ms into a flight finds 16.9px of wake, and one landing on the
+    //                          frame before the tail leaves finds the ends together with the
+    //                          animation still running - and parking there is just as much a
+    //                          cut.
+    //   a crossing is PLACING the frame - which is what keeps the follower ticking while the
+    //                          head is written rather than eased, and is the whole of why a
+    //                          wake can open during a sweep at all.
     function _barInFlight() {
         return root._markerCrossing
             || Math.abs(root._headY - root._tailY) > 0.5
             || root.indicatorHeadMotion.running
-            || root.indicatorTailMotion.running
     }
 
-    // The tracker's one entry point, and it routes the two mechanisms by asking which one
-    // is running. A crossing owns the POSITION and this routine only maintains the
-    // bookkeeping the landing needs; everything else is the widget's pair, aimed at the
-    // FOCUSED ROW.
+    // The tracker's one entry point, and it routes by asking which mechanism is in charge of
+    // the position. A crossing owns the POSITION and this routine only maintains the
+    // bookkeeping the landing needs; everything else aims the head at the FOCUSED ROW and lets
+    // the follower trail it.
     //
     // The crossing branch is the conflict named at the top of the indicator section, and it
     // is placed before the `!hasTarget` branch deliberately: a switch into an empty
@@ -2144,16 +2260,16 @@ property real debugTimeScale: 1
             // index of -1 hands back a negative offset roughly one row above the
             // panel's top: a real coordinate, which the next target's `Behavior`
             // then animates FROM. The bar is invisible, so the flight was not
-            // visible when it happened - but it was a flight, and it arrived at the
-            // right row only after `MotionTokens.slow * 2` of tail travel. That is
-            // the flash on arriving at a workspace whose focused row is not where
-            // the previous one was.
+            // visible when it happened - but it was a flight, and the tail it left
+            // behind had to walk the rest of the way before the bar looked settled.
+            // That is the flash on arriving at a workspace whose focused row is not
+            // where the previous one was.
             //
             // Zero is the honest "resting, nowhere" value: it is where
             // `_snapIndicator` puts the marker before its first placement, and a
             // bar that has no row to sit on has no business anywhere else. Retarget
             // from here and the first real target still travels, which is the
-            // dual-speed stretch doing its job, rather than arriving pre-stretched
+            // head-and-wake stretch doing its job, rather than arriving pre-stretched
             // from a coordinate that never named a row.
             root._pendingTop = -1
             root._snapIndicator(root._restingY())
