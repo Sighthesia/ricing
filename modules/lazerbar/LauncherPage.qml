@@ -193,6 +193,7 @@ Item {
                 // next open: the decoded-path cache is permanent, so nothing
                 // else can ever hand that row a fresh one.
                 root.rearmFailedThumbs()
+                root.rearmFailedIcons()
             }
         }
         function onSelectedIndexChanged() {
@@ -860,6 +861,7 @@ Item {
     // rows and the preview pane share the exact same proven path.
     readonly property var _thumbPaths: ({})
     property int _thumbRev: 0
+    property int _iconRetryRev: 0
     // Entry ids whose thumbnail a row reported as unloadable. The decoded path
     // cache is keyed by id and never invalidated, so without this a single
     // failed load was final: the same path came back on every later commit, so
@@ -938,6 +940,15 @@ Item {
         if (dropped > 0)
             root._thumbRev++
         return dropped
+    }
+
+    // App icons have the same one-way Image.Error failure mode as thumbnails,
+    // but their source is carried by the pooled result. Re-arm failed rows once
+    // per open so a transient provider/file failure cannot strand a fixed set
+    // of apps forever, while a genuinely missing icon does not spin per tick.
+    function rearmFailedIcons() {
+        root._iconRetryRev++
+        return root._iconRetryRev
     }
     function _issueThumbDecode(id, mime, done) {
         var service = root.session
@@ -1621,6 +1632,7 @@ Item {
                     onResultChanged: root.requestClipThumb(result)
                     thumbPath: root._thumbRev >= 0 ? root.clipThumbPath(result) : ""
                     metaStamp: root._clipMetaRev
+                    iconRetryRevision: root._iconRetryRev
                     searchQuery: root.activeSearchText
                     categoryFilter: root.activeCategory
                     // The shared rect's band, so this row lights the slice of itself the

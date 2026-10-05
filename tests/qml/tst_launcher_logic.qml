@@ -266,4 +266,13 @@ TestCase {
         verify(!Logic.poolMatches(unresolved, resolved))
         verify(Logic.poolMatches(resolved, [{ id: "app", icon: "image://icon/app" }]))
     }
+
+    function test_preferStableIconsDoesNotEraseAWorkingIcon() {
+        var previous = [{ id: "app", icon: "image://icon/app" }, { id: "other", icon: "" }]
+        var next = [{ id: "app", icon: "" }, { id: "other", icon: "image://icon/other" }]
+        var merged = Logic.preferStableIcons(previous, next)
+        compare(merged[0].icon, previous[0].icon)
+        verify(merged[0] !== previous[0], "fresh row fields must remain fresh")
+        compare(merged[1], next[1])
+    }
 }

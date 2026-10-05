@@ -32,6 +32,32 @@ Item {
     readonly property bool hidden: slotEmpty || searchHidden || categoryHidden
 
     readonly property string iconSource: result && result.icon ? String(result.icon) : ""
+    property bool iconFailed: false
+    property int iconReloadToken: 0
+    property int iconRetryRevision: 0
+
+    function retryIcon() {
+        root.iconFailed = false
+        root.iconReloadToken++
+        iconRetryTimer.restart()
+    }
+
+    Timer {
+        id: iconRetryTimer
+        interval: 0
+        repeat: false
+        onTriggered: root.iconReloadToken++
+    }
+
+    onIconRetryRevisionChanged: {
+        if (root.iconFailed && root.iconRetryRevision > 0 && root.iconSource.length > 0)
+            root.retryIcon()
+    }
+    onResultChanged: {
+        root.iconFailed = false
+        if (root.iconReloadToken % 2 !== 0)
+            root.iconReloadToken++
+    }
 
     // Clipboard image entries show a page-provided decoded thumbnail in
     // place of the app-icon slot; decoding and caching live on the page.
@@ -55,6 +81,7 @@ Item {
     // The owning page owns the decoded-path cache and the decode queue, so
     // it is the only party that can give this entry another decode.
     signal thumbLoadFailed(string id)
+    signal iconLoadFailed(string id)
     // Revision stamp from the owning page; read by the display bindings so
     // in-place metadata merges repaint the row without rebuilding it.
     property int metaStamp: 0
@@ -314,7 +341,7 @@ Item {
         // Colorful enlarged icon: original colors preserved.
         Image {
             id: iconImage
-            visible: root.iconSource.length > 0 && !thumbImage.visible
+            visible: root.iconSource.length > 0 && !root.iconFailed && !thumbImage.visible
             anchors.left: parent.left
             // (railWidth - iconSize) / 2 keeps the icon horizontally
             // centered inside the 40px rail block.
@@ -322,9 +349,15 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             width: 28
             height: 28
-            source: root.iconSource
+            source: root.iconReloadToken % 2 === 0 ? root.iconSource : ""
             fillMode: Image.PreserveAspectFit
             asynchronous: true
+            onStatusChanged: {
+                if (status === Image.Error && root.iconSource.length > 0) {
+                    root.iconFailed = true
+                    root.iconLoadFailed(String(root.result == null ? "" : root.result.id))
+                }
+            }
             scale: rowPress.pressed ? MotionTokens.pressScale : 1
             Behavior on scale {
                 enabled: !MotionTokens.reducedMotion

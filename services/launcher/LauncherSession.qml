@@ -427,7 +427,8 @@ QtObject {
             root._appsPrimeInFlight = false
             if (root.visible || !answered)
                 return
-            var sorted = LauncherLogic.sortResults(collected)
+            var sorted = LauncherLogic.preferStableIcons(
+                root.displayPool, LauncherLogic.sortResults(collected))
             root.displayPool = sorted
             root._pooledMode = "apps"
             root.publishCategorySummary(true)
@@ -568,6 +569,7 @@ QtObject {
         // the same ordered ids, so redundant refreshes never rebuild the list.
         var sorted = appending ? root.displayPool.concat(batch)
                                 : (complete ? LauncherLogic.sortResults(batch) : batch)
+        sorted = LauncherLogic.preferStableIcons(root.displayPool, sorted)
         var poolStable = appending ? false : LauncherLogic.poolMatches(sorted, root.displayPool)
         var previous = root.results
         if (!poolStable)

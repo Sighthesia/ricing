@@ -293,3 +293,24 @@ function poolMatches(left, right) {
             return false
     return true
 }
+
+// Preserve a known-good icon when a later desktop-entry pull transiently
+// resolves the same app to an empty source. A later successful lookup still
+// replaces an empty icon, while id/order changes remain untouched.
+function preferStableIcons(previous, next) {
+    if (!previous || !next || previous.length !== next.length)
+        return next
+    var merged = next.slice()
+    for (var i = 0; i < next.length; i++) {
+        if (identifierOf(previous[i]) !== identifierOf(next[i]))
+            continue
+        if (iconOf(merged[i]) === "" && iconOf(previous[i]) !== "") {
+            var replacement = ({})
+            for (var key in next[i])
+                replacement[key] = next[i][key]
+            replacement.icon = iconOf(previous[i])
+            merged[i] = replacement
+        }
+    }
+    return merged
+}
