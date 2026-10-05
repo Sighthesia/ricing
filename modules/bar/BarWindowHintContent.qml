@@ -82,7 +82,18 @@ Item {
     // diagnostic nobody can run. `tst_window_hint_content`'s `init()` sets this back to
     // 1, so the tests always measure the real recipes and the live shell is the only
     // thing that is slow. Set it to 1 to get normal motion back.
-    property real debugTimeScale: 6
+    // Observation slow-motion for the hint's own motion, which is what a 6x here is for:
+// it multiplies every duration on the marker's path so the crossing can be read frame by
+// frame. Back to normal speed now that the crossing reads correctly.
+//
+// The multiplier is not cosmetic for the indicator: `trailCatchUp` divides by it, so the
+// trail is NOT the same thickness at every setting. The wake is the head's per-tick travel
+// times `(1 - k) / k`, and with `k = 0.7 / debugTimeScale` that is `1.262 * v` at 6x against
+// `0.429 * v` at 1x - roughly a third as thick at normal speed, measured live at 6x as a
+// 26px bar growing to 27.3. If the trail reads too thin at normal speed, `trailCatchUp`'s
+// numerator is the one number to change; it is set for the normal-speed case and the
+// denominator exists only so slow motion stays representative.
+property real debugTimeScale: 1
 
     property real slideProgress: 1
     // A crossing is under way. A FLAG, not `slideProgress < 1`.
