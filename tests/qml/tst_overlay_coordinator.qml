@@ -177,6 +177,7 @@ Item {
             s._adapters = ({})
             launcherSurface.pendingOpener = null
             launcherSurface.requestedRoute = "launcher"
+            launcherSurface.requestedFromLauncher = false
             openSpy.clear()
             closeSpy.clear()
             opener.forceActiveFocus()
@@ -415,8 +416,16 @@ Item {
             compare(launcherSurface.host.route, "control-center")
             compare(launcherSurface.host.phase, "open")
 
-            // A real hide: the control center goes away the way a user closes
-            // it, which is the only moment the surface is allowed to forget it.
+            // A real hide. This open REPLACED a launcher, so the first press is the
+            // return the entry context earned - which is a route hand-off, not a
+            // hide, and deliberately not the moment the surface forgets its route.
+            // The press after it is the one the launcher declines, so THAT is the
+            // hide.
+            keyClick(Qt.Key_Escape)
+            tryCompare(launcherSurface.host, "route", "launcher", 2000)
+            wait(400)
+            compare(launcherSurface.host.phase, "open",
+                    "returning to the launcher is not a hide")
             keyClick(Qt.Key_Escape)
             tryCompare(launcherSurface.host, "phase", "closed", 1200)
             compare(host.session().visible, false)
@@ -465,6 +474,148 @@ Item {
             verify(launcherSurface.page() !== null)
             verify(launcherSurface.activePage() === launcherSurface.page(),
                    "the active page is the launcher page on the launcher route")
+        }
+
+        // The entry context, end to end.
+//
+// The control center's back press has to answer "return to the launcher, or
+// close?" and the answer is not derivable from the route: an open that replaced
+// a visible launcher and an open straight from the bar entry are the same route
+// on the same surface with the same services. So the wave owner latches the
+// context when the open intent arrives and hands it to the page.
+//
+// These two tests are the pair that matters: the LATCH has to be written by the
+// call that changed the route and left alone by the second call that a hand-off
+// makes to complete it. Read the other way - "recompute every time" - the second
+// call sees the coordinator already owning `control-center` and reports false, so
+// the launcher return silently disappears and this behaviour is untestable.
+
+// Opened from the launcher: Escape from the control-center overview returns to
+// the launcher, through the coordinator, and leaves the surface open.
+function test_escapeFromALauncherEnteredControlCenterReturnsToTheLauncher() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            tryVerify(function() { return host.page() !== null }, 500)
+
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "route", "control-center", 2000)
+            wait(600)
+            compare(launcherSurface.requestedFromLauncher, true,
+                    "the hand-off must record that the launcher was on screen")
+            compare(launcherSurface.activePage().enteredFromLauncher, true,
+                    "and the page must receive that context")
+
+            keyClick(Qt.Key_Escape)
+
+            // Back on the launcher, on the SAME surface, still open.
+            tryCompare(launcherSurface.host, "route", "launcher", 2000)
+            wait(400)
+            compare(launcherSurface.host.phase, "open",
+                    "returning to the launcher must not close the surface")
+            compare(coordinator.activeTarget, "launcher")
+            compare(coordinator.activeOwner, "wave")
+            verify(host.page() !== null, "the launcher page must be back")
+            tryVerify(function() { return host.page().searchField.activeFocus }, 600,
+                    "the launcher's own focus target takes the route back")
+        }
+
+// Opened straight from the bar entry: the same press closes the surface, because
+// there is no launcher behind this open to return to.
+function test_escapeFromABarEntryControlCenterClosesTheSurface() {
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            wait(400)
+
+            compare(launcherSurface.requestedFromLauncher, false,
+                    "a direct open has no launcher behind it")
+            compare(launcherSurface.activePage().enteredFromLauncher, false)
+
+            keyClick(Qt.Key_Escape)
+
+            tryCompare(launcherSurface.host, "phase", "closed", 1200)
+            compare(host.session().visible, false)
+            compare(coordinator.activeTarget, "")
+        }
+
+// The latch describes ONE open. A stale `true` surviving a close would give the
+// NEXT bar-entry open a back press that returns to a launcher the user never
+// left - so the context is dropped with the route it belonged to.
+function test_theEntryContextDoesNotSurviveAClose() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "route", "control-center", 2000)
+            wait(600)
+            compare(launcherSurface.requestedFromLauncher, true)
+
+            // Two presses, because this open came from the launcher: the first
+            // returns to it and the second closes. The point of the test is the
+            // hide, so it walks the real press sequence rather than calling a
+            // close the user cannot perform here.
+            keyClick(Qt.Key_Escape)
+            tryCompare(launcherSurface.host, "route", "launcher", 2000)
+            keyClick(Qt.Key_Escape)
+            tryCompare(launcherSurface.host, "phase", "closed", 1200)
+            compare(launcherSurface.requestedFromLauncher, false,
+                    "the context must die with the open it described")
+            compare(launcherSurface.requestedRoute, "launcher")
+
+            // ...so a fresh bar-entry open starts from no context.
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            wait(400)
+            compare(launcherSurface.requestedFromLauncher, false)
+        }
+
+// The context also dies when another owner takes the surface over, not only
+        // when the surface hides. A wave surface that handed its route to settings
+        // has ended that open, so nothing about "came from the launcher" is still
+        // true - and the sticky route beside it is dropped on exactly the same path,
+        // which is the behaviour this pair is really asserting.
+        function test_aHandOffToAnotherOwnerDropsTheEntryContext() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "route", "control-center", 2000)
+            wait(600)
+            compare(launcherSurface.requestedFromLauncher, true)
+
+            verify(coordinator.request("settings", alternateOpener))
+            tryCompare(launcherSurface.host, "phase", "closed", 1200)
+
+            compare(launcherSurface.requestedFromLauncher, false,
+                    "another owner taking over ends this open, context included")
+            compare(launcherSurface.requestedRoute, "launcher")
+        }
+
+        // A detail page still outranks the launcher return, through the real production
+        // stack - the coordinator and the host included. Otherwise the return would
+        // swallow the detail back and the user could never reach the overview.
+        function test_aDetailEscapeStillPrecedesTheLauncherReturn() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "route", "control-center", 2000)
+            wait(600)
+
+            var page = launcherSurface.activePage()
+            compare(page.enteredFromLauncher, true)
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            compare(page.backAction, "detail")
+
+            keyClick(Qt.Key_Escape)
+
+            // The overview, still on the control-center route.
+            tryVerify(function() { return page.activeSubPage === "" }, 1000)
+            compare(launcherSurface.host.route, "control-center",
+                    "a detail back returns to the overview, not to the launcher")
+            compare(launcherSurface.host.phase, "open")
+
+            // ...and the NEXT press is the launcher return that the entry context
+            // earned, which the previous test proves lands.
+            keyClick(Qt.Key_Escape)
+            tryCompare(launcherSurface.host, "route", "launcher", 2000)
         }
 
         function test_deprecatedWaveTargetsAreRejectedEverywhere() {

@@ -691,5 +691,144 @@ Item {
             compare(host.phase, "open")
             host.destroy()
         }
+
+        // --- Back from the overview: two different answers ---
+
+        // The design's own precedence, at the seam where it is actually decided:
+        // the surface hands the press to the page, and the page answers.
+        //
+        // Opened straight from the bar entry, there is no launcher behind this
+        // route, so the overview declines and the surface closes - which is the
+        // behaviour that existed before entry context existed, and must survive it.
+        function test_aBarEntryOverviewEscapeClosesTheSurface() {
+            var host = openControlCenterWithDetails()
+            var page = host.contentItem
+
+            compare(page.enteredFromLauncher, false,
+                "a direct open has no launcher behind it")
+            compare(host.canGoBack, false,
+                "so the host must not be told the page can go back")
+            compare(page.handleBack(), false)
+
+            keyClick(Qt.Key_Escape)
+            compare(host.phase, "closing",
+                "with no launcher behind it, the overview's press closes the surface")
+            tryCompare(host, "phase", "closed", 2000)
+            host.destroy()
+        }
+
+        // Opened from the launcher, the same press must NOT close the surface: it
+        // hands the route back to its sibling. The page emits the request because
+        // the launcher is a sibling route this surface's owner owns - the page
+        // holds neither the session nor the coordinator, so it asks rather than
+        // routes.
+        //
+        // Asserted as the host's own computed `canGoBack`, which is what
+        // handleEscape() consults; the page's manual flag is never written by a
+        // contract page and would be vacuously false here.
+        function test_anOverviewOpenedFromTheLauncherOffersBackInsteadOfClosing() {
+            var host = openControlCenterWithDetails()
+            var page = host.contentItem
+
+            var requests = 0
+            page.overviewBackRequested.connect(function() { requests++ })
+            page.enteredFromLauncher = true
+
+            tryVerify(function() { return host.canGoBack === true }, 1000,
+                "an open that replaced a launcher must be offered back")
+            compare(page.backAction, "launcher")
+
+            verify(host.handleEscape(), "the press must be consumed")
+
+            compare(host.phase, "open",
+                "returning to the launcher is a route hand-off, not a surface close")
+            compare(requests, 1,
+                "the page asks its owner; it does not route the surface itself")
+            compare(host.route, "control-center",
+                "the route only changes when the owner answers the request")
+            host.destroy()
+        }
+
+        // A detail page still outranks the launcher return, on a page that HAS a
+        // launcher behind it. Otherwise the launcher return would swallow the
+        // detail back and the user could never reach the overview.
+        function test_detailBackStillOutranksTheLauncherReturn() {
+            var host = openControlCenterWithDetails()
+            var page = host.contentItem
+            page.enteredFromLauncher = true
+            tryVerify(function() { return host.canGoBack === true }, 500,
+                "the launcher return is already available before any detail page")
+
+            page.openBluetoothDetails()
+            tryVerify(function() { return page.activeSubPage === "bluetooth-detail" }, 1000)
+            compare(page.backAction, "detail")
+            tryVerify(function() { return host.canGoBack === true }, 1000)
+
+            keyClick(Qt.Key_Escape)
+
+            tryVerify(function() { return page.activeSubPage === "" }, 1000)
+            compare(host.phase, "open", "the detail back must not close the surface")
+            compare(host.route, "control-center")
+            host.destroy()
+        }
+
+        // The sub-page hand-off through the REAL host, with motion on. Same
+        // surface, same route, same Loader: the host's own `route` never changes
+        // and no second surface or page appears, which is what distinguishes a
+        // sub-page from a route swap.
+        function test_theSubPageHandoffNeverTouchesTheHostRoute() {
+            Lazer.MotionTokens.reducedMotionOverride = false
+            var host = openControlCenterWithDetails()
+            var page = host.contentItem
+            var mounted = host.contentItem
+            tryVerify(function() { return page.controlCardCount === 4 }, 2000)
+
+            page.openNetworkDetails()
+            tryVerify(function() { return page.subPageReveal > 0 && page.subPageReveal <= 1 },
+                1000, "the hand-off must pass through a reveal")
+
+            // Mid-flight the host still knows nothing about it: the route page it
+            // holds is the same object, and the surface is fully open throughout.
+            // The overview's own state is asserted here too, and not only its reveal
+            // scalar: a reveal that animates while `visible` flips hard would satisfy
+            // the check above and still be the cut this replaces.
+            verify(host.contentItem === mounted,
+                "a sub-page must not replace the host's route page")
+            compare(host.route, "control-center")
+            compare(host.phase, "open",
+                "a sub-page must not close or reopen the surface")
+            verify(host.routeRetained === true)
+            verify(page.overviewItem.visible,
+                "the outgoing overview must still be painted while the page arrives")
+            verify(page.overviewItem.opacity < 1,
+                "and it must be fading, not already gone (opacity="
+                    + page.overviewItem.opacity + ")")
+
+            tryVerify(function() { return page.subPageReveal === 1 }, 2000)
+            verify(host.contentItem === mounted)
+            compare(host.route, "control-center")
+            compare(host.phase, "open")
+            host.destroy()
+        }
+
+        // Reduced motion through the real host: the hand-off lands immediately,
+        // so the surface is never caught between two states. Asserted on the
+        // settled state in the same turn as the request, which an animation could
+        // not produce.
+        function test_reducedMotionLandsTheSubPageHandoffImmediately() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var host = openControlCenterWithDetails()
+            var page = host.contentItem
+            tryVerify(function() { return page.controlCardCount === 4 }, 2000)
+
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            compare(page.subPageReveal, 1)
+            verify(page.detailPageItem !== null)
+            verify(!page.overviewItem.visible)
+            verify(host.contentItem !== null)
+            compare(host.phase, "open")
+            host.destroy()
+        }
     }
 }

@@ -15,15 +15,21 @@ import "ControlCenterLogic.js" as CcLogic
 // Services.* singletons and a test passes fakes. This page therefore never
 // imports a service. Its own side effects are exactly the four a control
 // performs when the user acts on it (set volume, toggle mute, media transport);
-// opening a detail page or the full notification list is a REQUEST, because this
-// page does not own those destinations. It creates no window and opens no
-// overlay: it is content inside the host's one retained Loader, which is what
-// keeps the launcher and the control center siblings on a single surface.
+// opening a detail page, returning to the launcher, or asking for the full
+// notification list is a REQUEST, because this page does not own those
+// destinations. It creates no window and opens no overlay: it is content inside
+// the host's one retained Loader, which is what keeps the launcher and the
+// control center siblings on a single surface.
 //
 // One set of sections, two arrangements. Each section is declared exactly once
 // and only its x/y/width differs between wide and narrow, so the two layouts
 // cannot drift apart. Every position comes from ControlCenterLogic's own section
 // order, so neither arrangement invents a vocabulary.
+//
+// The details are sub-pages of this one page, cross-faded in place on
+// MotionTokens.waveRoute - the same surface, the same viewport, the same timing
+// the host uses for a sibling-route swap - with the overview retained and alive
+// for the length of its own exit.
 //
 // Sharp language: every block is a right-angled rectangle, state is carried by
 // colour blocks and square bars, and motion comes only from MotionTokens.
@@ -92,21 +98,50 @@ Item {
     property string activeSubPage: ""
     readonly property bool detailActive: root.activeSubPage !== ""
 
-    // The overview is a top-level route with nothing to pop, and a sub-page
-    // always has the overview to pop back to. So this is exactly the mirror of
-    // `detailActive`: it is the ONE place that decides whether a back press
-    // belongs to this page or to the surface.
-    readonly property bool canGoBack: root.detailActive
+    // --- Entry context ---
+    //
+    // Where THIS open came from, handed in by the wave owner that opened the
+    // route. It cannot be worked out from inside the page: there is no session,
+    // no coordinator and no record of what was on screen a moment ago, and the
+    // two cases look identical from here - a control center that replaced a
+    // visible launcher and one opened straight from the bar entry are the same
+    // route with the same services.
+    //
+    // So the owner passes it explicitly, and the page's only job is to honour
+    // it. Default false is the conservative answer: a page that nobody gave
+    // entry context treats back as "close the surface", which is the behaviour
+    // that existed before entry context existed.
+    property bool enteredFromLauncher: false
 
-    // Back is route-local. With no sub-page mounted there is nothing to pop, so
-    // the page reports it cannot handle the press - which is what lets the host
-    // fall through to closing the surface. With one mounted, it pops it and
-    // reports the refresh for the next turn.
+    // What one back press means here, from the module: an active detail page
+    // consumes it, then the sibling launcher route, then closing the surface.
+    // The host never learns about any of this - it asks whether the page can go
+    // back and hands the press over - so this is the one place the precedence
+    // in the spec is decided.
+    readonly property string backAction: CcLogic.backAction(root.activeSubPage,
+        root.detailActive ? root.detailPageItem : null, root.enteredFromLauncher)
+
+    // Exactly the mirror of the module's "close": anything else is a step this
+    // page owns. Both halves of the host's contract are published together -
+    // `canGoBack` true with no callable `handleBack()` would take every press
+    // and do nothing with it.
+    readonly property bool canGoBack: root.backAction !== "close"
+
+    // Back is route-local. A detail page pops itself; the overview returns to the
+    // launcher only when that is where the route was entered from, which is a
+    // REQUEST the wave owner answers, because this page does not own the session
+    // and cannot route itself. Everything else declines, and declining is what
+    // lets the host fall through to closing the surface.
     function handleBack() {
-        if (!root.detailActive)
-            return false
-        root.closeSubPage()
-        return true
+        if (root.backAction === "detail") {
+            root.closeSubPage()
+            return true
+        }
+        if (root.backAction === "launcher") {
+            root.overviewBackRequested()
+            return true
+        }
+        return false
     }
 
     // Where keyboard focus lands when this route opens. The page itself, never a
@@ -134,6 +169,8 @@ Item {
             return false
         root._subPageOpenCount++
         root.activeSubPage = route
+        root._mountedSubPage = route
+        root.revealSubPage(true)
         // Hand focus to the page that just mounted, one turn later: a Loader
         // builds its item ASYNCHRONOUSLY, so reading `detailPageItem` in the
         // same turn as the route change reads null (or the page being replaced),
@@ -158,7 +195,76 @@ Item {
     // next one.
     function closeSubPage() {
         root.activeSubPage = ""
+        root.revealSubPage(false)
         returnRefreshTimer.restart()
+    }
+
+    // --- The same-surface sub-page transition ---
+    //
+    // One scalar crosses over both sides of the swap: the overview fades out as
+    // the detail fades in, on the same surface, in the same viewport, with the
+    // wave surface itself never involved. `MotionTokens.waveRoute` is the host's
+    // own sibling-route cross-fade duration, so a sub-page reads with the same
+    // timing vocabulary a route swap uses rather than introducing a second one.
+    property real subPageReveal: 0
+
+    // What the sub-page Loader currently holds, which is NOT the same question as
+    // `activeSubPage`.
+    //
+    // `activeSubPage` is the authority: back precedence, the focus target and the
+    // module's own backAction all read it, so they answer in the same turn as the
+    // press. This one is what the Loader mounts, and - like WaveSurfaceHost's own
+    // `_loadedRoute` - it outlives the request by exactly one exit, because a
+    // component dropped on the turn the route was cleared would cut the outgoing
+    // page's fade-out short and make the hand-off asymmetric.
+    property string _mountedSubPage: ""
+
+    // Drive the reveal, or land it directly when motion is reduced. The settled
+    // end state is applied here as well as from the animation's own onFinished,
+    // so reduced motion - or an interrupted animation - can never leave a page
+    // mounted forever behind a fully transparent overview.
+    function revealSubPage(revealed) {
+        subPageReveal.stop()
+        subPageHide.stop()
+        if (MotionTokens.reducedMotion) {
+            root.subPageReveal = revealed ? 1 : 0
+            if (!revealed)
+                root._mountedSubPage = ""
+            return
+        }
+        root._subPageRevealTransitions++
+        if (revealed)
+            subPageReveal.restart()
+        else
+            subPageHide.restart()
+    }
+
+    // Both directions run on one duration and one curve, from whatever value the
+    // reveal currently holds, so a press that interrupts an unfinished hand-off
+    // continues from where it was instead of snapping.
+    NumberAnimation {
+        id: subPageReveal
+        target: root
+        property: "subPageReveal"
+        to: 1
+        duration: MotionTokens.waveRoute
+        easing.type: Easing.OutQuint
+    }
+
+    // The exit's own completion: the outgoing page may go now that it has
+    // finished fading. Kept as a standalone animation rather than a step inside a
+    // group, because a nested animation's `onFinished` is not emitted on this Qt.
+    NumberAnimation {
+        id: subPageHide
+        target: root
+        property: "subPageReveal"
+        to: 0
+        duration: MotionTokens.waveRoute
+        easing.type: Easing.OutQuint
+        onFinished: {
+            if (!root.detailActive)
+                root._mountedSubPage = ""
+        }
     }
 
     // The deferred refresh, deferred because doing it in the same turn as the pop
@@ -190,6 +296,28 @@ Item {
     // answers it: the details live here, so the request never leaves the route.
     signal networkDetailsRequested()
     signal bluetoothDetailsRequested()
+
+    // The overview returning to the launcher, which is this route's one request
+    // it cannot answer itself - the launcher is a sibling route on the same wave
+    // surface, owned by the same wave owner, and this page holds neither the
+    // session nor the coordinator that would dispatch the change.
+    //
+    // So it is emitted and the wave owner answers it through the same
+    // `requestRoute()` funnel every other open and close of that surface goes
+    // through. A page that routed itself would be a second dispatch table.
+    signal overviewBackRequested()
+
+    // Asking for the full notification list.
+    //
+    // Deliberately UNWIRED, and the summary therefore renders its action inert.
+    // The full notification view is the bar's own notification popup, reachable
+    // only through a bar widget's hover intent on a different surface family, and
+    // there is no coordinator target, service seam or launcher route that names
+    // it - so the honest state is "no destination", not an enabled button whose
+    // press is dropped. The signal stays as the documented extension point, and
+    // the summary's own gate is what keeps the row from claiming to be a button.
+    // Adding a second notification implementation to make this live is explicitly
+    // out of scope in the design.
     signal notificationsOpenRequested()
 
     // --- Service snapshots ---
@@ -272,12 +400,29 @@ Item {
         }
     }
 
+    // Volume reads the default sink, and the sink's absence has to be declared
+    // HERE rather than derived by the module.
+    //
+    // VolumeService.defaultSinkNode is Pipewire.defaultAudioSink, which is null
+    // whenever there is no output device - and its own sinkVolume / sinkMuted
+    // reads are written as `defaultAudioSink ? ... : 0` and `: false`. So with no
+    // sink the service honestly reports 0 and false, and a snapshot that carried
+    // only those two numbers renders a real-looking, actionable "0%": a slider
+    // that drags a device that is not there and a mute button that toggles
+    // nothing. `empty` is the module's own channel for exactly this - emptiness
+    // is the caller's to declare - so the card reports "No output" and goes
+    // inert, as every other empty state in this page does.
+    //
+    // Strict on the null: a service that publishes no node at all (undefined)
+    // keeps the old reading rather than being silently turned into "no output",
+    // so a partial fake is not mistaken for a machine with no speakers.
     readonly property var volumeSnapshot: {
         var service = root.volumeService
         if (!service)
             return { available: false }
         return {
             available: true,
+            empty: service.defaultSinkNode === null,
             sinkVolume: Number(service.sinkVolume),
             sinkMuted: service.sinkMuted === true
         }
@@ -354,11 +499,12 @@ Item {
             temperature: Number(service.temperature),
             condition: String(service.condition == null ? "" : service.condition),
             location: String(service.location == null ? "" : service.location),
-            // updatedAt is full epoch milliseconds. It is carried through
-            // unconverted because the module's weatherState already treats
-            // isStale and lastError as the stale answer; no epoch arithmetic
-            // happens in this file, so a truncation upstream cannot become a
-            // second and wrong notion of staleness here.
+            // updatedAt is full epoch milliseconds, carried through unconverted. Two
+            // consumers need it whole: the module's own staleness ladder already
+            // treats isStale and lastError as the stale answer, and the age label
+            // below subtracts it from the clock - so no epoch arithmetic happens
+            // anywhere else in this file, and a truncation upstream cannot become
+            // a second and wrong notion of age here.
             updatedAt: Number(service.updatedAt),
             isStale: service.isStale === true,
             lastError: String(service.lastError == null ? "" : service.lastError)
@@ -367,6 +513,20 @@ Item {
     readonly property string weatherState: CcLogic.weatherState(root.weatherSnapshot)
     readonly property bool weatherReady: root.weatherState === "ready"
             || root.weatherState === "stale"
+
+    // How old the reading is, in the module's own compact vocabulary and against
+    // the injectable clock rather than a second Date() - so the age is
+    // deterministic under test and ticks with the same `now` the clock column
+    // renders from. Empty means "not knowable", and the header then shows no age
+    // at all instead of an invented one.
+    //
+    // Only a reading that is actually on screen is dated. A loading state with no
+    // cache has nothing to date, and dating a placeholder would be the one lie
+    // this header must not tell.
+    readonly property string weatherAgeLabel: root.weatherReady
+            ? CcLogic.weatherAgeLabel(root.weatherSnapshot.updatedAt,
+                                      root.now.getTime())
+            : ""
 
     readonly property var batterySnapshot: {
         var service = root.batteryService
@@ -479,12 +639,19 @@ Item {
     Flickable {
         id: layoutSurface
         objectName: "layoutSurface"
-        // The overview yields the viewport while a same-surface sub-page is up,
-        // and is RESTORED - not rebuilt - on the way back: it stays laid out and
-        // retained behind an invisible flag, so returning costs one property
-        // write instead of a whole screen of card, calendar and summary
-        // delegates. `visible` rather than `active` is what makes that possible.
-        visible: !root.detailActive
+        // The overview yields the viewport by FADING, not by vanishing, and it stays
+        // laid out and retained throughout: it is the outgoing content for half
+        // of every hand-off, so it must still exist - still measured, still
+        // holding its delegates - while the last pixel of it fades. Returning to
+        // it therefore costs one property write instead of a whole screen of
+        // card, calendar and summary delegates.
+        //
+        // `enabled` is the input half of that same rule. A retained overview is
+        // visible for the whole fade, so without this a card under a half-faded
+        // overview would answer a tap meant for the page arriving over it.
+        visible: root.subPageReveal < 0.99
+        opacity: 1 - root.subPageReveal
+        enabled: !root.detailActive
         x: root.pagePadding
         // The scroller starts at the page padding in BOTH arrangements, because the
         // header is not in a strip above it: it is the first section of the content
@@ -604,6 +771,27 @@ Item {
                     font.pixelSize: 12
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                }
+
+                // The reading's age, beside the value it belongs to. A cached
+                // number with no timestamp reads as live, which is the one thing
+                // a cached summary must never do - and the age is what makes a
+                // stale reading legible without dimming the number itself.
+                Text {
+                    id: weatherAge
+                    objectName: "weatherAge"
+                    height: 22
+                    verticalAlignment: Text.AlignVCenter
+                    text: root.weatherAgeLabel
+                    color: LazerTheme.textMuted
+                    font.pixelSize: 11
+                    // Sized by its own content: the module's vocabulary is "now",
+                    // "Nm ago", "Nh ago", "Nd ago", so a label is at most a handful
+                    // of characters and cannot become a layout dependency. The
+                    // in-band geometry is asserted as a test rather than defended
+                    // here with a cap - a cap nothing can reach would be an
+                    // untested knob pretending to be a guarantee.
+                    visible: text.length > 0
                 }
             }
 
@@ -768,6 +956,12 @@ Item {
                     to: 1
                     stepSize: 0.02
                     value: root.volumeService ? root.volumeService.sinkVolume : 0
+                    // Gated on the module's own action, exactly like the mute
+                    // button beside it. With no output device the card is empty
+                    // and there is nothing to scrub: leaving the slider live would
+                    // report 0% as a real level and let a drag write a volume to a
+                    // sink that does not exist.
+                    enabled: root.volumeCardState.action === "direct"
                     // A committed step is an embedded-control tap like any other:
                     // the ancestor card's handler still sees this event, and a
                     // scrub must not also toggle mute.
@@ -996,25 +1190,38 @@ Item {
     // ONE Loader for the whole route, holding whichever detail page is active.
     // It is inside this page, not inside the wave host, which is what makes the
     // details sub-pages: the host keeps a single retained Loader on a single
-    // surface, and this swaps its content without a route change, a cross-fade,
-    // a second window, or a coordinator hand-off.
+    // surface, and this swaps its content without a route change, a second
+    // window, or a coordinator hand-off.
     //
-    // `active` is bound to the active sub-page, so a page with none mounted pays
-    // for nothing, and the two Components are created lazily on first use rather
-    // than at the shell's startup.
+    // `active` follows the MOUNTED route rather than the requested one, so a page
+    // that is on its way out survives its own exit - see `_mountedSubPage`.
+    // `visible` is declarative off the reveal, so a page stops painting only once
+    // the transition has actually landed instead of at the instant it was asked
+    // for, which is the settings panel's rule for filtered rows applied to a page.
+    // `enabled` follows the request instead: input belongs to the page that is on
+    // top, and the page fading out must not take a tap meant for the overview
+    // reappearing underneath it.
     Loader {
         id: subPageLoader
         objectName: "controlCenterSubPage"
         anchors.fill: parent
-        active: root.detailActive
-        visible: root.detailActive
+        active: root._mountedSubPage !== ""
+        visible: root.subPageReveal > 0.01
+        opacity: root.subPageReveal
+        enabled: root.detailActive
         // Route-selected by name from the module's own detail routes, so a caller
         // cannot mount an arbitrary component under a detail route's name.
-        sourceComponent: root.activeSubPage === CcLogic.detailRoutes.network
-            ? networkDetailComponent
-            : (root.activeSubPage === CcLogic.detailRoutes.bluetooth
-               ? bluetoothDetailComponent : null)
+        sourceComponent: root.mountedSubPageComponent
     }
+
+    // The component for whatever the Loader is holding, resolved through the same
+    // name check requestSubPage() validated - so the Loader can never be handed
+    // a third destination by a route string that arrived another way.
+    readonly property Component mountedSubPageComponent:
+        root._mountedSubPage === CcLogic.detailRoutes.network
+            ? networkDetailComponent
+            : (root._mountedSubPage === CcLogic.detailRoutes.bluetooth
+               ? bluetoothDetailComponent : null)
 
     // The network detail sub-page. It receives the SAME injected service the
     // overview reads, so the two pages can never disagree about the state.
@@ -1093,10 +1300,19 @@ Item {
     //
     // Each one is a single call into the injected service and nothing else. An
     // absent service means its card is not `direct`, so these guards never fire on
-    // the missing-service path; they exist so a partial fake cannot throw.
+    // the missing-service path; they exist so a partial fake cannot throw - and
+    // so an EMPTY card is inert through this public hook as well as through its
+    // controls. The volume pair needs that second gate: with no output device the
+    // service's own reads are 0/false, so a caller that reached in directly would
+    // otherwise write a volume to a sink that does not exist.
 
     function setVolume(value) {
         if (!root.volumeService || typeof root.volumeService.setSinkVolume !== "function")
+            return
+        // Gated on the module's own action, so an empty card cannot be written
+        // through this public hook either. The slider gates every user path
+        // itself; this is the other half, for a host or a probe calling directly.
+        if (root.volumeCardState.action !== "direct")
             return
         var requested = Number(value)
         // An unusable value clamps to the bottom rather than reaching PipeWire:
@@ -1109,6 +1325,8 @@ Item {
 
     function toggleMute() {
         if (!root.volumeService || typeof root.volumeService.toggleSinkMute !== "function")
+            return
+        if (root.volumeCardState.action !== "direct")
             return
         root.volumeService.toggleSinkMute()
     }
@@ -1185,6 +1403,15 @@ Item {
     readonly property Item dateTextItem: dateText
     readonly property Item weatherTextItem: weatherText
     readonly property Item weatherConditionItem: weatherCondition
+    readonly property Item weatherAgeItem: weatherAge
+
+    // What the age WOULD read for a stamp, against the same injectable clock. The
+    // rendered label is gated on whether there is a reading at all, so this is the
+    // seam that lets a test walk several ages on one frozen page instead of
+    // rebuilding a page per stamp.
+    function weatherAgeLabelFor(updatedAtMs) {
+        return CcLogic.weatherAgeLabel(updatedAtMs, root.now.getTime())
+    }
     readonly property Item weatherStateItem: weatherHost
     readonly property Item headerItem: headerHost
     readonly property Item controlsColumnItem: controlsColumn
@@ -1196,11 +1423,22 @@ Item {
     // separate items flipping independently is how a page ends up showing both
     // or neither.
     readonly property Item overviewItem: layoutSurface
-    // The mounted sub-page, or null when the overview is showing. Read through
-    // this one accessor so a caller never has to know which page is mounted or
-    // how the Loader spells it.
+    // The mounted sub-page, or null when no page is loaded. Read through this one
+    // accessor so a caller never has to know which page is mounted or how the
+    // Loader spells it. It survives the exit animation on purpose - a page that
+    // is still fading out is still mounted - and `detailActive` is the authority
+    // on whether the route considers it current.
     readonly property Item detailPageItem: subPageLoader.item
     readonly property Item subPageLoaderItem: subPageLoader
+    // The transition itself: 0 is the overview, 1 the detail, and anything
+    // between them is a hand-off in flight with both sides alive. The animation
+    // itself and a count of the animated hand-offs are both published, so a test
+    // can prove the reveal RAN rather than reading a reveal that a hard swap
+    // would have produced just as well.
+    readonly property int subPageTransitionCount: _subPageRevealTransitions
+    property int _subPageRevealTransitions: 0
+    readonly property var subPageRevealAnimation: subPageReveal
+    readonly property var subPageHideAnimation: subPageHide
     // Counters for the refresh handshake, so the deferral is observable rather
     // than inferred from a service's side effects.
     readonly property int returnRefreshCount: _returnRefreshCount

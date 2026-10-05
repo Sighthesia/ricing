@@ -60,6 +60,17 @@ Item {
     // request that is still in flight.
     property string requestedRoute: "launcher"
 
+    // Where the newest open intent came from, latched for the same reason and the
+    // same lifetime as `requestedRoute`: whether the launcher was the surface's
+    // route when this open began is what the control center's back press means,
+    // and the route page cannot work it out from inside itself.
+    //
+    // "Came from the launcher" is read as what is actually on screen - the
+    // launcher route loaded AND the surface interactive - rather than from
+    // coordinator ownership, because a retained launcher route from an earlier
+    // visit must not turn a fresh bar-entry open into "go back to the launcher".
+    property bool requestedFromLauncher: false
+
     // Launcher palette anchored on the osu pink family; the wave bands come
     // from the shared LazerTheme.wavePalette so the launcher and the lock
     // screen sweep the same pinks. Independent of the retired
@@ -90,6 +101,13 @@ Item {
     // control-center open replaces the retained page, and a stale launcher
     // reference would then be a destroyed object.
     readonly property Item launcherPage: waveHost.loadedRoute === "launcher" ? waveHost.routePage : null
+
+    // Whether the launcher is what the user is looking at right now. Both halves
+    // matter: the retained route survives every close, so "loaded" alone would
+    // answer yes for a surface nobody can see.
+    function launcherRouteOnScreen() {
+        return waveHost.loadedRoute === "launcher" && waveHost.interactive
+    }
 
     function snapshot() {
         return {
@@ -136,6 +154,17 @@ Item {
     // returns to it once the surface closes.
     function requestRoute(route, opener) {
         root.requestedRoute = route
+        // Latch the entry context, but only on a genuine route change.
+        //
+        // A hand-off re-enters this function a second time: the coordinator
+        // closes this owner to give it the sibling route and then dispatches the
+        // same route again to reopen it, by which point the coordinator already
+        // owns the NEW target. Recomputing there would read "not the launcher"
+        // and erase the very fact this open began on the launcher - so the latch
+        // is written by the call that changed the route and left alone by the
+        // one that only completes it.
+        if (!root.coordinator || root.coordinator.activeTarget !== route)
+            root.requestedFromLauncher = root.launcherRouteOnScreen()
         var action = Logic.openAction(snapshot())
         if (action === "open-session") {
             pendingOpener = opener || null
@@ -230,6 +259,10 @@ Item {
             // the close would turn every later open into a control center.
             // Default opens go back to the launcher.
             root.requestedRoute = root.defaultRoute
+            // ...and the entry context with it: "came from the launcher" describes
+            // one open, and a stale true would give the next open's control center
+            // a back press that returns to a launcher the user never left.
+            root.requestedFromLauncher = false
             if (root.session && root.session.visible)
                 root.session.close()
         }
@@ -375,6 +408,16 @@ Item {
             batteryService: root.batteryService
             notificationService: root.notificationService
             weatherService: root.weatherService
+            // Entry context, from the latch this surface keeps. The page is
+            // retained across opens, so this is a live binding rather than a
+            // one-time assignment - which is what lets one page instance answer
+            // differently for a bar-entry open and a launcher-entry open.
+            enteredFromLauncher: root.requestedFromLauncher
+            // The one request the route cannot answer itself. It re-enters the
+            // same funnel as every other open of this surface, so the launcher is
+            // reached through the coordinator exactly as an entry reaches it -
+            // one dispatch path, one owner, one host.
+            onOverviewBackRequested: root.requestRoute(root.defaultRoute, null)
         }
     }
 

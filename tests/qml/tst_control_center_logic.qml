@@ -53,6 +53,94 @@ Item {
             compare(Logic.weatherState({ available: false }), "unavailable")
         }
 
+        // The finding this replaces: a cached reading was hidden by the refresh
+        // that was replacing it. `loading` used to outrank everything, so the
+        // header showed an ellipsis through the whole request and the cached
+        // value it had just been given never appeared. A usable reading is now the
+        // ladder's floor, which is the entire point of a cache-first adapter.
+        function test_aCachedReadingSurvivesAnInFlightRefresh() {
+            var cached = { available: true, loading: true, temperature: 18.5 }
+            compare(Logic.weatherState(cached), "ready",
+                "an in-flight refresh must not hide a reading it cannot replace yet")
+            // ...including when that refresh is already known to have failed.
+            compare(Logic.weatherState({ available: true, loading: true, temperature: 18.5,
+                lastError: "HTTP 503" }), "stale")
+            compare(Logic.weatherState({ available: true, loading: true, temperature: 18.5,
+                isStale: true }), "stale")
+
+            // With nothing cached the in-flight request still reads as loading, and
+            // still outranks the absent service - that is the "loading without
+            // cache" state the design asks for.
+            compare(Logic.weatherState({ available: true, loading: true }), "loading")
+            compare(Logic.weatherState({ available: false, loading: true }), "loading")
+
+            // A zero-degree reading is a reading. This is the strictness that makes
+            // the ladder work at all: Number(null) and Number("") are both 0, so a
+            // loose coercion would report a confident "0°" for a service that has
+            // cached nothing, and the header could not tell it from a real 0.
+            compare(Logic.weatherState({ available: true, loading: true, temperature: 0 }), "ready")
+            compare(Logic.weatherState({ available: true, loading: true, temperature: null }), "loading")
+            compare(Logic.weatherState({ available: true, loading: true, temperature: "" }), "loading")
+            compare(Logic.weatherState({ available: true, temperature: undefined }), "empty")
+            compare(Logic.weatherState({ available: true, temperature: Number.NaN }), "empty")
+        }
+
+        // The compact age beside a cached number. A cached reading without a
+        // timestamp is indistinguishable from a live one, which is the one thing a
+        // cache-first header must never present.
+        function test_theWeatherAgeLabel() {
+            var now = 1767225600000
+            var minute = 60 * 1000
+            compare(Logic.weatherAgeLabel(now - 5 * minute, now), "5m ago")
+            compare(Logic.weatherAgeLabel(now - 30 * 1000, now), "now",
+                "a reading inside the first minute is not worth a number")
+            compare(Logic.weatherAgeLabel(now - 3 * 60 * minute, now), "3h ago")
+            compare(Logic.weatherAgeLabel(now - 2 * 24 * 60 * minute, now), "2d ago")
+            // Rounded down, never up: an age of 5m59s must not claim six minutes.
+            compare(Logic.weatherAgeLabel(now - (5 * minute + 59000), now), "5m ago")
+
+            // Nothing knowable means no label at all, never a confident wrong one.
+            compare(Logic.weatherAgeLabel(0, now), "",
+                "a zero stamp is no reading, not a reading from 1970")
+            compare(Logic.weatherAgeLabel(undefined, now), "")
+            compare(Logic.weatherAgeLabel(null, now), "")
+            compare(Logic.weatherAgeLabel(Number.NaN, now), "")
+            compare(Logic.weatherAgeLabel(now, undefined), "",
+                "with no clock there is no age to state")
+            compare(Logic.weatherAgeLabel(now, null), "")
+            // A stamp dated ahead of the clock is a clock change, not a reading from
+            // the future; "-3m ago" would be a lie, so the header omits the age.
+            compare(Logic.weatherAgeLabel(now + 3 * minute, now), "")
+        }
+
+        // The whole volume-with-no-sink shape, from the snapshot the page builds
+        // to what the card renders. The page declares the emptiness (it is the
+        // only place that can see the sink node); the module turns it into a state.
+        function test_aVolumeSnapshotWithNoSinkIsEmptyRatherThanZeroPercent() {
+            // What VolumeService reports with no output device: defaultSinkNode is
+            // null and the two level reads are the values it has to invent.
+            var noSink = { available: true, empty: true, sinkVolume: 0, sinkMuted: false }
+            var card = Logic.normalizeCard("volume", noSink)
+            compare(card.status, "empty")
+            compare(card.summary, "No output")
+            compare(card.action, "none", "an empty card must be inert")
+            compare(card.available, true, "it is still a present service, just with nothing to control")
+
+            // With a sink the same two numbers are a real 0% and stay actionable -
+            // the fix must not disable volume on a machine that has speakers.
+            var mutedSink = { available: true, empty: false, sinkVolume: 0, sinkMuted: false }
+            compare(Logic.normalizeCard("volume", mutedSink).status, "ready")
+            compare(Logic.normalizeCard("volume", mutedSink).summary, "0%")
+            compare(Logic.normalizeCard("volume", mutedSink).action, "direct")
+
+            // A snapshot with no declaration at all keeps the old reading, so a
+            // partial fake is not silently turned into "no output".
+            compare(Logic.normalizeCard("volume", { sinkVolume: 0 }).status, "ready")
+            // ...and an explicit false is honoured as emphatically as an explicit
+            // true, which is what makes the page's strict null check safe.
+            compare(Logic.normalizeCard("volume", { empty: false }).status, "ready")
+        }
+
         function test_backPrecedence() {
             compare(Logic.backAction("network-detail", true, true), "detail")
             compare(Logic.backAction("control-center", false, true), "launcher")

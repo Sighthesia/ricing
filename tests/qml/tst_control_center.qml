@@ -320,11 +320,40 @@ Item {
 
     // The brief's shape verbatim, plus call counters so the assertion can tell
     // "the page called the setter" from "the page wrote its own copy".
+    //
+    // `defaultSinkNode` is here because the real VolumeService publishes it, and
+    // the page reads it to decide whether there IS an output device: with no sink
+    // the service's own level reads are `0` and `false`, which is indistinguishable
+    // from a real 0% unless something says the node is absent.
     Component {
         id: fakeVolumeComponent
         QtObject {
             property real sinkVolume: 0.42
             property bool sinkMuted: false
+            property var defaultSinkNode: ({ node: 1 })
+            property int setCalls: 0
+            property int muteCalls: 0
+
+            function setSinkVolume(value) {
+                sinkVolume = value
+                setCalls++
+            }
+
+            function toggleSinkMute() {
+                sinkMuted = !sinkMuted
+                muteCalls++
+            }
+        }
+    }
+
+    // A volume service with no output device: the node is null, and the two level
+    // reads are exactly what VolumeService returns against that null.
+    Component {
+        id: fakeNoSinkComponent
+        QtObject {
+            property real sinkVolume: 0
+            property bool sinkMuted: false
+            property var defaultSinkNode: null
             property int setCalls: 0
             property int muteCalls: 0
 
@@ -1561,22 +1590,84 @@ Item {
             compare(bare.unreadCount, 4)
         }
 
-        // Opening the summary is a request for the full view; it is emphatically
-        // not a decision to clear the user's unread notifications.
-        function test_openingTheSummaryNeverMarksAnythingRead() {
+        // "View all" has no destination, so it must not LOOK like a live action.
+        //
+        // The full notification list is the bar's own popup, reachable only through
+        // a bar widget's hover intent on a different surface family, with no
+        // coordinator target, service seam or wave route that names it. So there is
+        // no owner to dispatch the request to, and an enabled button whose press is
+        // dropped is exactly the dead affordance this row must not be. Designing a
+        // second notification implementation is explicitly out of scope.
+        function test_viewAllIsInertBecauseNoFullNotificationViewIsReachable() {
             var service = seedNotifications(makeFake(fakeNotificationComponent), 3)
             var summary = makeNotifications({ notificationService: service })
+            tryVerify(function() { return summary.viewAllItem.width > 0 }, 1000)
+            tryVerify(function() { return summary.entryCount > 0 }, 1000)
+
+            compare(summary.viewAllAvailable, false,
+                "there is no owner for the request, so the row cannot be live")
+            compare(summary.viewAllEnabled, false,
+                "entries alone must not make an unreachable action live")
+            compare(summary.viewAllItem.enabled, false)
+            compare(summary.viewAllItem.activeFocusOnTab, false,
+                "an inert row must stay out of the tab chain")
+            compare(summary.viewAllItem.Accessible.role, Accessible.StaticText,
+                "the row must not announce itself as a button")
+            // ...and it says which of the two reasons applies, so the a11y tree
+            // never reads as a control with nothing behind it.
+            verify(summary.viewAllItem.Accessible.name.indexOf("not available") >= 0,
+                "an inert row with entries must name the real reason: "
+                    + summary.viewAllItem.Accessible.name)
+            verify(summary.viewAllUnavailableReason.indexOf("not available") >= 0)
+            // The accent colour is this language's word for "live", so it leaves
+            // with the action.
+            compare(summary.viewAllLabelItem.color, Lazer.LazerTheme.textMuted,
+                "an inert row must not keep the live-action accent")
+
+            // Nothing can reach the request: no programmatic activation, no click,
+            // no key path. All three go through the same gate.
             var requests = 0
             summary.openRequested.connect(function() { requests++ })
+            summary.viewAllItem.activate()
+            mouseClick(summary.viewAllItem, summary.viewAllItem.width / 2,
+                       summary.viewAllItem.height / 2)
+            keyClick(Qt.Key_Return)
+            wait(60)
+            compare(requests, 0,
+                "an action with no owner must emit nothing (requests=" + requests + ")")
+        }
+
+        // The row stays in place and keeps its fixed band: the design asks for a
+        // route to the full view, and removing the affordance would hide that the
+        // surface has an unanswered need rather than solve it.
+        function test_theInertViewAllRowKeepsTheFixedSummaryFootprint() {
+            var service = seedNotifications(makeFake(fakeNotificationComponent), 3)
+            var summary = makeNotifications({ notificationService: service })
+            tryVerify(function() { return summary.viewAllItem.width > 0 }, 1000)
+
+            compare(summary.viewAllItem.height, summary.footerHeight)
+            compare(summary.implicitHeight,
+                summary.headerHeight + summary.rowGap + summary.entryBandHeight
+                    + summary.rowGap + summary.footerHeight + summary.contentPadding * 2,
+                "an inert row must not change the reserved band")
+        }
+
+        // Reading state is never touched by anything this summary does - not on
+        // construction, not by a click, not by the row being inert.
+        function test_theSummaryNeverMarksAnythingRead() {
+            var service = seedNotifications(makeFake(fakeNotificationComponent), 3)
+            var summary = makeNotifications({ notificationService: service })
             tryVerify(function() { return summary.viewAllItem.width > 0 }, 1000)
 
             compare(service.markAllCalls, 0, "construction must not touch read state")
             mouseClick(summary.viewAllItem, summary.viewAllItem.width / 2,
                        summary.viewAllItem.height / 2)
-            tryVerify(function() { return requests === 1 }, 800)
-            compare(service.markAllCalls, 0, "opening must not call markAllRead()")
-            compare(service.markReadCalls, 0, "opening must not call markRead()")
-            compare(service.unreadCount, 3, "the unread count is unchanged by opening")
+            summary.viewAllItem.activate()
+            wait(60)
+            compare(service.markAllCalls, 0,
+                "no path through the summary may call markAllRead()")
+            compare(service.markReadCalls, 0, "nor markRead()")
+            compare(service.unreadCount, 3, "the unread count is unchanged")
         }
 
         function test_anEmptyHistoryOffersNoViewAllAction() {
@@ -1585,6 +1676,10 @@ Item {
             tryVerify(function() { return summary.entryCount === 0 }, 1000)
             compare(summary.viewAllEnabled, false,
                 "nothing to view means nothing to activate")
+            // With nothing to view the reason is the emptiness, not the missing
+            // destination - the two are different words and both are truthful.
+            verify(summary.viewAllUnavailableReason.indexOf("nothing to open") >= 0)
+            compare(summary.viewAllItem.Accessible.role, Accessible.StaticText)
             var requests = 0
             summary.openRequested.connect(function() { requests++ })
             summary.viewAllItem.activate()
@@ -1762,6 +1857,13 @@ Item {
             tryCompare(volume, "setCalls", 4, 800)
             compare(volume.sinkVolume, 0, "an unusable value clamps rather than reaching the service")
 
+            // A present sink is what makes both controls live at all: with no
+            // output device the card is empty and there is nothing to scrub.
+            compare(page.volumeSliderItem.enabled, true,
+                "a real sink must leave the slider live - the fix must not "
+                    + "disable volume on a machine that has speakers")
+            compare(page.muteButtonItem.enabled, true)
+
             // The mute button is the second action on the same card.
             compare(volume.sinkMuted, false)
             mouseClick(page.muteButtonItem, page.muteButtonItem.width / 2,
@@ -1783,6 +1885,54 @@ Item {
             wait(50)
             page.volumeCard.activate()
             tryCompare(volume, "muteCalls", 3, 800)
+        }
+
+        // No output device is not a 0% sink.
+        //
+        // VolumeService answers `sinkVolume: 0` and `sinkMuted: false` when
+        // Pipewire.defaultAudioSink is null - those are the only values it can
+        // produce against no node - so before this was read the card rendered a
+        // real-looking, actionable "0%": a slider that dragged a device that is not
+        // there and a mute button that toggled nothing. The card has to declare
+        // the emptiness, because the two states are byte-identical in the service's
+        // own level reads.
+        function test_noOutputDeviceIsAnEmptyInertCardRatherThanZeroPercent() {
+            var volume = makeFake(fakeNoSinkComponent)
+            var page = makePage({ volumeService: volume })
+            tryVerify(function() { return page.volumeSliderItem.width > 0 }, 1000)
+
+            compare(page.volumeCard.status, "empty")
+            compare(page.volumeCard.summary, "No output",
+                "a machine with no output device must not read as a muted-to-zero sink")
+            compare(page.volumeCardState.action, "none")
+            compare(page.volumeCard.available, true,
+                "the service is still present; it just has nothing to control")
+
+            // Painted, and announced as text carrying its state - the same contract
+            // every other non-ready card in this page keeps.
+            verify(page.volumeCard.visible, "the card stays painted")
+            compare(page.volumeCard.Accessible.role, Accessible.StaticText,
+                "an inert card must not announce itself as a button")
+
+            // And every way of reaching the service from that card is refused: both
+            // embedded controls, the card's own activation, and the two public
+            // hooks a host or probe could call directly.
+            compare(page.volumeSliderItem.enabled, false)
+            compare(page.muteButtonItem.enabled, false)
+            page.volumeSliderItem.setValue(0.8)
+            wait(50)
+            page.muteButtonItem.activate()
+            wait(50)
+            page.volumeCard.activate()
+            wait(50)
+            page.setVolume(0.8)
+            page.toggleMute()
+            wait(50)
+            compare(volume.setCalls, 0,
+                "no sink means no write: setCalls=" + volume.setCalls)
+            compare(volume.muteCalls, 0,
+                "no sink means no mute: muteCalls=" + volume.muteCalls)
+            compare(volume.sinkMuted, false)
         }
 
         // A track tap or scrub is the slider's, not the card's. Qt delivers the
@@ -2097,8 +2247,12 @@ Item {
 
         function test_everyWeatherStateRendersWithoutBlocking() {
             var states = [
-                { available: true, loading: true },
-                { available: false },
+                // Loading with NOTHING cached is the design's loading state: a
+                // request that has not landed is not an absence. The temperature is
+                // NaN rather than omitted because the fake's own default is 18.5,
+                // and an inherited default would silently make this a cached case.
+                { available: true, loading: true, temperature: Number.NaN },
+                { available: false, temperature: Number.NaN },
                 { available: true, temperature: 18.5, isStale: true },
                 { available: true, temperature: 18.5, lastError: "HTTP 503" },
                 { available: true, temperature: Number.NaN },
@@ -2138,6 +2292,200 @@ Item {
             compare(absent.weatherState, "unavailable")
             compare(absent.weatherTextItem.text, "—")
             compare(absent.weatherConditionItem.text, "Unavailable")
+        }
+
+        // A cached reading must stay on screen while the refresh that will replace it is
+        // in flight.
+        //
+        // This is the finding the header had: `loading` outranked everything, so the
+        // whole request duration showed an ellipsis and the number the adapter had
+        // just handed over was never seen. A cache-first adapter whose cache is
+        // hidden during the refresh that fills it is not cache-first.
+        function test_aCachedReadingStaysVisibleWhileTheRefreshIsInFlight() {
+            var page = makePage({
+                now: new Date(2026, 9, 12, 9, 41),
+                weatherService: makeFake(fakeWeatherComponent, {
+                    available: true, loading: true, temperature: 18.5,
+                    condition: "partly-cloudy", isStale: false })
+            })
+            tryVerify(function() { return page.clockTextItem.width > 0 }, 1000)
+
+            compare(page.weatherState, "ready",
+                "an in-flight refresh must not hide the reading it is replacing")
+            compare(page.weatherTextItem.text, "19°",
+                "the cached value must stay on screen through the request")
+            compare(page.weatherConditionItem.text, "partly-cloudy",
+                "the cached condition must stay too")
+
+            // And the same reading once the request lands changes nothing a user
+            // would see - no flash, no jump between two renderings of one value.
+            page.weatherService.loading = false
+            wait(30)
+            compare(page.weatherState, "ready")
+            compare(page.weatherTextItem.text, "19°")
+        }
+
+        // A cached reading plus a failed refresh: value kept, staleness visible, and
+        // - because the refresh failed - nothing dated "now".
+        function test_aFailedRefreshWithACacheKeepsTheValueAndMarksItStale() {
+            var page = makePage({
+                weatherService: makeFake(fakeWeatherComponent, {
+                    available: true, loading: true, temperature: 18.5,
+                    lastError: "HTTP 503" })
+            })
+            tryVerify(function() { return page.clockTextItem.width > 0 }, 1000)
+            compare(page.weatherState, "stale")
+            compare(page.weatherTextItem.text, "19°",
+                "a failed refresh must not take the cached value away")
+            // The value stays legible; the staleness is carried by the dimmed word
+            // beside it and by the age, not by removing the number.
+            verify(page.weatherTextItem.color !== Lazer.LazerTheme.textMuted,
+                "the cached value must stay legible through a failed refresh")
+            compare(page.weatherConditionItem.color, Lazer.LazerTheme.textMuted,
+                "the condition word carries the staleness")
+        }
+
+        // The age is what makes a stale reading honest: the number on screen is
+        // old, and the header says so. Without it a cached reading is
+        // indistinguishable from a live one, which is the failure a cache-first
+        // header must not have.
+        function test_aStaleReadingIsDatedSoItCannotReadAsLive() {
+            var clock = new Date(2026, 9, 12, 9, 41)
+            var page = makePage({
+                now: clock,
+                weatherService: makeFake(fakeWeatherComponent, {
+                    available: true, temperature: 18.5, isStale: true,
+                    lastError: "HTTP 503",
+                    updatedAt: clock.getTime() - 3 * 60 * 60 * 1000 })
+            })
+            tryVerify(function() { return page.clockTextItem.width > 0 }, 1000)
+
+            compare(page.weatherState, "stale")
+            compare(page.weatherAgeLabel, "3h ago",
+                "a stale reading must say how old it is")
+            verify(page.weatherAgeItem.visible)
+        }
+
+        // The design asks for the cached value AND its update age: a number with no
+        // timestamp is indistinguishable from a live one, which is the one thing a
+        // cached summary must not present.
+        function test_theHeaderShowsTheReadingsAgeBesideTheValue() {
+            // The LONGEST label the module can produce, not a typical one. This
+            // header shares one centred band with the clock column and the battery
+            // block, so the assertion below is about the worst case: if the widest
+            // label fits between them, every label does.
+            var clock = new Date(2026, 9, 12, 9, 41)
+            var page = makePage({
+                now: clock,
+                weatherService: makeFake(fakeWeatherComponent, {
+                    available: true, temperature: 18.5, condition: "partly-cloudy",
+                    updatedAt: clock.getTime() - 999 * 24 * 60 * 60 * 1000 })
+            })
+            tryVerify(function() { return page.clockTextItem.width > 0 }, 1000)
+
+            compare(page.weatherAgeLabel, "999d ago",
+                "this fixture must present the worst-case label")
+            compare(page.weatherAgeItem.text, "999d ago")
+            verify(page.weatherAgeItem.visible,
+                "a dated reading must show its age")
+            verify(page.weatherAgeItem.width > 0)
+
+            // The age follows the value it belongs to, and stays inside the header band.
+            verify(page.weatherAgeItem.x >= page.weatherConditionItem.x,
+                "the age follows the value it describes")
+            verify(page.weatherAgeItem.x + page.weatherAgeItem.width
+                <= page.headerItem.width + 0.5,
+                "the age must stay inside the header band")
+            compare(page.weatherAgeItem.height, page.weatherConditionItem.height,
+                "the age shares the band's line height")
+
+            // The band is CENTRED between the clock column and the battery block, so this
+            // is the check that a new label cannot grow the header into its
+            // neighbours. Measured against the real neighbours rather than against
+            // the header's own width, which the band can never reach and would
+            // therefore make the assertion vacuous.
+            var band = page.weatherStateItem
+            tryVerify(function() { return band.width > 0 }, 1000)
+            // Against the clock's INK, not its slot. The clock column reserves 42% of
+            // the header and the clock text fills it from the left, so its `width` is
+            // a reservation rather than an occupied edge - asserting against that
+            // would fail on a band that overlaps nothing.
+            var clockRight = page.clockTextItem.x + page.clockTextItem.implicitWidth
+            var batteryLeft = page.batteryStateItem.x
+            verify(band.x >= clockRight - 0.5,
+                "the weather band must clear the clock text (band starts at "
+                    + band.x.toFixed(1) + ", clock ink ends at " + clockRight.toFixed(1) + ")")
+            verify(band.x + band.width <= batteryLeft + 0.5,
+                "the weather band must clear the battery block (band ends at "
+                    + (band.x + band.width).toFixed(1) + ", battery starts at "
+                    + batteryLeft.toFixed(1) + ")")
+
+            // ...and in the NARROW arrangement, where the header is far tighter. The
+            // same band on a smaller surface is the case that would actually collide,
+            // so a wide-only check proves nothing about the panel's worst shape.
+            var narrow = makePage({
+                width: 420, height: 1400, now: clock,
+                weatherService: makeFake(fakeWeatherComponent, {
+                    available: true, temperature: 18.5, condition: "partly-cloudy",
+                    updatedAt: clock.getTime() - 999 * 24 * 60 * 60 * 1000 })
+            })
+            tryVerify(function() { return narrow.weatherAgeItem.width > 0 }, 1000)
+            var narrowBand = narrow.weatherStateItem
+            verify(narrowBand.x >= narrow.clockTextItem.x
+                    + narrow.clockTextItem.implicitWidth - 0.5,
+                "the narrow weather band must clear the clock text (band starts at "
+                    + narrowBand.x.toFixed(1) + ")")
+            verify(narrowBand.x + narrowBand.width
+                <= narrow.batteryStateItem.x + 0.5,
+                "the narrow weather band must clear the battery block (band ends at "
+                    + (narrowBand.x + narrowBand.width).toFixed(1) + ")")
+            verify(page.weatherAgeLabelFor(clock.getTime() - 999 * 24 * 60 * 60 * 1000)
+                === "999d ago",
+                "the longest label the module can produce, so this is the worst case")
+
+            // Several ages, all from full epoch milliseconds - the same contract the
+            // staleness check uses, so a truncated stamp cannot produce a plausible
+            // age here while producing nonsense there.
+            compare(page.weatherAgeLabelFor(clock.getTime() - 20 * 1000), "now")
+            compare(page.weatherAgeLabelFor(clock.getTime() - 3 * 60 * 60 * 1000), "3h ago")
+            compare(page.weatherAgeLabelFor(clock.getTime() - 2 * 24 * 60 * 60 * 1000), "2d ago")
+        }
+
+        // No reading, or nothing knowable to date: the header stays usable and shows
+        // no age at all, rather than an invented or negative one.
+        function test_theAgeIsOmittedWheneverItIsNotKnowable() {
+            var clock = new Date(2026, 9, 12, 9, 41)
+            var noCache = makePage({
+                now: clock,
+                weatherService: makeFake(fakeWeatherComponent, {
+                    available: true, loading: true, temperature: Number.NaN })
+            })
+            tryVerify(function() { return noCache.clockTextItem.width > 0 }, 1000)
+            compare(noCache.weatherState, "loading")
+            compare(noCache.weatherAgeLabel, "",
+                "a loading header with nothing cached has nothing to date")
+            verify(!noCache.weatherAgeItem.visible,
+                "an empty label must not occupy the band")
+            compare(noCache.weatherAgeItem.width, 0)
+
+            // A reading with no usable stamp: the number is shown, the age is not.
+            var undated = makePage({
+                now: clock,
+                weatherService: makeFake(fakeWeatherComponent, {
+                    available: true, temperature: 18.5, updatedAt: 0 })
+            })
+            tryVerify(function() { return undated.clockTextItem.width > 0 }, 1000)
+            compare(undated.weatherState, "ready")
+            compare(undated.weatherTextItem.text, "19°")
+            compare(undated.weatherAgeLabel, "",
+                "a zero stamp is no reading, not a reading from 1970")
+            verify(!undated.weatherAgeItem.visible)
+
+            // No service at all: still a usable header.
+            var absent = makePage({ now: clock })
+            tryVerify(function() { return absent.clockTextItem.width > 0 }, 1000)
+            compare(absent.weatherAgeLabel, "")
+            verify(!absent.weatherAgeItem.visible)
         }
 
         // A page the shell retains keeps its header on screen for minutes at a time,
@@ -2516,6 +2864,15 @@ Item {
             verify(file.text.indexOf("CcLogic.minimumTwoColumnWidth") >= 0,
                 "the breakpoint value must be the module's own constant")
             verify(file.text.indexOf("CcLogic.weatherState") >= 0)
+            verify(file.text.indexOf("CcLogic.weatherAgeLabel") >= 0,
+                "the age label must come from the module too")
+
+            // Back precedence is the module's as well. A page that reimplemented
+            // the detail-then-launcher-then-close order would pass every behaviour
+            // test above while being free to drift from the one place it is written
+            // down, so the call itself is what is asserted here.
+            verify(file.text.indexOf("CcLogic.backAction") >= 0,
+                "the back precedence must come from the module")
         }
 
         // --- Detail pages: the same-surface contract ---
@@ -2571,13 +2928,170 @@ Item {
             verify(detail !== null, "the network detail page must be mounted")
             compare(detail.objectName, "controlCenterNetworkDetail")
             tryVerify(function() { return detail.width > 0 && detail.height > 0 }, 1000)
+            // Wait for the reveal to LAND before asserting the settled state. A
+            // TestCase function does not run the event loop, so a value an
+            // animation is still driving reads as its pre-change value - and
+            // asserting "invisible" mid-fade would be asserting a hard cut that the
+            // transition exists to remove.
+            tryVerify(function() { return page.subPageReveal === 1 }, 2000)
             verify(!page.overviewItem.visible,
-                "the overview yields the viewport while a detail page is up")
+                "the overview yields the viewport once the detail page has landed")
+            compare(page.overviewItem.opacity, 0)
             verify(page.visible, "the route page itself is still alive")
 
             page.openBluetoothDetails()
             tryVerify(function() { return page.activeSubPage === "bluetooth-detail" }, 1000)
             compare(page.detailPageItem.objectName, "controlCenterBluetoothDetail")
+        }
+
+        // The hand-off is a transition on the existing surface, not a hard swap.
+        //
+        // What it must not be: a cut. Before this, `visible` flipped between two
+        // items in one turn, so the overview was gone on the frame the detail
+        // appeared and the user saw a blink rather than a page change. So the
+        // recipe is asserted, not a sampled opacity: the animation's own
+        // duration, curve and endpoint - which cannot drift silently the way a
+        // copied constant can - plus the observable proof that both sides are
+        // alive at once mid-flight.
+        function test_theSubPageHandoffIsATokenTimedCrossfadeOnOneSurface() {
+            var page = makePage({
+                networkService: makeFake(fakeNetworkDetailComponent),
+                bluetoothService: makeFake(fakeBluetoothDetailComponent)
+            })
+            tryVerify(function() { return page.controlCardCount === 4 }, 1000)
+            compare(page.subPageReveal, 0, "the overview owns the viewport to begin with")
+
+            var host = page.parent
+            var before = page.subPageTransitionCount
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+
+            // The recipe, read off the real animation object rather than a constant
+            // copied into the test.
+            compare(page.subPageRevealAnimation.to, 1)
+            compare(page.subPageRevealAnimation.duration,
+                Lazer.MotionTokens.waveRoute,
+                "the hand-off must run on the wave route token, not a local number")
+            compare(page.subPageRevealAnimation.easing.type, Easing.OutQuint)
+            compare(page.subPageHideAnimation.to, 0)
+            compare(page.subPageHideAnimation.duration, Lazer.MotionTokens.waveRoute)
+            verify(page.subPageTransitionCount > before,
+                "a request must go through the transition, not snap to it")
+
+            // Mid-flight: BOTH sides exist. This is what a hard cut cannot produce,
+            // and it is the load-bearing part - an implementation that destroyed the
+            // outgoing side and rebuilt it later would still reach reveal === 1.
+            var sawBothAlive = false
+            for (var i = 0; i < 40 && !sawBothAlive; i++) {
+                wait(8)
+                if (page.subPageReveal > 0 && page.subPageReveal < 1) {
+                    sawBothAlive = true
+                    verify(page.detailPageItem !== null,
+                        "the incoming page must be mounted mid-flight")
+                    verify(page.overviewItem.visible,
+                        "the outgoing overview must still be painted mid-flight")
+                    verify(page.overviewItem.height > 0,
+                        "the outgoing overview must still be laid out mid-flight")
+                    compare(page.controlCardCount, 4,
+                        "the overview's cards must survive the transition")
+                    // Opacities strictly between the two ends: a real cross-dissolve,
+                    // not one side at full strength under a flag.
+                    verify(page.overviewItem.opacity > 0 && page.overviewItem.opacity < 1,
+                        "the overview must fade, not cut (opacity="
+                            + page.overviewItem.opacity + ")")
+                    // The Loader slot carries the fade, so the reveal is the incoming side's
+                    // opacity: read on the Loader, not on the item inside it.
+                    compare(page.subPageLoaderItem.opacity, page.subPageReveal)
+                    // Input belongs to the side on top, never to the retained
+                    // overview underneath it.
+                    verify(!page.overviewItem.enabled,
+                        "the retained overview must not take a tap meant for the page above it")
+                }
+            }
+            verify(sawBothAlive,
+                "the hand-off must pass through an in-between state (reveal="
+                    + page.subPageReveal + ")")
+
+            // ...and it lands.
+            tryVerify(function() { return page.subPageReveal === 1 }, 2000)
+            compare(page.overviewItem.opacity, 0)
+            verify(!page.overviewItem.visible)
+
+            // One surface, throughout: the route never changed and no window or
+            // second loader appeared. The overview is a child of this page before,
+            // during and after.
+            verify(host !== null)
+            compare(page.objectName, "controlCenterPage")
+        }
+
+        // Reduced motion is a real product state, so the hand-off has to collapse to
+        // its end state without a wall-clock wait and without leaving anything
+        // mounted. The animation must not run at all - not run faster.
+        function test_reducedMotionCollapsesTheSubPageHandoff() {
+            Lazer.MotionTokens.reducedMotionOverride = true
+            var page = makePage({
+                networkService: makeFake(fakeNetworkDetailComponent),
+                bluetoothService: makeFake(fakeBluetoothDetailComponent)
+            })
+            tryVerify(function() { return page.controlCardCount === 4 }, 1000)
+
+            page.openNetworkDetails()
+            // Settled in the same turn, which is the whole point: an animation would
+            // still be mid-flight right here.
+            compare(page.activeSubPage, "network-detail")
+            compare(page.subPageReveal, 1)
+            verify(!page.subPageRevealAnimation.running,
+                "reduced motion must not run the reveal animation")
+            compare(page.overviewItem.opacity, 0)
+            verify(page.detailPageItem !== null)
+
+            // And the return collapses too, including dropping the page - otherwise
+            // a reduced-motion session would accumulate a detail page per visit.
+            page.closeSubPage()
+            compare(page.activeSubPage, "")
+            compare(page.subPageReveal, 0)
+            tryVerify(function() { return page.detailPageItem === null }, 1000,
+                "the collapsed exit must still release the page it mounted")
+            Lazer.MotionTokens.reducedMotionOverride = false
+        }
+
+        // The outgoing page must survive its own exit long enough to be seen leaving.
+        //
+        // Clearing the route and dropping the Loader's component in the same turn -
+        // which is what a simpler version of this transition does - destroys the
+        // page on the first frame of its fade, so the exit is a cut on one side
+        // only. `activeSubPage` (what the route IS) and `_mountedSubPage` (what the
+        // loader holds) are therefore different questions, and this asserts the
+        // split is real.
+        function test_theOutgoingSubPageStaysAliveForItsOwnExit() {
+            var page = makePage({
+                networkService: makeFake(fakeNetworkDetailComponent),
+                bluetoothService: makeFake(fakeBluetoothDetailComponent)
+            })
+            tryVerify(function() { return page.controlCardCount === 4 }, 1000)
+            page.openNetworkDetails()
+            tryVerify(function() { return page.subPageReveal === 1 }, 2000)
+            var outgoing = page.detailPageItem
+            verify(outgoing !== null)
+
+            page.closeSubPage()
+            // Same turn: the route has already let go...
+            compare(page.activeSubPage, "",
+                "the route authority flips immediately, so back never waits on motion")
+            compare(page.backAction, "close",
+                "with no detail mounted the overview's own answer takes over")
+            // ...while the page itself is still mounted and still fading.
+            verify(page.detailPageItem === outgoing,
+                "the outgoing page must survive the turn that released it")
+            verify(page.detailPageItem.opacity > 0,
+                "and it must still be partly painted, or its exit is a cut")
+
+            // It goes when the exit finishes, and only then.
+            tryVerify(function() { return page.detailPageItem === null }, 2000,
+                "the page must be released once its exit has landed")
+            compare(page.subPageReveal, 0)
+            verify(page.overviewItem.visible, "the overview is back")
+            compare(page.overviewItem.opacity, 1)
         }
 
         // Focus follows the mounted page. While a sub-page is up, a keystroke meant for
@@ -2689,9 +3203,85 @@ Item {
             // Same turn: the overview is already back and the refresh has NOT
             // happened. This is the whole point of the deferral.
             compare(page.activeSubPage, "")
-            verify(page.overviewItem.visible)
+            verify(page.overviewItem.visible,
+                "the overview is restored in this turn, not after the fade")
             compare(page.returnRefreshCount, 0,
                 "restoring the overview and refreshing it are different turns")
+        }
+
+        // Back from the overview goes to the launcher only when that is where this
+        // open came from.
+        //
+        // The design's order is: detail page, then the sibling launcher route when
+        // the route was entered from the launcher, then close the surface. The page
+        // cannot work out the middle case by itself - it holds no session and no
+        // coordinator - so it is told, and the two cases have to stay visibly
+        // different: a bar-entry open must not strand the user on a control center
+        // with a back press that goes nowhere useful.
+        function test_overviewBackAsksForTheLauncherOnlyWhenEnteredFromIt() {
+            var page = makePage({
+                networkService: makeFake(fakeNetworkComponent),
+                bluetoothService: makeFake(fakeBluetoothComponent)
+            })
+            tryVerify(function() { return page.controlCardCount === 4 }, 1000)
+
+            var requests = 0
+            page.overviewBackRequested.connect(function() { requests++ })
+
+            // The bar-entry case: no entry context at all, which is the default.
+            compare(page.enteredFromLauncher, false)
+            compare(page.backAction, "close")
+            compare(page.canGoBack, false,
+                "an open with no launcher behind it offers the surface a close")
+            compare(page.handleBack(), false,
+                "declining is what lets the host close the surface")
+            compare(requests, 0, "and nothing is asked of the wave owner")
+
+            // The launcher-entry case: the same page, told where it was entered from.
+            page.enteredFromLauncher = true
+            wait(20)
+            compare(page.backAction, "launcher")
+            compare(page.canGoBack, true)
+            verify(page.handleBack(), "the press must be consumed")
+            compare(requests, 1,
+                "the wave owner owns the launcher route, so the page asks for it")
+
+            // Detail-page back still outranks it: with a sub-page mounted the same
+            // page must pop that, not ask for the launcher.
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            compare(page.backAction, "detail")
+            compare(page.handleBack(), true)
+            tryVerify(function() { return page.activeSubPage === "" }, 1000)
+            compare(requests, 1,
+                "popping a detail page must not also ask for the launcher")
+        }
+
+        // Both halves of the host's back contract, or neither: a page advertising
+        // `canGoBack: true` with no callable handler would swallow every press and
+        // do nothing with it, which is a surface nobody can close.
+        function test_everyBackAnswerIsActionable() {
+            var answers = [false, true]
+            for (var i = 0; i < answers.length; i++) {
+                var page = makePage({})
+                tryVerify(function() { return page.controlCardCount === 4 }, 1000)
+                page.enteredFromLauncher = answers[i]
+                wait(20)
+                compare(typeof page.handleBack, "function",
+                    "every entry context must publish a callable handler")
+                // The host's own rule, applied here: the page is the authority on
+                // back, so `canGoBack: true` without a callable handler would take
+                // every Escape press and do nothing with it - a surface nobody can
+                // close. `handleBack()` is what turns the answer into an action.
+                if (page.canGoBack) {
+                    verify(page.handleBack(),
+                        "an offered back press must be actionable (enteredFromLauncher="
+                            + answers[i] + ")")
+                } else {
+                    compare(page.handleBack(), false,
+                        "an unoffered back press must decline, so the host can close")
+                }
+            }
         }
 
         // The deferral itself, asserted as its own thing: same turn restores the
@@ -3804,6 +4394,11 @@ Item {
             // Back precedence, from the live page: nothing to pop on the overview,
             // one step to pop while a detail page is mounted, and a real refusal
             // in between so the host's fall-through-to-close stays reachable.
+            //
+            // The overview refusal is asserted in the no-entry-context state, which
+            // is the bar-entry case: with a launcher behind the route the same page
+            // instead offers a return, and conflating the two would hide both.
+            compare(page.enteredFromLauncher, false)
             compare(page.canGoBack, false)
             compare(page.handleBack(), false, "the overview declines back")
             page.requestSubPage(CcLogic.detailRoutes.network)

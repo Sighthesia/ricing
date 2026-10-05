@@ -302,7 +302,21 @@ Item {
             weather.loading = true
             root.check("refresh returns while loading", weather.refresh(), false)
             root.check("an in-flight refresh reads as loading", weather.loading, true)
-            root.check("a loading header is loading", root.headerState(weather), "loading")
+            // The header keeps the CACHED reading through the request rather than
+            // reporting "loading": the whole point of a cache-first adapter is that
+            // the number it already has survives the request that will replace it.
+            // This is the same fixture as the adopt phase - aged past the TTL - so
+            // the state is stale, which is exactly what a stale cache looks like
+            // mid-refresh.
+            root.check("a refresh in flight keeps the cached reading",
+                root.headerState(weather), "stale")
+            root.check("...and the cached temperature is still there",
+                weather.temperature, 18.5)
+            // With nothing cached the same flag does read as loading, so this is a
+            // statement about the cache rather than about the flag.
+            root.check("a loading header with no cache is loading",
+                ControlCenterLogic.weatherState({ available: true, loading: true }),
+                "loading")
             weather.loading = false
 
             // Clearing hands control back to the saved coordinates, whatever those

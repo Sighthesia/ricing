@@ -99,6 +99,13 @@ function statusFor(kind, value) {
 
 // Emptiness is the caller's to declare; it is only derived where the service
 // contract makes the answer unambiguous.
+//
+// Volume is the case that needs the caller to declare it. VolumeService reports
+// `sinkVolume: 0` and `sinkMuted: false` when there is no output device at all -
+// those are the reads it has to make against a null default sink - so a snapshot
+// without an emptiness declaration renders a real-looking "0%" that is actionable
+// against a sink that does not exist. `defaultSinkNode` is what the card's caller
+// turns into `empty`; see ControlCenter.qml's volumeSnapshot.
 function isEmpty(kind, value) {
     if (typeof value.empty === "boolean")
         return value.empty
@@ -227,22 +234,81 @@ function mediaSummary(value) {
 }
 
 // The header's weather state. Optional weather must never block the first
-// surface open, so an in-flight refresh reports "loading" rather than an empty
-// header, and a failed refresh keeps the previous reading as "stale" instead
-// of dropping the header back to unavailable.
+// surface open, so the ladder is ordered by what the user would lose:
+//
+//   1. a usable cached reading always wins, and an in-flight refresh does not
+//      hide it - the whole point of a cache-first adapter is that the number
+//      survives the request that is replacing it
+//   2. with nothing cached, an in-flight refresh is "loading" rather than an
+//      absence, because a request that has not landed is not a missing value
+//   3. an absent service is "unavailable" rather than an empty reading
+//   4. a service that reports a reading-shaped answer of NaN is "empty"
+//
+// A failed refresh keeps the previous reading and reports through `lastError`,
+// so it lands on 1 as "stale" - the value stays, and the word beside it says
+// why it may be wrong.
 function weatherState(snapshot) {
     var value = snapshot || {}
+    if (isFinite(usableTemperature(value.temperature))) {
+        return value.isStale === true || weatherErrorText(value) !== ""
+            ? "stale" : "ready"
+    }
     if (value.loading === true)
         return "loading"
     if (value.available === false)
         return "unavailable"
-    if (!isFinite(toNumber(value.temperature, Number.NaN)))
-        return "empty"
-    // The weather service reports its own failure as lastError, so a failed
-    // refresh keeps the previous reading and reads as stale rather than
-    // dropping the header back to unavailable.
-    return value.isStale === true || weatherErrorText(value) !== "" ? "stale" : "ready"
+    return "empty"
 }
+
+// A cached temperature, or NaN when the service has no reading yet.
+//
+// Strict on purpose, following the rule services/weather/WeatherLogic.js
+// already applies to a parsed payload: plain Number() maps null to 0 and "" to
+// 0, so a service with nothing cached yet would produce a confident, plausible
+// "0°" - and the header could not then tell a real 0-degree reading from no
+// reading at all, which is exactly the distinction the ladder above needs.
+function usableTemperature(raw) {
+    if (raw == null || typeof raw === "boolean")
+        return Number.NaN
+    if (typeof raw === "string" && raw.trim() === "")
+        return Number.NaN
+    var number = Number(raw)
+    return isFinite(number) ? number : Number.NaN
+}
+
+// How old a reading is, as the compact word the header shows beside it.
+//
+// Both arguments are full epoch milliseconds: the reading's own stamp and the
+// current clock. The label is deliberately coarse - a header has room for one
+// short word, not a duration - and it is "" whenever the age is not knowable, so
+// the header omits the age instead of printing a confident wrong one:
+//
+//   - no stamp, a non-numeric stamp, or a zero stamp: there is no reading to date
+//   - a stamp dated in the future: a clock change, not a reading from the future,
+//     and "−3m ago" would be a lie
+//
+// A missing `now` is treated the same way: the module has no clock of its own,
+// so a caller that cannot say what time it is gets no age rather than a wrong one.
+function weatherAgeLabel(updatedAt, now) {
+    var stamp = toNumber(updatedAt, Number.NaN)
+    var current = toNumber(now, Number.NaN)
+    if (!isFinite(stamp) || stamp <= 0 || !isFinite(current))
+        return ""
+    var age = current - stamp
+    if (age < 0)
+        return ""
+    if (age < weatherMinuteMs)
+        return "now"
+    if (age < weatherHourMs)
+        return Math.floor(age / weatherMinuteMs) + "m ago"
+    if (age < weatherDayMs)
+        return Math.floor(age / weatherHourMs) + "h ago"
+    return Math.floor(age / weatherDayMs) + "d ago"
+}
+
+var weatherMinuteMs = 60 * 1000
+var weatherHourMs = 60 * weatherMinuteMs
+var weatherDayMs = 24 * weatherHourMs
 
 function layoutMode(width, minimumWidth) {
     var available = toNumber(width, 0)

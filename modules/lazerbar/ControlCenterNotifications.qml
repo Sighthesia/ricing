@@ -15,6 +15,11 @@ import "ControlCenterLogic.js" as CcLogic
 // read is a user decision that belongs to whatever page finally renders the
 // full list.
 //
+// The request currently has no owner, so the action it names is inert rather
+// than live - see `viewAllAvailable`. Everything else about the row is
+// unchanged: it keeps its fixed band, so its footprint still depends on the cap
+// alone and never on how many notifications arrived.
+//
 // Sharp language: a section header with a square unread bar, one square row per
 // entry, and a square "view all" action. State comes from colour blocks, never
 // from rounded outlines.
@@ -103,7 +108,30 @@ Item {
     readonly property real entryBandHeight: root.entryCap * root.entryHeight
             + Math.max(0, root.entryCap - 1) * root.rowGap
 
-    readonly property bool viewAllEnabled: root.entryCount > 0
+    // Whether this summary can hand the user on to a full notification view.
+    //
+    // False, and it is the honest answer rather than a missing feature: the full
+    // list is the bar's own notification popup, reachable only through a bar
+    // widget's hover intent, on a different surface family, with no coordinator
+    // target, service seam or wave route that names it. There is no owner to
+    // dispatch to, so `openRequested()` has no production receiver - and an
+    // enabled button whose press is dropped is exactly the dead affordance this
+    // row must not be. Designing a second notification implementation to give it
+    // somewhere to go is explicitly out of scope, so the row stays inert until
+    // such an owner exists; `viewAllAvailable` is the single place that would
+    // become true, and it is read by the gate below rather than duplicated in
+    // the enabled/role/hover trio.
+    readonly property bool viewAllAvailable: false
+
+    readonly property bool viewAllEnabled: root.viewAllAvailable
+            && root.entryCount > 0
+    // Why the row cannot be activated, for the accessibility tree. A disabled
+    // control that still announces as a button promises a press that will do
+    // nothing, so the row announces as text and says which of the two reasons
+    // applies instead.
+    readonly property string viewAllUnavailableReason: root.entryCount > 0
+            ? " - full notification history is not available"
+            : " - nothing to open"
     readonly property string emptyLabel: "No notifications"
     readonly property string viewAllLabel: "View all"
 
@@ -265,8 +293,13 @@ Item {
         }
     }
 
-    // "View all": a request, not an action. It stays disabled with an empty
-    // history, so there is never a button that does nothing.
+    // "View all": a request with no owner, and therefore not a control. It is kept
+    // in place - and kept in the fixed footer band - because the design asks for
+    // a route to the full view and removing the row would hide that the surface
+    // has an unanswered need; but it is announced and behaves as text carrying
+    // its reason, exactly like every other inert element in this branch. Nothing
+    // here can activate it while `viewAllAvailable` is false, so a click, a key
+    // press and the programmatic path all agree that there is nothing to do.
     Rectangle {
         id: viewAll
         objectName: "viewAllButton"
@@ -290,7 +323,7 @@ Item {
         activeFocusOnTab: root.viewAllEnabled
         Accessible.role: root.viewAllEnabled ? Accessible.Button : Accessible.StaticText
         Accessible.name: root.viewAllEnabled ? root.viewAllLabel
-            : root.emptyLabel + " - nothing to open"
+            : root.viewAllLabel + root.viewAllUnavailableReason
 
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -299,8 +332,15 @@ Item {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             text: root.viewAllLabel
-            color: LazerTheme.settingsAccent
             font.pixelSize: 12
+            // Muted when the row cannot act, so it reads as unavailable rather
+            // than as an accent-coloured action that does nothing. The accent is
+            // the sharp language's word for "this is live", so it must not stay
+            // on an inert row.
+            color: root.viewAllEnabled
+                   ? LazerTheme.settingsAccent : LazerTheme.textMuted
+
+            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
         HoverHandler {
