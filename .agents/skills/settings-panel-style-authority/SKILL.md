@@ -69,6 +69,22 @@ description: 在 Afloat 中实现任何新的可见 QML 表面、交互反馈、
 - **图标按钮 hover 缩放**：`IconButton` / `OsuTopBarButton` 悬停 `hoverScale`、按压 `pressScale`（设置面板规则"悬停不缩放"不适用于栏上图标按钮）。
 - **ModeSelector 凹槽胶囊**：容器 `radius 9` + 底部锚定 xScale 0.97，是 lazer 模式选择器的标志性形态；选中指示仍为细条带。
 
+## 波浪 overlay 的两套 chrome（`WaveSurfaceHost`）
+
+overlay 本体**同时保留两套布局**，都是一等代码路径，不要因为"更干净"删掉其中一套：
+
+| `chromeLayout` | 形态 | 导航花费 |
+| --- | --- | --- |
+| `blocks` | osu wiki 三段式：标识标题条 → 页面条（页面名 + 横向标签）→ 内容列 | 高度，宽度全给内容 |
+| `rail` | 旧设置面板形态：标题条 + 可折叠竖向导航栏 + 内容列 | 宽度，高度还给结果 |
+
+- **色阶方向与设置面板相反**：设置面板是 rail 比 panel 深（lazer `Background5` 垫底 `Background4`）；overlay 三段式是标题条最深、内容列最浅，因为它照 osu wiki 的堆叠。三档由 `LazerTheme.overlayHeaderSurface` / `overlaySectionSurface` / `overlayContentSurface` 给出，两种布局共用。
+- **三段之间不画分隔线**：色阶本身就是分隔，加 hairline 反而多一层。
+- **内容列锚到页面条的下边缘**（不是标题条下边缘）。页面条在 `rail` 下高度为 0，所以这一个锚点覆盖两种布局；锚错会让内容盖住页面条而不是排在它下面。
+- **页面条塌成 0 高度**表示"当前没有分段"（如控制中心），内容列自动上抬，不预留空条。
+- 竖向栏走 `Loader`（每个条目都要建 nav item + 图标 + 效果，是页面条布局要省掉的那笔开销）；页面条只有 3 个标签委托，直接内联声明。`Loader` 三边锚定时高度为 0，会把 0 传给 item，所以页面条**不能**放进只锚三边的 `Loader`。
+- 对比开关：`AFLOAT_LAUNCHER_CHROME=rail` 选启动默认，`qs ipc call launcher chrome` 热切。启动器自己的查询面（搜索条 + 分类芯片）也跟随布局——`rail` 下恢复成改动前的通栏 `settingsRail` 条，这样对比才是真的 A/B 而不是只换了导航。
+
 ## 禁止事项
 
 - 禁止引入 MotionTokens 之外的时长/缓动常量。
