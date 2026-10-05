@@ -609,6 +609,34 @@ ShellRoot {
                         "service=" + details.ip4 + " nmcli=" + root.liveIp4.join(","))
                 }
 
+                // The port a tap targets has to be one the machine actually has,
+                // and a port with no carrier must still be worth tapping: the
+                // activation is attempted and reports the cable, not refused.
+                var groups = svc.wiredGroups
+                var groupWrong = []
+                for (var w = 0; w < groups.length; w++) {
+                    var port = String(groups[w].device || "")
+                    if (port !== "" && root.liveWiredPorts.indexOf(port) === -1)
+                        groupWrong.push(port)
+                    for (var pr = 0; pr < (groups[w].profiles || []).length; pr++) {
+                        var profile = groups[w].profiles[pr]
+                        var pin = ""
+                        for (var d = 0; d < (root.liveWiredDetails || []).length; d++) {
+                            if (root.liveWiredDetails[d].uuid === profile.uuid) {
+                                pin = String(root.liveWiredDetails[d].ifname || "")
+                                break
+                            }
+                        }
+                        // A profile pinned to a port this machine lacks can be
+                        // refused, because activation would be refused too.
+                        if (pin !== "" && root.liveWiredPorts.indexOf(pin) === -1
+                                && !profile.stalePin)
+                            groupWrong.push(profile.uuid + " pinned to absent " + pin)
+                    }
+                }
+                check("every port and profile the panel offers is real",
+                    groupWrong.length === 0, "wrong=" + groupWrong.join(" | "))
+
                 root.checkWired(root.liveWiredDetails || [])
                 root.wiredCheckDone = true
             }

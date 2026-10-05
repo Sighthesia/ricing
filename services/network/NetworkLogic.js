@@ -435,6 +435,12 @@ function stripPrefixLength(value) {
 // the answer the user actually needs on a port that is present but silent: it
 // separates "nothing plugged in" from "plugged in but nothing activated".
 //
+// Carrier is checked *before* NetworkManager's own connected state, because the
+// two genuinely disagree on this machine: NM reports enp2s0 as connected (it is
+// holding a static address) while the kernel reports NO-CARRIER. "Connected"
+// there is a claim about a profile being up, not about a link existing, and the
+// user needs the link.
+//
 // An absent `managed` flag is not a claim that the port is unmanaged — only an
 // explicit false is, so a caller that never computed it cannot make a live port
 // disappear behind that word.
@@ -443,10 +449,10 @@ function linkStateLabel(entry) {
         return { text: "", tone: "idle" }
     if (entry.managed === false)
         return { text: "Not managed", tone: "idle" }
-    if (entry.connected)
-        return { text: "Connected", tone: "active" }
     if (entry.carrier === "off")
         return { text: "No cable", tone: "idle" }
+    if (entry.connected)
+        return { text: "Connected", tone: "active" }
     if (String(entry.reason || "").indexOf("Carrier") !== -1
             || String(entry.reason || "").indexOf("40 ") === 0)
         return { text: "No cable", tone: "idle" }
@@ -653,6 +659,16 @@ function createArgs(ssid, password, hidden, device) {
     if (device)
         args.push("ifname", device)
     return args
+}
+
+// How long a wired activation may run before it is called failed. A port the
+// kernel reports as having no carrier gets a short leash: NetworkManager queues
+// such an activation and cancels it after carrier-wait-timeout (120s by default),
+// so the panel must not sit on that number. Four seconds is long enough for a
+// cable that is already in hand to register, and short enough that the failure
+// arrives while the user is still looking at the row.
+function wiredActivationTimeout(carrier) {
+    return carrier === "off" ? 4000 : 30000
 }
 
 function upArgs(uuid) {

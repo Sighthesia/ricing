@@ -100,6 +100,15 @@ Singleton {
     // Immutable snapshot of the wired attempt in flight, for the same reason
     // `_job` exists on the wireless side.
     property string _wiredJob: ""
+    // Whether that attempt started on a port the kernel reports as having no
+    // carrier, and which port — captured at submit time because the device table
+    // can move underneath a four-second wait.
+    property bool _wiredNoCable: false
+    property string _wiredDevice: ""
+    // True while an nmcli process for a wired attempt is still running. The
+    // in-flight marker clears when the watchdog gives up on the row, but NM's
+    // queued activation lives on for another two minutes after that.
+    property bool _wiredBusy: false
     // Immutable snapshot of the attempt in flight. onExited reads this instead
     // of the live Process properties, which a fast second tap would already
     // have overwritten — that cross-talk reported the first attempt's exit
@@ -123,10 +132,12 @@ Singleton {
     }
 
     // nmcli has no --wait on this version, so a request that never completes
-    // would leave the row spinning forever. Cap the attempt ourselves. This one
-    // covers both wired directions: a deactivation cannot hang on a carrier
-    // wait, but the row it holds is frozen for as long as the marker is set, so
-    // it needs the same guarantee.
+    // would leave the row spinning forever. Cap the attempt ourselves. The
+    // interval is set per attempt: a port with no carrier gets a short leash,
+    // because nothing is going to arrive on its own there. This covers both
+    // wired directions — a deactivation cannot hang on a carrier wait, but the
+    // row it holds is frozen for as long as the marker is set, so it needs the
+    // same guarantee.
     Timer {
         id: wiredWatchdog
         interval: 30000
@@ -135,11 +146,10 @@ Singleton {
             if (!root.wiredActivating && !root.wiredDeactivating)
                 return
             var label = root.wiredActivating !== "" ? root.wiredActivating : root.wiredDeactivating
-            var direction = root.wiredActivating !== "" ? "activation" : "deactivation"
-            console.warn("[Network] wired " + direction + " timed out for '"
-                + label + "'")
-            root._finishWired(false,
-                root.wiredActivating !== "" ? "Activation timeout" : "Deactivation timeout")
+            console.warn("[Network] wired attempt on '" + label + "' timed out after "
+                + interval + "ms")
+            root._finishWired(false, root.wiredActivating !== ""
+                ? root._wiredTimeoutMessage() : "Deactivation timeout")
         }
     }
 
@@ -483,6 +493,12 @@ Singleton {
         var target = String(uuid)
         if (root.wiredActivating === target || root.wiredDeactivating === target)
             return
+        // One attempt at a time. `wiredActivating` clears when the watchdog gives
+        // up on the row, but the nmcli behind it is still running — NM queues an
+        // activation on a port with no carrier and cancels it 120s later — so
+        // this is what actually stops a second one from starting.
+        if (root._wiredBusy)
+            return
         var group = root._wiredGroupForProfile(target)
         var profiles = group ? (group.profiles || []) : []
         var profile = null
@@ -498,7 +514,7 @@ Singleton {
     }
 
     function activateWired(uuid) {
-        if (!root.nmcliAvailable || !uuid)
+        if (!root.nmcliAvailable || !uuid || root._wiredBusy)
             return
         var target = String(uuid)
         var group = root._wiredGroupForProfile(target)
@@ -514,45 +530,62 @@ Singleton {
             root._setError("Pinned to a port that no longer exists", "")
             return
         }
-        // Pre-flight the carrier. NetworkManager does not fail a no-cable
-        // activation, it *queues* it and cancels it after carrier-wait-timeout
-        // (120s), so without this check the row would spin for two minutes and
-        // then report a generic activation failure.
-        if (group && !group.connected && group.carrier === "off") {
-            root._setError("No cable on " + group.device, "")
-            return
-        }
+        // A port with no carrier is attempted anyway. Refusing here used to make
+        // the row a dead end: NetworkManager queues such an activation and
+        // completes it the moment a cable appears, so "plug it in, then tap" is
+        // a flow the user can actually finish. What changes is the leash — a
+        // short one, and a message that says what to do — so the failure is a
+        // few seconds of "Connecting…" instead of two silent minutes.
+        var noCable = !!(group && group.carrier === "off")
         root.wiredActivating = target
         root._wiredJob = target
+        root._wiredNoCable = noCable
+        root._wiredDevice = group ? String(group.device || "") : ""
         root._clearError()
+        wiredWatchdog.interval = Logic.wiredActivationTimeout(group ? group.carrier : "")
         wiredWatchdog.restart()
-        console.info("[Network] activating wired profile '" + target + "'")
+        console.info("[Network] activating wired profile '" + target + "'"
+            + (noCable ? " on " + root._wiredDevice + " (no carrier, short leash)" : ""))
         // One turn of separation from the state assignment, so the Process
         // starts against this profile rather than the previous one.
         Qt.callLater(root._startWiredUp)
     }
 
     function disconnectWired(uuid) {
-        if (!root.nmcliAvailable || !uuid)
+        if (!root.nmcliAvailable || !uuid || root._wiredBusy)
             return
         var target = String(uuid)
         root.wiredDeactivating = target
         root._wiredJob = target
+        root._wiredNoCable = false
+        root._wiredDevice = ""
         root._clearError()
         wiredWatchdog.restart()
         console.info("[Network] deactivating wired profile '" + target + "'")
         Qt.callLater(root._startWiredDown)
     }
 
+    // A no-cable timeout has to name the port and the fix: "Activation timeout"
+    // tells the user nothing they can act on, and this is the one failure a
+    // direct-connect setup hits routinely.
+    function _wiredTimeoutMessage() {
+        if (root._wiredNoCable)
+            return "No cable on " + (root._wiredDevice || "this port")
+                + " — plug one in, then tap again"
+        return "Activation timeout"
+    }
+
     function _startWiredUp() {
         if (wiredUpProcess.running || !root._wiredJob)
             return
+        root._wiredBusy = true
         wiredUpProcess.running = true
     }
 
     function _startWiredDown() {
         if (wiredDownProcess.running || !root._wiredJob)
             return
+        root._wiredBusy = true
         wiredDownProcess.running = true
     }
 
@@ -612,6 +645,14 @@ Singleton {
 
     function getSignalLabel(signal) {
         return Logic.signalLabel(signal)
+    }
+
+    // A wired port's header state. The panel asks the service rather than
+    // repeating the precedence, because carrier-over-connected is a decision
+    // with a reason behind it (NM and the kernel genuinely disagree on this
+    // machine) and two copies of that rule will drift.
+    function wiredPortState(group) {
+        return Logic.linkStateLabel(group)
     }
 
     function getStatusText() {
@@ -1106,6 +1147,9 @@ Singleton {
         environment: root.cEnvironment
         command: ["nmcli"].concat(Logic.upArgs(root._wiredJob))
         onExited: function (code) {
+            // The attempt is over for real now, so the busy guard can lift even
+            // if the watchdog already gave up on the row.
+            root._wiredBusy = false
             if (!root._wiredJob) return
             if (code === 0)
                 root._finishWired(true, "")
@@ -1128,6 +1172,7 @@ Singleton {
         environment: root.cEnvironment
         command: ["nmcli"].concat(Logic.downArgs(root._wiredJob, true))
         onExited: function (code) {
+            root._wiredBusy = false
             if (!root._wiredJob) return
             if (code === 0)
                 root._finishWired(true, "")
