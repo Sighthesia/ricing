@@ -1302,9 +1302,20 @@ property real debugTimeScale: 1
     // the reading above is from the running shell rather than from a clock the suite steps.
     //
     // At normal speed (the multiplier is 1) the wake is the head's per-tick travel times
-    // `(1 - k) / k`, so this number IS the trail's length and nothing else is. At 0.7 that
-    // ratio was 0.43 and the trail read as barely there - the user asked for it longer, on
-    // the live shell, having watched it. 0.35 makes the ratio 1.86, about 4.3x as long.
+    // `(1 - k) / k`, so this number sets BOTH how long the trail is and how long it takes
+    // to close, and it sets them in the same direction: the tail keeps `k` of the
+    // remaining gap per 16ms tick, so the gap shrinks by `(1 - k)` per tick.
+    //
+    //   k     length    closes in
+    //   0.7     0.43x      ~67ms   barely there, gone before it can be read
+    //   0.35    1.86x     ~203ms
+    //   0.2     4.0x      ~328ms
+    //   0.15    5.7x      ~460ms   about the widget's own `slow * 2` shadow flight
+    //
+    // The user has watched this on the live shell twice and asked for more both times -
+    // first "not prominent enough, lengthen it", then "it disappears too fast". Both are
+    // this one number, so both are answered by stepping it down rather than by adding a
+    // second mechanism that would have to be kept consistent with this one.
     //
     // What makes a long trail safe here, and what did not before: the wake is proportional
     // to the head's SPEED, not to the journey's length, because the head is pinned rather
@@ -1312,12 +1323,14 @@ property real debugTimeScale: 1
     // runaway - the widget's own 55%-of-travel rule cannot apply to a pinned head, because
     // that rule comes from two `Behavior`s chasing one target over a known distance and
     // there is no such target here. It also stays bounded by `min(1, ...)` because a k
-    // above 1 makes the follower overshoot the head and oscillate.
+    // above 1 makes the follower overshoot the head and oscillate, and a clamped k is a
+    // too-long trail where an unstable one is a bar that wobbles.
     //
-    // Clamped, because the multiplier is writable and a suite may set it below 1: at k > 1 the
-    // follower overshoots the head and oscillates, and a clamped k is a too-long trail where
-    // an unstable one is a bar that wobbles.
-    readonly property real trailCatchUp: Math.min(1, 0.35 / Math.max(0.01, debugTimeScale))
+    // One cost of a slow k, worth knowing before stepping further: the wake freezes at
+    // whatever it was when the frame stops moving, and then takes `(1 - k)` per tick to
+    // come back. At 0.2 the bar therefore sits long for a third of a second while the
+    // panel is otherwise still.
+    readonly property real trailCatchUp: Math.min(1, 0.2 / Math.max(0.01, debugTimeScale))
 
     // `_snapping` is the load-bearing gate on both of these, and it is a
     // property rather than anything about the crossing, so a `Behavior` sees it at the
