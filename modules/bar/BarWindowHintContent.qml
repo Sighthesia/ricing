@@ -851,6 +851,9 @@ Item {
         // and the frame's arrival target with it - 162.9, 154.5, 148.7, 144.2. The frame
         // was arriving at a target that was still moving, and the trail's head was chasing
         // both.
+        // FIRST, before anything below replaces the frame's position: the pin stands aside for
+        // the length of this function. See `_carryAcrossPublish`.
+        root._aiming = true
         root._markerCrossing = true
         root.swapping = true
         root.plan = plan
@@ -875,6 +878,7 @@ Item {
         root.slideProgress = 0
         slideRun.restart()
         crossingRun.restart()
+        _carryAcrossPublish()
     }
 
     // A second switch arrived mid-crossing. The strip must CONTINUE from where it
@@ -894,6 +898,9 @@ Item {
     // and the panel's centre, neither of which the re-aim disturbs - the new leg
     // simply starts at the position the old one had reached.
     function _reaimSlide(plan) {
+        // The pin stands aside for the length of this function, for the reason at
+        // `_carryAcrossPublish`, and before anything here reads or writes the frame.
+        root._aiming = true
         // Read before the plan is replaced: `crossingTop` is a function of the clock and
         // the landing row, so reading it afterwards would measure the new leg against
         // the old leg's progress.
@@ -926,6 +933,55 @@ Item {
         root.slideProgress = 0
         slideRun.restart()
         crossingRun.restart()
+        _carryAcrossPublish()
+    }
+
+    // A publish has just REPLACED the frame's position - a different card, on a different
+    // column - and the trail is CARRIED across that, the same treatment the corner gets and
+    // for the same reason: a position the frame's own motion cannot produce is not motion.
+    //
+    // It has to be done HERE rather than in the pin, and that is not a preference. A publish
+    // moves the frame three times over, not once: `plan` moves `crossingTo`, `columns` moves
+    // it again, and `crossingRun.restart()` moves it a third time - each one running the pin
+    // on its own, inside this one synchronous block, and the last of them synchronously from
+    // `restart()` itself. So there is no single tick in which the pin could recognise the
+    // jump, and a flag set for the first of them is consumed by it: measured that way the
+    // trail still grew to 619% of its own length on a publish, because the second and third of
+    // those steps reached the pin as ordinary motion.
+    //
+    // `_aiming` is what makes it one tick after all: the pin stands aside for the length of the
+    // publish (`_startSlide`/`_reaimSlide` raise it, this lowers it) and this moves both ends by
+    // the same amount and re-bases the pin onto the position it now has. After it the wake is
+    // exactly what it was. A follower handed a 153px jump instead adds `(1 - k)` of it to the
+    // wake, which on three switches a fifth of a second apart put the drawn bar at 126px in a
+    // panel whose resting bar is 26 - the length the report complained about, arriving from the
+    // other direction.
+    //
+    // BOTH ends, and not just the tail, and that is measured rather than tidiness: carrying only
+    // the tail and leaving the head for the pin's next tick still read 157% and 279% of the
+    // trail's own length on the second and third publishes. The head's write is wrapped in
+    // `_snapping` for the ordinary reason - the `Behavior`s are disabled during a crossing, and
+    // this is the idiom the rest of the file uses for a write that must not be eased.
+    //
+    // `_journeyScroll` goes with them, because the target carries the scroll and the pin's own
+    // re-base would otherwise hand the tail the same difference twice. And the carry is skipped
+    // when the pin has never run, which is a switch published from rest: there is no live trail
+    // to move, `_pinHead` is not a position the tail is expressed against, and the pin's first
+    // tick opens the trail from nothing - which is the ordinary way a crossing starts.
+    function _carryAcrossPublish() {
+        root._aiming = false
+        const target = root._journeyTarget()
+        if (!isFinite(target))
+            return
+        if (_pinArmed) {
+            const step = target - _pinHead
+            _tailY += step
+            _snapping = true
+            _headY += step
+            _snapping = false
+        }
+        _pinHead = target
+        _journeyScroll = strip.scrollOffset
     }
 
     // The marker's clock: 320ms, twice the strip's, and it carries BOTH legs. The
@@ -1196,28 +1252,48 @@ Item {
     // tick behind and the shortest wake this mechanism can produce is one frame of the
     // head's own travel.
     //
-    // The number that came first was 0.12, a 131ms time constant, which put the wake at 2.5
-    // times the head's travel - 333px at the fastest point of a sweep, thirteen times the
-    // bar's resting length, and the plateau the report calls 异常地长.
+    // THE NUMBER IS A FRACTION OF THE MOTION'S OWN TIME, not of wall clock, and that is what
+    // `debugTimeScale` in the denominator is for. The wake is the head's travel over the last
+    // `1 / k` frames, so a per-frame rate measures the shadow in FRAMES - and this panel is
+    // mounted with an observation slow-motion multiplier of 6, which stretches the crossing
+    // over six times as many frames and divides every one of them by six. A flat 0.7 was
+    // therefore tuned against a frame the live shell does not draw: measured there, the
+    // trail was 1.6px over the calmer half of a crossing and 3.2px at InOutQuad's peak on a
+    // 26px bar - a bar 1.2% to 12% longer than its resting length, which is the "there is no
+    // trail" the report is about. Dividing by the scale says the opposite and is the honest
+    // statement: the trail is however far the frame has moved in the last `scale / k` of the
+    // motion's own milliseconds, so it looks the same watched in slow motion as it would at
+    // normal speed, which is the whole purpose of the multiplier.
     //
-    // CHOSEN FROM THE MEASURED WAKE, and the instrument had to be the pin's own clock to
-    // measure it: `_followJourney` runs from `onCrossingTopChanged`, so it runs once per
-    // frame of the journey, and a 16ms wall-clock sample cannot resolve that - in this
-    // environment one such sample spans several frames of it, a 320ms crossing finishing in
-    // thirteen of them. So the sweep's own travel range and the wake it produces at this
-    // rate:
+    // So 0.7 is a claim about the motion and the shell's own figure is 0.117. Against the
+    // per-frame travel the LIVE shell produces - instrumented in place, 16ms wall-clock
+    // samples through one whole crossing, whose exit leg covered 96px in 896ms and whose
+    // last samples moved 2.0-2.4px per 10-12ms, i.e. 0.11px per ms over the leg and 0.20 at
+    // InOutQuad's peak, on a panel at the display's 90Hz:
     //
-    //   the frame's per-frame travel      16.8px (departure) .. 42px (at InOutQuad's peak)
-    //   the wake at 0.7                   24px           .. 60px
-    //   the wake at 0.4                   42px           .. 105px
-    //   the wake at 0.85                  20px           .. 49px
+    //   a two-row panel (the one that log crossed)   1.2px/frame .. 2.2px/frame
+    //   a five-row panel, the leg is twice as long   2.6px/frame .. 4.7px/frame
     //
-    // 0.7 against a 26px resting bar is a trail: barely longer than the bar at rest on a
-    // switch's calmer half and two and a quarter times it where the frame is moving fastest,
-    // which is the workspace widget's own proportion on a real switch (148.9px of wake on a
-    // 26px bar). 0.4's 105px is a second bar. The time constant that goes with 0.7 is one
-    // frame over the rate, 16ms / 0.7 = 23ms.
-    readonly property real trailCatchUp: 0.7
+    //   at 0.117    10px .. 19px  of wake on the two-row panel   (the bar 36 .. 45px)
+    //               22px .. 40px  of wake on the five-row panel  (the bar 48 .. 66px)
+    //   at a flat 0.7  1.6px .. 3.2px                              (the bar 27.6 .. 29.2px)
+    //
+    // The first row is a readable trail - the bar between one and a half and two and a half
+    // times its resting length, tapering with the frame's own speed, which is the motion
+    // trail the widget's own indicator draws at 148.9px of wake on the same 26px bar. The
+    // second row is the fault, and it is why the number is not a constant.
+    //
+    // The per-frame number came first, at 0.12, a 131ms time constant, which put the wake at
+    // 2.5 times the head's travel - 333px at the fastest point of a sweep, thirteen times the
+    // bar's resting length, and the plateau the report calls 异常地长. Two things have changed
+    // since: the corner is CARRIED across instead of being read as travel (see
+    // `_followJourney`), so the number no longer has to defend against a 227px teleport, and
+    // the reading above is from the running shell rather than from a clock the suite steps.
+    //
+    // Clamped, because the multiplier is writable and a suite may set it below 1: at k > 1 the
+    // follower overshoots the head and oscillates, and a clamped k is a too-long trail where
+    // an unstable one is a bar that wobbles.
+    readonly property real trailCatchUp: Math.min(1, 0.7 / Math.max(0.01, debugTimeScale))
 
     // `_snapping` is the load-bearing gate on both of these, and it is a
     // property rather than anything about the crossing, so a `Behavior` sees it at the
@@ -1280,6 +1356,11 @@ Item {
     // what the trail must not follow. See the note in `_followJourney`.
     property real _pinHead: 0
     property bool _pinArmed: false
+    // A publish is AIMING the journey: replacing the frame's start, its landing row and its
+    // off-panel positions, and the pin stands aside until `_carryAcrossPublish` has re-based
+    // it. Up for the length of `_startSlide`/`_reaimSlide` and nowhere else - the note on that
+    // function is the whole of why it exists.
+    property bool _aiming: false
 
     // Hand the tracker to the crossing, and give the trail its follower - in one function,
     // on one clock.
@@ -1305,6 +1386,15 @@ Item {
         // clock AND of the focused row, so a reveal scroll moves it after the flag is down -
         // and a pin that keeps writing then is a third mechanism, fighting the two the file
         // means to have. See the measured shape at the note on `onCrossingTopChanged`.
+        //
+        // It also keeps its hands off a publish that is still AIMING the journey, and that is
+        // the whole of where the re-basing happens: `_aiming` is up for the length of
+        // `_startSlide`/`_reaimSlide`, which replace the frame's position three times inside one
+        // synchronous block, and `_carryAcrossPublish` moves both ends by the same amount at the
+        // end of it. Not after - `crossingRun.restart()` runs the pin synchronously, so a carry
+        // placed after it finds the step already consumed and does nothing at all.
+        if (root._aiming)
+            return
         if (!root._markerCrossing) {
             _pinArmed = false
             return
@@ -1348,14 +1438,60 @@ Item {
         // and back on one frame. Both are the same fault in the pin's terms: a step the
         // frame's own motion cannot produce.
         //
-        // A zero step is not a corner, and deliberately: the frame is stationary wherever
-        // the journey degenerates (no departing row, an empty arriving workspace), and a
-        // trail that had nothing to follow must not be re-based on it.
+        // THE LATCH, and the condition it used to be is the whole of this fault. It read
+        // `Math.abs(_headY - _tailY) < 0.5` - "if there is no gap, glue the tail to the
+        // target" - and looks obviously right: a tail already home should follow the head
+        // rather than fall behind it for no reason. But the gap is not a thing that happens
+        // to the follower, it is the ONLY thing the follower produces: the head is PINNED
+        // here, written straight to the frame's position rather than eased toward it, so
+        // head and tail are written the same value on every tick and the gap is identically
+        // zero from the first tick of a crossing to the last. So the branch always ran, the
+        // follower never ran, and no wake could ever open.
+        //
+        // Instrumented in the live shell, sampled every 16ms across a whole crossing: head
+        // 1.3, 1.5, 1.8, 2.1 ... with the tail identical to one decimal on all 56 samples and
+        // `barH` 26.0 on all 56 - 890ms of crossing with no trail at all, which is the report.
+        // Nothing about the suite caught it because every way this file published a crossing
+        // published it while a focus glide was still in flight, which opens a gap before the
+        // pin takes over, and a follower that already has a gap is the easy case.
+        //
+        // So THE FOLLOWER RUNS WHENEVER THE PIN IS IN CHARGE, with no condition on it at all,
+        // and that is not a simplification - it is the only predicate that survives contact
+        // with this clock. The obvious replacement - "run it when the head is MOVING" - was
+        // written and measured here first, as `Math.abs(step) > 0.5`, and it is the same
+        // latch with a different threshold: `crossingTop` is a leg's linear travel times
+        // `crossingClock`, and `InOutQuad` has zero derivative at the start of the journey,
+        // so a leg's first ticks move the frame by LESS than half a pixel while it is very
+        // much travelling. Measured, a second switch landing mid-crossing: tail 72.2 with
+        // 66.7px of wake on one tick, and tail 139.1 with 0.0px on the next, whose step was
+        // 0.2px. The trail was cut at the exact instant it was widest, which is the report
+        // again - "the trail is reset when I switch repeatedly" - in a different costume.
+        //
+        // Any threshold on the step has that shape, because the step is the easing's
+        // derivative and the easing is slowest exactly where a crossing starts and stops.
+        // There is nothing to threshold ON: the pin only runs while `_markerCrossing` is set,
+        // which already means a journey is placing the frame, and a follower asked to follow
+        // does the right thing unasked at both ends. With the frame at rest its gap has a
+        // fixed point of zero, so a parked frame's shadow CLOSES - 30% of what is left per
+        // tick - rather than snapping, which is what a trail settling should look like and is
+        // what happens to a journey that has degenerated (no departing row to leave, an
+        // arriving workspace with nothing focused).
+        //
+        // The step is read for its SIGN only and never for its size, and one more
+        // discontinuity is not the pin's to find: a publish replaces the frame's position
+        // three times inside one synchronous block, and it carries the trail across all three
+        // itself. See `_carryAcrossPublish`, which is why nothing here needs to know a publish
+        // happened.
+        //
+        // A step against the direction is the corner, plus the two nobody scheduled: the
+        // corner itself, and `_offBottom` momentarily collapsing mid-crossing because it is
+        // the panel's own live height.
+        //
+        // A zero step is not a discontinuity and is not treated as one: wherever a journey
+        // degenerates the frame is stationary, and it goes to the follower.
         const step = target - _pinHead
         if (_pinArmed && step * root._journeyDirection < 0)
             _tailY += step
-        else if (Math.abs(_headY - _tailY) < 0.5)
-            _tailY = target
         else
             _tailY += (_headY - _tailY) * trailCatchUp
         _pinArmed = true

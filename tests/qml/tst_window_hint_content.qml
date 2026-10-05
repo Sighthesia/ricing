@@ -2006,6 +2006,116 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
             settleSlide()
         }
 
+        // The pinned path, published from REST, sampled in wall clock. This is the shape of
+        // the reported fault, and it is the one shape this file had no instrument for.
+        //
+        // Every sweep claim above is measured from a state the live shell is not in. The pin
+        // hands the wake a gap or it hands it nothing, and both ways this file published a
+        // crossing handed it a gap: `startCrossingOverTwoRows` and `sampleSweepFlight` publish
+        // the resting panel and then immediately publish the switch, so the focus glide the
+        // first publish started is still in flight when the second one commits - the head has
+        // arrived, the tail has not, and the switch inherits that separation (109px of it in
+        // `test_theSweepCarriesTheBarAndTheCornerWithIt`). A follower with a gap already open
+        // is the easy case, which is why five rounds of work on this file measured a healthy
+        // 9-19px wake and the user saw none.
+        //
+        // The live shell publishes a switch from a panel that has been sitting there, where
+        // the two ends are the same number. Instrumented there and sampled every 16ms across
+        // a whole crossing: head 1.3, 1.5, 1.8, 2.1 ... and the tail identical to one decimal
+        // at all 56 samples, with `barH` 26.0 at all 56 - the trail did not exist for any of
+        // the 890ms and the bar was the resting bar for the whole crossing. The follower only
+        // runs when a gap is ALREADY there, and a gap is what the follower produces, so it can
+        // never begin. That is this test: the wake has to open from zero.
+        //
+        // The three claims, and the second one is the only bound here:
+        //   - it OPENS while the frame is crossing, which is the thing the user is looking at;
+        //   - it is not CUT - no single-frame step in the drawn length beyond the head's own
+        //     travel plus what one tick of the follower recovers. That is `barLengthAllowance`'s
+        //     form with the head's travel added, because a sweep's head has no flight left to
+        //     be bounded by; it is the bound `test_consecutiveSwitchesCarryTheTrailRatherThan
+        //     ResettingIt` already states for the same reason;
+        //   - it CLOSES on the landing.
+        //
+        // NO UPPER BOUND ON THE WAKE, deliberately. A wake is a length, the report is that it
+        // is missing, and the user has seen the absolute numbers for a 55%-of-travel wake and
+        // accepted them. A cap converts a growing trail into a held one, which is the plateau
+        // this file removed once already - and the peak here is whatever the frame's own speed
+        // makes it, which is the claim `test_theCornerCarriesTheTrailRatherThanOpeningIt`
+        // bounds against the travel rather than against a number.
+        function test_aSwitchWithBothEndsAtRestStillCarriesATrail() {
+            // Five rows, so the sweep is longer than the row marker it stands in for, and the
+            // focus lands on a DIFFERENT row than it leaves, so the crossing is not a switch
+            // whose two ends are handed the same target.
+            body.hint = root.tallFramedHint(2, 2, 5, 1)
+            settleIndicator()
+            verify(Math.abs(body._headY - body._tailY) < 0.05,
+                "the two ends are home together before the switch - head "
+                    + body._headY.toFixed(2) + ", tail " + body._tailY.toFixed(2)
+                    + " - which is the state the live shell publishes every switch from and "
+                    + "the one this file never drove")
+            body.hint = root.tallFramedHint(3, 2, 5, 3)
+            verify(body._markerCrossing, "the frame is travelling")
+            // Sampled in wall clock rather than by stepping the clock, and that is the whole
+            // reason this test exists: the pin runs from `onCrossingTopChanged`, so it runs
+            // once per frame of the journey. `driveMarkerTo` steps the pin by hand, which
+            // cannot tell a follower that runs on the frame's own clock from one that a test
+            // keeps feeding it.
+            var samples = Math.round(body.crossingAnimation.duration / 16) + 8
+            var openSamples = 0
+            var peak = 0
+            var worstCut = 0
+            var worstDetail = ""
+            var previousLength = body._barLength
+            var previousWake = body._wake
+            var previousHead = body._headY
+            for (var i = 0; i < samples; ++i) {
+                wait(16)
+                var wake = body._wake
+                if (body._barLength > body.indicatorLength)
+                    ++openSamples
+                if (wake > peak)
+                    peak = wake
+                var headTravel = Math.abs(body._headY - previousHead)
+                var allowance = headTravel * 2 + body.trailCatchUp * previousWake + 1
+                var cut = Math.abs(body._barLength - previousLength) - allowance
+                if (cut > worstCut) {
+                    worstCut = cut
+                    worstDetail = "the drawn length moved "
+                        + Math.abs(body._barLength - previousLength).toFixed(1)
+                        + "px in one frame where the head travelled "
+                        + headTravel.toFixed(1) + "px and the follower could recover "
+                        + (body.trailCatchUp * previousWake).toFixed(1) + "px"
+                }
+                previousLength = body._barLength
+                previousWake = wake
+                previousHead = body._headY
+            }
+            verify(openSamples > 0 && peak >= 2,
+                "the drawn bar was longer than its resting " + body.indicatorLength
+                    + "px while the frame was crossing - open on " + openSamples + " of "
+                    + samples + " samples, peaking at " + peak.toFixed(1) + "px of wake. "
+                    + "The floor matters as much as the count: a wake of a hundredth of a "
+                    + "pixel makes the drawn length greater than " + body.indicatorLength
+                    + "too, and one sample of that reads as open. Measured on the live "
+                    + "shell, sampled every 16ms through a whole crossing, the tail matched "
+                    + "the head to one decimal on all 56 samples and `barH` never left 26.0: "
+                    + "the follower waits for a gap that only the follower can open, so the "
+                    + "wake is identically zero")
+            verify(worstCut <= 0,
+                "and the trail was not cut across a frame - the worst one-frame step in the "
+                    + "drawn length beyond the mechanism's own allowance was "
+                    + worstCut.toFixed(1) + "px, where " + worstDetail)
+            settleMarker()
+            // ...and it closes, which is what makes "it opened" a trail rather than a longer
+            // bar: the landing hands both ends to the widget's own two curves.
+            for (var k = 0; k < 60 && body._barLength !== body.indicatorLength; ++k)
+                wait(16)
+            compare(body._barLength, body.indicatorLength,
+                "and once the frame had landed the bar was back at its resting length, "
+                    + body._barLength.toFixed(1))
+            settleSlide()
+        }
+
         // The corner specifically: the trail is CARRIED across it and not opened by it.
         //
         // A follower reads a teleport as speed, and speed is the only thing it can read, so
@@ -2455,6 +2565,26 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         // "the trail was small at sample 21" says nothing; "the trail was 13.8px on the
         // frame before a publish and 0.1px on the frame after it" is the report.
         //
+        // READ ON THE PUBLISH'S OWN TICK, with no `wait` between the assignment and the
+        // reading, and that is what makes the measurement honest. It used to read the sample
+        // 16ms later, which is one to three frames of the follower after the publish - so what
+        // it compared was the publish against the follower's own DECAY, and at this rate 30%
+        // of what is left goes per frame. Measured on identical code that ratio reported 53%,
+        // 42% and 39% across three runs, which is the test reading how many frames happened to
+        // elapse rather than what the trail did. A fresh leg's first ticks move the frame by a
+        // fifth of a pixel - `InOutQuad` has no derivative at t=0 - so a trail is legitimately
+        // short there, and that is the "narrows to nothing on its own wherever the frame is
+        // slow" this comment calls not the fault.
+        //
+        // The publish's own tick is synchronous and exact: assigning `hint` runs
+        // `_startSlide`, which aims the journey and restarts the clock, which moves
+        // `crossingTop`, which runs the pin - in that order, inside the assignment. So the
+        // reading below is the trail immediately after a publish has placed the frame and
+        // nothing has had a chance to decay yet, and the claim it can make is the whole of the
+        // report: a publish CARRIES the trail, so it may not be shorter than it was.
+        // `_aimJumped` is what makes that true, and a commit during a crossing would read 0.0
+        // here - which is the fault this test was written for.
+        //
         // The second clause is the same event seen as geometry rather than as a number, and
         // it is bounded the way `barLengthAllowance` bounds: the drawn length may not step
         // further than the head's own travel plus what one tick of the follower can recover.
@@ -2463,7 +2593,8 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
         function test_consecutiveSwitchesCarryTheTrailRatherThanResettingIt() {
             body.hint = root.tallFramedHint(2, 2, 12, 4)
             settleIndicator()
-            var worstRatio = 1
+            var worstRatio = 99
+            var bestRatio = 0
             var detail = ""
             var worstLength = 0
             var crossings = 0
@@ -2485,18 +2616,23 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 if (published >= 0) {
                     body.hint = root.tallFramedHint(3 + published, 2 + published, 12,
                         rows[published])
+                    // No `wait`: this is the publish's own tick. See the note above.
+                    if (before > 4) {
+                        var ratio = body._wake / before
+                        if (ratio < worstRatio) {
+                            worstRatio = ratio
+                            detail = "publish " + (published + 1) + " left "
+                                + body._wake.toFixed(1) + "px of a " + before.toFixed(1)
+                                + "px trail"
+                        }
+                        if (ratio > bestRatio)
+                            bestRatio = ratio
+                    }
                 }
                 wait(16)
                 if (body._markerCrossing)
                     ++crossings
                 if (published >= 0 && before > 4) {
-                    var ratio = body._wake / before
-                    if (ratio < worstRatio) {
-                        worstRatio = ratio
-                        detail = "publish " + (published + 1) + " left "
-                            + body._wake.toFixed(1) + "px of a " + before.toFixed(1)
-                            + "px trail"
-                    }
                     // What the length is allowed to do across one publish: the head may
                     // travel as far as the frame moved, and the follower recovers
                     // `trailCatchUp` of the gap it had.
@@ -2511,12 +2647,26 @@ function test_anEmptyNeighbourKeepsItsSlotAndSaysSo() {
                 "the switches really did land inside a crossing - " + crossings
                     + " of 72 samples had the frame travelling, and the journey is 320ms so "
                     + "a switch every 208ms cannot miss it")
-            verify(worstRatio > 0.5,
-                "and no publish collapsed the trail: the worst it fell to across one was "
+            verify(worstRatio > 0.9,
+                "and every publish CARRIED the trail rather than shortening it: on the "
+                    + "publish's own tick the worst it fell to was "
                     + (100 * worstRatio).toFixed(0) + "% of the trail before it, where "
                     + detail + ". The previous behaviour committed both ends on every "
                     + "switch, and measured across the same three switches the trail went "
                     + "34.3 to 5.9 and then 1.8px - a 17% and a 5%")
+            // ...and carried rather than LENGTHENED it, which is the other half of "a
+            // publish's teleport is not the frame's motion". A publish aims the journey at
+            // the departing card, which on the second and third of these switches is 153px
+            // and 70px from where the frame was; a follower reads that as speed and adds
+            // `(1 - k) * step` to the wake, so without the carry the trail stood at 153% of
+            // what it was for one frame on publish 2 - a green bar at 126px in a panel whose
+            // resting bar is 26, which is the length the report complained about arriving
+            // from the other direction.
+            verify(bestRatio < 1.02,
+                "and none of them LENGTHENED it either, so the trail is the frame's own "
+                    + "motion and not the publish's jump: the largest it grew across one was "
+                    + (100 * bestRatio).toFixed(0) + "% of the trail before it, against "
+                    + "the 153% a follower reads from a 153px re-aim")
             verify(worstLength <= 0,
                 "and the drawn length never stepped further across one than the frame's own "
                     + "travel plus what one tick of the follower recovers, by "
