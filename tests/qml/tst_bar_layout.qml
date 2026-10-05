@@ -167,5 +167,68 @@ Item {
             verify(fileText("../../modules/bar/widgets/LauncherButton.qml").indexOf("LauncherService") !== -1,
                    "launcher bar entry must drive the launcher session")
         }
+
+        // The control-center entry is the one bar affordance whose whole job is
+        // to ask the shared wave owner for a route, so its wiring is asserted on
+        // the production bar's source: the entry must go through the screen
+        // scope's requestOverlay (which owns the coordinator hand-off and the
+        // opener), and it must not mount a surface of its own. A second window
+        // here would be invisible to every behavioural test in the suite and
+        // would silently become the owner the coordinator does not know about.
+        function test_controlCenterEntry_requestsTheWaveRouteAndAddsNoSurface() {
+            var bar = fileText("../../modules/bar/TopBar.qml")
+            if (bar === "")
+                skip("local file reads disabled; run with QML_XHR_ALLOW_FILE_READ=1")
+
+            verify(bar.indexOf('id: controlCenterEntry') !== -1,
+                   "the bar must declare one control-center entry")
+            verify(bar.indexOf('requestOverlay("control-center", controlCenterEntry)') !== -1,
+                   "the entry must ask for the route through the screen scope, by name")
+            verify(bar.indexOf("function requestOverlay(target, opener)") !== -1,
+                   "the screen scope must own the overlay entry point")
+            verify(bar.indexOf("CoordLogic.entryMethodFor(target)") !== -1,
+                   "the entry point must read the wave dispatch from the coordinator registry")
+
+            // One wave owner, one route registry, no second window: the file must
+            // mount exactly one LauncherSurface and exactly one OverlayCoordinator.
+            verify(countOccurrences(bar, "LauncherSurface {") === 1,
+                   "the production bar mounts exactly one launcher/wave surface")
+            verify(countOccurrences(bar, "OverlayCoordinator {") === 1,
+                   "the production bar mounts exactly one overlay coordinator")
+
+            // `root` in this file is the bar's Variants, which owns no hover
+            // state at all. A glyph that read `root.hovered` would compile, look
+            // plausible and never brighten.
+            verify(bar.indexOf("root.hovered") < 0,
+                   "a bar-surface hover read must name the widget that has it")
+
+            // The owner edge passes the singletons in, rather than the route page
+            // importing them, so a test can still inject fakes.
+            var surface = fileText("../../modules/lazerbar/LauncherSurface.qml")
+            verify(surface !== "", "the launcher surface must be readable")
+            verify(surface.indexOf("ControlCenter {") !== -1,
+                   "the surface must build the control-center route page")
+            verify(surface.indexOf("import \"../../services\"") < 0,
+                   "the surface must not import services; the owner edge injects them")
+            for (var i = 0; i < controlCenterServiceNames.length; i++)
+                verify(bar.indexOf("Services." + controlCenterServiceNames[i]) !== -1,
+                       "the bar must pass " + controlCenterServiceNames[i] + " to the route page")
+        }
+
+        // The services the production owner edge hands to the route page. Named
+        // once here so the assertion above and the wiring itself cannot drift.
+        readonly property var controlCenterServiceNames: ["NetworkService",
+            "BluetoothService", "VolumeService", "MediaService", "BatteryService",
+            "NotificationService", "WeatherService"]
+
+        function countOccurrences(text, needle) {
+            var total = 0
+            var at = text.indexOf(needle)
+            while (at >= 0) {
+                total++
+                at = text.indexOf(needle, at + needle.length)
+            }
+            return total
+        }
     }
 }

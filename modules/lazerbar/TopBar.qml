@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../../services" as Services
+import "OverlayCoordinatorLogic.js" as CoordLogic
 
 // Create the bar and three independently sized overlay owners per screen.
 Variants {
@@ -28,10 +29,17 @@ Variants {
         property bool musicTooltipOpen: false
         property bool shuffleActive: false
 
+        // One screen's overlay entry point. The wave's routes go through the
+        // launcher surface, which owns the session, the opener record and the
+        // focus hand-off for both of them; which of its two methods answers is
+        // read from the coordinator's own registry rather than hard-coded per
+        // route. Everything else is a separate owner and goes straight to the
+        // coordinator.
         function requestOverlay(target, opener) {
             musicTooltipOpen = false
-            if (target === "launcher") {
-                launcherSurface.requestOpen(opener)
+            var waveEntry = CoordLogic.entryMethodFor(target)
+            if (waveEntry !== "" && launcherSurface[waveEntry] !== undefined) {
+                launcherSurface[waveEntry](opener)
                 return
             }
             overlayCoordinator.request(target, opener)
@@ -115,6 +123,16 @@ Variants {
                 id: launcherSurface; anchors.fill: parent
                 coordinator: overlayCoordinator
                 session: Services.LauncherService
+                // Owner edge for the control-center route, same as the
+                // production bar: injected here so this surface never imports a
+                // service and the route page stays fake-injectable.
+                networkService: Services.NetworkService
+                bluetoothService: Services.BluetoothService
+                volumeService: Services.VolumeService
+                mediaService: Services.MediaService
+                batteryService: Services.BatteryService
+                notificationService: Services.NotificationService
+                weatherService: Services.WeatherService
             }
         }
 

@@ -103,6 +103,12 @@ Item {
         "modules/lazerbar/LazerSettingsContent.qml",
         "modules/lazerbar/LazerSettingsSections.qml",
         "modules/lazerbar/LazerSettingsRow.qml",
+        // The standalone lazer top bar, which mounts its own wave surface and
+        // therefore also acts as an owner edge for the control-center route. Its
+        // body was never compiled here; the file had no registered instance, so
+        // a compile error in it could not have been caught by loading it, and
+        // adding it to the guard is the only way its wiring is checked at all.
+        "modules/lazerbar/TopBar.qml",
         "modules/lazerbar/NotificationHost.qml",
         "modules/lazerbar/OverviewBackgroundWindow.qml",
         "modules/lazerbar/ScreenRoundedCorners.qml",
@@ -137,6 +143,7 @@ Item {
         "modules/lazerbar/NotificationHost.qml",
         "modules/lazerbar/OverviewBackgroundWindow.qml",
         "modules/lazerbar/ScreenRoundedCorners.qml",
+        "modules/lazerbar/TopBar.qml",
         "modules/lazerbar/WallpaperBackground.qml",
     ]
 

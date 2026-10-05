@@ -3,10 +3,12 @@ import Quickshell
 import Quickshell.Wayland
 import "../lazerbar"
 import "../lazerbar/ScreenCornerMask.js" as CornerMask
+import "../lazerbar/OverlayCoordinatorLogic.js" as CoordLogic
 import "../lazerbar/WallpaperBootLogic.js" as BootLogic
 import "./FullscreenBarLogic.js" as RevealLogic
 import "./StartupBarRevealLogic.js" as StartupReveal
 import "../../services" as Services
+import "../../services/barlayout/BarLayoutSections.js" as BarLayoutSections
 
 // Mount the layout-driven bar plus the launcher wave owner per screen.
 // BarPopupHost is mounted per screen and bound to BarContent hover intents.
@@ -388,6 +390,27 @@ Variants {
             Services.SettingsService.settingsMaskOverride !== "off"
             && settingsOverlay.blocksDesktop
 
+        // One screen's overlay entry point, and the only way any bar affordance
+        // asks for one. The wave's two routes go through the launcher surface
+        // rather than through the coordinator, because that surface owns the
+        // session mirror, the opener record and the focus hand-off for both of
+        // them; the coordinator would open the host with none of that. Which of
+        // its two methods answers is read from the coordinator's own registry
+        // (`entryMethodFor`), so the launcher and the control center cannot be
+        // reached by two spellings of one owner.
+        //
+        // Everything else is a separate owner and goes straight to the
+        // coordinator, which keeps its existing mutual exclusion and opener
+        // restoration untouched.
+        function requestOverlay(target, opener) {
+            var waveEntry = CoordLogic.entryMethodFor(target)
+            if (waveEntry !== "" && launcherSurface[waveEntry] !== undefined) {
+                launcherSurface[waveEntry](opener)
+                return
+            }
+            overlayCoordinator.request(target, opener)
+        }
+
         // Serialize launcher transitions; settings/music owners live elsewhere.
         OverlayCoordinator {
             id: overlayCoordinator
@@ -613,6 +636,15 @@ Variants {
                     screenX: screenScope.barWindowX
                     screenY: screenScope.barWindowY
                     startupStaging: root.startupStaging
+                    // Hand the trailing strip to the fixed control-center entry
+                    // below, so the layout-driven right section yields it instead
+                    // of running underneath. Zero when a host mounts no fixed
+                    // entry, which is every existing caller. The width is read
+                    // with an explicit fallback because the entry is declared
+                    // after this block, and `undefined + 6` would be a NaN margin
+                    // for the one frame before its id resolves.
+                    rightEdgeInset: (controlCenterEntry.width || 0)
+                            + BarLayoutSections.widgetSpacing
 
                     // While mod is held the hint owns the popup, so a widget's own hover traffic
                     // must not reach the host. Two reasons, both observable:
@@ -675,6 +707,52 @@ Variants {
                     onContextPopupCloseRequested: {
                         popupHost.widgetHovered = false
                         popupHost.requestClose()
+                    }
+                }
+
+                // The control center entry, fixed at the bar's trailing edge next
+                // to the high-frequency status cluster. Same sharp pill and glyph
+                // language as every other bar entry, and the same hover fill -
+                // this is a bar affordance, not a second design.
+                //
+                // A fixed entry rather than a layout widget on purpose: it must be
+                // present on every screen without depending on a persisted bar
+                // layout, and it must not be draggable away by the layout editor,
+                // because a control center with no visible entry is a surface
+                // nothing can open.
+                //
+                // It creates nothing. `requestOverlay` names the route on the wave
+                // owner this screen already has, so the control center is a route
+                // on the surface below the bar, not a second window, a second
+                // coordinator or a second session.
+                BarPill {
+                    id: controlCenterEntry
+                    objectName: "controlCenterEntry"
+
+                    anchors.right: parent.right
+                    anchors.rightMargin: barContent.sidePadding
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitWidth: LazerTheme.barWidgetHeight
+
+                    // Same glow-origin contract the layout-injected widgets get,
+                    // so this entry rings from the right place on every output.
+                    glowScreenX: screenScope.barWindowX
+                    glowScreenY: screenScope.barWindowY
+
+                    onClicked: screenScope.requestOverlay("control-center", controlCenterEntry)
+
+                    // Scheme-aware slider glyph, resolved here because BarIcon
+                    // resolves relative paths against its own file. The hover
+                    // state comes from this entry's own pill: `root` is the
+                    // bar's Variants and owns no such state.
+                    BarIcon {
+                        anchors.centerIn: parent
+                        width: LazerTheme.barGlyphSize
+                        height: LazerTheme.barGlyphSize
+                        source: Qt.resolvedUrl("../lazerbar/icons/control-center.svg")
+                        opacity: controlCenterEntry.hovered ? 1 : 0.85
+
+                        Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
                     }
                 }
             }
@@ -775,6 +853,19 @@ Variants {
                 coordinator: overlayCoordinator
                 session: Services.LauncherService
                 startupPrewarmAllowed: root.startupPrewarmAllowed
+                // Owner edge for the control-center route: the same singletons
+                // the bar's own popups read, so the overview, its same-surface
+                // sub-pages and the bar can never disagree about one service
+                // instance. Media is MediaService rather than
+                // MediaControlService because this route needs the transport
+                // actions the latter does not own.
+                networkService: Services.NetworkService
+                bluetoothService: Services.BluetoothService
+                volumeService: Services.VolumeService
+                mediaService: Services.MediaService
+                batteryService: Services.BatteryService
+                notificationService: Services.NotificationService
+                weatherService: Services.WeatherService
             }
         }
 

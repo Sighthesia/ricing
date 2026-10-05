@@ -14,6 +14,112 @@ Item {
     Item { id: opener; objectName: "opener"; focus: true }
     Item { id: alternateOpener; objectName: "alternate-opener" }
 
+    // --- Injected service fakes ---
+    //
+    // The control center takes its services as injected properties, exactly as
+    // the production owner edge passes Services.*. These stand in for those
+    // singletons: each declares only the properties the page is documented to
+    // read, so a binding that reaches for anything else resolves to undefined
+    // here exactly as an absent property would in production. They are declared
+    // once and never mutated, so they carry no test state and `init()` does not
+    // have to reset them.
+    QtObject {
+        id: fakeNetwork
+        property bool wifiConnected: true
+        property bool wifiEnabled: true
+        // The real NetworkService has no flat activeSsid: it keeps a scan map
+        // keyed by SSID. This fake has that shape, so the page's derivation is
+        // exercised the way production exercises it.
+        property var networks: ({
+            "Home": { ssid: "Home", security: "WPA2", signal: 78,
+                connected: true, existing: true }
+        })
+        property bool ethernetConnected: false
+        property string activeEthernetConnection: ""
+        property bool scanningActive: false
+        property bool connecting: false
+        property string lastError: ""
+        property int refreshCount: 0
+        function refreshForOpen() { refreshCount++ }
+    }
+
+    QtObject {
+        id: fakeBluetooth
+        property bool bluetoothAvailable: true
+        property bool enabled: true
+        property bool blocked: false
+        property bool scanningActive: false
+        property var devices: [{ name: "Speaker" }]
+        property var connectedDevices: []
+        property int scanCount: 0
+        function startScan() { scanCount++ }
+    }
+
+    QtObject {
+        id: fakeVolume
+        property real sinkVolume: 0.42
+        property bool sinkMuted: false
+        property var volumeWrites: []
+        function setSinkVolume(value) { volumeWrites.push(value) }
+        function toggleSinkMute() { sinkMuted = !sinkMuted }
+    }
+
+    QtObject {
+        id: fakeMedia
+        property bool hasPlayer: true
+        property string title: "Night Sky"
+        property string artist: "Artist"
+        property bool playing: true
+        property string playbackState: "playing"
+        property bool canGoPrevious: true
+        property bool canTogglePlayback: true
+        property bool canGoNext: true
+        property var actions: []
+        function previous() { actions.push("previous") }
+        function playPause() { actions.push("playPause") }
+        function next() { actions.push("next") }
+    }
+
+    QtObject {
+        id: fakeBattery
+        property bool available: true
+        property bool ready: true
+        property int percentage: 77
+        property bool charging: false
+        property bool pluggedIn: true
+        property string iconText: "AC"
+    }
+
+    // The notification service hands out a ListModel-shaped head plus a bounded
+    // history walk, so the fake answers the same `get(i)`/`count` pair the real
+    // one does rather than a plain array.
+    QtObject {
+        id: fakeHistory
+        property int count: 0
+        function get(index) { return null }
+    }
+
+    QtObject {
+        id: fakeNotifications
+        property int unreadCount: 2
+        property var latestNotification: function() {
+            return { notifId: "n1", appName: "Shell", summary: "Ready", read: false }
+        }
+        readonly property var historyList: fakeHistory
+    }
+
+    QtObject {
+        id: fakeWeather
+        property bool available: true
+        property bool loading: false
+        property real temperature: 21.4
+        property string condition: "Clear"
+        property string location: "Home"
+        property double updatedAt: 1767225600000
+        property bool isStale: false
+        property string lastError: ""
+    }
+
     Lazer.OverlayCoordinator {
         id: coordinator
         onOpenRequested: (owner, target) => { if (owner === "wave") launcherSurface.host.openRoute(target, null) }
@@ -25,14 +131,25 @@ Item {
 
     // Production-shaped launcher wiring with the embedded Quickshell-free
     // session; every open intent funnels through requestOpen / syncVisibility.
+    // The services are injected here - the same owner edge the production bar
+    // uses - so the route page and its sub-pages are built exactly as the shell
+    // builds them, without this suite importing a Quickshell singleton.
     Lazer.LauncherSurface {
         id: launcherSurface
         anchors.fill: parent
         coordinator: coordinator
+        networkService: fakeNetwork
+        bluetoothService: fakeBluetooth
+        volumeService: fakeVolume
+        mediaService: fakeMedia
+        batteryService: fakeBattery
+        notificationService: fakeNotifications
+        weatherService: fakeWeather
     }
 
     function page() { return launcherSurface.page() }
     function session() { return launcherSurface.session }
+    function controlCenterPage() { return launcherSurface.activePage() }
 
     TestCase {
         name: "OverlayCoordinator"
@@ -115,6 +232,85 @@ Item {
             tryCompare(launcherSurface.host, "phase", "closed", 800)
             compare(coordinator.activeTarget, "")
             verify(opener.activeFocus)
+        }
+
+        // The brief's shape, verbatim in intent: the entry asks the shared
+        // coordinator for `control-center`, one dispatch reaches the wave owner,
+        // and no launcher search field is ever focused for it.
+        function test_theControlCenterEntryUsesTheWaveOwnerAndNeverFocusesLauncherSearch() {
+            launcherSurface.requestControlCenter(opener)
+
+            compare(openSpy.signalArguments[0][0], "wave")
+            compare(openSpy.signalArguments[0][1], "control-center")
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            compare(launcherSurface.host.route, "control-center")
+            verify(!(host.page() && host.page().searchField.activeFocus),
+                   "the launcher search field must never hold focus on this route")
+        }
+
+        // The control center is the newest request, not the default: the plain
+        // entry that used to mean "the launcher" still has to mean it, or every
+        // shortcut and IPC open would land on the control center after one visit.
+        function test_theDefaultLauncherEntryStillSelectsTheLauncherRoute() {
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+
+            launcherSurface.requestOpen(opener)
+
+            tryCompare(launcherSurface.host, "route", "launcher", 2000)
+            compare(coordinator.activeTarget, "launcher")
+            verify(host.page() !== null, "the launcher page must be mounted")
+            tryVerify(function() { return host.page().searchField.activeFocus }, 500)
+            compare(launcherSurface.requestedRoute, "launcher")
+        }
+
+        // The owner edge hands the route page the singleton instances, and the
+        // page forwards the same objects to its same-surface sub-pages. Identity,
+        // not shape: two service objects that happen to agree on every property
+        // read today still disagree on the next scan, and the overview would
+        // then describe a network the detail page is not looking at.
+        function test_theControlCenterRouteAndItsSubPagesShareOneServiceInstance() {
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            var page = launcherSurface.activePage()
+            tryVerify(function() { return page !== null }, 500)
+
+            compare(page.networkService, fakeNetwork)
+            compare(page.bluetoothService, fakeBluetooth)
+            compare(page.volumeService, fakeVolume)
+            compare(page.mediaService, fakeMedia)
+            compare(page.batteryService, fakeBattery)
+            compare(page.notificationService, fakeNotifications)
+            compare(page.weatherService, fakeWeather)
+
+            // The detail sub-page reads the same instance, not a second one.
+            compare(page.networkCardData.action, "detail",
+                    "the network card must be a detail hand-off for this to mean anything")
+            page.openNetworkDetails()
+            tryVerify(function() { return page.detailPageItem !== null }, 1000)
+            compare(page.detailPageItem.networkService, fakeNetwork)
+        }
+
+        // Focus ownership across a live hand-off: the launcher really had the
+        // caret, the control center really took the surface, and the caret did
+        // not survive into a page that is no longer on screen.
+        function test_theControlCenterEntryTakesFocusFromALiveLauncherSearch() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            tryVerify(function() { return host.page().searchField.activeFocus }, 600)
+
+            launcherSurface.requestControlCenter(opener)
+            tryCompare(launcherSurface.host, "route", "control-center", 2000)
+            wait(500)
+
+            verify(!(host.page() && host.page().searchField.activeFocus),
+                   "a retained launcher page must not keep the caret behind the route swap")
+            // The route's own target is the page itself, so Tab can move from
+            // there into the first ready card.
+            tryVerify(function() {
+                return launcherSurface.activePage() !== null
+                        && launcherSurface.activePage().activeFocus
+            }, 600)
         }
 
         // The launcher <-> control-center hand-off is one wave owner being

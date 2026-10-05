@@ -16,6 +16,12 @@ Item {
     property real screenY: 0
     readonly property int sidePadding: 12
 
+    // Extra trailing margin the host reserves for a fixed entry of its own, so
+    // the layout-driven right section yields that strip instead of running
+    // underneath it. Zero for every host that mounts no such entry, which is
+    // why the section geometry everything else reads is unchanged by default.
+    property real rightEdgeInset: 0
+
     // Hover intent publication for BarPopupHost.
     signal popupRequested(var intent)
     signal popupCloseRequested()
@@ -544,12 +550,13 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
     }
 
-    // Right section trails the trailing edge of the bar.
+    // Right section trails the trailing edge of the bar, behind whatever fixed
+    // entry the host reserved there.
     SectionRow {
         id: rightRow
         section: "right"
         anchors.right: parent.right
-        anchors.rightMargin: root.sidePadding
+        anchors.rightMargin: root.sidePadding + root.rightEdgeInset
     }
 
     // Dockzone outlines: reveal each section frame while arranging widgets.

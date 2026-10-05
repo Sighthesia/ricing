@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 import "../../modules/lazerbar/OverlayCoordinatorLogic.js" as Logic
 import "../../modules/lazerbar/LauncherSurfaceLogic.js" as SurfaceLogic
+import "../../modules/lazerbar/WaveSurfaceLogic.js" as WaveLogic
 
 // Verify target validation, visual-owner classification, and the launcher
 // surface mirror decisions without loading QML surfaces.
@@ -18,6 +19,45 @@ Item {
             compare(Logic.ownerFor("settings"), "settings")
             compare(Logic.ownerFor("music"), "music")
             compare(Logic.ownerFor("remote"), "")
+        }
+
+        // The screen-scoped entry point asks this instead of hard-coding a
+        // branch per route: the answer is the wave owner's own method name, so a
+        // screen that dispatched a wave target any other way would have to
+        // duplicate the mapping instead of reading it.
+        function test_entryMethodNamesTheWaveOwnersOwnRequestMethod() {
+            compare(Logic.entryMethodFor("launcher"), "requestOpen")
+            compare(Logic.entryMethodFor("control-center"), "requestControlCenter")
+            // Every other owner is dispatched by the coordinator itself, so the
+            // wave owner has nothing to call: "" is the answer, not a guess.
+            compare(Logic.entryMethodFor("settings"), "")
+            compare(Logic.entryMethodFor("music"), "")
+            compare(Logic.entryMethodFor("wiki"), "")
+            compare(Logic.entryMethodFor("remote"), "")
+            compare(Logic.entryMethodFor(""), "")
+            compare(Logic.entryMethodFor(null), "")
+        }
+
+        // The wave owner's two registries are one contract stated twice: what the
+        // coordinator will route, and what the surface will mount. A route added
+        // to only one of them produces a target that either never dispatches or
+        // dispatches onto a page that does not exist, and neither failure is
+        // visible from the other side - so the two lists are compared here.
+        function test_everyWaveTargetIsBothRoutableAndMountable() {
+            var waveTargets = Logic.waveTargets
+            compare(waveTargets.length, 2)
+            for (var index = 0; index < waveTargets.length; index++) {
+                var target = waveTargets[index]
+                compare(WaveLogic.isRoute(target), true,
+                    target + " is a wave target but the surface cannot mount it")
+                compare(Logic.ownerFor(target), "wave")
+                compare(Logic.entryMethodFor(target) !== "", true,
+                    target + " is a wave target with no entry method")
+            }
+            // And nothing is routable as a wave route that the surface rejects.
+            for (var route = 0; route < WaveLogic.routes.length; route++)
+                compare(Logic.normalizeTarget(WaveLogic.routes[route]) !== "", true,
+                    WaveLogic.routes[route] + " is a mounted route the coordinator cannot route")
         }
 
         function test_deprecatedWaveTargetsAreRejected() {

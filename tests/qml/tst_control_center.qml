@@ -2927,6 +2927,102 @@ Item {
             }
         }
 
+        // --- Production owner edge ---
+
+        // The route page takes its services as injected properties, so the
+        // wiring lives at the owner edge and the page itself stays importable by
+        // this suite with no Quickshell module. That boundary is worth pinning:
+        // a service imported straight into the page would make every fake-service
+        // test above a lie, and a service added to the page but never injected
+        // would render an "unavailable" card in production with nothing failing.
+        //
+        // So the two halves are asserted together: every property the page
+        // declares is forwarded by the surface, and the surface declares nothing
+        // the page cannot accept.
+        function test_theRoutePageReceivesEveryInjectedServiceAndImportsNone() {
+            var page = readRepoFile("modules/lazerbar/ControlCenter.qml")
+            compare(page.status, 200, "the overview must be readable")
+            var pageCode = stripComments(page.text)
+            verify(pageCode.indexOf("Quickshell") < 0,
+                "the overview must not import Quickshell to reach a service")
+            verify(pageCode.indexOf("../services") < 0,
+                "the overview must not import a service directly")
+
+            var surface = readRepoFile("modules/lazerbar/LauncherSurface.qml")
+            compare(surface.status, 200, "the launcher surface must be readable")
+            var surfaceCode = stripComments(surface.text)
+            // The closing quote matters: the surface legitimately imports the
+            // embedded launcher session, and only the bare services module would
+            // give it the singletons.
+            verify(surfaceCode.indexOf('import "../../services"') < 0,
+                "the launcher surface must not import the services module; the bar injects them")
+
+            // Every service seam the page declares, named off the page itself so
+            // this cannot drift from the contract the cards actually read.
+            var seams = pageServiceSeams(pageCode)
+            verify(seams.length > 0, "the overview must declare service seams to inject")
+            for (var index = 0; index < seams.length; index++) {
+                var seam = seams[index]
+                verify(surfaceCode.indexOf("property var " + seam) !== -1,
+                    "the launcher surface must declare an injected " + seam)
+                verify(surfaceCode.indexOf(seam + ": root." + seam) !== -1,
+                    "the launcher surface must forward " + seam + " into the route page")
+            }
+
+            // The bars that bind the singletons are PanelWindow roots, so the
+            // whole-repo compile guard cannot read their bodies: a name the
+            // services module does not declare would surface as a shell that does
+            // not start, with nothing to point at. The registry is a plain text
+            // file, so this half of the contract is checkable after all - and both
+            // bars are checked, because both mount a wave surface.
+            var registry = readRepoFile("services/qmldir")
+            compare(registry.status, 200, "the services registry must be readable")
+            for (var edge = 0; edge < barOwnerEdges.length; edge++) {
+                var owner = readRepoFile(barOwnerEdges[edge])
+                compare(owner.status, 200, barOwnerEdges[edge] + " must be readable")
+                var ownerCode = stripComments(owner.text)
+                for (var bound = 0; bound < seams.length; bound++)
+                    verify(ownerCode.indexOf(seams[bound] + ": Services."
+                            + seamNameFor(seams[bound])) !== -1,
+                        barOwnerEdges[edge] + " must bind " + seams[bound]
+                            + " to Services." + seamNameFor(seams[bound]))
+            }
+            // And each bound name has to be a singleton that exists, or the shell
+            // dies at startup on an unknown type rather than on a missing card.
+            for (var name = 0; name < seams.length; name++)
+                verify(registry.text.indexOf("singleton " + seamNameFor(seams[name])) !== -1,
+                    "no Services." + seamNameFor(seams[name]) + " singleton for the "
+                        + seams[name] + " seam")
+        }
+
+        // Every bar that mounts the wave surface is an owner edge for the route's
+        // services, so a new binding has to reach all of them.
+        readonly property var barOwnerEdges: ["modules/bar/TopBar.qml",
+            "modules/lazerbar/TopBar.qml"]
+
+        // The singleton name a seam is bound to. `mediaService` is the seam and
+        // `MediaService` the singleton; the convention is stated here rather than
+        // left implicit, so a seam that does not follow it fails loudly instead of
+        // quietly looking for a singleton nobody declared.
+        function seamNameFor(seam) {
+            return seam.charAt(0).toUpperCase() + seam.slice(1)
+        }
+
+        // The page's service seams, read off its own declarations: `property var
+        // <name>: null` is how it spells "injected, and absent is a defined
+        // state". Anything else with a different default is a local, so it is not
+        // part of the owner-edge contract.
+        function pageServiceSeams(pageCode) {
+            var found = []
+            var pattern = /property var ([A-Za-z][A-Za-z0-9]*): null/g
+            var match
+            while ((match = pattern.exec(pageCode)) !== null) {
+                if (found.indexOf(match[1]) < 0)
+                    found.push(match[1])
+            }
+            return found
+        }
+
         // --- Network detail page ---
 
         function test_theNetworkDetailPagePublishesTheBackContract() {

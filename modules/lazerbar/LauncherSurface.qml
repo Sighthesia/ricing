@@ -18,6 +18,28 @@ Item {
     // Owning serialization coordinator; null keeps the stack self-contained.
     property var coordinator: null
 
+    // --- Injected services for the control-center route ---
+    //
+    // The control center is the one route on this surface that reports system
+    // state, so its services are injected rather than imported: the bar that
+    // mounts this surface passes the Services.* singletons in production, and a
+    // test passes fakes. That keeps this file loadable by the component suite
+    // with no Quickshell module, and keeps the route page the only place that
+    // knows what a card reads.
+    //
+    // Every one defaults to null, which is a defined state rather than a broken
+    // one: the route page renders its explicit unavailable/optional states for a
+    // missing service instead of throwing. Battery stays read-only and weather
+    // stays optional - both are forwarded here unchanged and the page decides
+    // what an absent service means.
+    property var networkService: null
+    property var bluetoothService: null
+    property var volumeService: null
+    property var mediaService: null
+    property var batteryService: null
+    property var notificationService: null
+    property var weatherService: null
+
     // Exposed for owner-window mask and layer keyboard-focus bindings.
     readonly property alias host: waveHost
     // Exit-card layer above the host, exposed for tests.
@@ -342,7 +364,18 @@ Item {
 
     Component {
         id: controlCenterPageComponent
-        ControlCenter {}
+        // The route page receives the injected singletons unchanged. The page
+        // forwards the same objects to its same-surface sub-pages, so the
+        // overview and a detail page can never describe two different services.
+        ControlCenter {
+            networkService: root.networkService
+            bluetoothService: root.bluetoothService
+            volumeService: root.volumeService
+            mediaService: root.mediaService
+            batteryService: root.batteryService
+            notificationService: root.notificationService
+            weatherService: root.weatherService
+        }
     }
 
     // Ghost layer above the wave host: exit cards continue their parabolic
