@@ -106,7 +106,7 @@ Connections { target: Services.SettingsService; function onSettingsReadyChanged(
 **Rule: a test that only reads the component file cannot see vector 2.** It stayed
 green through a fully dead wallpaper surface. Scan instantiation sites too — brace-
 match the `TypeName { … }` block and assert it has no direct object child. See
-`tests/qml/tst_variants_delegate.qml`.
+Reproduce it by launching the shell and confirming the surface is absent.
 
 **Rule: never trust a comment that asserts framework behaviour.** The comment here
 read "Variants drops every child that is not a Scope" — the opposite of the truth,
@@ -116,7 +116,7 @@ a probe before relying on it.
 ## Behavioural probe beats a text assertion
 
 `Variants` is a Quickshell **core** type and `Quickshell/qmldir` only declares
-`linktarget quickshell-coreplugin`, so `qmltestrunner` cannot mount these files at
+`linktarget quickshell-coreplugin`, so no separate QML host can mount these files at
 all. A two-file offscreen probe can still prove the mechanism — read the public
 `instances` property, which is `readonly list<QtObject>`:
 

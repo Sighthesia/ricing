@@ -31,5 +31,6 @@ if (event.WindowsChanged)
 ## Verification
 
 - Run `niri msg -j windows` and confirm the top-level `WindowsChanged.windows` wrapper.
-- Run `qs -p tst_niri_active_window.qml` and require all title propagation checks to pass.
+- Restart the shell, switch focus and a workspace, and confirm `scripts/check-shell.sh`
+  reports nothing new while the title follows both.
 - Exercise both a window focus switch and a workspace switch while watching `ActiveWindow`.

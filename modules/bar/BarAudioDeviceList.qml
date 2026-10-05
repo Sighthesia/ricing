@@ -288,8 +288,8 @@ Item {
         return root.levelFormatter(device)
     }
 
-    // Injected so the popup keeps this file free of service imports and stays
-    // instantiable under qmltestrunner.
+    // Injected so the popup keeps this file free of service imports and builds
+    // its labels from its inputs alone.
     property var levelFormatter: function (device) {
         if (device.audio.muted === true)
             return "Muted"

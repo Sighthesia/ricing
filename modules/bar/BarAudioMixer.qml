@@ -11,7 +11,7 @@ import "../lazerbar"
 // the section's body keeps everything inside the surface that is already there.
 //
 // Every service call arrives as an injected function so this file stays free of
-// `services/` imports and remains instantiable under qmltestrunner.
+// `services/` imports and drives itself from the calls it is handed.
 Item {
     id: root
 

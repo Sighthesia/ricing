@@ -3,8 +3,8 @@
 // Network plumbing for NetworkService: terse `nmcli -t` parsing (device table,
 // wireless list, saved profiles, wired profiles), security classification,
 // connect-strategy choice and stderr → user-facing message.
-// Stateless and free of QML/Quickshell imports so it stays runnable under
-// plain qmltestrunner, matching the other services/ *.js siblings.
+// Stateless and free of QML/Quickshell imports, matching the other
+// services/ *.js siblings, so it can be read and reasoned about on its own.
 
 // nmcli -t escapes the field separator inside values, so a split on ":" is
 // wrong for SSIDs like "Cafe:2.4G". Split escape-aware and cap the field

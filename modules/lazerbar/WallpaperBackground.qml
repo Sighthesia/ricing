@@ -33,7 +33,7 @@ Variants {
     // here does not get dropped for being the wrong type: it becomes the
     // delegate, the per-screen Scope is never instantiated, and every wallpaper
     // surface silently disappears from the compositor while the rest of the
-    // shell keeps working. See tests/qml/tst_variants_delegate.qml.
+    // shell keeps working: an absent delegate must not take the surface down.
     //
     // "Ahead of the Scope" includes children contributed from outside this file:
     // this component's root object is the Variants, so anything declared inline
@@ -57,8 +57,9 @@ Variants {
     // instantiates its delegate inside a Scope whose `children` list cannot be
     // read from QML at all — asking it for a count throws "List doesn't define a
     // Count function" — so the delegate publishes its window here instead. That
-    // makes it the only supported way in, and it is what
-    // tst_wallpaper_startup_slots.qml asserts the slot handover through.
+    // makes it the only supported way in: each per-screen delegate registers
+    // its window here on completion, and that array is what the startup slot
+    // handover in adoptStartupLock() walks.
     property var screenWindows: []
 
     // Record or drop one screen's window. The array is replaced rather than

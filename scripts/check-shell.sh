@@ -12,9 +12,9 @@
 #   lock asset, and two TypeErrors in the same window-hint file — none of which
 #   any test asserted.
 #
-#   So the default verification is: run the shell, read its log, judge the
-#   warnings and errors. The suite stays available for logic with no runtime
-#   (scripts/run-tests.sh), but it is no longer the gate for every change.
+#   So verification is: run the shell, read its log, judge the warnings and
+#   errors. This script is that gate, and it is the only one — the test suite that
+#   used to sit beside it has been removed.
 #
 # What it deliberately does NOT do: start a second shell over a live one. Two
 # instances paint two bars and two wallpapers, and the session lock belongs to one

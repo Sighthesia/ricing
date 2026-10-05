@@ -2,8 +2,8 @@
 
 // Pure parsing/model helpers behind the volume panel's device list and
 // application mixer. Split out of VolumeService so the parts that can rot -
-// the pactl payload shape and the row assembly - are testable without a
-// PipeWire graph (see tests/qml/tst_volume_mixer.qml).
+// the pactl payload shape and the row assembly - can be checked without a
+// PipeWire graph.
 //
 // The whole routing feature rests on ONE fact discovered by probing a live
 // PipeWire 1.6.9 session: pulse and pipewire keep different id spaces, so a

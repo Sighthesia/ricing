@@ -331,8 +331,8 @@ ShellRoot {
     }
 
     // Inject the wallpaper palette into the shared LazerTheme singleton.
-    // Keeps LazerTheme loadable without Quickshell in qmltestrunner while
-    // restoring the live theme-color path in the compositor. Stays on the root
+    // Keeps LazerTheme loadable without Quickshell while restoring the live
+    // theme-color path in the compositor. Stays on the root
     // because the wallpaper floor resolves its color through these bindings
     // during bootstrap, before any chrome exists.
     //

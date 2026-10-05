@@ -17,8 +17,8 @@
 // window that happens to fill the working area, and for windowed (fake)
 // fullscreen — which niri keeps as an ordinary tile on purpose.
 //
-// All inputs are plain objects/arrays so the logic stays testable under
-// qmltestrunner without instantiating NiriService:
+// All inputs are plain objects/arrays, so the verdict can be read and reasoned
+// about without instantiating NiriService:
 //
 //   outputSizes:      { "<connector>": { width, height, scale } }
 //   activeWorkspaces: { "<connector>": "<workspace id>" }

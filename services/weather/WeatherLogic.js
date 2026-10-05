@@ -12,8 +12,8 @@
 // documents.
 //
 // Stateless and free of QML/Quickshell imports, matching the other
-// services/*/*.js siblings, so tests/qml/tst_weather_logic.qml runs it under a
-// bare qmltestrunner with no service, no clock, and no network.
+// services/*/*.js siblings, so it resolves entirely from its inputs: no
+// service, no clock, and no network.
 
 // How long a cached reading stays fresh. This is the single TTL: the service
 // derives both its refresh cadence and its staleness threshold from it, so the
@@ -235,8 +235,7 @@ function toNumber(value, fallback) {
 // SettingsService.locationCoordsValid rejects is one this module also refuses.
 // Inlined rather than imported: SolarCalc.js is a sibling in services/, and a
 // nested services/weather/ module importing "../SolarCalc.js" is a relative
-// path that Quickshell resolves inside the config root but a bare
-// qmltestrunner treats as opaque.
+// path that only Quickshell resolves, inside the config root.
 var SolarCoord = {
     parseLatitude: function (value) {
         return parseCoordinate(value, 90)

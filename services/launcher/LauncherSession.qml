@@ -1,7 +1,7 @@
 // Standalone launcher session state machine: visibility, query/mode
 // derivation, refresh sequencing against pluggable data sources, selection,
 // execution outcomes, and keyboard action handling. Deliberately free of
-// Quickshell imports so it loads under plain qmltestrunner;
+// Quickshell imports so it loads standalone;
 // LauncherService embeds it and owns the IPC surface.
 import QtQml
 import "../LauncherLogic.js" as LauncherLogic

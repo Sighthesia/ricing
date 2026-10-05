@@ -7,8 +7,8 @@
 // same timetable offline from lat/lon so auto theme works without network;
 // city names are resolved to coordinates first (see LocationService).
 //
-// All math is pure JS (no Date networking, no QML imports) so it stays
-// runnable under plain qmltestrunner.
+// All math is pure JS (no Date networking, no QML imports) so a timetable can
+// be read and reasoned about in isolation.
 
 var ZENITH = 90.833 // official sunrise/sunset zenith (incl. refraction)
 var MINUTES_PER_DAY = 1440

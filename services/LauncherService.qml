@@ -147,7 +147,7 @@ Singleton {
         function onPersistenceReady() { rankingRevalidateTimer.restart() }
     }
 
-    // Quickshell-free session core (unit tested directly under qmltestrunner).
+    // Quickshell-free session core (kept separate so it loads standalone).
     LauncherSession {
         id: session
         _adapters: root._adapters

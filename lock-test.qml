@@ -2,8 +2,8 @@
 // asking. With AFLOAT_LOCK_SELFTEST=1 it mounts Lock for real, grabs the
 // session lock and blacks out the screen for selfTestDelayMs (5s), so the user
 // is locked out of their own desktop until they authenticate. Without that env
-// var it arms nothing and exits immediately. It is deliberately NOT named
-// tst_*.qml, so scripts/run-tests.sh never picks it up.
+// var it arms nothing and exits immediately. Nothing automated picks it up:
+// it is a manual probe, run by hand and never by a script.
 import QtQuick
 import Quickshell
 import "modules/lock" as LockModule

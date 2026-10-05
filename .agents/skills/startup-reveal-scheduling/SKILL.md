@@ -126,7 +126,7 @@ checkout at `~/0_Files/Producing/Software/Quickshell/DymicShell`).
 
 - Re-read the trace after the change and confirm the large event-loop gaps are gone,
   not merely shifted.
-- `scripts/run-tests.sh` (offscreen by default). Never bare `qmltestrunner` — it maps
+- `scripts/check-shell.sh` after restarting the shell. Never launch a second shell — it maps
   real windows and destroys fcitx5 input on a live session.
 - Confirm the startup ladder still has exactly one writer per quiet-ready gate, and
   that the watchdog budget textually covers the longest legitimate step.

@@ -142,7 +142,7 @@ run completed *before* the dependency did.
 
 ## Verification
 
-These are timing bugs: a single green run proves nothing. Run the root-level
-harness (`qs -p tst_*.qml`) **at least 10 times** before believing a fix, and
-put a cross-check Process in the harness that re-reads the same source
-independently and compares — that is what surfaced the overwrite in (2).
+These are timing bugs: a single clean run proves nothing. Restart the shell and
+re-read the log **at least 10 times** before believing a fix, and add a
+cross-check Process that re-reads the same source independently and compares —
+that is what surfaced the overwrite in (2).

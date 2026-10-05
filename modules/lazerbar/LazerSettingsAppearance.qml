@@ -11,8 +11,9 @@ LazerSettingsSection {
     property var defaults: ({})
     property var resetCallback: null
     // Location-mode wiring (injected by the host so this page stays
-    // singleton-free and runnable under plain qmltestrunner; the live shell
-    // passes Services.LocationService + Services.SettingsService values).
+    // singleton-free and derives its schedule from the values it is handed;
+    // the live shell passes Services.LocationService + Services.SettingsService
+    // values).
     property var locationService: null
     property string effectiveSunrise: ""
     property string effectiveSunset: ""

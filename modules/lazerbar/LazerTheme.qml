@@ -5,15 +5,15 @@ import QtQuick
 // color tokens follow the wallpaper-extracted Material palette when the
 // Theme Adaptation setting is enabled, otherwise they fall back to the
 // built-in violet/osu defaults.
-// Injection design: keep the singleton loadable without Quickshell so
-// qmltestrunner harnesses remain deterministic, while the live shell
-// injects the palette at startup (see shell.qml). When no palette is
+// Injection design: keep the singleton loadable without Quickshell, so it
+// loads standalone and every token resolves deterministically, while the live
+// shell injects the palette at startup (see shell.qml). When no palette is
 // injected, adapt stays false and every token resolves to the built-in
-// fallback, preserving existing test expectations.
+// fallback.
 QtObject {
     id: root
 
-    // Injected by the shell runtime; null in qmltestrunner.
+    // Injected by the shell runtime; null when instantiated standalone.
     // The shell binds these to Services.SettingsService / Services.Color
     // so the palette stays reactive without this singleton importing Services.
     property var settingsService: null

@@ -576,7 +576,7 @@ Item {
         return root.mediaLengthMs > 0
     }
     // Spectrum values flow through the hover payload so this file stays
-    // free of direct service imports for qmltestrunner isolation.
+    // free of direct service imports.
     readonly property var mediaSpectrumService:
         payload && payload.spectrumService ? payload.spectrumService : null
     readonly property var mediaSpectrumValues: {
@@ -622,7 +622,7 @@ Item {
         }
         // Fallback no-op when no injected service; real shell wires payload to
         // VolumeService.setSinkVolume / toggleSinkMute, so no direct import is
-        // needed for qmltestrunner isolation.
+        // needed to reach the service.
     }
 
     function handleToggleMute() {

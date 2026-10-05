@@ -147,10 +147,10 @@ The outer content owners must be wide enough for the catcher. Preserve the visua
 
 ## Verification
 
-Use the safe test runner and a real desktop reproduction:
+Reproduce it on the real desktop, then lint what you touched:
 
 ```sh
-scripts/run-tests.sh tst_bar_tray_menu_content
+scripts/check-shell.sh          # after restarting the shell
 qmllint modules/bar/BarPopupHost.qml modules/bar/BarPopupActions.qml modules/bar/BarTrayMenuContent.qml
 ```
 

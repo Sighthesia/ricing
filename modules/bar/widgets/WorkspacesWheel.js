@@ -7,8 +7,8 @@
 // workspace is empty) does the same scroll step cross into the neighbor
 // workspace. Up (angleDelta.y > 0) moves backward, down moves forward.
 //
-// All inputs are plain arrays so the logic stays testable under
-// qmltestrunner without instantiating NiriService:
+// All inputs are plain arrays, so the resolution can be read and reasoned
+// about in isolation without instantiating NiriService:
 //   workspaces: [{ wsId, idx, isActive }]
 //   windows: [{ winId, workspaceId, colIdx, rowIdx }]
 // Returns null for no-op, otherwise:

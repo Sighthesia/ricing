@@ -3,7 +3,7 @@
 // Pure scheduling math for automatic light/dark switching (cf. noctalia's
 // DarkModeService): resolve the painted mode from the user's intent plus a
 // sunrise/sunset timetable or the OS-reported color scheme. Stateless and
-// UI-free so it stays runnable under plain qmltestrunner.
+// UI-free so the colour logic can be read and reasoned about in isolation.
 
 var DEFAULT_SUNRISE = "06:30"
 var DEFAULT_SUNSET = "18:30"

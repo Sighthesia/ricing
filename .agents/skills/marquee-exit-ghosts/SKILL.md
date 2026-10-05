@@ -18,7 +18,7 @@ Preserve the visible outgoing characters when a marquee title changes after deep
 
 ## Correct Pattern
 
-- **Constant speed:** `marqueeLegDuration() = Math.max(2000, overflow * 18)` — no `maxScrollLegMs` cap. `tst_marquee_drift.qml` asserts `overflow 6400 → 115200 ms` linear.
+- **Constant speed:** `marqueeLegDuration() = Math.max(2000, overflow * 18)` — no `maxScrollLegMs` cap. `overflow 6400` must give `115200 ms` — the mapping stays linear.
 - **Non-interrupted exit (`!wasActive`):** capture `scrollX` (`label.x` or `_preservedScrollX`, clamped to `[-maxScrollX,0]`), `_clearGhosts()`, then `spawnGhosts(oldText, fallSpan, scrollX, viewRight)` scanning the whole `oldText` and counting only visible ghosts toward `transitionMaxChars`.
 - **Interrupted exit (`wasActive`):** do **not** spawn full `oldText`. Compute `elapsed = Date.now() - _sweepStart`, then `_collapseStandingGhosts()` (re-stagger ghosts with `y==0 && opacity>=0.99`, overlap-checked) and `_collapseRevealedChars(elapsed, fallSpan)` (only chars with `delays[i]+scanGapMs <= elapsed` fall at `i*8`). `_stopSweepRow()` after collapse. Standing ghosts keep falling; unrevealed chars vanish without flashing.
 - **Desktop coalesce (`ActiveWindow.qml`):** `displayTitle === desktopLabel` starts `desktopHold:120ms` storing `_pendingDesktopPrev`; a new window within 120 ms cancels the hold and animates `pendingPrev → newWindow` directly, skipping desktop. Hold expiry animates `pendingPrev → desktop` only if still on desktop.
@@ -26,7 +26,9 @@ Preserve the visible outgoing characters when a marquee title changes after deep
 
 ## Verification
 
-- Run `qs -p tst_marquee_drift.qml` — expect `10 passed, 0 failed`.
+- Restart the shell and check `scripts/check-shell.sh` reports nothing new while a
+  very long title scrolls: watch for a visible ghost left mid-air at the switch
+  boundary, and for the scroll to jump when a new title interrupts an exit.
 - `deep-exit-ghost`: old title scrolled ~1289 px, still leaves visible falling ghosts; immediate ghost at switch boundary.
 - `pacing-constant-speed`: `marqueeLegDuration()` linear `overflow*18` (e.g. 6400 px → 115200 ms), `pacing-bounded` never exits viewport.
 - `rapid-interrupt` / `title-churn`: only revealed chars fall, standing ghosts re-staggered, `maxGhosts <= 48` (overlap-checked).

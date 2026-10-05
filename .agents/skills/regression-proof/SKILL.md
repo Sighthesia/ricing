@@ -53,8 +53,8 @@ harnesses turned out to be flaky on **unmodified HEAD**:
 
 | harness | run 1 | run 2 | run 3 |
 | --- | --- | --- | --- |
-| `tst_bar_popup_host.qml` | 349/0 | 344/5 | 344/5 |
-| `tst_bar_tray_menu_content.qml` | 40/3 | 39/4 | 40/3 |
+| popup-host surface | 349/0 | 344/5 | 344/5 |
+| tray-menu content | 40/3 | 39/4 | 40/3 |
 
 Three "all green" claims in a row were, in truth, one lucky run each. Once this
 is known, any single green reading is noise.
@@ -69,7 +69,7 @@ Rules that follow:
   harness, and it changes how much every other result is worth.
 
 **Never** resolve flakiness with a repeat-and-check loop over a bare
-`qmltestrunner`. See the platform rules in `AGENTS.md` — each bare invocation maps
+the QML it loads. See the platform rules in `AGENTS.md` — each bare invocation maps
 a real focused window and breaks the input method.
 
 ## 4. After two wrong guesses, stop reading code and capture a frame
