@@ -273,6 +273,38 @@ Item {
 
     readonly property bool passwordActive: root.passwordSsid !== ""
 
+    // --- Open refresh ---
+    //
+    // What this page owes the service on its way in: one fresh read of the radio.
+    // The scan behind the overview's summary can be minutes old, and a network
+    // that appeared since then is simply not in the list - the same reason the
+    // bar's network popup re-reads the radio when it becomes visible.
+    //
+    // It is that call, unchanged: the service's own refreshForOpen(), which
+    // throttles itself, reached through the same typeof guard so no service - or
+    // no service at all - is called on a method it does not have. There is no
+    // scan() fallback here, unlike BarPopupActions: this page's rescan is a user
+    // action with its own arguments, and "the page opened" is not that action.
+    //
+    // Asked ONCE per mount, from Component.onCompleted. A binding or an
+    // onNetworkServiceChanged handler would ask again for every re-render and
+    // every service swap - which is exactly what a test does when it seeds a
+    // fake - and an open that re-reads the radio per binding churn is a scan per
+    // frame. The count is published so the once-ness is asserted rather than
+    // assumed.
+    readonly property int openRefreshCount: _openRefreshCount
+    property int _openRefreshCount: 0
+
+    Component.onCompleted: root.refreshForOpen()
+
+    function refreshForOpen() {
+        var service = root.networkService
+        if (!service || typeof service.refreshForOpen !== "function")
+            return
+        root._openRefreshCount++
+        service.refreshForOpen()
+    }
+
     // --- Actions ---
     //
     // Each is one guarded call into an existing service method. The guards are
@@ -890,7 +922,20 @@ Item {
 
                         onTextChanged: root.password = text
                         onAccepted: root.submitPassword()
-                        Keys.onEscapePressed: root.cancelPassword()
+                        // Escape belongs to the PROMPT, not to the page.
+                        //
+                        // Claimed explicitly, the way every consumed key in this
+                        // shell is claimed. Qt happens to stop an Escape at the
+                        // first Keys handler that runs, but that is an implicit
+                        // default, not this page saying so - and a prompt whose
+                        // Escape is nobody's business hands the press to whichever
+                        // ancestor answers next, which is the wave host: its
+                        // handler pops the whole detail page and throws away the
+                        // user's place along with the half-typed secret.
+                        Keys.onEscapePressed: event => {
+                            root.cancelPassword()
+                            event.accepted = true
+                        }
                     }
 
                     // Submit without exposing the secret anywhere on screen.

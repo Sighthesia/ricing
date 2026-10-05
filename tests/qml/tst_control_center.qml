@@ -196,7 +196,12 @@ Item {
                 wifiEnabled = enabled
                 record("setWifiEnabled", enabled)
             }
-            function refreshForOpen() { record("refreshForOpen") }
+            // `refreshCalls` counts the OPEN refresh on its own, so "the page asked
+            // once when it mounted" is not inferred from the shape of a recorded
+            // argument list, and a refresh the overview's deferred path made can be
+            // told apart from one the detail page made.
+            property int refreshCalls: 0
+            function refreshForOpen() { refreshCalls++; record("refreshForOpen") }
             function requestScan(rescan, clearError) { record("requestScan", rescan, clearError) }
             function connect(ssid, password, isHidden, securityKey) {
                 connecting = true
@@ -2674,7 +2679,11 @@ Item {
             page.openNetworkDetails()
             tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
             compare(page.returnRefreshCount, 0,
-                "opening a sub-page reads what the service already has")
+                "opening a sub-page is not a RETURN, so the deferred hook stays quiet")
+            // What the page DID ask for on the way in is its own open refresh, and
+            // that is the detail page's call, not the overview's.
+            compare(network.callCount("refreshForOpen"), 1,
+                "the mounted detail page asked the service to re-read the radio")
 
             verify(page.handleBack(), "back must be consumed, not declined")
             // Same turn: the overview is already back and the refresh has NOT
@@ -2693,7 +2702,10 @@ Item {
             tryVerify(function() { return page.controlCardCount === 4 }, 1000)
             page.openNetworkDetails()
             tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
-            compare(network.callCount("refreshForOpen"), 0)
+            // The mount asked for its own read; the RETURN refresh is what this
+            // test is about, so it is counted from there.
+            compare(network.callCount("refreshForOpen"), 1,
+                "the detail page's own open refresh happened on the way in")
 
             verify(page.handleBack())
             compare(page.activeSubPage, "")
@@ -2702,9 +2714,10 @@ Item {
 
             tryCompare(page, "returnRefreshCount", 1, 1000)
             // The hook reaches the service, and reaches it through its own
-            // method: the page must not re-read the adapter itself.
-            tryVerify(function() { return network.callCount("refreshForOpen") === 1 }, 1000)
-            compare(network.callCount("refreshForOpen"), 1)
+            // method: the page must not re-read the adapter itself. One more call
+            // than the mount made - the deferral adds one, and only one.
+            tryVerify(function() { return network.callCount("refreshForOpen") === 2 }, 1000)
+            compare(network.callCount("refreshForOpen"), 2)
 
             // Exactly one refresh: the deferral must not become a loop.
             compare(page.returnRefreshCount, 1)
@@ -2733,6 +2746,134 @@ Item {
             var bare = makePage({})
             tryVerify(function() { return bare.controlCardCount === 4 }, 1000)
             bare.refreshAfterReturn()
+        }
+
+        // --- Opening the detail asks the service to re-read the radio ---
+
+        // The scan behind the overview's summary can be minutes old, and a
+        // network that appeared since then is not in the list at all. So the
+        // detail page asks for a fresh read on its way in - the same call the
+        // bar's network popup makes, through the service's own method, so the
+        // service throttles it exactly as it throttles that one.
+        function test_theNetworkDetailRequestsAServiceRefreshWhenItOpens() {
+            var fake = seededNetworkDetail(makeFake(fakeNetworkDetailComponent), [
+                { ssid: "Home", connected: true, signal: 78 }
+            ])
+            var page = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return page.width > 0 }, 1000)
+
+            compare(fake.refreshCalls, 1,
+                "opening the page asks the service to re-read the radio, once")
+            compare(fake.callCount("refreshForOpen"), 1,
+                "and it reaches the service through its own refreshForOpen()")
+            compare(fake.callArgs("requestScan", 0), undefined,
+                "the open must not borrow the rescan button's arguments")
+            compare(fake.callCount("requestScan"), 0,
+                "opening is a read, not the user's deliberate rescan")
+
+            // The count is the page's own, so the ONCE-ness is observable rather
+            // than inferred from the service.
+            compare(page.openRefreshCount, 1)
+        }
+
+        // One open, one request. A binding, or a handler on the service property,
+        // would ask again for every re-render and every service swap - and a
+        // service swap is precisely what a test does when it seeds a fake. An
+        // open that re-reads the radio per binding churn is a scan per frame, and
+        // the service's own throttle is the only thing standing between that and
+        // a busy adapter.
+        function test_theOpenRefreshIsAskedOnceAndNeverAgainOnChurn() {
+            var fake = seededNetworkDetail(makeFake(fakeNetworkDetailComponent), [
+                { ssid: "Home", connected: true, signal: 78 }
+            ])
+            var page = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return page.width > 0 }, 1000)
+            compare(fake.refreshCalls, 1)
+
+            // Every kind of churn a live page sees: the scan map replaced wholesale,
+            // a loading flag, a resize, a focus hand-off.
+            fake.setWifiMap([
+                { ssid: "Home", security: "WPA2", signal: 70, connected: true,
+                    existing: true },
+                { ssid: "Neighbour 5G", security: "WPA2", signal: 40,
+                    connected: false, existing: false }])
+            fake.scanningActive = true
+            fake.connecting = true
+            fake.connectingTo = "Home"
+            page.width = 800
+            page.focusDefault()
+            wait(200)
+            compare(fake.refreshCalls, 1,
+                "churn must not turn the open refresh into a poll")
+
+            // A second mount is a second open, so it asks again - the rule is
+            // "once per mount", not "once per page object ever".
+            var reopened = makeNetworkPage({ networkService: fake })
+            tryVerify(function() { return reopened.width > 0 }, 1000)
+            compare(fake.refreshCalls, 2, "a fresh mount is a fresh open")
+        }
+
+        // Only the network has a radio to re-read: the Bluetooth detail mounts and
+        // asks nothing of the network service, and its own construction is inert
+        // (asserted on its own page below). Returning to the overview stays the
+        // overview's deferred path - the page does not take that over.
+        function test_onlyTheNetworkMountRefreshesAndTheReturnStaysDeferred() {
+            var network = makeFake(fakeNetworkDetailComponent)
+            var bluetooth = seededBluetooth(makeFake(fakeBluetoothDetailComponent), [
+                { name: "Speaker", address: "AA:BB:00:00:00:01", connected: true,
+                    paired: true, signalStrength: 80 }
+            ])
+            var page = makePage({ networkService: network, bluetoothService: bluetooth })
+            tryVerify(function() { return page.controlCardCount === 4 }, 1000)
+            compare(network.refreshCalls, 0,
+                "the overview itself opens without a radio refresh")
+
+            page.openBluetoothDetails()
+            tryVerify(function() { return page.activeSubPage === "bluetooth-detail" }, 1000)
+            wait(150)
+            compare(network.refreshCalls, 0,
+                "a Bluetooth detail mounts without touching the radio")
+            compare(page.returnRefreshCount, 0)
+
+            // Returning is the overview's own deferred refresh, and only then.
+            verify(page.handleBack())
+            tryCompare(page, "returnRefreshCount", 1, 1000)
+            compare(network.refreshCalls, 1,
+                "the return refresh is the deferred path, and it is the only one here")
+
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            tryVerify(function() { return network.refreshCalls === 2 }, 1000,
+                "the network detail's own open refresh, on top of the return one")
+
+            verify(page.handleBack())
+            tryCompare(page, "returnRefreshCount", 2, 1000)
+            compare(network.refreshCalls, 3, "one open, one return, one call each")
+        }
+
+        // The password prompt must CLAIM its Escape, and the claim must be written
+        // down rather than left implicit.
+        //
+        // Measured on this Qt build (6.11.2): a Keys handler already stops an
+        // unaccepted press from walking up the chain, so the runtime behaviour is
+        // the same either way - which is exactly why it cannot be what pins the
+        // rule. What is at stake is the page's intent: an Escape nobody claims
+        // reads as "nobody here wanted this press", and the first ancestor waiting
+        // for one is the wave host, whose handler pops the whole detail page. So
+        // the explicit claim is asserted on the source, the same way the other
+        // invisible-to-runtime contracts here are.
+        function test_thePasswordPromptExplicitlyClaimsItsEscapePress() {
+            var file = readRepoFile("modules/lazerbar/ControlCenterNetwork.qml")
+            compare(file.status, 200, "the network page source must be readable")
+            var code = stripComments(file.text)
+            var claim = code.indexOf("Keys.onEscapePressed")
+            verify(claim >= 0, "the prompt field must handle Escape itself")
+            var cancel = code.indexOf("root.cancelPassword()", claim)
+            verify(cancel > claim, "Escape must cancel the prompt")
+            verify(code.indexOf("event.accepted = true", cancel) > cancel
+                    && code.indexOf("event.accepted = true", cancel)
+                        - cancel < 220,
+                "and it must claim the press, so the host never sees it")
         }
 
         // A detail page must not be reachable as a top-level Wave route. That is

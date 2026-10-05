@@ -380,9 +380,13 @@ Item {
             id: readyNetwork
             property bool wifiConnected: true
             property bool wifiEnabled: true
+            // Two networks, because the one that needs a password is never the
+            // connected one: a secured row is only reachable by tapping it.
             property var networks: ({
                 "Home": { ssid: "Home", security: "WPA2", signal: 78,
-                    connected: true, existing: true }
+                    connected: true, existing: true },
+                "Neighbour 5G": { ssid: "Neighbour 5G", security: "WPA2",
+                    signal: 55, connected: false, existing: false }
             })
             property bool ethernetConnected: false
             property string activeEthernetConnection: ""
@@ -396,7 +400,7 @@ Item {
             function requestScan(rescan, clearError) {}
             function connect(ssid, password, isHidden, securityKey) {}
             function disconnect(ssid) {}
-            function needsPasswordFor(ssid) { return false }
+            function needsPasswordFor(ssid) { return ssid === "Neighbour 5G" }
             function isCredentialFailure(message) { return false }
         }
 
@@ -520,6 +524,87 @@ Item {
             tryVerify(function() { return page.activeSubPage === "" }, 1000)
             compare(host.phase, "open")
             verify(host.contentItem === page)
+            host.destroy()
+        }
+
+        // Escape inside the password prompt is the PROMPT's back, not the page's.
+        //
+        // A prompt is the one sub-page element that takes focus of its own, so it
+        // is the one place where a key press has two possible owners: the field,
+        // and the wave host further up the chain whose Escape handler pops the
+        // whole detail page. A user dismissing a half-typed secret has to land
+        // back on the network list, not be thrown out of Network with the
+        // half-typed secret - so the field claims the press, and this pins what
+        // that claim buys.
+        //
+        // Asserted with a real key press at a really focused field: calling
+        // cancelPassword() directly would pass even if the press carried on to
+        // the host, because the contract is where the press ENDS, not what the
+        // field does with it.
+        function test_escapeInsideThePasswordPromptCancelsItAndKeepsTheDetailPage() {
+            var host = openControlCenterWithDetails()
+            var page = host.contentItem
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            var detail = page.detailPageItem
+            verify(detail !== null, "the network detail sub-page must be mounted")
+
+            detail.activateNetwork("Neighbour 5G")
+            tryVerify(function() { return detail.passwordSsid === "Neighbour 5G" }, 1000)
+            detail.password = "hunter2"
+            tryVerify(function() { return detail.passwordItem.activeFocus === true }, 1000,
+                "an open prompt must own the caret, or the press never reaches it")
+
+            keyPress(Qt.Key_Escape)
+            keyRelease(Qt.Key_Escape)
+
+            tryCompare(detail, "passwordSsid", "", 1000)
+            compare(detail.password, "", "a dismissed secret must not linger in the page")
+            compare(detail.passwordItem.activeFocus, false,
+                "the dismissed field must hand focus back")
+            compare(page.activeSubPage, "network-detail",
+                "the prompt's back press must not pop the whole detail page")
+            compare(host.route, "control-center")
+            compare(host.phase, "open",
+                "the wave surface must stay open: this press was never its own")
+            verify(host.contentItem === page, "no route swap may have happened")
+            host.destroy()
+        }
+
+        // ...and once the prompt is gone the page's own back press is unchanged:
+        // the next Escape returns to the overview, the one after that closes the
+        // surface. Consuming the field's Escape must not have consumed the page's.
+        function test_pageBackIsUnchangedOnceThePasswordPromptIsDismissed() {
+            var host = openControlCenterWithDetails()
+            var page = host.contentItem
+            page.openNetworkDetails()
+            tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+            var detail = page.detailPageItem
+
+            detail.activateNetwork("Neighbour 5G")
+            tryVerify(function() { return detail.passwordSsid === "Neighbour 5G" }, 1000)
+            // Wait for the prompt's own focus hand-off before pressing, so this
+            // test presses Escape where the user does: at the field.
+            tryVerify(function() { return detail.passwordItem.activeFocus === true }, 1000)
+            keyPress(Qt.Key_Escape)
+            keyRelease(Qt.Key_Escape)
+            tryCompare(detail, "passwordSsid", "", 1000)
+            compare(detail.passwordItem.activeFocus, false,
+                "the dismissed field is not where the caret is any more")
+            // Focus is handed to the page through its own entry point, the way the
+            // route asks for it - so the next press is a PAGE-level one, and it is
+            // pressed for real rather than faked through the host.
+            detail.focusDefault()
+            tryVerify(function() { return detail.activeFocus === true }, 1000)
+            keyPress(Qt.Key_Escape)
+            keyRelease(Qt.Key_Escape)
+            tryCompare(page, "activeSubPage", "", 1000)
+
+            compare(host.phase, "open", "the detail page's own back still spares the surface")
+            compare(host.route, "control-center")
+
+            verify(host.handleEscape())
+            compare(host.phase, "closing", "and the overview still declines back, so the host closes")
             host.destroy()
         }
     }
