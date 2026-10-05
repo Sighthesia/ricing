@@ -47,8 +47,24 @@ Item {
     property var weatherService: null
 
     // Injectable clock, so the header is deterministic under test. Production
-    // never assigns it and reads the wall clock.
-    property date now: new Date()
+    // never assigns it and follows the wall clock through `liveClock`.
+    //
+    // The binding IS the override mechanism. `new Date()` as a plain initialiser
+    // is evaluated once, which is why a retained overview used to freeze on the
+    // minute it was opened; a live clock the tick advances fixes that. Assigning
+    // `now` - a test freezing the header at a fixed moment - removes the binding,
+    // and the tick's later writes to `liveClock` can then no longer reach that
+    // value. Measured rather than assumed, because the whole override story rests
+    // on it: after such an assignment the property does NOT re-attach to the next
+    // `liveClock` write, through either createObject properties or a plain
+    // assignment.
+    property date now: root.liveClock
+    // What the clock tick writes. Published so a test can read the value the tick
+    // itself produced, not only its effect on the rendered header strings.
+    property date liveClock: new Date()
+    // Tick period, in milliseconds. Exposed so a behaviour test can drive the
+    // real Timer quickly instead of calling a function production never calls.
+    property int clockTickInterval: 1000
 
     // Focus landings, so a caller can prove the route's own focus target was used
     // rather than the launcher's search field. Diagnostics only.
@@ -96,6 +112,39 @@ Item {
     // file's. A fake that omits a property yields undefined, which the module
     // already treats as "nothing to report".
 
+    // The connected Wi-Fi network's name.
+    //
+    // NetworkService has NO flat activeSsid: it keeps a `networks` scan map keyed
+    // by SSID whose entry carries `ssid` and `connected`, and it reassigns that
+    // whole map on every status change - which is exactly the notification a
+    // binding needs, so reading it here stays live. A flat accessor, if some
+    // service ever grows one, still wins, so this is a fallback rather than a
+    // second source of truth.
+    //
+    // Only the connected entry is consulted, and the module's own ladder still
+    // decides what the card says: an ethernet-only link never reaches this value,
+    // and a connected link whose entry the scan has not reported yet still falls
+    // back to the module's "Connected".
+    readonly property string connectedWifiSsid: {
+        var service = root.networkService
+        if (!service)
+            return ""
+        var flat = String(service.activeSsid == null ? "" : service.activeSsid)
+        if (flat !== "")
+            return flat
+        var networks = service.networks
+        if (networks == null || typeof networks !== "object")
+            return ""
+        var keys = Object.keys(networks)
+        for (var i = 0; i < keys.length; i++) {
+            var entry = networks[keys[i]]
+            if (entry != null && entry.connected === true)
+                return String(entry.ssid == null || entry.ssid === ""
+                    ? keys[i] : entry.ssid)
+        }
+        return ""
+    }
+
     readonly property var networkSnapshot: {
         var service = root.networkService
         if (!service)
@@ -104,7 +153,7 @@ Item {
             available: true,
             wifiEnabled: service.wifiEnabled !== false,
             wifiConnected: service.wifiConnected === true,
-            activeSsid: String(service.activeSsid == null ? "" : service.activeSsid),
+            activeSsid: root.connectedWifiSsid,
             ethernetConnected: service.ethernetConnected === true,
             activeEthernetConnection: String(
                 service.activeEthernetConnection == null
@@ -297,13 +346,20 @@ Item {
     // Cumulative y of one named section inside one order array. One implementation
     // for both arrangements, so wide's right column and narrow's stack cannot
     // compute an offset differently.
-    function offsetInOrder(order, name) {
+    //
+    // `belowOverview` prepends the full-width overview band. The wide arrays
+    // (["controls"], ["calendar", "notifications"]) describe a COLUMN, so they
+    // never mention the band that sits above both columns - and the header is laid
+    // out at y 0 inside the same content box. Without that prepend every wide
+    // section resolved its offset to 0 and landed on the header's own row.
+    function offsetInOrder(order, name, belowOverview) {
+        var list = belowOverview === true ? ["overview"].concat(order) : order
         var offset = 0
-        for (var i = 0; i < order.length; i++) {
-            if (order[i] === name)
+        for (var i = 0; i < list.length; i++) {
+            if (list[i] === name)
                 return offset
-            offset += root.sectionHeight(order[i])
-            if (i < order.length - 1)
+            offset += root.sectionHeight(list[i])
+            if (i < list.length - 1)
                 offset += root.sectionGap
         }
         return 0
@@ -311,6 +367,19 @@ Item {
 
     implicitWidth: 1024
     implicitHeight: 640
+
+    // The clock tick. It writes `liveClock` and never `now`, so it cannot break the
+    // binding an injected clock depends on. It keeps running while the surface is
+    // retained rather than only while visible, so a header that was hidden behind
+    // another route reads the right time the moment it comes back.
+    Timer {
+        id: clockTick
+        objectName: "clockTick"
+        interval: root.clockTickInterval
+        repeat: true
+        running: true
+        onTriggered: root.liveClock = new Date()
+    }
 
     // --- Layout surface ---
     //
@@ -322,7 +391,13 @@ Item {
         id: layoutSurface
         objectName: "layoutSurface"
         x: root.pagePadding
-        y: root.pagePadding + root.headerHeight + root.sectionGap
+        // The scroller starts at the page padding in BOTH arrangements, because the
+        // header is not in a strip above it: it is the first section of the content
+        // box, and the wide columns are offset below it (see offsetInOrder). An
+        // earlier version reserved `headerHeight + sectionGap` here as well, which
+        // left 74px of empty panel above the clock in both layouts - and in wide,
+        // where nothing scrolls, that band is pure dead surface.
+        y: root.pagePadding
         width: root.usableWidth
         height: Math.max(0, root.height - y - root.pagePadding)
         contentWidth: width
@@ -513,7 +588,7 @@ Item {
             parent: layoutContent
             spacing: root.cardGap
             x: 0
-            y: root.wideLayout ? root.offsetInOrder(root.sections.left, "controls")
+            y: root.wideLayout ? root.offsetInOrder(root.sections.left, "controls", true)
                                : root.offsetInOrder(root.sections.stacked, "controls")
             width: root.wideLayout ? root.leftColumnWidth : root.usableWidth
 
@@ -689,6 +764,14 @@ Item {
                 Accessible.name: root.mediaCardState.title + ", " + root.mediaCardState.summary
                 onActivated: root.onMediaCardActivated()
 
+                // Transport buttons. The model carries ONLY what identifies a
+                // button, and nothing in it is bound to the player's state: a
+                // Repeater rebuilds every delegate when its model changes, so a
+                // model whose glyph, label or enabled flag came from `playing` or
+                // from a capability flag replaced all three buttons - and the
+                // keyboard focus the user had parked on one - on every play/pause.
+                // The dynamic words are therefore read inside the delegate, where
+                // they are ordinary bindings on properties that already exist.
                 Row {
                     id: mediaTransport
                     objectName: "mediaTransport"
@@ -697,25 +780,33 @@ Item {
                     spacing: root.cardGap
 
                     Repeater {
+                        // Constant by construction: nothing here reads a service, so
+                        // this array is evaluated once and never reassigned.
                         model: [
-                            { id: "previous", glyph: "icons/previous.svg",
-                              enabled: root.mediaSnapshot.canGoPrevious,
-                              label: "Previous", action: "previous" },
-                            { id: "toggle", glyph: root.mediaSnapshot.playing
-                                  ? "icons/pause.svg" : "icons/play.svg",
-                              enabled: root.mediaSnapshot.canTogglePlayback,
-                              label: root.mediaSnapshot.playing ? "Pause" : "Play",
-                              action: "playPause" },
-                            { id: "next", glyph: "icons/next.svg",
-                              enabled: root.mediaSnapshot.canGoNext,
-                              label: "Next", action: "next" }
+                            { id: "previous", action: "previous", capability: "canGoPrevious" },
+                            { id: "toggle", action: "playPause", capability: "canTogglePlayback" },
+                            { id: "next", action: "next", capability: "canGoNext" }
                         ]
 
                         delegate: Rectangle {
                             id: transportButton
                             required property var modelData
-                            readonly property bool mediaEnabled: modelData.enabled === true
                             readonly property string transportId: String(modelData.id)
+                            readonly property Item glyphItem: transportGlyph
+
+                            // Everything the player decides, read here and nowhere
+                            // else: the model's own words are the player's, named by
+                            // the snapshot key it belongs to.
+                            readonly property bool mediaEnabled:
+                                root.mediaSnapshot[modelData.capability] === true
+                            readonly property string glyph: transportButton.transportId === "toggle"
+                                ? (root.mediaSnapshot.playing
+                                   ? "icons/pause.svg" : "icons/play.svg")
+                                : "icons/" + transportButton.transportId + ".svg"
+                            readonly property string label: transportButton.transportId === "toggle"
+                                ? (root.mediaSnapshot.playing ? "Pause" : "Play")
+                                : (transportButton.transportId === "previous"
+                                   ? "Previous" : "Next")
 
                             width: 26
                             height: 26
@@ -723,11 +814,10 @@ Item {
                             color: transportHover.hovered ? LazerTheme.settingsCardHover
                                                           : "transparent"
                             enabled: transportButton.mediaEnabled
-                            readonly property Item glyphItem: transportGlyph
                             opacity: enabled ? 1 : LazerTheme.settingsDisabledAlpha
                             activeFocusOnTab: enabled
                             Accessible.role: enabled ? Accessible.Button : Accessible.StaticText
-                            Accessible.name: transportButton.modelData.label
+                            Accessible.name: transportButton.label
 
                             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -744,7 +834,7 @@ Item {
                                 id: transportGlyph
                                 anchors.fill: parent
                                 anchors.margins: 3
-                                source: transportButton.modelData.glyph
+                                source: transportButton.glyph
                                 fillMode: Image.PreserveAspectFit
                                 opacity: transportButton.enabled ? 1
                                     : LazerTheme.settingsDisabledAlpha
@@ -782,7 +872,7 @@ Item {
             objectName: "calendar"
             parent: layoutContent
             x: root.wideLayout ? root.leftColumnWidth + root.columnGap : 0
-            y: root.wideLayout ? root.offsetInOrder(root.sections.right, "calendar")
+            y: root.wideLayout ? root.offsetInOrder(root.sections.right, "calendar", true)
                                : root.offsetInOrder(root.sections.stacked, "calendar")
             width: root.wideLayout ? root.rightColumnWidth : root.usableWidth
         }
@@ -797,7 +887,7 @@ Item {
             objectName: "notifications"
             parent: layoutContent
             x: root.wideLayout ? root.leftColumnWidth + root.columnGap : 0
-            y: root.wideLayout ? root.offsetInOrder(root.sections.right, "notifications")
+            y: root.wideLayout ? root.offsetInOrder(root.sections.right, "notifications", true)
                                : root.offsetInOrder(root.sections.stacked, "notifications")
             width: root.wideLayout ? root.rightColumnWidth : root.usableWidth
             notificationService: root.notificationService
@@ -914,6 +1004,10 @@ Item {
     }
 
     // --- Test and host seams ---
+
+    // The clock timer itself, so a probe can read its period and running state
+    // instead of inferring them from the rendered header.
+    readonly property var clockTickTimer: clockTick
 
     readonly property var controlCards: [networkCardItem, bluetoothCardItem,
         volumeCardItem, mediaCardItem]

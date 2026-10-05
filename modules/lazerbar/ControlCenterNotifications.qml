@@ -93,6 +93,16 @@ Item {
     readonly property real rowGap: 6
     readonly property real footerHeight: 22
     readonly property real contentPadding: 2
+
+    // The reserved entry band: one fixed row per capped entry plus the gaps
+    // between them. Derived from maxEntries and NEVER from entryCount, which is
+    // the difference between a fixed footprint and a growing one - and it is also
+    // what keeps the second row off the "view all" row, since the footer is
+    // placed below this band rather than below a single row.
+    readonly property int entryCap: Math.max(0, Math.floor(root.maxEntries))
+    readonly property real entryBandHeight: root.entryCap * root.entryHeight
+            + Math.max(0, root.entryCap - 1) * root.rowGap
+
     readonly property bool viewAllEnabled: root.entryCount > 0
     readonly property string emptyLabel: "No notifications"
     readonly property string viewAllLabel: "View all"
@@ -101,8 +111,8 @@ Item {
     // Height is a function of the cap alone. Two entries and nine entries occupy
     // exactly the same space, and so does an empty history: a summary that grew
     // with its content would resize the information column under the user.
-    implicitHeight: root.headerHeight + root.rowGap + root.entryHeight
-            + root.footerHeight + root.contentPadding * 2
+    implicitHeight: root.headerHeight + root.rowGap + root.entryBandHeight
+            + root.rowGap + root.footerHeight + root.contentPadding * 2
     width: implicitWidth
 
     // Unread count as a state block: bar plus word, both inside the section.
@@ -163,14 +173,16 @@ Item {
     }
 
     // Entry rows. The model is the already-bounded slice, so the Repeater can
-    // never create more rows than maxEntries.
+    // never create more rows than maxEntries, and the column's height is the
+    // reserved band rather than its content - a Column would otherwise size
+    // itself from however many rows happened to arrive.
     Column {
         id: entryColumn
         x: 0
         y: root.headerHeight + root.rowGap
         width: parent.width
-        height: root.entryHeight
-        spacing: 0
+        height: root.entryBandHeight
+        spacing: root.rowGap
         visible: root.entryCount > 0
 
         Repeater {
@@ -267,7 +279,7 @@ Item {
         }
 
         x: 0
-        y: root.headerHeight + root.rowGap + root.entryHeight
+        y: root.headerHeight + root.rowGap + root.entryBandHeight + root.rowGap
         width: parent.width
         height: root.footerHeight
         radius: 0
@@ -313,6 +325,19 @@ Item {
     }
 
     // --- Test and host seams ---
+
+    // One entry row by index. A Repeater leaves one role-less, zero-width
+    // placeholder among its parent's children, so this filters on a declared
+    // delegate property instead of trusting a raw child index.
+    function entryItem(index) {
+        var kids = entryColumn.children
+        var kept = []
+        for (var i = 0; i < kids.length; i++) {
+            if (kids[i].entryApp !== undefined)
+                kept.push(kids[i])
+        }
+        return index >= 0 && index < kept.length ? kept[index] : null
+    }
 
     readonly property Item headerItem: headerRow
     readonly property Item emptyStateItem: emptyText

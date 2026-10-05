@@ -51,13 +51,30 @@ Item {
         QtObject {
             property bool wifiConnected: true
             property bool wifiEnabled: true
-            property string activeSsid: "Home"
+            // The real NetworkService exposes NO flat activeSsid: it keeps a scan
+            // map keyed by SSID whose entries carry ssid and connected. This fake
+            // has that shape and no flat property, so a page that reached for
+            // `activeSsid` would read undefined here exactly as it does in
+            // production.
+            property var networks: ({
+                "Home": { ssid: "Home", security: "WPA2", signal: 78,
+                    connected: true, existing: true }
+            })
             property bool ethernetConnected: false
             property string activeEthernetConnection: ""
             property bool scanningActive: false
             property bool connecting: false
             property string connectingTo: ""
             property string lastError: ""
+
+            // Replace the scan map wholesale, which is how the real service
+            // invalidates its own bindings after a status change.
+            function setWifiMap(entries) {
+                var map = ({})
+                for (var i = 0; i < entries.length; i++)
+                    map[entries[i].ssid] = entries[i]
+                networks = map
+            }
         }
     }
 
@@ -73,6 +90,20 @@ Item {
             property int scanCalls: 0
 
             function startScan() { scanCalls++ }
+        }
+    }
+
+    // A network service with neither the scan map nor the flat name, so the page's
+    // derivation has to cope with a service that offers nothing to derive from.
+    Component {
+        id: fakeHistoryOnlyNetworkComponent
+        QtObject {
+            property bool wifiConnected: false
+            property bool wifiEnabled: true
+            property bool ethernetConnected: false
+            property bool scanningActive: false
+            property bool connecting: false
+            property string lastError: ""
         }
     }
 
@@ -318,6 +349,18 @@ Item {
             return page
         }
 
+        // A page with NO injected clock, which is the production state: its header
+        // follows the wall clock the page's own tick advances. makePage freezes the
+        // clock for every other test, so the live path needs its own builder - a
+        // `now: null` argument would not do, because assigning null to a date
+        // property still replaces the binding with an invalid date.
+        function makeLiveClockPage(properties) {
+            var args = { x: 0, y: 0, width: 1024, height: 720 }
+            for (var key in properties)
+                args[key] = properties[key]
+            return pageComponent.createObject(root.testHost, args)
+        }
+
         function makeFake(component, properties) {
             var args = {}
             for (var key in (properties || {}))
@@ -332,6 +375,25 @@ Item {
         function registerFake(fake) {
             if (fake)
                 root.testHost.fakes.push(fake)
+            return fake
+        }
+
+        // A network fake carrying a scan map, in the real service's shape: one
+        // connected entry plus any number of visible-but-not-connected ones.
+        // Written through the fake's own setWifiMap so the map is replaced
+        // wholesale, exactly as NetworkService invalidates its own bindings.
+        function seededNetwork(fake, entries) {
+            var list = []
+            for (var i = 0; i < entries.length; i++) {
+                list.push({
+                    ssid: entries[i].ssid,
+                    security: entries[i].security || "WPA2",
+                    signal: entries[i].signal == null ? 70 : entries[i].signal,
+                    connected: entries[i].connected === true,
+                    existing: true
+                })
+            }
+            fake.setWifiMap(list)
             return fake
         }
 
@@ -385,6 +447,29 @@ Item {
         function calendarSettled(calendar) {
             return calendar.previousButtonItem.x > 0 && calendar.nextButtonItem.x > 0
                     && calendar.monthLabelItem.width > 0 && calendar.gridItem.height > 0
+        }
+
+        // Do two items share any vertical strip, measured in one shared space?
+        // The overlap test is the point, so it asks the question about boxes rather
+        // than about a pair of y values: "header bottom <= section top" and "these
+        // two rects intersect" are the same fact, and only one of them is what a
+        // reader of the layout actually cares about.
+        function overlapsVertically(first, second, space) {
+            var firstTop = first.mapToItem(space, 0, 0).y
+            var firstBottom = first.mapToItem(space, 0, first.height).y
+            var secondTop = second.mapToItem(space, 0, 0).y
+            var secondBottom = second.mapToItem(space, 0, second.height).y
+            return firstTop < secondBottom - 0.5 && secondTop < firstBottom - 0.5
+        }
+
+        // An item's bottom edge in a shared space, which is what "must start below
+        // the one above it" is really asking about.
+        function bottomIn(item, space) {
+            return item.mapToItem(space, 0, item.height).y
+        }
+
+        function topIn(item, space) {
+            return item.mapToItem(space, 0, 0).y
         }
 
         // A Repeater leaves one role-less placeholder among its children, so
@@ -1086,7 +1171,60 @@ Item {
                 "an empty history must not collapse the panel either")
         }
 
-        // The read path prefers latestNotification() and falls back to a bounded
+        // A bounded height is not the same as a height that FITS. Reserving one row
+        // instead of `maxEntries` rows leaves the summary's own box correct while
+        // the second entry paints straight over the "view all" row and off the
+        // bottom of the component - the kind of defect a cap assertion cannot see,
+        // because both summaries in that test are the same height either way.
+        function test_twoEntriesStayAboveTheViewAllRowAndInsideTheSummary() {
+            var service = seedNotifications(makeFake(fakeNotificationComponent), 3)
+            var summary = makeNotifications({ notificationService: service })
+            tryCompare(summary, "entryCount", 2, 1000)
+            compare(summary.entryCap, 2, "the band is sized from the cap")
+
+            var first = summary.entryItem(0)
+            var second = summary.entryItem(1)
+            verify(first !== null && second !== null,
+                "both capped entries must be on screen, found "
+                    + (first === null ? "no first row" : "") + (second === null ? "no second row" : ""))
+            // A Column assigns its children's positions during layout, so the rows'
+            // geometry needs a real settle before it means anything.
+            tryVerify(function() { return second.height > 0 && second.width > 0 }, 1000)
+            compare(summary.entryItem(2), null, "the band is never over-filled")
+
+            // The band is the cap's worth of rows plus the gaps between them, which
+            // is the geometry the footer has to be placed against.
+            compare(summary.entryBandHeight, 2 * summary.entryHeight + summary.rowGap)
+            compare(summary.entryColumnItem.height, summary.entryBandHeight)
+
+            var secondBottom = bottomIn(second, summary)
+            var viewAllTop = topIn(summary.viewAllItem, summary)
+            verify(secondBottom <= viewAllTop + 0.5,
+                "the second row must end above \"view all\" (row bottom "
+                    + secondBottom.toFixed(1) + ", view-all top " + viewAllTop.toFixed(1) + ")")
+            verify(topIn(second, summary) >= bottomIn(first, summary) - 0.5,
+                "the rows are stacked, not painted on top of each other")
+
+            // ...and everything stays inside the component's own box.
+            verify(viewAllTop + summary.viewAllItem.height
+                    <= summary.implicitHeight + 0.5,
+                "the action row must fit inside the summary (bottom "
+                    + (viewAllTop + summary.viewAllItem.height).toFixed(1)
+                    + ", height " + summary.implicitHeight.toFixed(1) + ")")
+            verify(secondBottom <= summary.implicitHeight + 0.5)
+            verify(summary.viewAllItem.height === summary.footerHeight)
+
+            // A third entry changes nothing about the band, so the layout this
+            // measurement describes is the layout a busy history gets too.
+            var busy = makeNotifications({ notificationService: seedNotifications(
+                makeFake(fakeNotificationComponent), 9) })
+            tryCompare(busy, "entryCount", 2, 1000)
+            tryVerify(function() { return busy.entryItem(1).height > 0 }, 1000)
+            compare(busy.entryBandHeight, summary.entryBandHeight)
+            compare(busy.implicitHeight, summary.implicitHeight)
+            verify(bottomIn(busy.entryItem(1), busy) <= topIn(busy.viewAllItem, busy) + 0.5,
+                "a nine-entry history overlaps its own action row")
+        }
         // historyList loop, deduplicating the overlap between the two. No
         // unbounded walk of the history is allowed.
         function test_theSummaryPrefersTheLatestEntryAndDeduplicatesTheHistory() {
@@ -1424,12 +1562,68 @@ Item {
             tryCompare(media, "playPauseCalls", 1, 800)
         }
 
+        // A play/pause is the one control on this page the user presses most, and
+        // it is also the one that changes a glyph, a label and an enabled state. A
+        // Repeater rebuilds every delegate when its MODEL changes, so a model that
+        // carried those three words replaced all three buttons - and the keyboard
+        // focus parked on one of them - on every single press. The buttons are
+        // therefore identified by the model and nothing else, and identity plus
+        // focus are what this asserts.
+        function test_theTransportDelegatesSurviveAPlayStateChange() {
+            var media = makeFake(fakeMediaComponent)
+            var page = makePage({ mediaService: media })
+            tryVerify(function() { return page.mediaPlayPauseButtonItem.width > 0 }, 1000)
+            var before = [page.mediaPreviousButtonItem, page.mediaPlayPauseButtonItem,
+                page.mediaNextButtonItem]
+            for (var i = 0; i < before.length; i++)
+                verify(before[i] !== null, "transport " + i + " must exist")
+
+            var toggle = before[1]
+            toggle.forceActiveFocus()
+            tryVerify(function() { return toggle.activeFocus }, 800,
+                "the toggle must be able to take focus at all")
+            verify(String(toggle.glyphItem.source).indexOf("pause.svg") >= 0,
+                "a playing track shows the pause glyph")
+            compare(toggle.label, "Pause")
+
+            media.playing = false
+
+            // Wait on the NEW state rather than on the model having changed: a
+            // settled check right after a swap reads the previous frame.
+            tryVerify(function() {
+                return page.mediaPlayPauseButtonItem.label === "Play"
+            }, 1000, "the toggle must follow the player's own state")
+            verify(String(page.mediaPlayPauseButtonItem.glyphItem.source)
+                .indexOf("play.svg") >= 0, "a paused track shows the play glyph")
+
+            // Same three objects, in the same order, with the focus they had.
+            var after = [page.mediaPreviousButtonItem, page.mediaPlayPauseButtonItem,
+                page.mediaNextButtonItem]
+            for (var j = 0; j < after.length; j++)
+                verify(after[j] === before[j],
+                    "transport " + j + " was rebuilt by a play-state change")
+            verify(toggle.activeFocus,
+                "a play-state change must not take the keyboard focus away")
+
+            // ...and back again, including the capability flip, which is the same
+            // model the old shape rebuilt on.
+            media.playing = true
+            media.canTogglePlayback = false
+            tryVerify(function() {
+                return page.mediaPlayPauseButtonItem.enabled === false
+            }, 1000, "the toggle must follow the player's own capability")
+            compare(page.mediaPlayPauseButtonItem, toggle,
+                "losing a capability must not rebuild the delegates either")
+            compare(page.mediaPreviousButtonItem, before[0])
+            compare(page.mediaNextButtonItem, before[2])
+        }
+
         // --- Overview: unavailable / absent optional services ---
 
         function test_theOverviewRendersWithUnavailableServices() {
             var page = makePage({
                 networkService: makeFake(fakeNetworkComponent, { wifiEnabled: false,
-                    wifiConnected: false, activeSsid: "" }),
+                    wifiConnected: false, networks: ({}) }),
                 bluetoothService: makeFake(fakeBluetoothComponent, {
                     bluetoothAvailable: false, devices: null, connectedDevices: null }),
                 volumeService: makeFake(fakeVolumeComponent, { sinkVolume: 0 }),
@@ -1504,6 +1698,65 @@ Item {
             compare(detailRequests, 0, "inert stays inert - no activation was restored")
         }
 
+        // The connected network's name has to come from the service's actual shape.
+        // NetworkService exposes no flat `activeSsid`: the name lives on the
+        // connected entry of its `networks` scan map. A page that read a flat
+        // property instead got undefined and degraded every connected card to a
+        // bare "Connected" - which looks like a working card, so nothing about the
+        // card itself reports the mistake.
+        function test_theConnectedNetworkNameIsReadFromTheServicesOwnScanMap() {
+            var fake = seededNetwork(makeFake(fakeNetworkComponent), [
+                { ssid: "Neighbour 5G", connected: false },
+                { ssid: "Cafe Guest", connected: true },
+                { ssid: "Attic", connected: false }
+            ])
+            var page = makePage({ networkService: fake })
+            tryVerify(function() { return page.networkCard.width > 0 }, 1000)
+
+            compare(fake.activeSsid, undefined,
+                "the fake must not quietly grow the flat property the real service lacks")
+            compare(page.connectedWifiSsid, "Cafe Guest")
+            compare(page.networkSnapshot.activeSsid, "Cafe Guest")
+            compare(page.networkCard.summary, "Cafe Guest",
+                "the connected network's name, not a bare \"Connected\"")
+            compare(page.networkCard.status, "ready")
+
+            // Moving the connected mark has to follow, which is the half that only
+            // works if the page reads the map and the service replaces it wholesale.
+            seededNetwork(fake, [
+                { ssid: "Cafe Guest", connected: false },
+                { ssid: "Attic", connected: true }
+            ])
+            tryCompare(page.networkCard, "summary", "Attic", 1000)
+
+            // No connected entry: the module's own fallback, unchanged.
+            seededNetwork(fake, [{ ssid: "Cafe Guest", connected: false }])
+            tryCompare(page.networkCard, "summary", "Connected", 1000)
+            compare(page.connectedWifiSsid, "")
+
+            // An entry whose ssid field is missing falls back to its map key, which
+            // is the same string the map is keyed by.
+            fake.networks = ({ Kettle: { connected: true } })
+            tryCompare(page, "connectedWifiSsid", "Kettle", 1000)
+
+            // Ethernet precedence is the module's, and it is untouched: a wired
+            // link reads its own name, and the derived SSID never outranks it.
+            var wired = makeFake(fakeNetworkComponent, {
+                wifiConnected: false, ethernetConnected: true,
+                activeEthernetConnection: "Wired link 1", networks: ({})
+            })
+            var wiredPage = makePage({ networkService: wired })
+            tryVerify(function() { return wiredPage.networkCard.width > 0 }, 1000)
+            compare(wiredPage.connectedWifiSsid, "")
+            compare(wiredPage.networkCard.summary, "Wired link 1")
+
+            // A service with neither shape still renders the module's ladder.
+            var bare = makePage({ networkService: makeFake(fakeHistoryOnlyNetworkComponent) })
+            tryVerify(function() { return bare.networkCard.width > 0 }, 1000)
+            compare(bare.connectedWifiSsid, "")
+            compare(bare.networkCard.summary, "Not connected")
+        }
+
         // --- Overview: header ---
 
         function test_theHeaderReadsTheInjectedClockWeatherAndBattery() {
@@ -1566,6 +1819,64 @@ Item {
             compare(absent.weatherState, "unavailable")
             compare(absent.weatherTextItem.text, "—")
             compare(absent.weatherConditionItem.text, "Unavailable")
+        }
+
+        // A page the shell retains keeps its header on screen for minutes at a time,
+        // so a clock that only ever reads the moment of construction is a wrong
+        // clock rather than an approximate one. This drives the real Timer, because
+        // a test that called a hand-written tick function would pass even if nothing
+        // in production ever called it.
+        function test_theHeaderClockTicksWhileThePageIsRetained() {
+            var before = new Date()
+            var live = makeLiveClockPage({ clockTickInterval: 20 })
+            tryVerify(function() { return live.clockTextItem.width > 0 }, 1000)
+            compare(live.clockTickTimer.running, true,
+                "the clock tick must run for a retained page")
+            compare(live.clockTickTimer.interval, 20)
+
+            // The production state: nothing injected, so the header follows the wall
+            // clock and the tick is what moves it.
+            var initial = live.liveClock.getTime()
+            tryVerify(function() {
+                return live.liveClock.getTime() !== initial
+            }, 2000, "a live page's clock must advance on its own")
+            verify(live.liveClock.getTime() >= before.getTime(),
+                "the tick reads the wall clock, not a private counter")
+
+            // ...and the header renders the value the tick wrote. Qt.formatDate is
+            // used rather than a literal weekday, because the pattern is what the
+            // header declares and the locale's word is not this test's business.
+            tryVerify(function() {
+                return live.clockTextItem.text === Qt.formatTime(live.now, "HH:mm")
+                    && live.dateTextItem.text === Qt.formatDate(live.now, "yyyy-MM-dd dddd")
+            }, 1000, "the header must render the moment the tick wrote")
+
+            // The text itself has to move, not just the property behind it: the tick
+            // period here is far shorter than a minute, so a real minute boundary may
+            // or may not fall inside the test. Asserted instead that the label agrees
+            // with `now` before and after the tick, which a frozen header could not
+            // manage if it ever disagreed - and that `now` is what moved.
+            var labelBefore = live.clockTextItem.text
+            var stampBefore = live.now.getTime()
+            tryVerify(function() { return live.now.getTime() !== stampBefore }, 2000)
+            compare(live.clockTextItem.text,
+                Qt.formatTime(live.now, "HH:mm"),
+                "the label must track the tick" + (labelBefore === live.clockTextItem.text
+                    ? " (both read " + live.clockTextItem.text + ")" : ""))
+
+            // An injected clock is still injected: `now` was assigned, so the binding
+            // the tick drives is gone and the tick cannot write over a fixed moment.
+            // Every other header test depends on this half.
+            var frozen = new Date(2026, 9, 12, 9, 41)
+            var injected = makePage({ now: frozen, clockTickInterval: 20 })
+            tryVerify(function() { return injected.clockTextItem.width > 0 }, 1000)
+            wait(120)
+            compare(injected.now.getTime(), frozen.getTime(),
+                "an injected clock must survive the tick")
+            compare(injected.clockTextItem.text, "09:41")
+            compare(injected.dateTextItem.text, Qt.formatDate(frozen, "yyyy-MM-dd dddd"))
+            compare(injected.liveClock.getTime() === frozen.getTime(), false,
+                "the live clock kept running underneath - only the binding is gone")
         }
 
         // --- Overview: layout ---
@@ -1638,6 +1949,79 @@ Item {
             compare(page.notificationsItem.width, page.rightColumnWidth)
         }
 
+        // The header and the sections it introduces are laid out in the SAME content
+        // box: the header is the first section of the stack, and the wide column
+        // arrays describe a column, so neither arrangement mentions the other. Every
+        // wide section therefore resolved its offset to 0 and painted on top of the
+        // clock. Asserted as an overlap between real rectangles rather than as a
+        // pair of y values, because "the clock and the cards share pixels" is the
+        // defect and it is what a reader of this layout has to be able to trust.
+        function test_theWideLayoutKeepsTheHeaderClearOfEverySection() {
+            var page = makePage({
+                width: 1024, height: 720,
+                networkService: makeFake(fakeNetworkComponent),
+                bluetoothService: makeFake(fakeBluetoothComponent),
+                volumeService: makeFake(fakeVolumeComponent),
+                mediaService: makeFake(fakeMediaComponent),
+                batteryService: makeFake(fakeBatteryComponent),
+                notificationService: seedNotifications(
+                    makeFake(fakeNotificationComponent), 3)
+            })
+            tryVerify(function() { return page.layoutMode === "wide" }, 1000)
+            tryVerify(function() {
+                return page.mediaCard.width > 0 && page.calendarItem.width > 0
+                    && page.headerItem.height > 0
+            }, 1000)
+
+            var content = page.layoutContentItem
+            var headerBottom = bottomIn(page.headerItem, content)
+            verify(headerBottom > 0, "the header occupies real space in the content box")
+
+            var names = CcLogic.sectionOrder("wide").left.concat(
+                CcLogic.sectionOrder("wide").right)
+            compare(names.join(","), "controls,calendar,notifications")
+            for (var i = 0; i < names.length; i++) {
+                var section = page.sectionItem(names[i])
+                verify(section !== null, "section " + names[i] + " must exist")
+                verify(!overlapsVertically(page.headerItem, section, content),
+                    "the header and the " + names[i]
+                        + " section overlap (header ends at " + headerBottom.toFixed(1)
+                        + ", " + names[i] + " starts at " + topIn(section, content).toFixed(1) + ")")
+                verify(topIn(section, content) >= headerBottom - 0.5,
+                    names[i] + " must start below the header")
+            }
+
+            // The header has to be the first thing on the panel, not a strip the
+            // scroller is pushed down past: the reserved-band arrangement left 74px
+            // of empty surface above the clock in both layouts.
+            var surfaceTop = topIn(page.layoutSurfaceItem, page)
+            compare(surfaceTop, page.pagePadding,
+                "the scroller starts at the page padding, with no band above the header")
+            compare(topIn(page.headerItem, page), page.pagePadding,
+                "the header is the first thing in the content box")
+            compare(topIn(page.headerItem, page), surfaceTop,
+                "the header sits at the top of the scroll surface itself")
+
+            // The narrow surface carries the same header as the first section of its
+            // stack, so the no-band arrangement has to hold there too - and the
+            // fixture must actually scroll, or the assertion proves nothing.
+            var narrow = makePage({ width: 560, height: 700 })
+            tryVerify(function() { return narrow.layoutMode === "narrow"
+                                    && narrow.headerItem.height > 0 }, 1000)
+            compare(topIn(narrow.layoutSurfaceItem, narrow), narrow.pagePadding)
+            verify(narrow.layoutSurfaceItem.interactive,
+                "the fixture must actually be a scrolling narrow surface")
+            verify(!overlapsVertically(narrow.headerItem,
+                    narrow.sectionItem("controls"), narrow.layoutContentItem),
+                "the narrow header must stay clear of the control column too")
+
+            // And the content box is tall enough for the whole wide arrangement, so
+            // nothing is pushed out of the surface by the header it now clears.
+            verify(content.height >= bottomIn(page.notificationsItem, content),
+                "the content box must contain the information column")
+            verify(content.height >= bottomIn(page.controlsColumnItem, content))
+        }
+
         function test_theNarrowStackFollowsTheModulesSectionOrder() {
             var page = makePage({ width: 560, height: 1400 })
             tryVerify(function() { return page.layoutMode === "narrow" }, 1000)
@@ -1699,8 +2083,8 @@ Item {
         function test_theWideLayoutKeepsLongLabelsInsideTheirColumns() {
             var page = makePage({
                 width: 900, height: 720,
-                networkService: makeFake(fakeNetworkComponent, {
-                    activeSsid: "a-network-ssid-long-enough-to-need-eliding" }),
+                networkService: seededNetwork(makeFake(fakeNetworkComponent), [
+                    { ssid: "a-network-ssid-long-enough-to-need-eliding" }]),
                 mediaService: makeFake(fakeMediaComponent, {
                     title: "a track title that is far longer than any column",
                     artist: "and an artist name to match it" })
