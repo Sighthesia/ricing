@@ -60,6 +60,7 @@ LauncherPage 1.0 LauncherPage.qml
 ControlCenter 1.0 ControlCenter.qml
 ControlCenterCard 1.0 ControlCenterCard.qml
 ControlCenterCalendar 1.0 ControlCenterCalendar.qml
+ControlCenterNotifications 1.0 ControlCenterNotifications.qml
 LauncherCategoryBar 1.0 LauncherCategoryBar.qml
 LauncherCategoryChip 1.0 LauncherCategoryChip.qml
 LauncherListFooter 1.0 LauncherListFooter.qml

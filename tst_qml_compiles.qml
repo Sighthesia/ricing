@@ -78,6 +78,14 @@ Item {
         // lazerbar surfaces
         "modules/lazerbar/LauncherSurface.qml",
         "modules/lazerbar/WaveSurfaceHost.qml",
+        // The control center and everything it mounts at runtime. These are live
+        // in the shell the moment the wave host constructs the route page, so
+        // they belong to this guard even before the wiring task passes the
+        // singletons in.
+        "modules/lazerbar/ControlCenter.qml",
+        "modules/lazerbar/ControlCenterCard.qml",
+        "modules/lazerbar/ControlCenterCalendar.qml",
+        "modules/lazerbar/ControlCenterNotifications.qml",
         "modules/lazerbar/WaveRevealLayers.qml",
         "modules/lazerbar/LauncherPage.qml",
         "modules/lazerbar/FullscreenWave.qml",
