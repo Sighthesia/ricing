@@ -181,6 +181,7 @@ Item {
         LauncherPage {
             session: root.session
             prewarmSlots: root.startupPrewarmAllowed === true
+            thumbnailsActive: waveHost.phase === "open"
             onExitFlingRequested: spec => root.spawnExitCard(spec)
         }
     }

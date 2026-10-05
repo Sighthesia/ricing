@@ -19,6 +19,11 @@ Item {
     // Services.LauncherService; tests inject deterministic sessions. The
     // embedded default keeps the page self-contained without Quickshell.
     property var session: embeddedSession
+    // Thumbnail decodes are deliberately held until the wave has finished
+    // entering. The first cliphist decode spawns a process and competes with
+    // the opening frame; the queue remains viewport-prioritized once this gate
+    // opens. Standalone page tests keep the gate open by default.
+    property bool thumbnailsActive: true
     // The real page is retained before the first open. Reserve its fixed row
     // window during that idle prewarm too, so the first clipboard batch fills
     // existing delegates instead of constructing the whole 96-row tree in the
@@ -224,6 +229,8 @@ Item {
             resultsView.syncSelectionFrame()
         }
     }
+
+    onThumbnailsActiveChanged: thumbQueue.wake()
 
     // Fallback key handling for focus held by the page itself or by rows;
     // the search field handles its own keys first and stops propagation.
@@ -1024,7 +1031,8 @@ Item {
     // for the next open.
     LauncherThumbScheduler {
         id: thumbQueue
-        active: !!root.session && root.session.visible === true && root.enabled
+        active: root.thumbnailsActive && !!root.session
+                && root.session.visible === true && root.enabled
         candidates: root._thumbCandidates
         decode: root._issueThumbDecode
         decoded: root._thumbDecoded
