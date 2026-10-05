@@ -519,6 +519,86 @@ function test_escapeFromALauncherEnteredControlCenterReturnsToTheLauncher() {
                     "the launcher's own focus target takes the route back")
         }
 
+        // The opener record must outlive the launcher return.
+        //
+        // The record is what the final close restores focus FROM, and it lives on
+        // the coordinator because that is where the focus hand-off is settled. So
+        // a return that names no opener wipes it, and the surface then closes onto
+        // whatever focus the hidden page happened to leave - the control the user
+        // opened this from is thrown away by the press that went back.
+        function test_theLauncherReturnKeepsTheOpenerForTheFinalClose() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+
+            // Opened from a control of its own, so "the opener" is unambiguous:
+            // the newest open intent is the one that owns the record.
+            launcherSurface.requestControlCenter(alternateOpener)
+            tryCompare(launcherSurface.host, "route", "control-center", 2000)
+            wait(600)
+            compare(coordinator.opener, alternateOpener,
+                    "the newest open intent owns the opener record")
+
+            keyClick(Qt.Key_Escape)
+
+            tryCompare(launcherSurface.host, "route", "launcher", 2000)
+            wait(400)
+            compare(launcherSurface.host.phase, "open",
+                    "returning to the launcher must not close the surface")
+            compare(coordinator.opener, alternateOpener,
+                    "the launcher return must not discard the opener record")
+
+            // Focus is on the page that came back, so the assertion below cannot
+            // be satisfied by an opener that never lost focus in the first place.
+            tryVerify(function() { return host.page().searchField.activeFocus }, 600)
+            verify(!alternateOpener.activeFocus,
+                    "the opener must not hold focus while the surface is open")
+
+            keyClick(Qt.Key_Escape)
+
+            tryCompare(launcherSurface.host, "phase", "closed", 1200)
+            compare(coordinator.activeTarget, "")
+            compare(coordinator.opener, null,
+                    "a restored opener is consumed, never left behind for the next open")
+            // verify, not tryVerify: the close has already settled, so a missed
+            // focus restore is a wrong value rather than a slow one - and a
+            // tryVerify here would swallow the reason it failed.
+            verify(alternateOpener.activeFocus,
+                    "the opener this open was made with must regain focus")
+        }
+
+        // The other half of the same rule: a return must not INVENT an opener. An
+        // IPC or keyboard open has none to restore, so the record stays empty and
+        // the close restores nothing, rather than focusing a control nobody
+        // pressed.
+        function test_theLauncherReturnInventsNoOpenerForAnOpenThatHadNone() {
+            // The production IPC shape: no opener at all. LauncherService.open()
+            // is what a keybind and `afloat-ipc` reach, and neither names one.
+            host.session().open()
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            compare(coordinator.opener, null,
+                    "an open that named no opener must record none")
+
+            launcherSurface.requestControlCenter(null)
+            tryCompare(launcherSurface.host, "route", "control-center", 2000)
+            wait(600)
+            compare(launcherSurface.requestedFromLauncher, true)
+            compare(coordinator.opener, null)
+
+            keyClick(Qt.Key_Escape)
+
+            tryCompare(launcherSurface.host, "route", "launcher", 2000)
+            compare(coordinator.opener, null,
+                    "returning to the launcher must not record an opener")
+
+            // ...and the close restores nothing, rather than focusing a control
+            // nobody pressed.
+            keyClick(Qt.Key_Escape)
+            tryCompare(launcherSurface.host, "phase", "closed", 1200)
+            compare(coordinator.activeTarget, "")
+            verify(!opener.activeFocus && !alternateOpener.activeFocus,
+                    "no open named an opener, so no opener may be restored")
+        }
+
 // Opened straight from the bar entry: the same press closes the surface, because
 // there is no launcher behind this open to return to.
 function test_escapeFromABarEntryControlCenterClosesTheSurface() {
@@ -535,6 +615,10 @@ function test_escapeFromABarEntryControlCenterClosesTheSurface() {
             tryCompare(launcherSurface.host, "phase", "closed", 1200)
             compare(host.session().visible, false)
             compare(coordinator.activeTarget, "")
+            // A direct open keeps the opener contract it always had: the bar
+            // control it was pressed from gets focus back, and nothing else.
+            compare(coordinator.opener, null)
+            tryVerify(function() { return opener.activeFocus })
         }
 
 // The latch describes ONE open. A stale `true` surviving a close would give the
@@ -586,6 +670,40 @@ function test_theEntryContextDoesNotSurviveAClose() {
             compare(launcherSurface.requestedFromLauncher, false,
                     "another owner taking over ends this open, context included")
             compare(launcherSurface.requestedRoute, "launcher")
+        }
+
+        // The return must not cost the record its precedence: a detail page still
+        // outranks it, and the opener is still the one waiting behind both.
+        function test_aDetailEscapeStillPrecedesTheLauncherReturnWithTheOpenerIntact() {
+            launcherSurface.requestOpen(opener)
+            tryCompare(launcherSurface.host, "phase", "open", 1600)
+            launcherSurface.requestControlCenter(alternateOpener)
+            tryCompare(launcherSurface.host, "route", "control-center", 2000)
+            wait(600)
+            compare(launcherSurface.requestedFromLauncher, true)
+
+            launcherSurface.activePage().openNetworkDetails()
+            tryVerify(function() {
+                return launcherSurface.activePage().activeSubPage === "network-detail"
+            }, 1000)
+
+            keyClick(Qt.Key_Escape)
+
+            // The detail back, not the launcher return: the opener record was
+            // never in question on this leg either.
+            tryVerify(function() {
+                return launcherSurface.activePage().activeSubPage === ""
+            }, 1000)
+            compare(launcherSurface.host.route, "control-center")
+            compare(coordinator.opener, alternateOpener)
+
+            keyClick(Qt.Key_Escape)
+            tryCompare(launcherSurface.host, "route", "launcher", 2000)
+
+            keyClick(Qt.Key_Escape)
+            tryCompare(launcherSurface.host, "phase", "closed", 1200)
+            verify(alternateOpener.activeFocus,
+                    "detail back, launcher return and close must still land on the opener")
         }
 
         // A detail page still outranks the launcher return, through the real production

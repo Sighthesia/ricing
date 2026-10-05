@@ -149,6 +149,21 @@ Item {
     // a second overlay: one coordinator, one retained Loader, one opener.
     function requestControlCenter(opener) { requestRoute("control-center", opener) }
 
+    // The launcher return that a launcher-entered control center's back press
+    // earns. This is the same open continuing on the same surface, NOT a new open
+    // intent, so it must not replace the opener record: `requestRoute` hands the
+    // coordinator a reset on every call, so returning with no opener would clear
+    // the Item focus is restored to when the surface finally closes - the control
+    // the user opened this from, thrown away by the press that went back.
+    //
+    // The record is read back from the coordinator because that is where the
+    // focus hand-off is settled and therefore where it lives. Handing the same
+    // Item back changes nothing, and when the open had no opener at all this
+    // passes null - so a return still never invents one.
+    function returnToDefaultRoute() {
+        requestRoute(root.defaultRoute, root.coordinator ? root.coordinator.opener : null)
+    }
+
     // Every activation funnels through one route-parameterised path: bar entry,
     // IPC open, or a session-visible flip. The opener Item is recorded so focus
     // returns to it once the surface closes.
@@ -416,8 +431,9 @@ Item {
             // The one request the route cannot answer itself. It re-enters the
             // same funnel as every other open of this surface, so the launcher is
             // reached through the coordinator exactly as an entry reaches it -
-            // one dispatch path, one owner, one host.
-            onOverviewBackRequested: root.requestRoute(root.defaultRoute, null)
+            // one dispatch path, one owner, one host. The opener rides along
+            // unchanged, because this is the same open continuing.
+            onOverviewBackRequested: root.returnToDefaultRoute()
         }
     }
 
