@@ -220,12 +220,34 @@ Singleton {
         _shortcutProc.running = true
     }
 
+    // Which chrome the wave overlay wears: "blocks" (the osu wiki three-band
+    // stack — masthead, page bar, content) or "rail" (masthead, collapsible
+    // vertical navigation, content).
+    //
+    // Both are kept as first-class code paths because the choice is a judgement
+    // call the source cannot settle: the rail spends width on navigation and
+    // gives the height back, the page bar does the opposite, and which reads
+    // better depends on the display and on habit. The env var picks the startup
+    // default and `chrome()` flips it live, so both can be compared against the
+    // same open session without restarting the shell.
+    property string chromeLayout: (Quickshell.env("AFLOAT_LAUNCHER_CHROME") || "blocks").trim() === "rail"
+            ? "rail" : "blocks"
+
+    function toggleChrome() {
+        root.chromeLayout = root.chromeLayout === "rail" ? "blocks" : "rail"
+        // Printed rather than returned: Quickshell rejects a non-void IPC
+        // handler and calls it with no receiver, so a returning `chrome()`
+        // would look like a silent no-op.
+        console.log("[launcher] chrome layout ->", root.chromeLayout)
+    }
+
     // IPC surface for the launcher entry and niri keybind integration.
     IpcHandler {
         target: "launcher"
         function toggle() { root.toggle() }
         function openClipboard() { root.openClipboard() }
         function openShortcuts() { root.openShortcuts() }
+        function chrome() { root.toggleChrome() }
     }
 
     Process {

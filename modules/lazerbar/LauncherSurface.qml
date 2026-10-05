@@ -333,31 +333,51 @@ Item {
             return currentPage && currentPage.description !== undefined
                     ? String(currentPage.description) : ""
         }
-        sidebarEntries: {
+        titleIcon: {
             var currentPage = root.activePage()
-            return currentPage && currentPage.sidebarEntries !== undefined
-                    ? currentPage.sidebarEntries : []
+            return currentPage && currentPage.titleIcon !== undefined
+                    ? String(currentPage.titleIcon) : ""
         }
-        activeSidebarId: {
+        sectionEntries: {
+            var currentPage = root.activePage()
+            return currentPage && currentPage.sectionEntries !== undefined
+                    ? currentPage.sectionEntries : []
+        }
+        activeSectionId: {
             var currentPage = root.activePage()
             if (!currentPage)
                 return ""
-            if (currentPage.activeSidebarId !== undefined)
-                return String(currentPage.activeSidebarId)
+            if (currentPage.activeSectionId !== undefined)
+                return String(currentPage.activeSectionId)
             return currentPage.activeMode !== undefined ? String(currentPage.activeMode) : ""
+        }
+        pageLabel: {
+            var currentPage = root.activePage()
+            return currentPage && currentPage.pageLabel !== undefined
+                    ? String(currentPage.pageLabel) : ""
+        }
+        // Chrome layout: read from the session so the IPC/env switch and the
+        // body can never disagree, with the block stack as the defined default
+        // for a session that publishes nothing (the embedded test session).
+        chromeLayout: {
+            var layout = root.session && root.session.chromeLayout !== undefined
+                    ? String(root.session.chromeLayout) : ""
+            return layout === "rail" ? "rail" : "blocks"
         }
         palette: root.launcherPalette
         contentComponent: launcherPageComponent
         routeComponents: root.routeComponents
 
-        onSidebarSelected: id => {
-            // Contract first, launcher spelling second: the sidebar rail is
-            // shared chrome, so the mounted page decides what an id means.
+        onSectionSelected: id => {
+            // Contract first, launcher spelling second: the page bar is shared
+            // chrome, so the mounted page decides what a section id means. The
+            // launcher's own vocabulary is "mode", and its handler keeps that
+            // honest name rather than adopting the chrome's.
             var currentPage = root.activePage()
             if (!currentPage)
                 return
-            if (typeof currentPage.handleSidebarSelected === "function")
-                currentPage.handleSidebarSelected(id)
+            if (typeof currentPage.handleSectionSelected === "function")
+                currentPage.handleSectionSelected(id)
             else if (typeof currentPage.handleModeSelected === "function")
                 currentPage.handleModeSelected(id)
         }
@@ -377,6 +397,11 @@ Item {
             session: root.session
             prewarmSlots: root.startupPrewarmAllowed === true
             thumbnailsActive: waveHost.phase === "open"
+            // The page's own query surface answers the chrome layout, so the two
+            // are a genuine A/B rather than two navigation shapes over one
+            // surface: the rail layout restores the full-bleed strip this page
+            // had before the three-band stack.
+            chromeLayout: waveHost.chromeLayout
             onExitFlingRequested: spec => root.spawnExitCard(spec)
             // The rail's footer action. The page owns what the id MEANS; the
             // surface owns what it DOES, because only this surface can switch

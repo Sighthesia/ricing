@@ -55,6 +55,8 @@ WaveRevealLayers 1.0 WaveRevealLayers.qml
 WaveSurfaceHost 1.0 WaveSurfaceHost.qml
 LauncherSurface 1.0 LauncherSurface.qml
 FullscreenHeader 1.0 FullscreenHeader.qml
+OverlayPageBand 1.0 OverlayPageBand.qml
+OverlaySectionTab 1.0 OverlaySectionTab.qml
 FullscreenSidebar 1.0 FullscreenSidebar.qml
 LauncherPage 1.0 LauncherPage.qml
 ControlCenter 1.0 ControlCenter.qml

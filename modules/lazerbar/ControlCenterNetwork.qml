@@ -55,8 +55,8 @@ Item {
     // host learning anything about sub-pages: it still reads one route page.
     readonly property string title: "Network"
     readonly property string description: "Wi-Fi and wired"
-    readonly property var sidebarEntries: []
-    readonly property string activeSidebarId: ""
+    readonly property var sectionEntries: []
+    readonly property string activeSectionId: ""
 
     // Focus lands on the page itself, never on a control: the rows join the tab
     // chain on their own, and the page must be able to take focus back from the

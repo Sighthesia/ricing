@@ -43,8 +43,8 @@ Item {
     // Host chrome for this sub-page, in the same shape the overview publishes.
     readonly property string title: "Bluetooth"
     readonly property string description: "Devices and adapter"
-    readonly property var sidebarEntries: []
-    readonly property string activeSidebarId: ""
+    readonly property var sectionEntries: []
+    readonly property string activeSectionId: ""
 
     function focusDefault() { root.forceActiveFocus() }
 

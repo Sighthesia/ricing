@@ -185,6 +185,32 @@ QtObject {
     readonly property int settingsContentWidth: 400
     readonly property int settingsPanelWidth: 570
 
+    // --- Wave overlay block ladder (wiki header / page / content) ---
+    //
+    // The overlay paints three full-bleed bands stacked top to bottom: the
+    // identity header, the page band, and the content column. Unlike lazer's own
+    // panel/sidebar pair (where the rail is DARKER than the body,
+    // Background5 under Background4), this ladder runs the other way on
+    // purpose — header darkest, content lightest — because that is the osu wiki
+    // stack: a near-black masthead, a lifted page bar, and the content column
+    // carried on the lightest plane, so the body reads as lifted off the bands
+    // above it rather than as a hole cut between them.
+    //
+    // Monotonic by construction in both schemes: dark mixes toward the raw
+    // surface, light toward paper. The content plane stops at the surface so
+    // the overlay's own interior cards (settingsCard, settingsCardHover) still
+    // sit ABOVE it — three bands plus cards would need a fourth step and there
+    // is not one to spend.
+    readonly property color overlayHeaderSurface: adapt && colorService
+        ? (lightScheme ? mix(colorService.mSurface, paperWhite, 0.26) : Qt.darker(colorService.mSurface, 1.34))
+        : "#0B0A0F"
+    readonly property color overlaySectionSurface: adapt && colorService
+        ? (lightScheme ? mix(colorService.mSurface, paperWhite, 0.60) : Qt.darker(colorService.mSurface, 1.14))
+        : "#15131A"
+    readonly property color overlayContentSurface: adapt && colorService
+        ? (lightScheme ? mix(colorService.mSurface, paperWhite, 0.82) : Qt.darker(colorService.mSurface, 1.02))
+        : "#1B1922"
+
     readonly property int barHeight: 46
     readonly property int bottomRadius: 14
     readonly property int iconSize: 20

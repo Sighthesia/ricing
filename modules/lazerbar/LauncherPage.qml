@@ -59,23 +59,41 @@ Item {
         onTriggered: root.reclaimKeyboardFallback()
     }
 
-    // Data surfaced to the wave shell header and sidebar.
+    // Data surfaced to the wave shell's three-block chrome.
     readonly property string title: "Launcher"
-    readonly property string description: root.modeDescription(activeMode)
-    // The rail carries two kinds of entry. The three primaries are FILTERS of
-    // this page: they rewrite the query and change what the list shows. The
-    // footer entry is not a filter - it leaves the rail's own section and
-    // switches this surface to the control-center route, which is why it is
-    // marked `section: "footer"` and answered by a different handler below.
-    // Declaring them in one list is deliberate: they share one rail and one
-    // accent indicator, and the hairline is what tells them apart.
-    readonly property var sidebarEntries: [
+    // The masthead's subtitle line, which only the rail layout has room to
+    // mean anything in. Under "blocks" it is empty: band 2 already names the
+    // mode twice, and a mode's description sitting under the launcher's own
+    // name describes neither, so the wiki-shaped masthead carries the site name
+    // alone. Empty is a defined state — the header drops the slot rather than
+    // reserving it.
+    readonly property string description: root.chromeLayout === "rail"
+            ? root.modeDescription(activeMode) : ""
+    // Identity glyph for the masthead.
+    readonly property string titleIcon: "icons/launcher.svg"
+    // The navigation entries, in the order the chrome shows them. They used to
+    // be a vertical rail's list and are now the page bar's tab row; both
+    // layouts read this one list, which is why it is named for what it holds
+    // rather than for where it is drawn.
+    //
+    // Two kinds of entry share it. The three primaries are FILTERS of this
+    // page: they rewrite the query and change what the list shows. The footer
+    // entry is not a filter - it leaves this page and switches the surface to
+    // the control-center route, which is why it is marked `section: "footer"`
+    // and answered by a different handler below. Declaring them together is
+    // deliberate: they share one accent indicator, and the hairline is what
+    // tells them apart.
+    readonly property var sectionEntries: [
         { id: "apps", label: "Apps", icon: "icons/apps.svg" },
         { id: "clipboard", label: "Clipboard", icon: "icons/clipboard.svg" },
         { id: "shortcuts", label: "Shortcuts", icon: "icons/keyboard.svg" },
         { id: "control-center", label: "Control Center", icon: "icons/control-center.svg", section: "footer" }
     ]
     readonly property string activeMode: root.session && root.session.mode != null ? String(root.session.mode) : ""
+    // Chrome-facing spelling of the same thing: in the page bar a tab selects a
+    // section, and here a section IS a mode. Both names are published so the
+    // host never has to fall back on a guess.
+    readonly property string activeSectionId: root.activeMode
 
     // Normalized free-text portion of the query; rows fold themselves against
     // it exactly like settings rows do under a search filter.
@@ -143,6 +161,16 @@ Item {
 
     implicitWidth: 400
     implicitHeight: 300
+
+    // Which chrome layout the wave host is wearing: "blocks" (the osu wiki
+    // three-band stack) or "rail" (masthead + collapsible vertical navigation).
+    //
+    // The query surface answers it rather than staying put, because a comparison
+    // that changed only the navigation would not be a comparison — under the
+    // rail layout the full-bleed `settingsRail` strip this page had before the
+    // stack came back exactly as it was, inset card and all.
+    property string chromeLayout: "blocks"
+    readonly property bool insetQuery: root.chromeLayout !== "rail"
 
     // Row currently carrying the shared focus frame; pure var property so
     // imperative updates are safe under the qs engine.
@@ -281,11 +309,13 @@ Item {
         return "Search applications"
     }
 
-    // The rail's contract entry point: the surface asks this, never the mode
-    // handler directly, because one rail now carries two kinds of entry. A
-    // footer id is an action on the surface and is answered here; everything
-    // else is a filter on this page and falls through unchanged.
-    function handleSidebarSelected(id) {
+    // The chrome's contract entry point: the surface asks this, never the mode
+    // handler directly, because one entry list now carries two kinds of entry.
+    // A footer id is an action on the surface and is answered here; everything
+    // else is a filter on this page and falls through unchanged. Named for the
+    // section the chrome selects, not for the rail it used to be drawn in —
+    // both layouts route through here, so the name has to cover both.
+    function handleSectionSelected(id) {
         if (id === "control-center") {
             root.controlCenterRequested()
             return
@@ -311,10 +341,10 @@ Item {
     // list but answers a different question, so admitting it here would let a
     // mode prefix be built for an id that names no data source.
     function isKnownMode(modeId) {
-        for (var i = 0; i < root.sidebarEntries.length; i++) {
-            if (root.sidebarEntries[i].id !== modeId)
+        for (var i = 0; i < root.sectionEntries.length; i++) {
+            if (root.sectionEntries[i].id !== modeId)
                 continue
-            if (String(root.sidebarEntries[i].section || "") === "footer")
+            if (String(root.sectionEntries[i].section || "") === "footer")
                 return false
             return true
         }
@@ -783,80 +813,143 @@ Item {
         }
     }
 
-    // Full-width sharp search rail carrying the osu caret text field.
-    FocusScope {
-        id: searchSurface
+    // Query column: the search field and the category lens as ONE inset card
+    // sitting on the content plane.
+    //
+    // It used to be a full-bleed `settingsRail` strip, which is now impossible:
+    // the rail tone is DARKER than the content band it would cut across, so a
+    // full-bleed query surface became a fourth band with a tone that belongs to
+    // none of the three. Insetting it is also the wiki's own answer — the
+    // content column carries its blocks as cards, and the blocks read as
+    // objects on a plane rather than as more plane.
+    Item {
+        id: queryColumn
+        objectName: "launcherQueryColumn"
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 44
+        anchors.topMargin: root.insetQuery ? 14 : 0
+        anchors.leftMargin: root.insetQuery ? 14 : 0
+        anchors.rightMargin: root.insetQuery ? 14 : 0
 
-        // Last query value pushed from this page into the session; external
-        // session changes always differ from it and are adopted below.
-        property string _lastPushedQuery: ""
-        property bool _syncingEditor: false
-        readonly property string queryText: root.session && root.session.query != null ? String(root.session.query) : ""
-        readonly property alias editorItem: editor
-
-        function focusEditor() {
-            editor.forceActiveFocus()
-        }
-
-        // Adopt external session query values into the editor exactly once per
-        // change so user typing remains the only other writer.
-        function adoptSessionQuery() {
-            if (queryText === _lastPushedQuery)
-                return
-            _lastPushedQuery = queryText
-            _syncingEditor = true
-            editor.suppressDeleteFx = true
-            editor.text = queryText
-            editor.suppressDeleteFx = false
-            _syncingEditor = false
-        }
-
-        onQueryTextChanged: adoptSessionQuery()
-        Component.onCompleted: adoptSessionQuery()
+        // Card padding and the gap between the field and the lens. One source
+        // for both, so the field, the chips and the result rows below cannot
+        // drift apart by a stray literal. Under the rail layout both collapse to
+        // zero and the field carries its own 12px text margin, which is exactly
+        // the full-bleed strip this page had before the stack.
+        readonly property int cardPadding: root.insetQuery ? 10 : 0
+        readonly property int queryGap: root.insetQuery ? 8 : 6
+        // The lens collapses to zero height for a mode with no categories, and
+        // the column's height folds that away with it — so everything below
+        // still starts under the field rather than under a gap.
+        height: cardPadding * 2 + searchSurface.height
+              + (categoryBar.visible ? queryGap + categoryBar.height : 0)
 
         Rectangle {
             anchors.fill: parent
-            radius: 0
-            color: LazerTheme.settingsRail
+            radius: root.insetQuery ? LazerTheme.settingsControlRadius : 0
+            color: root.insetQuery
+                    ? LazerTheme.settingsSearchSurface
+                    : LazerTheme.settingsRail
         }
 
-        OsuTextField {
-            id: editor
+        // Search field inside the card, carrying the osu caret text field.
+        FocusScope {
+            id: searchSurface
+            anchors.top: parent.top
+            anchors.topMargin: queryColumn.cardPadding
             anchors.left: parent.left
-            anchors.leftMargin: 12
+            anchors.leftMargin: queryColumn.cardPadding
             anchors.right: parent.right
-            anchors.rightMargin: 12
-            anchors.verticalCenter: parent.verticalCenter
-            clip: true
-            color: LazerTheme.textPrimary
-            selectionColor: LazerTheme.osuPink
-            font.pixelSize: 14
-            onTextChanged: {
-                if (searchSurface._syncingEditor)
-                    return
-                searchSurface._lastPushedQuery = text
-                if (root.session)
-                    root.session.query = text
+            anchors.rightMargin: queryColumn.cardPadding
+            height: root.insetQuery ? 40 : 44
+
+            // Last query value pushed from this page into the session; external
+            // session changes always differ from it and are adopted below.
+            property string _lastPushedQuery: ""
+            property bool _syncingEditor: false
+            readonly property string queryText: root.session && root.session.query != null ? String(root.session.query) : ""
+            readonly property alias editorItem: editor
+
+            function focusEditor() {
+                editor.forceActiveFocus()
             }
-            Keys.onUpPressed: event => { event.accepted = root.navigateSelection(-1) }
-            Keys.onDownPressed: event => { event.accepted = root.navigateSelection(1) }
-            Keys.onReturnPressed: event => { root.executeSelected(); event.accepted = true }
-            Keys.onEnterPressed: event => { root.executeSelected(); event.accepted = true }
+
+            // Adopt external session query values into the editor exactly once per
+            // change so user typing remains the only other writer.
+            function adoptSessionQuery() {
+                if (queryText === _lastPushedQuery)
+                    return
+                _lastPushedQuery = queryText
+                _syncingEditor = true
+                editor.suppressDeleteFx = true
+                editor.text = queryText
+                editor.suppressDeleteFx = false
+                _syncingEditor = false
+            }
+
+            onQueryTextChanged: adoptSessionQuery()
+            Component.onCompleted: adoptSessionQuery()
+
+            OsuTextField {
+                id: editor
+                anchors.left: parent.left
+                anchors.leftMargin: 12
+                anchors.right: parent.right
+                anchors.rightMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                clip: true
+                color: LazerTheme.textPrimary
+                selectionColor: LazerTheme.osuPink
+                font.pixelSize: 14
+                onTextChanged: {
+                    if (searchSurface._syncingEditor)
+                        return
+                    searchSurface._lastPushedQuery = text
+                    if (root.session)
+                        root.session.query = text
+                }
+                Keys.onUpPressed: event => { event.accepted = root.navigateSelection(-1) }
+                Keys.onDownPressed: event => { event.accepted = root.navigateSelection(1) }
+                Keys.onReturnPressed: event => { root.executeSelected(); event.accepted = true }
+                Keys.onEnterPressed: event => { root.executeSelected(); event.accepted = true }
+            }
+
+            Text {
+                anchors.left: editor.left
+                anchors.verticalCenter: editor.verticalCenter
+                visible: !editor.text && !editor.activeFocus
+                text: "Search..."
+                color: LazerTheme.textMuted
+                font.pixelSize: 14
+            }
         }
 
-        Text {
-            anchors.left: editor.left
-            anchors.verticalCenter: editor.verticalCenter
-            visible: !editor.text && !editor.activeFocus
-            text: "Search..."
-            color: LazerTheme.textMuted
-            font.pixelSize: 14
+        // Category lens under the field, inside the same card: the lens is part
+        // of the query surface, so it shares the field's block rather than
+        // becoming a panel of its own. Modes whose taxonomy yields a single
+        // chip (shortcut binds, until their categories are known) take no space,
+        // and the column's height folds the gap away with them.
+        LauncherCategoryBar {
+            id: categoryBar
+            objectName: "launcherCategoryBar"
+            anchors.top: searchSurface.bottom
+            anchors.topMargin: visible ? queryColumn.queryGap : 0
+            anchors.left: parent.left
+            anchors.leftMargin: queryColumn.cardPadding
+            anchors.right: parent.right
+            anchors.rightMargin: queryColumn.cardPadding
+            height: visible ? implicitHeight : 0
+            visible: root.categoryChips.length > 1
+            chips: root.categoryChips
+            selected: root.activeCategory
+            onChipSelected: id => {
+                root.setCategory(id)
+                // Typing after picking a category must keep going to the search
+                // field, so activation always hands the keyboard back.
+                root.focusSearch()
+            }
         }
-
     }
 
     // Result viewport: settings-panel structure (Flickable + folding rows)
@@ -1215,31 +1308,6 @@ Item {
             _hoveredResult = null
     }
 
-    // Category chip rail between the search field and the results: the lens
-    // is part of the query surface, so it stays a flat full-width strip
-    // rather than its own panel. Modes whose taxonomy yields a single chip
-    // (shortcut binds, until their categories are known) take no space.
-    LauncherCategoryBar {
-        id: categoryBar
-        objectName: "launcherCategoryBar"
-        anchors.top: searchSurface.bottom
-        // Collapsed, the strip must not leave a gap where it used to be:
-        // the margin collapses with it so the results start where they did.
-        anchors.topMargin: visible ? 6 : 0
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: visible ? implicitHeight : 0
-        visible: root.categoryChips.length > 1
-        chips: root.categoryChips
-        selected: root.activeCategory
-        onChipSelected: id => {
-            root.setCategory(id)
-            // Typing after picking a category must keep going to the search
-            // field, so activation always hands the keyboard back.
-            root.focusSearch()
-        }
-    }
-
     // Clipboard preview pane: the selected entry rendered large — decoded
     // image or full multi-line text — beside a narrowed results list.
     // Pointing at any row previews it ahead of the keyboard selection. The
@@ -1277,14 +1345,13 @@ Item {
             var rev = root._thumbRev
             return rev >= 0 ? root.clipThumbPath(r) : ""
         }
-        // Anchored to the chip rail's bottom edge rather than to the strip
-        // itself: the rail collapses to zero height when a mode has no
-        // categories, and everything below then starts under the search
-        // field exactly as it did before the lens existed.
-        anchors.top: categoryBar.visible ? categoryBar.bottom : searchSurface.bottom
-        anchors.topMargin: 12
+        // Anchored to the query card's bottom edge, which already folds the
+        // lens away when a mode has no categories — so everything below
+        // starts under the search field either way.
+        anchors.top: queryColumn.bottom
+        anchors.topMargin: root.insetQuery ? 14 : 12
         anchors.right: parent.right
-        anchors.rightMargin: 8
+        anchors.rightMargin: root.insetQuery ? 14 : 8
         anchors.bottom: parent.bottom
         width: parent.width / 2
         visible: shown
@@ -1446,13 +1513,15 @@ Item {
     // has to move while a refresh streams in.
     Flickable {
         id: resultsView
-        anchors.top: categoryBar.visible ? categoryBar.bottom : searchSurface.bottom
+        anchors.top: queryColumn.bottom
         anchors.left: parent.left
         anchors.right: previewPane.visible ? previewPane.left : parent.right
         anchors.bottom: parent.bottom
-        anchors.topMargin: 12
-        anchors.leftMargin: 8
-        anchors.rightMargin: previewPane.visible ? 12 : 8
+        anchors.topMargin: root.insetQuery ? 14 : 12
+        anchors.leftMargin: root.insetQuery ? 14 : 8
+        anchors.rightMargin: previewPane.visible
+                ? (root.insetQuery ? 14 : 12)
+                : (root.insetQuery ? 14 : 8)
         clip: true
         visible: !root.sessionLoading && !root.sessionError
         contentWidth: width

@@ -6,10 +6,11 @@ import "ControlCenterLogic.js" as CcLogic
 // WaveSurfaceHost.openRoute("control-center").
 //
 // It implements the Wave route-page contract the host reads - title,
-// description, sidebarEntries, activeSidebarId, canGoBack, handleBack(),
-// focusDefault() - and adds exactly four core controls: network, Bluetooth,
-// volume and media. Battery is read-only header state and weather is an
-// optional header, so neither is a card, and neither can block the first open.
+// description, titleIcon, sectionEntries, activeSectionId, pageLabel,
+// canGoBack, handleBack(), focusDefault() - and adds exactly four core
+// controls: network, Bluetooth, volume and media. Battery is read-only header
+// state and weather is an optional header, so neither is a card, and neither
+// can block the first open.
 //
 // Services arrive as injected properties; the production owner edge passes
 // Services.* singletons and a test passes fakes. This page therefore never
@@ -81,10 +82,24 @@ Item {
 
     readonly property string title: "Control Center"
     readonly property string description: "System, audio and media"
-    // No rail entries: the host hides the sidebar for an empty list, so the page
-    // fills the full width instead of reserving an empty 176px column.
-    readonly property var sidebarEntries: []
-    readonly property string activeSidebarId: ""
+    readonly property string titleIcon: "icons/control-center.svg"
+    // No section tabs: the host collapses the whole page band to zero height for
+    // an empty list, so the content column rises to sit under the masthead
+    // instead of reserving an empty strip. The control center's navigation is a
+    // back stack, not a set of siblings — which is exactly what pageLabel below
+    // is for.
+    readonly property var sectionEntries: []
+    readonly property string activeSectionId: ""
+    // The page band's name slot, which no tab could fill: the overview is the
+    // default, and a detail sub-page names itself (both sub-pages publish a
+    // title). Read through detailPageItem rather than a hardcoded id list, so
+    // the name and the mounted page cannot disagree.
+    readonly property string pageLabel: {
+        var detail = root.detailActive ? root.detailPageItem : null
+        if (detail && detail.title !== undefined && String(detail.title) !== "")
+            return String(detail.title)
+        return "Overview"
+    }
 
     // --- Same-surface sub-pages ---
     //

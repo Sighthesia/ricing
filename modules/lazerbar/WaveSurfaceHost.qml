@@ -2,6 +2,23 @@ import QtQuick
 import "WaveSurfaceLogic.js" as Logic
 
 // Own the fixed wave viewport as a content-agnostic surface for launcher and future routes.
+//
+// Its body wears one of TWO chrome layouts, both kept because the choice is a
+// judgement call no amount of reading settles:
+//
+//   "blocks" — the wiki three-band stack. Identity masthead, page bar, content
+//              column; three full-bleed planes a step lighter than the one above.
+//   "rail"   — the earlier settings-panel shape. Masthead, collapsible vertical
+//              navigation rail, content column.
+//
+// They spend different budgets: the rail spends width on navigation and returns
+// height to the results; the page bar spends height and returns width. Which
+// reads better depends on the display and on the habit of whoever is looking,
+// so the layout is a value the owner sets, not one this file decides.
+//
+// The host knows the chrome and nothing about what fills it: which entries the
+// navigation carries, and what the page calls itself, both arrive through the
+// route-page contract.
 Item {
     id: root
 
@@ -16,14 +33,49 @@ Item {
     // canGoBack, never this.
     property bool pageCanGoBack: false
     property Item opener: null
+    // --- Band 1: the identity masthead ---
     property string title: ""
     property string description: ""
-    property var sidebarEntries: []
-    property string activeSidebarId: ""
-    // Collapsible settings-style rail; the width eases between the two
-    // canonical settings sidebar sizes.
-    property bool sidebarExpanded: true
-    readonly property int sidebarWidth: root.sidebarExpanded
+    // Identity glyph for the masthead. Empty is a defined state: the band drops
+    // its tile and the title takes the left margin, so a route without a glyph
+    // never reserves an empty square.
+    property string titleIcon: ""
+    // --- Band 2: the page bar ---
+    //
+    // Section entries are the horizontal tabs that switch what the content
+    // column shows (the launcher's modes). They replaced a vertical rail: the
+    // row above already declares itself a page row, so a mode switch reads as a
+    // page switch and the rail's whole column went back to content height.
+    property var sectionEntries: []
+    property string activeSectionId: ""
+    // The page's own name for band 2's left-hand slot. Empty means "use the
+    // active section's label" — the common case, where the page name IS the
+    // selected tab. A route whose name comes from somewhere else (the control
+    // center's sub-page stack) publishes it instead.
+    property string pageLabel: ""
+    // Band 2's left-hand slot, resolved: an explicit pageLabel wins, otherwise
+    // the page name IS the selected tab's label. Derived here rather than in
+    // each route so the two spellings cannot disagree.
+    readonly property string resolvedPageLabel: {
+        if (root.pageLabel !== "")
+            return root.pageLabel
+        var entries = root.sectionEntries || []
+        for (var i = 0; i < entries.length; i++)
+            if (entries[i].id === root.activeSectionId)
+                return String(entries[i].label || "")
+        return ""
+    }
+    // Which chrome the body wears: "blocks" (the wiki three-band stack) or
+    // "rail" (masthead + collapsible vertical navigation). Both are real code
+    // paths, not a variant with a dead branch — see the file comment for why
+    // neither is going away.
+    property string chromeLayout: "blocks"
+    readonly property bool railChrome: root.chromeLayout === "rail"
+    // Rail collapse state and width. Only the rail layout reads them; the page
+    // bar has no such affordance, which is one of the two layouts' differences
+    // rather than a missing feature in either.
+    property bool railExpanded: true
+    readonly property int railWidth: root.railExpanded
             ? LazerTheme.settingsSidebarExpandedWidth : LazerTheme.settingsSidebarContractedWidth
     // `final` keeps this intentional name from shadowing Item.palette.
     final property var palette: ({})
@@ -55,7 +107,6 @@ Item {
     property alias surface: body
     property alias outsideLeft: outsideLeft
     property alias outsideRight: outsideRight
-    property alias sidebar: sidebar
     property alias contentItem: routeLoader.item
     // The retained page of the currently loaded route. Every host decision that
     // needs page content reads it through this one accessor, so no caller has to
@@ -69,7 +120,7 @@ Item {
     // mounted page are the new pair and the surface is still open. Distinct
     // from `opened()`, which a swap never emits.
     signal routeSwapped(string route)
-    signal sidebarSelected(string id)
+    signal sectionSelected(string id)
 
     // Construct the real route during the shell's idle window. The host stays
     // invisible and disabled while closed, so cold QML and delegate work is
@@ -235,8 +286,13 @@ Item {
         }
 
         // Move the continuous body inside the fixed compositor-facing owner.
-        // The body uses the settings-panel surface hierarchy; the palette
-        // drives only the wave backdrop behind it.
+        //
+        // Both chrome layouts paint from the same ladder
+        // (LazerTheme.overlay*Surface): the "blocks" stack's three bands meet
+        // edge to edge because the ladder IS the separation, while the "rail"
+        // shape uses only the header rung and carries the navigation beside the
+        // content on the content plane. The palette object still drives only
+        // the wave backdrop behind them.
         Rectangle {
             id: body
             z: 5
@@ -245,9 +301,10 @@ Item {
             width: parent.width
             height: root.height
             radius: 0
-            color: LazerTheme.settingsPanel
+            color: LazerTheme.overlayContentSurface
             opacity: root.bodyProgress
 
+            // Band 1 in both layouts: the identity masthead.
             FullscreenHeader {
                 id: header
                 anchors.top: parent.top
@@ -255,48 +312,86 @@ Item {
                 anchors.right: parent.right
                 title: root.title
                 description: root.description
+                iconSource: root.titleIcon
                 onCloseRequested: root.close()
             }
 
-            Rectangle {
+            // Band 2 of the "blocks" layout: page name plus the section tabs
+            // that switch the content column.
+            //
+            // Declared inline rather than behind a Loader. A Loader sizes the
+            // item it loads to ITSELF, and this one is anchored on three sides
+            // only — so its height is 0 and it would hand that 0 straight to the
+            // band, which then reported no height at all. (A rail is worth a
+            // Loader's indirection because its delegates are expensive; three
+            // tab delegates are not.)
+            OverlayPageBand {
+                id: pageBand
                 anchors.top: header.bottom
                 anchors.left: parent.left
                 anchors.right: parent.right
-                height: 1
-                color: LazerTheme.divider
+                entries: root.sectionEntries
+                selected: root.activeSectionId
+                pageLabel: root.resolvedPageLabel
+                onSectionSelected: id => root.sectionSelected(id)
+                // Collapses for BOTH of the reasons it can be absent: the rail
+                // layout replaces it, and a route with no entries has no page bar
+                // to show. Zero height is exactly what the content column reads,
+                // so either way the content rises to meet band 1.
+                height: root.railChrome ? 0 : implicitHeight
+                visible: height > 0
             }
 
-            FullscreenSidebar {
-                id: sidebar
+            // Navigation rail of the "rail" layout, standing in for band 2. In a
+            // Loader because this one genuinely costs to keep alive: every entry
+            // builds a nav item with its own icon, effect and animations, and
+            // that is precisely what the page-bar layout exists to stop paying.
+            Loader {
+                id: railLoader
                 anchors.top: header.bottom
-                anchors.bottom: parent.bottom
                 anchors.left: parent.left
-                entries: root.sidebarEntries
-                selected: root.activeSidebarId
-                expanded: root.sidebarExpanded
-                width: root.sidebarWidth
-                visible: root.sidebarEntries.length > 0
-                Behavior on width {
-                    enabled: !MotionTokens.reducedMotion
-                    NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
+                anchors.bottom: parent.bottom
+                active: root.railChrome
+                visible: active
+                sourceComponent: Component {
+                    FullscreenSidebar {
+                        entries: root.sectionEntries
+                        selected: root.activeSectionId
+                        expanded: root.railExpanded
+                        width: root.railWidth
+                        Behavior on width {
+                            enabled: !MotionTokens.reducedMotion
+                            NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
+                        }
+                        onSelectedChangedByUser: id => root.sectionSelected(id)
+                        onCollapseToggled: root.railExpanded = !root.railExpanded
+                    }
                 }
-                onSelectedChangedByUser: id => root.sidebarSelected(id)
-                onCollapseToggled: root.sidebarExpanded = !root.sidebarExpanded
             }
 
-            // Hairline divider between the navigation rail and the content column.
+            // Hairline between the rail and the content column. A full-height
+            // rule, because the rail runs to the bottom and the content scrolls
+            // against it for the whole session.
             Rectangle {
                 anchors.top: header.bottom
                 anchors.bottom: parent.bottom
-                anchors.left: sidebar.visible ? sidebar.right : parent.left
+                anchors.left: parent.left
+                anchors.leftMargin: root.railWidth
                 width: 1
+                visible: root.railChrome
                 color: LazerTheme.divider
             }
 
+            // Content column. It anchors to the page band's BOTTOM edge, which is
+            // the masthead's own bottom edge in the rail layout (the band
+            // collapses to zero there) and one band lower in the block stack —
+            // so no layout branch is needed and the content can never end up
+            // painting over the band instead of below it.
             Item {
                 id: viewport
-                anchors.top: header.bottom
-                anchors.left: sidebar.visible ? sidebar.right : parent.left
+                anchors.top: pageBand.bottom
+                anchors.left: parent.left
+                anchors.leftMargin: root.railChrome ? root.railWidth + 1 : 0
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 clip: true
@@ -326,7 +421,7 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     visible: root.loading
-                    color: LazerTheme.settingsPanel
+                    color: LazerTheme.overlayContentSurface
                     Text { anchors.centerIn: parent; text: "Loading..."; color: LazerTheme.textMuted }
                 }
             }
