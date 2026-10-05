@@ -259,4 +259,11 @@ TestCase {
         verify(!Logic.poolMatches(first, [{ id: "a" }]))
         verify(!Logic.poolMatches(first, null))
     }
+
+    function test_poolMatchesNoticesLateIconResolution() {
+        var unresolved = [{ id: "app", icon: "" }]
+        var resolved = [{ id: "app", icon: "image://icon/app" }]
+        verify(!Logic.poolMatches(unresolved, resolved))
+        verify(Logic.poolMatches(resolved, [{ id: "app", icon: "image://icon/app" }]))
+    }
 }

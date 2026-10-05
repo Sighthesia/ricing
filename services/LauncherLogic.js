@@ -40,6 +40,10 @@ function identifierOf(item) {
     return item == null || item.id == null ? "" : String(item.id)
 }
 
+function iconOf(item) {
+    return item == null || item.icon == null ? "" : String(item.icon)
+}
+
 function sortResults(items) {
     if (!items || !items.length)
         return []
@@ -274,16 +278,18 @@ function preservedSelection(items, index, nextItems) {
     return clampSelection(index, count)
 }
 
-// Content equality by ordered ids: lets the session keep the same pooled
-// array (and therefore the same live delegates) when a pull returns data
-// identical to what is already rendered.
+// Content equality by ordered ids and icons: lets the session keep the same
+// pooled array (and therefore the same live delegates) when a pull returns
+// data identical to what is already rendered, while still allowing a late
+// icon-theme lookup to replace an earlier empty icon.
 function poolMatches(left, right) {
     if (left === right)
         return true
     if (!left || !right || left.length !== right.length)
         return false
     for (var i = 0; i < left.length; i++)
-        if (identifierOf(left[i]) !== identifierOf(right[i]))
+        if (identifierOf(left[i]) !== identifierOf(right[i])
+                || iconOf(left[i]) !== iconOf(right[i]))
             return false
     return true
 }

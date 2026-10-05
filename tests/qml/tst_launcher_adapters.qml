@@ -330,6 +330,25 @@ Item {
             compare(lookups.length, 2)
         }
 
+        function test_appsAdapterKeepsAbsoluteIconPaths() {
+            var lookups = []
+            var absolutePath = "/usr/share/icons/example.svg"
+            var adapters = LauncherAdapters.createAdapters({
+                appsSource: makeAppsSource([
+                    makeAppEntry("absolute", "Absolute", "", { icon: absolutePath })
+                ]),
+                iconResolver: function(name) {
+                    lookups.push(name)
+                    return ""
+                }
+            })
+
+            var outcome = null
+            adapters.apps.refresh("", "apps", function(result) { outcome = result })
+            compare(outcome[0].icon, absolutePath)
+            compare(lookups.length, 0)
+        }
+
         function test_appsAdapterFiltersQueriesAcrossNameCommentAndId() {
             var adapters = LauncherAdapters.createAdapters({
                 appsSource: makeAppsSource([
