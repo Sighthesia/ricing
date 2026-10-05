@@ -19,6 +19,11 @@ Item {
     // Services.LauncherService; tests inject deterministic sessions. The
     // embedded default keeps the page self-contained without Quickshell.
     property var session: embeddedSession
+    // The real page is retained before the first open. Reserve its fixed row
+    // window during that idle prewarm too, so the first clipboard batch fills
+    // existing delegates instead of constructing the whole 96-row tree in the
+    // opening frame.
+    property bool prewarmSlots: false
 
     // Fallback keyboard owner: click-away can strand the surface with no
     // focused item, and then Escape would reach no handler at all. While
@@ -770,7 +775,8 @@ Item {
     // through on a clipboard open, both of them right after the open and both
     // visible as the list twitching as it fills. A slot with no result yet is
     // collapsed and inert (see LauncherResultRow.slotEmpty).
-    readonly property int rowSlotCount: windowedResults.length > 0 ? _resultWindowLimit : 0
+    readonly property int rowSlotCount: windowedResults.length > 0 || root.prewarmSlots
+            ? _resultWindowLimit : 0
     // Stretch the materialized window past the base slice only when a query
     // actually matches rows beyond it. This runs in two phases: the query
     // first folds the current window in place (persisted delegates glide,

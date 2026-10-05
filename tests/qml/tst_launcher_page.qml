@@ -618,6 +618,15 @@ function test_streamedFirstFillLeavesTheViewportScrollable() {
         }, 3000)
     }
 
+    function test_prewarmSlotsReserveTheFixedWindowBeforeResultsArrive() {
+        page.prewarmSlots = true
+        compare(page.resultCount, 0)
+        compare(page.rowSlotCount, page._resultWindowLimit)
+        tryVerify(function() { return page.resultsView.slotCount === page.rowSlotCount }, 2000)
+        page.prewarmSlots = false
+        tryVerify(function() { return page.rowSlotCount === 0 }, 2000)
+    }
+
     function test_windowGrowthReleasesItsNewRowsAndKeepsScrolling() {
         // Growing the materialized window builds fresh delegates. Nothing
         // releases them but the commit that growth schedules, and a held row is

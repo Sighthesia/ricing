@@ -47,6 +47,8 @@ Item {
     // paid before the first visible opening instead of during it.
     function prewarmRoute() {
         root.routeRetained = true
+        if (routeLoader.item && routeLoader.item.prewarmSlots !== undefined)
+            routeLoader.item.prewarmSlots = true
     }
 
     function openRoute(nextRoute, source) {        var normalized = Logic.normalizeRoute(nextRoute)
@@ -235,6 +237,10 @@ Item {
                     // they cost memory and nothing else.
                     active: root.phase !== "closed" || root.routeRetained
                     sourceComponent: root.contentComponent
+                    onLoaded: {
+                        if (root.routeRetained && item && item.prewarmSlots !== undefined)
+                            item.prewarmSlots = true
+                    }
                 }
 
                 Rectangle {

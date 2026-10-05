@@ -180,6 +180,7 @@ Item {
         id: launcherPageComponent
         LauncherPage {
             session: root.session
+            prewarmSlots: root.startupPrewarmAllowed === true
             onExitFlingRequested: spec => root.spawnExitCard(spec)
         }
     }
