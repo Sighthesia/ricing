@@ -1301,10 +1301,23 @@ property real debugTimeScale: 1
     // `_followJourney`), so the number no longer has to defend against a 227px teleport, and
     // the reading above is from the running shell rather than from a clock the suite steps.
     //
+    // At normal speed (the multiplier is 1) the wake is the head's per-tick travel times
+    // `(1 - k) / k`, so this number IS the trail's length and nothing else is. At 0.7 that
+    // ratio was 0.43 and the trail read as barely there - the user asked for it longer, on
+    // the live shell, having watched it. 0.35 makes the ratio 1.86, about 4.3x as long.
+    //
+    // What makes a long trail safe here, and what did not before: the wake is proportional
+    // to the head's SPEED, not to the journey's length, because the head is pinned rather
+    // than flying toward a fixed target. So there is no journey long enough to make it
+    // runaway - the widget's own 55%-of-travel rule cannot apply to a pinned head, because
+    // that rule comes from two `Behavior`s chasing one target over a known distance and
+    // there is no such target here. It also stays bounded by `min(1, ...)` because a k
+    // above 1 makes the follower overshoot the head and oscillate.
+    //
     // Clamped, because the multiplier is writable and a suite may set it below 1: at k > 1 the
     // follower overshoots the head and oscillates, and a clamped k is a too-long trail where
     // an unstable one is a bar that wobbles.
-    readonly property real trailCatchUp: Math.min(1, 0.7 / Math.max(0.01, debugTimeScale))
+    readonly property real trailCatchUp: Math.min(1, 0.35 / Math.max(0.01, debugTimeScale))
 
     // `_snapping` is the load-bearing gate on both of these, and it is a
     // property rather than anything about the crossing, so a `Behavior` sees it at the
