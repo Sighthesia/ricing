@@ -76,7 +76,22 @@ QtObject {
     // low-alpha ink wash (white washes are invisible there); pressed stays
     // fainter than hover. Active highlight reads as a container tint in
     // light mode instead of a translucent mid-tone patch.
-    readonly property color hoverFill: lightScheme ? shade(barIcon, 0x14 / 255) : "#18FFFFFF"
+    //
+    // The wash is the light scheme's only hover token, and it is one token
+    // rather than a tone per host, because an overlay hover is painted over
+    // whatever surface its row happens to live on. An opaque tone cannot do
+    // that job: the rail IS `settingsRail`, so naming the rail for its own
+    // rows painted the highlight in its own background colour and the hover
+    // vanished. It also has to be translucent to survive the swap — a
+    // `Behavior on color` animates out of `"transparent"` (transparent BLACK),
+    // so an opaque light target travels through dark desaturated frames on the
+    // way in and the hover reads as a grey block before it resolves. A wash is
+    // dark at any alpha and already faint, so the ramp stays next to the host
+    // the whole way. Measured over the light rail, the opaque ramp dips to
+    // #B7958C at saturation 0.23 against the host's 0.50 and lands on the host;
+    // the wash runs monotone #F4C7BB -> #E4BAAF.
+    readonly property color lightHoverWash: lightScheme ? shade(barIcon, 0x14 / 255) : "transparent"
+    readonly property color hoverFill: lightScheme ? lightHoverWash : "#18FFFFFF"
     readonly property color pressedFill: lightScheme ? shade(barIcon, 0x0A / 255) : "#0FFFFFFF"
     // Bar glyph tint follows the painted bar surface: light scheme tints
     // with the palette's on-surface ink (fallback near-black), dark scheme
@@ -168,9 +183,15 @@ QtObject {
         ? (lightScheme ? settingsRail : colorService.mSurfaceContainerHighest)
         : "#322E3F"
     readonly property color settingsRow: "transparent"
-    readonly property color settingsRowHover: adapt && colorService
-        ? (lightScheme ? settingsRail : colorService.mSurfaceContainerHighest)
-        : "#FF363842"
+    // Row hover is an OVERLAY (`hovered ? rowHover : "transparent"`), so it is
+    // painted over the rail, the search strip, the query card, the category
+    // block or the overlay's page band depending on where the row lives. It
+    // cannot name one of those tones: on the rail, where `settingsRowHover`
+    // used to resolve to `settingsRail` itself, the highlight was its own
+    // background and there was nothing to see. Light takes the shared ink
+    // wash, which stays visible over every one of those surfaces.
+    readonly property color settingsRowHover: lightScheme ? lightHoverWash
+        : (adapt && colorService ? colorService.mSurfaceContainerHighest : "#FF363842")
     readonly property color settingsCard: adapt && colorService
         ? (lightScheme ? mix(colorService.mSurfaceContainerLow, paperWhite, 0.60) : colorService.mSurfaceContainerLow)
         : "#221F2B"
