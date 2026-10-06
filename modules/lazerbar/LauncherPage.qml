@@ -7,31 +7,10 @@ import "../../services/launcher/LauncherCategories.js" as LauncherCategories
 // search rail, mode sidebar data with prefix rewriting, service-driven result
 // list, and explicit loading / empty / error / retry states. All session
 // state flows through the injected session; the page never owns launcher data.
-//
-// The control center is the FOURTH rail entry's view of this same content area,
-// not a sibling Wave route: one page, one content area, one selection semantic.
-// See `controlCenterActive` below for why that is a page-local flag rather than
-// a session mode.
 Item {
     id: root
     objectName: "launcherPage"
     property double _born: Date.now()
-
-    // --- Injected service seams for the control-center view ---
-    //
-    // The control center is the one thing on this page that reports system state,
-    // so its services are injected rather than imported, exactly like the session
-    // below: production binds Services.* singletons at the surface owner edge and
-    // a test passes fakes. Every one defaults to null, which is a defined state -
-    // the overview renders its explicit unavailable/optional states for a missing
-    // service instead of throwing. This file still imports no service.
-    property var networkService: null
-    property var bluetoothService: null
-    property var volumeService: null
-    property var mediaService: null
-    property var batteryService: null
-    property var notificationService: null
-    property var weatherService: null
 
     // Session contract: any object exposing the observable LauncherService
     // state (visible, query, mode, results, loading, error, selectedIndex)
@@ -80,153 +59,41 @@ Item {
         onTriggered: root.reclaimKeyboardFallback()
     }
 
-    // Data surfaced to the wave shell header and sidebar.
+    // Data surfaced to the wave shell's three-block chrome.
+    readonly property string title: "Launcher"
+    // The masthead's subtitle line, which only the rail layout has room to
+    // mean anything in. Under "blocks" it is empty: band 2 already names the
+    // mode twice, and a mode's description sitting under the launcher's own
+    // name describes neither, so the wiki-shaped masthead carries the site name
+    // alone. Empty is a defined state — the header drops the slot rather than
+    // reserving it.
+    readonly property string description: root.chromeLayout === "rail"
+            ? root.modeDescription(activeMode) : ""
+    // Identity glyph for the masthead.
+    readonly property string titleIcon: "icons/launcher.svg"
+    // The navigation entries, in the order the chrome shows them. They used to
+    // be a vertical rail's list and are now the page bar's tab row; both
+    // layouts read this one list, which is why it is named for what it holds
+    // rather than for where it is drawn.
     //
-    // The header follows the VIEW, not the session. Apps / Clipboard / Shortcuts
-    // are queries over a data source and their description says so; the control
-    // center has nothing to search, and announcing "Search applications" over a
-    // wall of toggles would be a lie. The words live here because this is now the
-    // page the host reads - the view itself no longer publishes chrome.
-    readonly property string title: root.controlCenterActive ? "Control Center" : "Launcher"
-    readonly property string description: root.controlCenterActive
-        ? "System, audio and media"
-        : root.modeDescription(root.activeMode)
-
-    // The rail carries four PEER entries, declared in one list on purpose: they
-    // share one rail, one accent indicator and one row arithmetic, and the only
-    // difference between them is what the content area shows afterwards - which
-    // the content area already shows. The three primaries rewrite the query and
-    // change the list; the fourth swaps this page's view.
-    //
-    // `controlCenterEntryId` is what the rail, the selection and the query-mode
-    // guard all read, so the view's identity is named in exactly one place.
-    readonly property string controlCenterEntryId: "control-center"
-    readonly property var sidebarEntries: [
+    // Two kinds of entry share it. The three primaries are FILTERS of this
+    // page: they rewrite the query and change what the list shows. The footer
+    // entry is not a filter - it leaves this page and switches the surface to
+    // the control-center route, which is why it is marked `section: "footer"`
+    // and answered by a different handler below. Declaring them together is
+    // deliberate: they share one accent indicator, and the hairline is what
+    // tells them apart.
+    readonly property var sectionEntries: [
         { id: "apps", label: "Apps", icon: "icons/apps.svg" },
         { id: "clipboard", label: "Clipboard", icon: "icons/clipboard.svg" },
         { id: "shortcuts", label: "Shortcuts", icon: "icons/keyboard.svg" },
-        { id: "control-center", label: "Control Center", icon: "icons/control-center.svg" }
+        { id: "control-center", label: "Control Center", icon: "icons/control-center.svg", section: "footer" }
     ]
     readonly property string activeMode: root.session && root.session.mode != null ? String(root.session.mode) : ""
-    // What the shared rail highlights: the control center while its view is up,
-    // otherwise the query mode. Published explicitly because the host reads
-    // `activeSidebarId` first and only falls back to `activeMode`, and a view
-    // that left the accent strip on "apps" would claim the rail shows apps.
-    readonly property string activeSidebarId: root.controlCenterActive
-        ? root.controlCenterEntryId
-        : root.activeMode
-
-    // --- The control-center view ---
-    //
-    // A PAGE-LOCAL flag, deliberately not a session mode. `session.mode` is
-    // derived from the query prefix by LauncherLogic.parseQuery and names a DATA
-    // SOURCE: apps, clipboard, shortcuts. The control center is not a source -
-    // there is no `>ctl ` prefix, no result pool and no query to fold - and
-    // inventing a fourth prefix would have put a view switch into the same
-    // vocabulary as search modes, where a mode change also rewrites the query and
-    // reports a mode change to the session. That would destroy exactly what this
-    // switch must preserve: the typed query and the caret.
-    //
-    // So the query is never touched on either edge of the switch, and this flag is
-    // the whole of the state that changes.
-    property bool controlCenterActive: false
-
-    // The view is a cold path: nothing of it is built until the first entry asks
-    // for it. After that it is RETAINED, exactly like the host's own retained
-    // route page - a control center carries four cards, a calendar and a summary,
-    // and returning to it should restore that rather than rebuild a screen of
-    // delegates behind the rail.
-    property bool controlCenterBuilt: false
-    readonly property Item controlCenterItem: controlCenterLoader.item
-
-    // Open the view. Focus is handed to the control center's own default target
-    // one turn later, for the reason its sub-page hand-off is deferred: a Loader
-    // builds its item ASYNCHRONOUSLY, so focusing in the same turn as the flag
-    // flip would target the item that is not there yet - or, on the very first
-    // open, nothing at all, leaving the surface with no keyboard owner.
-    function openControlCenter() {
-        if (root.controlCenterActive)
-            return false
-        root.controlCenterActive = true
-        controlCenterFocusTimer.restart()
-        return true
-    }
-
-    // Leave the view. The control center's own back contract runs FIRST: a
-    // mounted detail page is inside this view and consumes the press, so
-    // `handleBack()` is asked before the view itself is dismissed. Declining
-    // (nothing to pop) is what lets the view step out and the query answer.
-    function closeControlCenter() {
-        if (!root.controlCenterActive)
-            return false
-        root.controlCenterActive = false
-        root.dismissControlCenterDetail()
-        // The search editor is invisible while the view is up, and Qt answers an
-        // invisible item's focus request with a refusal - so the hand-back is
-        // deferred one turn as well, until the editor is really visible again.
-        controlCenterFocusTimer.restart()
-        // Nothing above the list moved, so the viewport needs no reflow; the
-        // frame does, because its anchor is the selected row's geometry.
-        resultsView.syncSelectionFrame()
-        return true
-    }
-
-    Timer {
-        id: controlCenterFocusTimer
-        interval: 0
-        repeat: false
-        onTriggered: {
-            // Both edges of the switch go through here, and which one runs is the
-            // flag: the view owns the keyboard while it is up, the editor owns it
-            // the rest of the time.
-            if (root.controlCenterActive)
-                root.handOverControlCenterFocus()
-            else
-                root.focusSearch()
-        }
-    }
-
-    // Take the view back to its overview as it leaves the screen.
-//
-// Required, and not a tidiness fix: the view is RETAINED, and a detail sub-page
-// inside a retained view would survive the close and be what the next open lands
-// on - so a user who opened Network, closed the launcher and reopened the control
-// center would come back to the network list, with no way back to the overview
-// except the sub-page's own back press. Measured rather than assumed: focus
-// followed straight into `controlCenterNetworkDetail` on the next open.
-//
-// One turn is enough because the sub-page's own pop is synchronous on
-// `activeSubPage`; only its fade-out is deferred, and a fading page that is no
-// longer reachable cannot take focus.
-function dismissControlCenterDetail() {
-        var view = root.controlCenterItem
-        if (view && view.detailActive === true
-                && typeof view.closeSubPage === "function")
-            view.closeSubPage()
-        return true
-    }
-
-    // Where the keyboard goes on each edge of the switch.
-    //
-    // Two calls, and the split is the whole point. On the way IN the target is
-    // the view, which must exist before it can be focused - and it does not on
-    // the first open, because a Loader builds its item asynchronously. So
-    // `openControlCenter` asks for the hand-off now AND `onLoaded` asks again,
-    // which is what makes the first open and every later one behave the same. The
-    // fallback is the page itself, never the editor: the editor is hidden, and Qt
-    // answers a focus request on an invisible item with a refusal - which would
-    // leave the whole surface with no keyboard owner and a dead Escape.
-    function handOverControlCenterFocus() {
-        if (!root.controlCenterActive)
-            return false
-        var view = root.controlCenterItem
-        if (view && typeof view.focusDefault === "function") {
-            view.focusDefault()
-            return true
-        }
-        root.forceActiveFocus()
-        return true
-    }
+    // Chrome-facing spelling of the same thing: in the page bar a tab selects a
+    // section, and here a section IS a mode. Both names are published so the
+    // host never has to fall back on a guess.
+    readonly property string activeSectionId: root.activeMode
 
     // Normalized free-text portion of the query; rows fold themselves against
     // it exactly like settings rows do under a search filter.
@@ -259,6 +126,11 @@ function dismissControlCenterDetail() {
 
     // Emitted when a sidebar-driven mode change is applied to the session.
     signal modeChangeRequested(string mode)
+    // Emitted when the rail's footer action is chosen. A page switch, not a
+    // filter, so it travels as its own signal rather than riding the mode one:
+    // the owner changes this surface's route, which the session knows nothing
+    // about.
+    signal controlCenterRequested()
     // Bubbled from the activated result row so the owning surface can replay
     // the card's parabolic exit in a layer above the closing panel.
     signal exitFlingRequested(var spec)
@@ -289,6 +161,16 @@ function dismissControlCenterDetail() {
 
     implicitWidth: 400
     implicitHeight: 300
+
+    // Which chrome layout the wave host is wearing: "blocks" (the osu wiki
+    // three-band stack) or "rail" (masthead + collapsible vertical navigation).
+    //
+    // The query surface answers it rather than staying put, because a comparison
+    // that changed only the navigation would not be a comparison — under the
+    // rail layout the full-bleed `settingsRail` strip this page had before the
+    // stack came back exactly as it was, inset card and all.
+    property string chromeLayout: "blocks"
+    readonly property bool insetQuery: root.chromeLayout !== "rail"
 
     // Row currently carrying the shared focus frame; pure var property so
     // imperative updates are safe under the qs engine.
@@ -357,14 +239,6 @@ function dismissControlCenterDetail() {
                 // else can ever hand that row a fresh one.
                 root.rearmFailedThumbs()
                 root.rearmFailedIcons()
-                // The control center view dies with the surface that showed it.
-                // The page is retained across closes, so without this a reopen
-                // would land on the control center - which is not what any open
-                // asked for, since the query survives but the VIEW is not
-                // session state. `controlCenterBuilt` deliberately stays: the view
-                // stays constructed, it just is not on screen.
-                root.dismissControlCenterDetail()
-                root.controlCenterActive = false
             }
         }
         function onSelectedIndexChanged() {
@@ -407,13 +281,6 @@ function dismissControlCenterDetail() {
     // Fallback key handling for focus held by the page itself or by rows;
     // the search field handles its own keys first and stops propagation.
     Keys.onPressed: event => {
-        // Input isolation. The control-center view has its own controls and its
-        // own key handling, and the launcher's editor is INVISIBLE while the view
-        // is up - so an arrow key landing here must not move a selection the user
-        // cannot see, and Return must not execute a row behind the view. Escape
-        // is the one exception: it is the press that leaves the view.
-        if (root.controlCenterActive && event.key !== Qt.Key_Escape)
-            return
         switch (event.key) {
         case Qt.Key_Up:
             event.accepted = root.navigateSelection(-1)
@@ -442,19 +309,17 @@ function dismissControlCenterDetail() {
         return "Search applications"
     }
 
-    // The rail's contract entry point: the surface asks this, never the mode
-    // handler directly, because one rail carries four peer entries. Three are
-    // filters of this page and fall through to the mode handler unchanged; the
-    // fourth is a VIEW of this page and is answered here.
-    function handleSidebarSelected(id) {
-        if (id === root.controlCenterEntryId) {
-            root.openControlCenter()
+    // The chrome's contract entry point: the surface asks this, never the mode
+    // handler directly, because one entry list now carries two kinds of entry.
+    // A footer id is an action on the surface and is answered here; everything
+    // else is a filter on this page and falls through unchanged. Named for the
+    // section the chrome selects, not for the rail it used to be drawn in —
+    // both layouts route through here, so the name has to cover both.
+    function handleSectionSelected(id) {
+        if (id === "control-center") {
+            root.controlCenterRequested()
             return
         }
-        // A filter chosen while the control center is up replaces the view, in
-        // this order: leave the view first, so the mode handler's own focus
-        // hand-back lands on a visible editor.
-        root.closeControlCenter()
         root.handleModeSelected(id)
     }
 
@@ -472,16 +337,17 @@ function dismissControlCenterDetail() {
         root.modeChangeRequested(modeId)
     }
 
-    // Only the primaries are query modes. The control center names a VIEW of this
-    // page rather than a data source, so admitting it here would let a mode
-    // prefix be built for an id that names no pool - and a "mode change" would be
-    // reported for a view switch.
+    // Only the primary entries are query modes. The footer entry shares this
+    // list but answers a different question, so admitting it here would let a
+    // mode prefix be built for an id that names no data source.
     function isKnownMode(modeId) {
-        if (modeId === root.controlCenterEntryId)
-            return false
-        for (var i = 0; i < root.sidebarEntries.length; i++)
-            if (root.sidebarEntries[i].id === modeId)
-                return true
+        for (var i = 0; i < root.sectionEntries.length; i++) {
+            if (root.sectionEntries[i].id !== modeId)
+                continue
+            if (String(root.sectionEntries[i].section || "") === "footer")
+                return false
+            return true
+        }
         return false
     }
 
@@ -496,12 +362,6 @@ function dismissControlCenterDetail() {
     function executeSelected() {
         var service = root.session
         if (!service)
-            return
-        // Same isolation as navigateSelection, and for the same reason: the
-        // editor and the preview pane each bind Return to this directly. Executing
-        // a row behind the control center would launch an application the user
-        // cannot see they picked.
-        if (root.controlCenterActive)
             return
         var current = service.results && service.selectedIndex >= 0
                 ? service.results[service.selectedIndex] : null
@@ -527,15 +387,6 @@ function dismissControlCenterDetail() {
     function navigateSelection(direction) {
         if (!root.session)
             return false
-        // Input isolation, enforced here rather than only at the key handler. The
-        // search editor, the preview pane and the page itself each register their
-        // own arrow bindings and each calls this function, so a guard in
-        // `Keys.onPressed` alone would leave the editor's own binding able to move
-        // a selection the user cannot see - which is reachable in the one turn
-        // between the view going up and the focus hand-back landing, measured
-        // rather than assumed.
-        if (root.controlCenterActive)
-            return false
         // Keyboard navigation reclaims the preview: a resting mouse would
         // otherwise keep the hovered row previewed while the highlight moves.
         root._hoveredResult = null
@@ -556,32 +407,12 @@ function dismissControlCenterDetail() {
         return false
     }
 
-    // One press, four possible meanings, in the order they are decided here:
-    //
-    //   1. the control center's own detail sub-page, if one is mounted - it is
-    //      INSIDE this view and pops itself, so the view does not close over it;
-    //   2. the control center view itself, which hands back to the launcher view
-    //      the user came from, with their query and caret untouched;
-    //   3. typed text, which clears back to the active mode's bare prefix
-    //      (never falling back to apps);
-    //   4. nothing left, reported as "close" to the owning wave shell by leaving
-    //      the key unaccepted.
-    //
-    // The order is the whole contract, and it is decided in ONE function because
-    // every step is a different owner: the sub-page answers inside the control
-    // center, the view is this page's own flag, and the query is the session's.
-    // Splitting these across handlers is how a press ends up consumed by a page
-    // that has already spent it. The page never tears down its own session.
+    // Decides Escape through the shared pure contract: typed text clears
+    // back to the active route's bare prefix (never falls back to apps);
+    // with nothing typed beyond the prefix, report "close" to the owning
+    // wave shell by leaving the key unaccepted. The page never tears down
+    // its own session.
     function handleEscape() {
-        if (root.controlCenterActive) {
-            var view = root.controlCenterItem
-            // A mounted detail page consumes the press. Asking it FIRST is what
-            // makes step 2 reachable at all: the overview declines, and declining
-            // is the signal that the view itself is what leaves.
-            if (view && typeof view.handleBack === "function" && view.handleBack() !== false)
-                return true
-            return root.closeControlCenter()
-        }
         if (!root.session)
             return false
         var esc = LauncherLogic.escapeAction(root.session.query)
@@ -592,15 +423,6 @@ function dismissControlCenterDetail() {
         return false
     }
 
-    // The page's half of the wave host's back contract, read by the host when a
-    // press reaches it rather than this page's own key handler. Both halves or
-    // neither: advertising a back step with no handler would take every press
-    // and do nothing with it, and this page - not the host - is the authority.
-    // While the control center is up the answer is always `true`, because
-    // `handleEscape()` then has a step it can always take.
-    readonly property bool canGoBack: root.controlCenterActive
-    function handleBack() { return root.handleEscape() }
-
     function focusSearch() {
         // Same contract as the reclaim timer above: a prewarmed page must never
         // steal keyboard ownership. Without this guard the retained page
@@ -609,12 +431,6 @@ function dismissControlCenterDetail() {
         // launcher then opens with no focused search box, and Escape reaches
         // nothing at all.
         if (!root.enabled)
-            return
-        // The editor is hidden while the control center view is up, and Qt answers
-        // a focus request on an invisible item with a refusal. Focusing it anyway
-        // would leave the view with no keyboard owner at all, which is how a
-        // sidebar selection ends up with a dead Escape.
-        if (root.controlCenterActive)
             return
         searchSurface.focusEditor()
     }
@@ -997,93 +813,143 @@ function dismissControlCenterDetail() {
         }
     }
 
-    // The launcher's own chrome - search rail, category chips, result list and
-    // preview pane - is hidden as a UNIT while the control center view is up. The
-    // control center has nothing to search, so a visible search rail over it
-    // would advertise an input that filters nothing.
+    // Query column: the search field and the category lens as ONE inset card
+    // sitting on the content plane.
     //
-    // `visible`, never a layout change: the hidden items keep their anchors and
-    // their geometry, so returning to a launcher view cannot shift anything. This
-    // is the requirement that the typed query and caret survive the round trip -
-    // a collapse-and-restore of the rail's height would move the list under the
-    // viewport and leave the selection pointing at a different row.
-    readonly property bool chromeVisible: !root.controlCenterActive
-
-    // Full-width sharp search rail carrying the osu caret text field.
-    FocusScope {
-        id: searchSurface
+    // It used to be a full-bleed `settingsRail` strip, which is now impossible:
+    // the rail tone is DARKER than the content band it would cut across, so a
+    // full-bleed query surface became a fourth band with a tone that belongs to
+    // none of the three. Insetting it is also the wiki's own answer — the
+    // content column carries its blocks as cards, and the blocks read as
+    // objects on a plane rather than as more plane.
+    Item {
+        id: queryColumn
+        objectName: "launcherQueryColumn"
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 44
-        visible: root.chromeVisible
+        anchors.topMargin: root.insetQuery ? 14 : 0
+        anchors.leftMargin: root.insetQuery ? 14 : 0
+        anchors.rightMargin: root.insetQuery ? 14 : 0
 
-        // Last query value pushed from this page into the session; external
-        // session changes always differ from it and are adopted below.
-        property string _lastPushedQuery: ""
-        property bool _syncingEditor: false
-        readonly property string queryText: root.session && root.session.query != null ? String(root.session.query) : ""
-        readonly property alias editorItem: editor
-
-        function focusEditor() {
-            editor.forceActiveFocus()
-        }
-
-        // Adopt external session query values into the editor exactly once per
-        // change so user typing remains the only other writer.
-        function adoptSessionQuery() {
-            if (queryText === _lastPushedQuery)
-                return
-            _lastPushedQuery = queryText
-            _syncingEditor = true
-            editor.suppressDeleteFx = true
-            editor.text = queryText
-            editor.suppressDeleteFx = false
-            _syncingEditor = false
-        }
-
-        onQueryTextChanged: adoptSessionQuery()
-        Component.onCompleted: adoptSessionQuery()
+        // Card padding and the gap between the field and the lens. One source
+        // for both, so the field, the chips and the result rows below cannot
+        // drift apart by a stray literal. Under the rail layout both collapse to
+        // zero and the field carries its own 12px text margin, which is exactly
+        // the full-bleed strip this page had before the stack.
+        readonly property int cardPadding: root.insetQuery ? 10 : 0
+        readonly property int queryGap: root.insetQuery ? 8 : 6
+        // The lens collapses to zero height for a mode with no categories, and
+        // the column's height folds that away with it — so everything below
+        // still starts under the field rather than under a gap.
+        height: cardPadding * 2 + searchSurface.height
+              + (categoryBar.visible ? queryGap + categoryBar.height : 0)
 
         Rectangle {
             anchors.fill: parent
-            radius: 0
-            color: LazerTheme.settingsRail
+            radius: root.insetQuery ? LazerTheme.settingsControlRadius : 0
+            color: root.insetQuery
+                    ? LazerTheme.settingsSearchSurface
+                    : LazerTheme.settingsRail
         }
 
-        OsuTextField {
-            id: editor
+        // Search field inside the card, carrying the osu caret text field.
+        FocusScope {
+            id: searchSurface
+            anchors.top: parent.top
+            anchors.topMargin: queryColumn.cardPadding
             anchors.left: parent.left
-            anchors.leftMargin: 12
+            anchors.leftMargin: queryColumn.cardPadding
             anchors.right: parent.right
-            anchors.rightMargin: 12
-            anchors.verticalCenter: parent.verticalCenter
-            clip: true
-            color: LazerTheme.textPrimary
-            selectionColor: LazerTheme.osuPink
-            font.pixelSize: 14
-            onTextChanged: {
-                if (searchSurface._syncingEditor)
-                    return
-                searchSurface._lastPushedQuery = text
-                if (root.session)
-                    root.session.query = text
+            anchors.rightMargin: queryColumn.cardPadding
+            height: root.insetQuery ? 40 : 44
+
+            // Last query value pushed from this page into the session; external
+            // session changes always differ from it and are adopted below.
+            property string _lastPushedQuery: ""
+            property bool _syncingEditor: false
+            readonly property string queryText: root.session && root.session.query != null ? String(root.session.query) : ""
+            readonly property alias editorItem: editor
+
+            function focusEditor() {
+                editor.forceActiveFocus()
             }
-            Keys.onUpPressed: event => { event.accepted = root.navigateSelection(-1) }
-            Keys.onDownPressed: event => { event.accepted = root.navigateSelection(1) }
-            Keys.onReturnPressed: event => { root.executeSelected(); event.accepted = true }
-            Keys.onEnterPressed: event => { root.executeSelected(); event.accepted = true }
+
+            // Adopt external session query values into the editor exactly once per
+            // change so user typing remains the only other writer.
+            function adoptSessionQuery() {
+                if (queryText === _lastPushedQuery)
+                    return
+                _lastPushedQuery = queryText
+                _syncingEditor = true
+                editor.suppressDeleteFx = true
+                editor.text = queryText
+                editor.suppressDeleteFx = false
+                _syncingEditor = false
+            }
+
+            onQueryTextChanged: adoptSessionQuery()
+            Component.onCompleted: adoptSessionQuery()
+
+            OsuTextField {
+                id: editor
+                anchors.left: parent.left
+                anchors.leftMargin: 12
+                anchors.right: parent.right
+                anchors.rightMargin: 12
+                anchors.verticalCenter: parent.verticalCenter
+                clip: true
+                color: LazerTheme.textPrimary
+                selectionColor: LazerTheme.osuPink
+                font.pixelSize: 14
+                onTextChanged: {
+                    if (searchSurface._syncingEditor)
+                        return
+                    searchSurface._lastPushedQuery = text
+                    if (root.session)
+                        root.session.query = text
+                }
+                Keys.onUpPressed: event => { event.accepted = root.navigateSelection(-1) }
+                Keys.onDownPressed: event => { event.accepted = root.navigateSelection(1) }
+                Keys.onReturnPressed: event => { root.executeSelected(); event.accepted = true }
+                Keys.onEnterPressed: event => { root.executeSelected(); event.accepted = true }
+            }
+
+            Text {
+                anchors.left: editor.left
+                anchors.verticalCenter: editor.verticalCenter
+                visible: !editor.text && !editor.activeFocus
+                text: "Search..."
+                color: LazerTheme.textMuted
+                font.pixelSize: 14
+            }
         }
 
-        Text {
-            anchors.left: editor.left
-            anchors.verticalCenter: editor.verticalCenter
-            visible: !editor.text && !editor.activeFocus
-            text: "Search..."
-            color: LazerTheme.textMuted
-            font.pixelSize: 14
+        // Category lens under the field, inside the same card: the lens is part
+        // of the query surface, so it shares the field's block rather than
+        // becoming a panel of its own. Modes whose taxonomy yields a single
+        // chip (shortcut binds, until their categories are known) take no space,
+        // and the column's height folds the gap away with them.
+        LauncherCategoryBar {
+            id: categoryBar
+            objectName: "launcherCategoryBar"
+            anchors.top: searchSurface.bottom
+            anchors.topMargin: visible ? queryColumn.queryGap : 0
+            anchors.left: parent.left
+            anchors.leftMargin: queryColumn.cardPadding
+            anchors.right: parent.right
+            anchors.rightMargin: queryColumn.cardPadding
+            height: visible ? implicitHeight : 0
+            visible: root.categoryChips.length > 1
+            chips: root.categoryChips
+            selected: root.activeCategory
+            onChipSelected: id => {
+                root.setCategory(id)
+                // Typing after picking a category must keep going to the search
+                // field, so activation always hands the keyboard back.
+                root.focusSearch()
+            }
         }
-
     }
 
     // Result viewport: settings-panel structure (Flickable + folding rows)
@@ -1442,36 +1308,6 @@ function dismissControlCenterDetail() {
             _hoveredResult = null
     }
 
-    // Category chip rail between the search field and the results: the lens
-    // is part of the query surface, so it stays a flat full-width strip
-    // rather than its own panel. Modes whose taxonomy yields a single chip
-    // (shortcut binds, until their categories are known) take no space.
-    LauncherCategoryBar {
-        id: categoryBar
-        objectName: "launcherCategoryBar"
-        anchors.top: searchSurface.bottom
-        // Collapsed, the strip must not leave a gap where it used to be:
-        // the margin collapses with it so the results start where they did.
-        anchors.topMargin: visible ? 6 : 0
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: visible ? implicitHeight : 0
-        // The chip rail is a lens over the query surface, so it follows that
-        // surface in and out with the control center view. Hiding it costs no
-        // geometry: the collapse above already folds the strip's height and
-        // margin to zero, so the anchors below land on the search rail's bottom
-        // edge either way and the list cannot shift on the way back.
-        visible: root.chromeVisible && root.categoryChips.length > 1
-        chips: root.categoryChips
-        selected: root.activeCategory
-        onChipSelected: id => {
-            root.setCategory(id)
-            // Typing after picking a category must keep going to the search
-            // field, so activation always hands the keyboard back.
-            root.focusSearch()
-        }
-    }
-
     // Clipboard preview pane: the selected entry rendered large — decoded
     // image or full multi-line text — beside a narrowed results list.
     // Pointing at any row previews it ahead of the keyboard selection. The
@@ -1509,22 +1345,16 @@ function dismissControlCenterDetail() {
             var rev = root._thumbRev
             return rev >= 0 ? root.clipThumbPath(r) : ""
         }
-        // Anchored to the chip rail's bottom edge rather than to the strip
-        // itself: the rail collapses to zero height when a mode has no
-        // categories, and everything below then starts under the search
-        // field exactly as it did before the lens existed.
-        anchors.top: categoryBar.visible ? categoryBar.bottom : searchSurface.bottom
-        anchors.topMargin: 12
+        // Anchored to the query card's bottom edge, which already folds the
+        // lens away when a mode has no categories — so everything below
+        // starts under the search field either way.
+        anchors.top: queryColumn.bottom
+        anchors.topMargin: root.insetQuery ? 14 : 12
         anchors.right: parent.right
-        anchors.rightMargin: 8
+        anchors.rightMargin: root.insetQuery ? 14 : 8
         anchors.bottom: parent.bottom
         width: parent.width / 2
-        // Gated on the launcher chrome as well as on a selection: the pane is a
-        // preview OF the launcher's list, so it cannot stay on screen when the
-        // control center owns the content area. `shown` keeps its own meaning -
-        // "there is a result to preview" - so the anchors that read it below are
-        // unaffected by the view switch.
-        visible: root.chromeVisible && shown
+        visible: shown
         color: LazerTheme.settingsCard
         radius: 6
         clip: true
@@ -1683,19 +1513,17 @@ function dismissControlCenterDetail() {
     // has to move while a refresh streams in.
     Flickable {
         id: resultsView
-        anchors.top: categoryBar.visible ? categoryBar.bottom : searchSurface.bottom
+        anchors.top: queryColumn.bottom
         anchors.left: parent.left
         anchors.right: previewPane.visible ? previewPane.left : parent.right
         anchors.bottom: parent.bottom
-        anchors.topMargin: 12
-        anchors.leftMargin: 8
-        anchors.rightMargin: previewPane.visible ? 12 : 8
+        anchors.topMargin: root.insetQuery ? 14 : 12
+        anchors.leftMargin: root.insetQuery ? 14 : 8
+        anchors.rightMargin: previewPane.visible
+                ? (root.insetQuery ? 14 : 12)
+                : (root.insetQuery ? 14 : 8)
         clip: true
-        // The list yields the content area to the control center. It is hidden,
-        // not collapsed: its geometry and its delegates stay exactly as they
-        // were, so returning to a launcher view shows the same rows in the same
-        // places with the same selection.
-        visible: root.chromeVisible && !root.sessionLoading && !root.sessionError
+        visible: !root.sessionLoading && !root.sessionError
         contentWidth: width
         contentHeight: resultsColumn.height + listFooter.height
         // The decode queue ranks rows against this viewport, so every shape
@@ -2059,11 +1887,7 @@ function dismissControlCenterDetail() {
         id: loadingSurface
         objectName: "launcherLoadingSurface"
         anchors.fill: resultsView
-        // Part of the launcher chrome: a spinner over the control center would
-        // report a search that is not running. `sessionLoading` itself is
-        // unchanged, so a background refresh landing while the view is up does
-        // not clear this latch on the way back.
-        visible: root.chromeVisible && root.sessionLoading
+        visible: root.sessionLoading
         radius: 0
         color: "transparent"
 
@@ -2095,7 +1919,7 @@ function dismissControlCenterDetail() {
     Item {
         id: emptyStateHost
         anchors.fill: resultsView
-        visible: root.chromeVisible && root.sessionEmpty
+        visible: root.sessionEmpty
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
@@ -2112,7 +1936,7 @@ function dismissControlCenterDetail() {
     Item {
         id: errorStateHost
         anchors.fill: resultsView
-        visible: root.chromeVisible && root.sessionError
+        visible: root.sessionError
 
         Column {
             anchors.horizontalCenter: parent.horizontalCenter
@@ -2161,74 +1985,4 @@ function dismissControlCenterDetail() {
             }
         }
     }
-
-    // --- The control center: this page's fourth view ---
-    //
-    // ONE Loader, filling the whole content area. It is inside this page rather
-    // than inside the wave host, which is what makes the control center a VIEW
-    // rather than a sibling route: the host keeps its single retained Loader on
-    // its single surface, and this swaps what the content area shows underneath
-    // one unchanged header and one unchanged rail.
-    //
-    // No cross-fade here. The host's own sibling-route swap animates because two
-    // whole pages replace each other; a view swap replaces the content area with
-    // one view that already knows its own entrance, and `MotionTokens.waveRoute`
-    // is spent on the control center's OWN sub-page hand-off instead. Inventing a
-    // second reveal for this would make a faster, quieter switch than the rail's
-    // own indicator already gives - the accent strip moving to the fourth row IS
-    // the transition, exactly as it is for the three mode filters.
-    //
-    // `active` latches on the first build (see `controlCenterBuilt`) so a control
-    // center is constructed once per page and then survives every switch back to
-    // a launcher view - the same retention contract the host's route page has.
-    Loader {
-        id: controlCenterLoader
-        objectName: "launcherControlCenter"
-        anchors.fill: parent
-        // The request OR the latch: the first open asks for it, and the latch
-        // keeps it afterwards. `active: controlCenterBuilt` alone would deadlock -
-        // a Loader that is never active can never load, so the latch that its own
-        // onLoaded sets would never be reached.
-        active: root.controlCenterActive || root.controlCenterBuilt
-        visible: root.controlCenterActive
-        // Input belongs to whatever is on top. Without this a card under the
-        // control center's first frame would still answer a click meant for the
-        // launcher list behind it - and, while the view is up, the launcher list's
-        // own invisible rows would claim keys meant for the controls.
-        enabled: root.controlCenterActive
-        sourceComponent: controlCenterComponent
-        onLoaded: {
-            root.controlCenterBuilt = true
-            // The focus hand-off asked for by `openControlCenter` may have run
-            // before this item existed - the Loader is asynchronous, and on the
-            // FIRST open it always is. Asking again here is what makes the first
-            // open hand the keyboard over exactly like every later one; without it
-            // the view would come up with no keyboard owner at all.
-            if (root.controlCenterActive)
-                root.handOverControlCenterFocus()
-        }
-    }
-
-    Component {
-        id: controlCenterComponent
-        ControlCenter {
-            // The injected services are forwarded UNCHANGED, so the view and its
-            // same-surface sub-pages can never describe two different instances of
-            // one service. A null service is a defined state: the overview renders
-            // its explicit unavailable/optional state rather than throwing.
-            networkService: root.networkService
-            bluetoothService: root.bluetoothService
-            volumeService: root.volumeService
-            mediaService: root.mediaService
-            batteryService: root.batteryService
-            notificationService: root.notificationService
-            weatherService: root.weatherService
-        }
-    }
-
-    // Test and shell seams: the mounted view, and the switch's own observable
-    // edge so a test can assert what the rail actually did rather than inferring
-    // it from a re-render.
-    readonly property bool controlCenterVisible: controlCenterLoader.visible
-        && controlCenterLoader.item !== null
 }

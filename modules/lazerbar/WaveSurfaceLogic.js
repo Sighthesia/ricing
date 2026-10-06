@@ -3,12 +3,7 @@
 // Pure wave-surface contracts: route validation, geometry, and escape precedence.
 // Content routes stay out; register future routes explicitly instead of editing call sites.
 
-// The launcher page is the wave's only route. The control center used to be a
-// sibling route here; it is now a VIEW inside the launcher page's content area,
-// which is what removed the second entry - not a deprecation. A sibling route
-// cost its own Loader component, its own header/rail contract and its own
-// coordinator owner, all for content the same page already had to host.
-var routes = ["launcher"]
+var routes = ["launcher", "control-center"]
 var waveAngles = [13, -7, 4, -2]
 
 function isRoute(route) {
