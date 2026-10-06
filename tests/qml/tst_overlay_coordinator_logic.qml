@@ -12,13 +12,29 @@ Item {
 
         function test_targetClassification() {
             compare(Logic.normalizeTarget("launcher"), "launcher")
-            compare(Logic.normalizeTarget("control-center"), "control-center")
             compare(Logic.normalizeTarget("remote"), "")
             compare(Logic.ownerFor("launcher"), "wave")
-            compare(Logic.ownerFor("control-center"), "wave")
             compare(Logic.ownerFor("settings"), "settings")
             compare(Logic.ownerFor("music"), "music")
             compare(Logic.ownerFor("remote"), "")
+        }
+
+        // The control center is a view inside the launcher page, so it must not
+        // be a coordinator target: a target the registry accepts is one the
+        // screen scope will dispatch, and dispatching it would look for an owner
+        // method that opens a surface which does not exist.
+        function test_theControlCenterIsNotACoordinatorTarget() {
+            compare(Logic.targets.indexOf("control-center"), -1)
+            compare(Logic.waveTargets.indexOf("control-center"), -1)
+            compare(Logic.normalizeTarget("control-center"), "")
+            compare(Logic.ownerFor("control-center"), "",
+                "a view inside a page is not owned by a surface owner")
+            compare(Logic.entryMethodFor("control-center"), "",
+                "no wave owner method can open a view; the rail opens it")
+            // The dispatch is therefore the coordinator's to reject, and NOT a
+            // wave dispatch against a method that does not exist.
+            var owner = { requestOpen: function() {} }
+            compare(Logic.dispatchFor("control-center", owner).route, "coordinator")
         }
 
         // The screen-scoped entry point asks this instead of hard-coding a
@@ -27,7 +43,6 @@ Item {
         // duplicate the mapping instead of reading it.
         function test_entryMethodNamesTheWaveOwnersOwnRequestMethod() {
             compare(Logic.entryMethodFor("launcher"), "requestOpen")
-            compare(Logic.entryMethodFor("control-center"), "requestControlCenter")
             // Every other owner is dispatched by the coordinator itself, so the
             // wave owner has nothing to call: "" is the answer, not a guess.
             compare(Logic.entryMethodFor("settings"), "")
@@ -45,7 +60,10 @@ Item {
         // visible from the other side - so the two lists are compared here.
         function test_everyWaveTargetIsBothRoutableAndMountable() {
             var waveTargets = Logic.waveTargets
-            compare(waveTargets.length, 2)
+            // One wave route, and this is where the count is pinned: a second
+            // entry here without a matching route below is exactly the drift this
+            // test exists to catch, in the direction that costs a whole surface.
+            compare(waveTargets.length, 1)
             for (var index = 0; index < waveTargets.length; index++) {
                 var target = waveTargets[index]
                 compare(WaveLogic.isRoute(target), true,
@@ -67,14 +85,14 @@ Item {
         function test_dispatchSendsWaveTargetsToTheOwnerAndTheRestToTheCoordinator() {
             var owner = {
                 requestOpen: function() {},
+                // A stale owner still carrying the old control-center entry. The
+                // dispatch must not use it: the method is only reachable for a
+                // target the registry names, and no such target is a view.
                 requestControlCenter: function() {}
             }
             var launcher = Logic.dispatchFor("launcher", owner)
             compare(launcher.route, "wave")
             compare(launcher.method, "requestOpen")
-            var controlCenter = Logic.dispatchFor("control-center", owner)
-            compare(controlCenter.route, "wave")
-            compare(controlCenter.method, "requestControlCenter")
 
             // Settings and music have their own owners and are untouched by any of
             // this: whatever the wave owner implements, they go to the coordinator.
@@ -90,13 +108,16 @@ Item {
         // The route is then on screen while every later decision - close, refocus,
         // the next open intent - still believes it is closed.
         function test_aWaveTargetTheOwnerDoesNotImplementIsRefusedNotDispatched() {
-            // Drift between the route registry and the surface: the registry names
-            // a method, the owner has not got it.
-            var stale = { requestOpen: function() {} }
-            var plan = Logic.dispatchFor("control-center", stale)
+            // Drift between the target registry and the surface: the registry
+            // names a method, the owner has not got it. This is now the LAUNCHER
+            // that can drift, since it is the only wave target left - and it is
+            // the more dangerous direction, because the launcher is the surface
+            // everything else is dispatched against.
+            var stale = { requestControlCenter: function() {} }
+            var plan = Logic.dispatchFor("launcher", stale)
             compare(plan.route, "refuse",
                 "a wave target with no entry method must not be dispatched at all")
-            compare(plan.method, "requestControlCenter",
+            compare(plan.method, "requestOpen",
                 "the refusal must still name the method that is missing")
 
             // No owner at all is the same refusal, not a coordinator dispatch.
@@ -105,8 +126,8 @@ Item {
             // A member of the right name that is not callable is not an entry
             // method either: it would be called as though it opened a route.
             compare(Logic.dispatchFor("launcher", { requestOpen: "nope" }).route, "refuse")
-            // Spelling the same route as a non-wave target does not smuggle it past
-            // the refusal either - it lands on the coordinator, which rejects it.
+            // A non-wave target does not get the refusal treatment at all - it
+            // lands on the coordinator, which rejects it.
             compare(Logic.dispatchFor("wiki", stale).route, "coordinator")
         }
 

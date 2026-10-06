@@ -8,7 +8,6 @@ TestCase {
 
     function test_routesAndToggle() {
         compare(Logic.normalizeRoute("launcher"), "launcher")
-        compare(Logic.normalizeRoute("control-center"), "control-center")
         compare(Logic.normalizeRoute("settings"), "")
         compare(Logic.normalizeRoute("music"), "")
         compare(Logic.normalizeRoute(""), "")
@@ -18,9 +17,27 @@ TestCase {
         compare(Logic.normalizeRoute("news"), "")
         compare(Logic.normalizeRoute("beatmap"), "")
         compare(Logic.toggleRoute("", "launcher"), "launcher")
-        compare(Logic.toggleRoute("launcher", "control-center"), "control-center")
         compare(Logic.toggleRoute("launcher", "launcher"), "")
         compare(Logic.toggleRoute("", "bogus"), "")
+    }
+
+    // The control center is a VIEW inside the launcher page, so it is not a
+    // route and this is the assertion that keeps it from quietly becoming one
+    // again. A route name that survives normalization is one the host will
+    // accept from openRoute(), mount its own retained Loader component for, and
+    // hand a second header/rail contract to - so a view that re-registered itself
+    // would rebuild all of that on top of the page that already hosts it.
+    function test_theControlCenterIsNotARoute() {
+        compare(Logic.routes.indexOf("control-center"), -1,
+            "the wave has one route; the control center is a view inside it")
+        verify(!Logic.isRoute("control-center"))
+        compare(Logic.normalizeRoute("control-center"), "",
+            "an unregistered route must not resolve")
+        // And the toggle must not smuggle it past validation either: asking for
+        // the control center has to leave the current route standing, not select
+        // something the host would then have to mount.
+        compare(Logic.toggleRoute("launcher", "control-center"), "launcher")
+        compare(Logic.toggleRoute("", "control-center"), "")
     }
 
     function test_waveGeometry() {

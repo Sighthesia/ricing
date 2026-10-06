@@ -168,13 +168,13 @@ Item {
                    "launcher bar entry must drive the launcher session")
         }
 
-        // The control center is reached from the launcher's rail, not from the bar.
-        // Nothing on the bar may name it any more: a second entry would give the
+        // The control center is reached from the launcher's rail, not from the bar, and
+        // it is a VIEW inside the launcher page rather than a wave route. Nothing on
+        // the bar may name it as a target any more: a second entry would give the
         // same surface two spellings again, and the one it replaces would sit on
         // every screen as an affordance the launcher already carries. The seam
-        // itself stays, because the coordinator registry still names both wave
-        // routes and a wave target refused there must fail loudly rather than
-        // open a route without the surface's session and opener bookkeeping.
+        // itself stays, because a wave target refused there must fail loudly rather
+        // than open a surface without the session and opener bookkeeping.
         function test_theControlCenterHasNoBarEntryAndTheSeamSurvives() {
             var bar = fileText("../../modules/bar/TopBar.qml")
             if (bar === "")
@@ -211,24 +211,61 @@ Item {
             verify(bar.indexOf("root.hovered") < 0,
                    "a bar-surface hover read must name the widget that has it")
 
-            // The owner edge passes the singletons in, rather than the route page
-            // importing them, so a test can still inject fakes.
+            // The owner edge passes the singletons in, rather than the launcher page
+            // importing them, so a test can still inject fakes. The page is where
+            // they land: it owns the control-center view's Loader, so it is the one
+            // place that has to forward them.
             var surface = fileText("../../modules/lazerbar/LauncherSurface.qml")
             verify(surface !== "", "the launcher surface must be readable")
-            verify(surface.indexOf("ControlCenter {") !== -1,
-                   "the surface must build the control-center route page")
+            verify(surface.indexOf("ControlCenter {") < 0,
+                   "the surface must not build the control center: the page owns it")
+            verify(surface.indexOf("controlCenterPageComponent") < 0,
+                   "and no route component may be registered for it")
             verify(surface.indexOf("import \"../../services\"") < 0,
                    "the surface must not import services; the owner edge injects them")
-            for (var i = 0; i < controlCenterServiceNames.length; i++)
-                verify(bar.indexOf("Services." + controlCenterServiceNames[i]) !== -1,
-                       "the bar must pass " + controlCenterServiceNames[i] + " to the route page")
+
+            var page = fileText("../../modules/lazerbar/LauncherPage.qml")
+            verify(page !== "", "the launcher page must be readable")
+            verify(page.indexOf("ControlCenter {") !== -1,
+                   "the launcher page must mount the control-center view")
+            // `Services.` in a line comment is a comment, not an import; the page's
+            // launcher seam is `services/launcher`, which is a QML component
+            // directory and not the singleton registry. So the check is on the
+            // registry MODULE specifically - importing `services` would let this
+            // page reach a singleton directly and bypass the injection contract.
+            verify(page.indexOf("import \"../../services\"") < 0,
+                   "the page must not import the service registry; the surface forwards them")
+            for (var i = 0; i < controlCenterServiceNames.length; i++) {
+                verify(bar.indexOf("Services." + controlCenterServiceNames[i].name) !== -1,
+                       "the bar must pass " + controlCenterServiceNames[i].name + " in")
+                verify(surface.indexOf(controlCenterServiceNames[i].seam) !== -1,
+                       "the surface must forward " + controlCenterServiceNames[i].name
+                           + " as " + controlCenterServiceNames[i].seam + " to the page")
+                verify(page.indexOf(controlCenterServiceNames[i].seam) !== -1,
+                       "the page must forward " + controlCenterServiceNames[i].name
+                           + " as " + controlCenterServiceNames[i].seam + " to the view")
+            }
         }
 
-        // The services the production owner edge hands to the route page. Named
-        // once here so the assertion above and the wiring itself cannot drift.
-        readonly property var controlCenterServiceNames: ["NetworkService",
-            "BluetoothService", "VolumeService", "MediaService", "BatteryService",
-            "NotificationService", "WeatherService"]
+        // The services the production owner edge hands to the launcher page, and
+        // the page forwards to the control-center view, named once here so the
+        // assertions above and the wiring itself cannot drift.
+        //
+        // Both spellings are listed per service because they are two different
+        // contracts: `name` is the registry symbol only the bar may use, and
+        // `seam` is the property name the other two files spell. Asserting the
+        // registry symbol in the surface or the page would be wrong (it would
+        // fail loudly rather than silently), and asserting the seam in the bar
+        // would pass without proving the singleton was ever named at all.
+        readonly property var controlCenterServiceNames: [
+            { name: "NetworkService", seam: "networkService" },
+            { name: "BluetoothService", seam: "bluetoothService" },
+            { name: "VolumeService", seam: "volumeService" },
+            { name: "MediaService", seam: "mediaService" },
+            { name: "BatteryService", seam: "batteryService" },
+            { name: "NotificationService", seam: "notificationService" },
+            { name: "WeatherService", seam: "weatherService" }
+        ]
 
         function countOccurrences(text, needle) {
             var total = 0

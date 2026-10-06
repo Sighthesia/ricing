@@ -2786,24 +2786,54 @@ Item {
 
         // --- Overview: page contract and seams ---
 
-        function test_theOverviewPublishesTheWaveRouteContract() {
+        // The control center is a VIEW inside the launcher page, so it publishes no
+        // route-page chrome. What it does publish is the two things the page that
+        // owns it reads: a focus landing, and a back contract it can decline.
+        //
+        // The absence assertions matter as much as the presence ones. A view that
+        // still published `title` / `sidebarEntries` would render the launcher's
+        // chrome from properties nobody reads - and a future host-side change that
+        // DID read them would give this view its own rail and header again, with
+        // nothing failing in between.
+        function test_theViewPublishesNoRoutePageChrome() {
             var page = makePage({})
             tryVerify(function() { return page.controlCardCount === 4 }, 1000)
             compare(page.objectName, "controlCenterPage")
-            verify(page.title.length > 0)
-            verify(page.description.length > 0)
-            compare(page.sidebarEntries.length, 0,
-                "the overview fills the full width; the host hides an empty rail")
-            compare(page.activeSidebarId, "")
-            // The overview is a top-level route with nothing to pop.
-            compare(page.canGoBack, false)
-            compare(page.handleBack(), false,
-                "declining back is what lets the host close the surface")
+
+            verify(page.title === undefined,
+                "the surrounding page owns the header, not the view")
+            verify(page.description === undefined)
+            verify(page.sidebarEntries === undefined,
+                "the rail is the launcher's; a view with entries would steal it")
+            verify(page.activeSidebarId === undefined)
+            verify(page.enteredFromLauncher === undefined,
+                "a view inside the launcher cannot be opened without it, so the entry context is gone")
+            verify(page.overviewBackRequested === undefined,
+                "the view cannot ask for a route back; the page that shows it decides")
+
+            // What it DOES publish: a focus landing, and a back contract.
             compare(page.focusDefaultCount, 0)
             page.focusDefault()
             tryCompare(page, "focusDefaultCount", 1, 800)
             verify(page.activeFocus,
-                "focus lands on the page, never on the launcher's search field")
+                "focus lands on the view, never on the launcher's search field")
+        }
+
+        // The overview has nothing inside itself to pop, so it DECLINES. That is
+        // not the old "close the surface" answer - the decline is the signal that
+        // lets the page that shows this view decide what back means next.
+        function test_theOverviewDeclinesBackSoItsOwnerDecides() {
+            var page = makePage({})
+            tryVerify(function() { return page.controlCardCount === 4 }, 1000)
+            compare(page.activeSubPage, "")
+            compare(page.detailPageItem, null)
+
+            compare(page.backAction, "none",
+                "the module's own vocabulary for 'nothing here to pop'")
+            compare(page.canGoBack, false,
+                "nothing to pop, so no back is offered")
+            compare(page.handleBack(), false,
+                "declining is what lets the owner take the next step")
         }
 
         function test_theOverviewMapsItsSnapshotsThroughTheLogicNormalizer() {
@@ -3078,8 +3108,8 @@ Item {
             // Same turn: the route has already let go...
             compare(page.activeSubPage, "",
                 "the route authority flips immediately, so back never waits on motion")
-            compare(page.backAction, "close",
-                "with no detail mounted the overview's own answer takes over")
+            compare(page.backAction, "none",
+                "with no detail mounted the overview declines, so its owner decides")
             // ...while the page itself is still mounted and still fading.
             verify(page.detailPageItem === outgoing,
                 "the outgoing page must survive the turn that released it")
@@ -3209,78 +3239,68 @@ Item {
                 "restoring the overview and refreshing it are different turns")
         }
 
-        // Back from the overview goes to the launcher only when that is where this
-        // open came from.
+        // What back means from the overview is now the OWNER's decision, and the owner's
+        // answer is a page-local flag this file cannot see. So the only thing
+        // asserted here is the boundary: the view declines, does not perform an
+        // exit of its own, and does not emit a request naming a route.
         //
-        // The design's order is: detail page, then the sibling launcher route when
-        // the route was entered from the launcher, then close the surface. The page
-        // cannot work out the middle case by itself - it holds no session and no
-        // coordinator - so it is told, and the two cases have to stay visibly
-        // different: a bar-entry open must not strand the user on a control center
-        // with a back press that goes nowhere useful.
-        function test_overviewBackAsksForTheLauncherOnlyWhenEnteredFromIt() {
+        // The launcher-return step itself belongs to the page that shows this
+        // view, and is asserted there as a sequence - detail, then view, then
+        // query, then close - because a test here could only ever check that a
+        // property was set, which the page was going to read anyway.
+        function test_theOverviewNeitherPerformsNorRequestsAnExit() {
             var page = makePage({
                 networkService: makeFake(fakeNetworkComponent),
                 bluetoothService: makeFake(fakeBluetoothComponent)
             })
             tryVerify(function() { return page.controlCardCount === 4 }, 1000)
 
-            var requests = 0
-            page.overviewBackRequested.connect(function() { requests++ })
+            // Nothing to pop on the overview.
+            compare(page.handleBack(), false, "the overview declines")
+            verify(page.activeSubPage === "",
+                "and a decline must not have mounted or unmounted anything")
 
-            // The bar-entry case: no entry context at all, which is the default.
-            compare(page.enteredFromLauncher, false)
-            compare(page.backAction, "close")
-            compare(page.canGoBack, false,
-                "an open with no launcher behind it offers the surface a close")
-            compare(page.handleBack(), false,
-                "declining is what lets the host close the surface")
-            compare(requests, 0, "and nothing is asked of the wave owner")
-
-            // The launcher-entry case: the same page, told where it was entered from.
-            page.enteredFromLauncher = true
-            wait(20)
-            compare(page.backAction, "launcher")
-            compare(page.canGoBack, true)
-            verify(page.handleBack(), "the press must be consumed")
-            compare(requests, 1,
-                "the wave owner owns the launcher route, so the page asks for it")
-
-            // Detail-page back still outranks it: with a sub-page mounted the same
-            // page must pop that, not ask for the launcher.
+            // A detail page DOES consume the press, and only that page's state
+            // changes: this is the one exit step the view owns.
             page.openNetworkDetails()
             tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
             compare(page.backAction, "detail")
-            compare(page.handleBack(), true)
+            verify(page.handleBack(), "the detail page must consume the press")
             tryVerify(function() { return page.activeSubPage === "" }, 1000)
-            compare(requests, 1,
-                "popping a detail page must not also ask for the launcher")
+            compare(page.backAction, "none", "and the view declines again")
         }
 
-        // Both halves of the host's back contract, or neither: a page advertising
-        // `canGoBack: true` with no callable handler would swallow every press and
-        // do nothing with it, which is a surface nobody can close.
+        // Both halves of the owner's back contract, or neither: a view advertising
+        // `canGoBack: true` with no callable handler would take every press and do
+        // nothing with it, which is a surface nobody can close. The two states
+        // are walked here as real page instances rather than as a flag, because
+        // the flag alone cannot prove a handler exists.
         function test_everyBackAnswerIsActionable() {
-            var answers = [false, true]
-            for (var i = 0; i < answers.length; i++) {
-                var page = makePage({})
+            for (var i = 0; i < 2; i++) {
+                var page = makePage({
+                    networkService: makeFake(fakeNetworkDetailComponent),
+                    bluetoothService: makeFake(fakeBluetoothDetailComponent)
+                })
                 tryVerify(function() { return page.controlCardCount === 4 }, 1000)
-                page.enteredFromLauncher = answers[i]
-                wait(20)
                 compare(typeof page.handleBack, "function",
-                    "every entry context must publish a callable handler")
-                // The host's own rule, applied here: the page is the authority on
-                // back, so `canGoBack: true` without a callable handler would take
-                // every Escape press and do nothing with it - a surface nobody can
-                // close. `handleBack()` is what turns the answer into an action.
+                    "a view must publish a callable handler in every state")
+                // Round one: the overview offers nothing and declines.
                 if (page.canGoBack) {
                     verify(page.handleBack(),
-                        "an offered back press must be actionable (enteredFromLauncher="
-                            + answers[i] + ")")
+                        "an offered back press must be actionable")
                 } else {
                     compare(page.handleBack(), false,
-                        "an unoffered back press must decline, so the host can close")
+                        "an unoffered back press must decline, so its owner can act")
                 }
+                // Round two: a mounted detail page offers back, and the offer must
+                // be actionable rather than a claim nothing can honour.
+                page.openNetworkDetails()
+                tryVerify(function() { return page.activeSubPage === "network-detail" }, 1000)
+                verify(page.canGoBack, "a mounted detail page must offer back")
+                compare(typeof page.handleBack, "function",
+                    "back needs a callable handler, not just a published flag")
+                verify(page.handleBack(), "the offered press must be actionable")
+                tryVerify(function() { return page.activeSubPage === "" }, 1000)
             }
         }
 
@@ -4360,24 +4380,15 @@ Item {
             compare(scrollers[0].flickableDirection, Flickable.VerticalFlick)
         }
 
-        // The route default, asserted from the live page rather than from the
-        // module: the host decides what a route page looks like from `title`,
-        // `description`, `sidebarEntries`, `activeSidebarId`, `canGoBack`,
-        // `focusDefault()` and `handleBack()`, so a page that drifted on any of
-        // them would render the launcher's chrome on the control center.
+        // The view's own layout and back contract, asserted from the live page.
         //
-        // The empty rail is the load-bearing half: with entries, the shared host
-        // mounts FullscreenSidebar and every section of the page loses 196px of
-        // width - which is exactly what would break the B1 two-column layout.
-        function test_theRoutePageContractIsWhatTheSharedHostReads() {
+        // The chrome half was deleted with the route: this page no longer has
+        // `title` / `description` / `sidebarEntries` / `activeSidebarId` at all,
+        // so what is left to prove is that the sections still resolve in the wide
+        // arrangement and that back still has exactly one step it owns.
+        function test_theViewLayoutAndBackContractStillHold() {
             var page = makePage({ width: 900, height: 720 })
             tryVerify(function() { return page.layoutMode === "wide" }, 1000)
-
-            compare(page.title, "Control Center")
-            compare(page.description.length > 0, true)
-            compare(page.sidebarEntries.length, 0,
-                "an entry here would steal the B1 layout's right column")
-            compare(page.activeSidebarId, "")
 
             // Every section the wide arrangement names must resolve to a real,
             // shown item - the overview band plus both columns. `visibleSectionCount`
@@ -4391,14 +4402,9 @@ Item {
                 verify(item.visible, "wide section " + wideNames[i] + " must be shown")
             }
 
-            // Back precedence, from the live page: nothing to pop on the overview,
-            // one step to pop while a detail page is mounted, and a real refusal
-            // in between so the host's fall-through-to-close stays reachable.
-            //
-            // The overview refusal is asserted in the no-entry-context state, which
-            // is the bar-entry case: with a launcher behind the route the same page
-            // instead offers a return, and conflating the two would hide both.
-            compare(page.enteredFromLauncher, false)
+            // Back, from the live page: nothing to pop on the overview, one step
+            // to pop while a detail page is mounted, and a decline in between so
+            // the view's owner gets the press and can decide what it means.
             compare(page.canGoBack, false)
             compare(page.handleBack(), false, "the overview declines back")
             page.requestSubPage(CcLogic.detailRoutes.network)

@@ -21,55 +21,19 @@ Rectangle {
     readonly property bool showLabels: expanded && width >= 130
     property alias selectionIndicatorItem: selectionIndicator
 
-    // Entries partition the rail by KIND, not by position: a `footer` entry is
-    // an action that leaves the rail's own section (jumping to another page),
-    // while a primary entry is a filter of what this page shows. They share one
-    // rail and one accent indicator, and a hairline separates them, so the
-    // difference reads without a second component or a second column.
-    function isFooterEntry(entry) {
-        return entry !== undefined && entry !== null
-                && String(entry.section || "") === "footer"
-    }
-
-    readonly property var primaryEntries: {
-        var out = []
-        for (var i = 0; i < entries.length; i++)
-            if (!isFooterEntry(entries[i]))
-                out.push(entries[i])
-        return out
-    }
-
-    readonly property var footerEntries: {
-        var out = []
-        for (var i = 0; i < entries.length; i++)
-            if (isFooterEntry(entries[i]))
-                out.push(entries[i])
-        return out
-    }
-
-    readonly property bool hasFooter: footerEntries.length > 0
-
-    // Index of `selected` WITHIN primaryEntries, or -1. The indicator asks
-    // this first: a selected footer entry must not move the strip up into the
-    // primary column, where the y formula would place it on the wrong row.
+    // ONE column of peer entries. The three mode filters and the control-center
+    // view are the same KIND of thing to the user - each one changes what this
+    // page's content area shows - so they share a single list, a single accent
+    // indicator and a single row arithmetic. Nothing here partitions by entry
+    // kind: a `section` field, if a caller ever adds one, is data the rail does
+    // not read, because a second band would be a second layout for a difference
+    // the content area already shows.
     function selectedIndex() {
-        for (var i = 0; i < primaryEntries.length; i++)
-            if (primaryEntries[i].id === selected)
+        for (var i = 0; i < entries.length; i++)
+            if (entries[i].id === selected)
                 return i
         return -1
     }
-
-    // The same lookup in the footer band, or -1 when nothing there is selected.
-    function selectedFooterIndex() {
-        for (var i = 0; i < footerEntries.length; i++)
-            if (footerEntries[i].id === selected)
-                return i
-        return -1
-    }
-
-    // True while either band owns the selection, so the strip stays visible
-    // across the whole rail instead of blinking out between the two.
-    readonly property bool anySelected: selectedIndex() >= 0 || selectedFooterIndex() >= 0
 
     color: LazerTheme.settingsRail
 
@@ -79,15 +43,11 @@ Rectangle {
         id: selectionIndicator
         z: 2
         x: 10 + 4 + 5 * root.expansionProgress
-        // One strip, two bands: whichever owns the selection places it, and the
-        // anchor is a real y rather than a row number so a footer selection does
-        // not inherit the primary column's top-down arithmetic.
         y: root.selectedIndex() >= 0
             ? root.railTop + root.selectedIndex() * (root.itemHeight + root.itemSpacing)
                 + root.itemHeight / 2 - height / 2
-            : footerRail.y + root.selectedFooterIndex() * (root.itemHeight + root.itemSpacing)
-                + root.itemHeight / 2 - height / 2
-        visible: root.anySelected
+            : root.railTop
+        visible: root.selectedIndex() >= 0
         width: 4
         height: 24
         radius: 2
@@ -111,52 +71,12 @@ Rectangle {
         spacing: root.itemSpacing
 
         Repeater {
-            model: root.primaryEntries
+            model: root.entries
 
             delegate: LazerSettingsNavItem {
                 required property var modelData
                 required property int index
                 width: rail.width
-                label: modelData.label
-                iconSource: modelData.icon || ""
-                expanded: root.expanded
-                expansionProgress: root.expansionProgress
-                selected: root.selected === modelData.id
-                sharedSelectionIndicator: root.selectionIndicatorItem
-                onActivated: root.selectedChangedByUser(modelData.id)
-            }
-        }
-    }
-
-    // Footer band: the rail's own actions, stacked above the collapse toggle
-    // and set apart by a hairline so "filter this page" and "go somewhere else"
-    // are not read as one list. Anchored to the bottom, so a rail with a short
-    // primary column keeps both bands on their own edges.
-    Column {
-        id: footerRail
-        visible: root.hasFooter
-        anchors.bottom: collapseButton.top
-        anchors.bottomMargin: 8
-        x: 10
-        width: Math.max(0, root.width - 20)
-        spacing: root.itemSpacing
-
-        // Section hairline. Sharp language: a 1px rule, never a rounded
-        // container around the footer.
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: LazerTheme.divider
-            visible: root.hasFooter
-        }
-
-        Repeater {
-            model: root.footerEntries
-
-            delegate: LazerSettingsNavItem {
-                required property var modelData
-                required property int index
-                width: footerRail.width
                 label: modelData.label
                 iconSource: modelData.icon || ""
                 expanded: root.expanded

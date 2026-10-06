@@ -141,10 +141,15 @@ Item {
             compare(Logic.normalizeCard("volume", { empty: false }).status, "ready")
         }
 
+        // The control center is a view inside the launcher page, so the module answers
+        // only the step it owns: an active detail page, or nothing. The two exits
+        // it used to name - "launcher" and "close" - belonged to a sibling route
+        // with its own surface, and a view inside a page has no business naming
+        // what leaves that page.
         function test_backPrecedence() {
-            compare(Logic.backAction("network-detail", true, true), "detail")
-            compare(Logic.backAction("control-center", false, true), "launcher")
-            compare(Logic.backAction("control-center", false, false), "close")
+            compare(Logic.backAction("network-detail", true), "detail")
+            compare(Logic.backAction("", false), "none")
+            compare(Logic.backAction(null, null), "none")
         }
 
         function test_cardTitlesIconsAndActions() {
@@ -312,28 +317,45 @@ Item {
         }
 
         function test_backActionPrecedence() {
-            // A detail page always consumes back first.
-            compare(Logic.backAction("control-center", true, true), "detail")
-            compare(Logic.backAction("control-center", true, false), "detail")
-            compare(Logic.backAction("network-detail", false, false), "detail")
-            // Then the sibling route, then closing the surface.
-            compare(Logic.backAction("control-center", false, true), "launcher")
-            compare(Logic.backAction("control-center", false, false), "close")
-            compare(Logic.backAction("launcher", false, true), "launcher")
-            compare(Logic.backAction("", false, false), "close")
-            compare(Logic.backAction(null, null, undefined), "close")
-            // A missing detail flag is not a detail page.
-            compare(Logic.backAction("control-center", undefined, true), "launcher")
-            compare(Logic.backAction("control-center", null, true), "launcher")
+            // A detail page consumes back, however it is reported: by name or by a
+            // truthy handle. Both spellings exist because the view reads its own
+            // route while a host-driven mount has no name to read.
+            compare(Logic.backAction("", true), "detail")
+            compare(Logic.backAction("control-center", true), "detail")
+            compare(Logic.backAction("network-detail", false), "detail",
+                "the named route decides on its own")
+            compare(Logic.backAction("bluetooth-detail", false), "detail")
+            // Everything else is the owner's step, and the module has exactly one
+            // word for it.
+            compare(Logic.backAction("", false), "none")
+            compare(Logic.backAction("launcher", false), "none")
+            compare(Logic.backAction(null, null), "none")
+            // A missing detail handle is not a detail page.
+            compare(Logic.backAction("control-center", undefined), "none")
+            compare(Logic.backAction("control-center", null), "none")
             // A missing route is not a detail route either. Volume and media have
             // no entry in the detail-route table, so their lookup reads
             // undefined — which must not compare equal to a route that was never
             // supplied, or an unbound route would resolve back to the detail page.
-            compare(Logic.backAction(undefined, false, true), "launcher")
-            compare(Logic.backAction(undefined, false, false), "close")
-            compare(Logic.backAction(), "close")
-            // The named detail routes still match.
-            compare(Logic.backAction("bluetooth-detail", false, false), "detail")
+            compare(Logic.backAction(undefined, false), "none")
+            compare(Logic.backAction(), "none")
+        }
+
+        // The old answers are gone from the vocabulary, not merely unused. A caller
+        // that still expects "launcher" or "close" from a view inside a page would
+        // be acting on a surface that does not exist.
+        function test_theModuleNamesNoRouteLevelExits() {
+            var answers = ["detail", "none"]
+            var cases = [
+                [""], [null], ["control-center"], [undefined],
+                ["network-detail"], [""]
+            ]
+            for (var i = 0; i < cases.length; i++) {
+                var action = Logic.backAction(cases[i][0], i === 5)
+                verify(answers.indexOf(action) >= 0,
+                    "backAction(" + cases[i][0] + ") must be one of detail/none, got "
+                        + action)
+            }
         }
     }
 }

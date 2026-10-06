@@ -18,19 +18,19 @@ Item {
     // Owning serialization coordinator; null keeps the stack self-contained.
     property var coordinator: null
 
-    // --- Injected services for the control-center route ---
+    // --- Injected services for the control-center view ---
     //
-    // The control center is the one route on this surface that reports system
-    // state, so its services are injected rather than imported: the bar that
-    // mounts this surface passes the Services.* singletons in production, and a
-    // test passes fakes. That keeps this file loadable by the component suite
-    // with no Quickshell module, and keeps the route page the only place that
+    // The control center is a VIEW inside the launcher page rather than a route on
+    // this surface, so its services are injected rather than imported: the bar
+    // that mounts this surface passes the Services.* singletons in production, and
+    // a test passes fakes. That keeps this file loadable by the component suite
+    // with no Quickshell module, and keeps the launcher page the only place that
     // knows what a card reads.
     //
     // Every one defaults to null, which is a defined state rather than a broken
-    // one: the route page renders its explicit unavailable/optional states for a
+    // one: the page renders its explicit unavailable/optional states for a
     // missing service instead of throwing. Battery stays read-only and weather
-    // stays optional - both are forwarded here unchanged and the page decides
+    // stays optional - both are forwarded here unchanged and the view decides
     // what an absent service means.
     property var networkService: null
     property var bluetoothService: null
@@ -53,23 +53,14 @@ Item {
     // flight.
     readonly property string defaultRoute: "launcher"
 
-    // The route the newest open intent asked for. The session mirror reacts to
-    // this rather than assuming the launcher, so a control-center open is not
-    // turned back into a launcher open by the session turning visible - and it
-    // is dropped again on every genuine close, so it only ever describes a
-    // request that is still in flight.
+    // The route the newest open intent asked for. The wave has ONE route left -
+    // the control center is a view inside the launcher page, not a sibling route
+    // - so this is always `defaultRoute`. It survives as the funnel's own
+    // parameter rather than being deleted, because `LauncherSurfaceLogic` makes
+    // every open/close decision against the route the caller asked for, and
+    // collapsing the parameter would put the comparison back into a hard-coded
+    // "launcher" at each call site.
     property string requestedRoute: "launcher"
-
-    // Where the newest open intent came from, latched for the same reason and the
-    // same lifetime as `requestedRoute`: whether the launcher was the surface's
-    // route when this open began is what the control center's back press means,
-    // and the route page cannot work it out from inside itself.
-    //
-    // "Came from the launcher" is read as what is actually on screen - the
-    // launcher route loaded AND the surface interactive - rather than from
-    // coordinator ownership, because a retained launcher route from an earlier
-    // visit must not turn a fresh bar-entry open into "go back to the launcher".
-    property bool requestedFromLauncher: false
 
     // Launcher palette anchored on the osu pink family; the wave bands come
     // from the shared LazerTheme.wavePalette so the launcher and the lock
@@ -97,17 +88,12 @@ Item {
     // This is the route-safe accessor: `page()` answers only for the launcher.
     function activePage() { return waveHost.routePage }
 
-    // The launcher page, and only while the launcher route owns the surface: a
-    // control-center open replaces the retained page, and a stale launcher
-    // reference would then be a destroyed object.
+    // The launcher page, and only while the launcher route owns the surface.
+    // `page()` and this are the same object today, and they stay separate on
+    // purpose: `page()` is the named contract callers use, while this one states
+    // the route condition explicitly so the next real route does not have to
+    // rewrite every caller.
     readonly property Item launcherPage: waveHost.loadedRoute === "launcher" ? waveHost.routePage : null
-
-    // Whether the launcher is what the user is looking at right now. Both halves
-    // matter: the retained route survives every close, so "loaded" alone would
-    // answer yes for a surface nobody can see.
-    function launcherRouteOnScreen() {
-        return waveHost.loadedRoute === "launcher" && waveHost.interactive
-    }
 
     function snapshot() {
         return {
@@ -127,9 +113,11 @@ Item {
             currentPage.focusSearch()
     }
 
-    // Focus the active route's own default target: the launcher's search field,
-    // a sibling route's page decides through the same contract. A control-center
-    // open must never steal the launcher's search box.
+    // Focus the active route's own default target: the launcher's search field, or
+    // the control-center view's own landing when that view is the one on screen.
+    // Going through the page rather than reaching for the editor is what keeps the
+    // two from diverging - `LauncherPage.focusDefault` already knows which of the
+    // two owns the keyboard, and the hidden search editor refuses focus anyway.
     function focusActivePage() {
         var currentPage = root.activePage()
         if (!currentPage)
@@ -145,57 +133,11 @@ Item {
     // it once the surface closes.
     function requestOpen(opener) { requestRoute(root.defaultRoute, opener) }
 
-    // The control center is a sibling route on this same surface and session, not
-    // a second overlay: one coordinator, one retained Loader, one opener.
-    function requestControlCenter(opener) { requestRoute("control-center", opener) }
-
-    // The launcher return that a launcher-entered control center's back press
-    // earns. This is the same open continuing on the same surface, NOT a new open
-    // intent, so it must not replace the opener record: `requestRoute` hands the
-    // coordinator a reset on every call, so returning with no opener would clear
-    // the Item focus is restored to when the surface finally closes - the control
-    // the user opened this from, thrown away by the press that went back.
-    //
-    // The record is read back from the coordinator because that is where the
-    // focus hand-off is settled and therefore where it lives. Handing the same
-    // Item back changes nothing, and when the open had no opener at all this
-    // passes null - so a return still never invents one.
-    function returnToDefaultRoute() {
-        requestRoute(root.defaultRoute, root.coordinator ? root.coordinator.opener : null)
-    }
-
-    // The launcher's rail entry for the control center. This is the SAME open
-    // continuing on the SAME surface, not a new open intent, so it must not
-    // replace the opener record - exactly the rule `returnToDefaultRoute`
-    // follows. The record is read back off the coordinator, where the focus
-    // hand-off was settled: passing the same Item changes nothing, and an open
-    // that never had one still passes null, so a rail switch never invents an
-    // opener either.
-    //
-    // Going through `requestRoute` rather than reaching for the host is what
-    // keeps the switch inside the one funnel: it settles to `reopen-host`
-    // because this surface is already open, so the route changes on the live
-    // host with no coordinator round trip and no second window.
-    function requestControlCenterFromLauncher() {
-        requestRoute("control-center", root.coordinator ? root.coordinator.opener : null)
-    }
-
     // Every activation funnels through one route-parameterised path: bar entry,
     // IPC open, or a session-visible flip. The opener Item is recorded so focus
     // returns to it once the surface closes.
     function requestRoute(route, opener) {
         root.requestedRoute = route
-        // Latch the entry context, but only on a genuine route change.
-        //
-        // A hand-off re-enters this function a second time: the coordinator
-        // closes this owner to give it the sibling route and then dispatches the
-        // same route again to reopen it, by which point the coordinator already
-        // owns the NEW target. Recomputing there would read "not the launcher"
-        // and erase the very fact this open began on the launcher - so the latch
-        // is written by the call that changed the route and left alone by the
-        // one that only completes it.
-        if (!root.coordinator || root.coordinator.activeTarget !== route)
-            root.requestedFromLauncher = root.launcherRouteOnScreen()
         var action = Logic.openAction(snapshot())
         if (action === "open-session") {
             pendingOpener = opener || null
@@ -237,8 +179,7 @@ Item {
         if (root.session.visible) {
             // `requestedRoute` is the newest intent, not a remembered outcome:
             // a genuine close puts it back to the default, so a session-visible
-            // flip carries a route only while a control-center open is still
-            // being handed off.
+            // flip never carries a route from an open that already ended.
             requestRoute(root.requestedRoute, pendingOpener)
         } else {
             var action = Logic.closeAction(snapshot())
@@ -286,14 +227,10 @@ Item {
                 return
             // A real close, so nothing is in flight. Drop the sticky route with
             // it: the session names no route, and the next session-visible flip
-            // replays `requestedRoute`, so a control-center intent that survived
-            // the close would turn every later open into a control center.
-            // Default opens go back to the launcher.
+            // replays `requestedRoute`, so an intent from an open that already
+            // ended would leak into the next one. Default opens go back to the
+            // launcher.
             root.requestedRoute = root.defaultRoute
-            // ...and the entry context with it: "came from the launcher" describes
-            // one open, and a stale true would give the next open's control center
-            // a back press that returns to a launcher the user never left.
-            root.requestedFromLauncher = false
             if (root.session && root.session.visible)
                 root.session.close()
         }
@@ -321,8 +258,10 @@ Item {
         id: waveHost
         anchors.fill: parent
         // Chrome is read from the active route page through the shared page
-        // contract, so a sibling route renders its own header without the host
-        // knowing anything about it.
+        // contract, so a route renders its own header without the host knowing
+        // anything about it. With the control center folded into the launcher
+        // page, that page answers for the header of whichever view it is
+        // showing, and the host is unchanged by either.
         title: {
             var currentPage = root.activePage()
             return currentPage && currentPage.title !== undefined
@@ -352,7 +291,10 @@ Item {
 
         onSidebarSelected: id => {
             // Contract first, launcher spelling second: the sidebar rail is
-            // shared chrome, so the mounted page decides what an id means.
+            // shared chrome, so the mounted page decides what an id means. That
+            // is now the whole of the rail's dispatch: four peer entries, three
+            // query filters and the control-center view, all answered by the one
+            // page that owns them.
             var currentPage = root.activePage()
             if (!currentPage)
                 return
@@ -363,12 +305,13 @@ Item {
         }
     }
 
-    // Page components for every sibling route this surface serves. Registering a
-    // route is the entire wiring: the host selects by route name and keeps one
-    // retained Loader across all of them.
+    // Route components for every route this surface serves. The wave has ONE
+    // route: the launcher page, which owns the control-center view inside its
+    // content area. Registering a route is still the entire wiring - the host
+    // selects by route name and keeps one retained Loader across them - so
+    // adding a real second route later needs no change here.
     readonly property var routeComponents: ({
-        "launcher": launcherPageComponent,
-        "control-center": controlCenterPageComponent
+        "launcher": launcherPageComponent
     })
 
     Component {
@@ -378,19 +321,10 @@ Item {
             prewarmSlots: root.startupPrewarmAllowed === true
             thumbnailsActive: waveHost.phase === "open"
             onExitFlingRequested: spec => root.spawnExitCard(spec)
-            // The rail's footer action. The page owns what the id MEANS; the
-            // surface owns what it DOES, because only this surface can switch
-            // its own route.
-            onControlCenterRequested: root.requestControlCenterFromLauncher()
-        }
-    }
-
-    Component {
-        id: controlCenterPageComponent
-        // The route page receives the injected singletons unchanged. The page
-        // forwards the same objects to its same-surface sub-pages, so the
-        // overview and a detail page can never describe two different services.
-        ControlCenter {
+            // The control center's services reach it through this page, which is
+            // where its Loader lives. Forwarded unchanged, so the overview and a
+            // mounted detail sub-page can never describe two different instances
+            // of one service.
             networkService: root.networkService
             bluetoothService: root.bluetoothService
             volumeService: root.volumeService
@@ -398,17 +332,6 @@ Item {
             batteryService: root.batteryService
             notificationService: root.notificationService
             weatherService: root.weatherService
-            // Entry context, from the latch this surface keeps. The page is
-            // retained across opens, so this is a live binding rather than a
-            // one-time assignment - which is what lets one page instance answer
-            // differently for a bar-entry open and a launcher-entry open.
-            enteredFromLauncher: root.requestedFromLauncher
-            // The one request the route cannot answer itself. It re-enters the
-            // same funnel as every other open of this surface, so the launcher is
-            // reached through the coordinator exactly as an entry reaches it -
-            // one dispatch path, one owner, one host. The opener rides along
-            // unchanged, because this is the same open continuing.
-            onOverviewBackRequested: root.returnToDefaultRoute()
         }
     }
 

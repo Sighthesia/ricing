@@ -18,7 +18,6 @@ Item {
     }
 
     SignalSpy { id: modeSpy; target: page; signalName: "modeChangeRequested" }
-    SignalSpy { id: controlCenterSpy; target: page; signalName: "controlCenterRequested" }
 
     // Standalone result-row probe for thumbnail failure behavior.
     Component {
@@ -36,6 +35,34 @@ Item {
 
         function makeItem(id, name, weight, usedAt) {
             return { id: id, displayName: name, favoriteWeight: weight, lastUsedAt: usedAt }
+        }
+
+        // A network service good enough for the control center's card to be `ready`.
+        // Declared with ONLY the properties the overview reads, so a binding that
+        // reaches for anything else resolves to undefined here exactly as it does
+        // in production.
+        QtObject {
+            id: readyNetwork
+            property bool wifiConnected: true
+            property bool wifiEnabled: true
+            property var networks: ({
+                "Home": { ssid: "Home", security: "WPA2", signal: 78,
+                    connected: true, existing: true }
+            })
+            property bool ethernetConnected: false
+            property string activeEthernetConnection: ""
+            property bool scanningActive: false
+            property bool connecting: false
+            property string connectingTo: ""
+            property string lastError: ""
+
+            function setWifiEnabled(value) { wifiEnabled = value }
+            function refreshForOpen() {}
+            function requestScan(rescan, clearError) {}
+            function connect(ssid, password, isHidden, securityKey) {}
+            function disconnect(ssid) {}
+            function needsPasswordFor(ssid) { return false }
+            function isCredentialFailure(message) { return false }
         }
 
         function makeCategorized(id, name, category, usedAt) {
@@ -107,7 +134,12 @@ Item {
         function init() {
             Lazer.MotionTokens.reducedMotionOverride = false
             modeSpy.clear()
-            controlCenterSpy.clear()
+            // Both halves of the view flag are page state, not fixture state, and a
+            // retained view from the previous test would make the cold-path
+            // assertion below read as a build the test did not ask for.
+            page.controlCenterActive = false
+            page.controlCenterBuilt = false
+            page.networkService = null
             resetSession()
             // Park focus away from the page so focus-on-open assertions start clean.
             testRoot.forceActiveFocus()
@@ -119,14 +151,15 @@ Item {
 
         // --- header and sidebar data provided to the wave shell ---
 
-        function test_providesTitleDescriptionAndTheThreeModeEntriesInOrder() {
+        function test_providesTitleDescriptionAndFourPeerEntriesInOrder() {
             compare(page.title, "Launcher")
             verify(page.description.length > 0)
 
-            // The three primaries keep their order and labels; the rail's footer
-            // action is asserted separately, because it is a different KIND of
-            // entry and folding it in here would hide the split this test exists
-            // to protect.
+            // Four peers in ONE list. The control center is asserted here rather
+            // than in a separate test because the whole point of the fold-in is
+            // that it is not a different kind of entry: a rail that showed a
+            // `section` marker on the fourth would lay out identically and still
+            // be re-partitioned on the next change.
             compare(page.sidebarEntries.length, 4)
             compare(page.sidebarEntries[0].id, "apps")
             compare(page.sidebarEntries[0].label, "Apps")
@@ -134,6 +167,11 @@ Item {
             compare(page.sidebarEntries[1].label, "Clipboard")
             compare(page.sidebarEntries[2].id, "shortcuts")
             compare(page.sidebarEntries[2].label, "Shortcuts")
+            compare(page.sidebarEntries[3].id, "control-center")
+            compare(page.sidebarEntries[3].label, "Control Center")
+            compare(page.sidebarEntries[3].section, undefined,
+                "no entry may carry a section marker")
+            compare(page.controlCenterEntryId, "control-center")
 
             compare(page.activeMode, "apps")
         }
@@ -237,56 +275,318 @@ Item {
             tryVerify(function() { return page.searchField.activeFocus }, 300)
         }
 
-        // --- the rail's two kinds of entry ---
+        // --- the control-center view inside this page ---
 
-        // The rail now carries a footer action alongside the three mode filters.
-        // The load-bearing behaviour is the SPLIT, not the new item: a footer id
-        // must not be answerable as a query mode, because handleModeSelected
-        // would otherwise build a prefix for a data source that does not exist and
-        // the page would report a mode change for a route switch.
-        function test_theRailSeparatesItsFooterActionFromTheModeFilters() {
+        // The fourth rail entry is a VIEW, and the load-bearing consequence is
+        // that it is not answerable as a query mode. If it were, handleModeSelected
+        // would build a prefix for a data source that does not exist, rewrite the
+        // user's query with it and report a mode change - which is precisely the
+        // state this switch has to leave untouched.
+        function test_theControlCenterViewIsNotAQueryMode() {
             openWithResults([makeItem("a", "Alpha", 0, 0)])
 
-            var footerId = ""
-            var footerMarked = false
-            var primaryIds = []
-            for (var i = 0; i < page.sidebarEntries.length; i++) {
-                var entry = page.sidebarEntries[i]
-                if (String(entry.section || "") === "footer") {
-                    footerId = String(entry.id)
-                    footerMarked = true
-                } else {
-                    primaryIds.push(String(entry.id))
-                }
-            }
-
-            verify(footerMarked, "the rail must declare exactly one footer action")
-            compare(footerId, "control-center")
-            compare(primaryIds, ["apps", "clipboard", "shortcuts"])
-
-            // A footer id is not a mode, so the query-prefix path rejects it.
-            verify(!page.isKnownMode(footerId),
-                   "a footer action must not be answerable as a query mode")
+            verify(!page.isKnownMode(page.controlCenterEntryId),
+                   "the control center names a view, not a data source")
+            compare(page.isKnownMode("apps"), true)
+            compare(page.isKnownMode("clipboard"), true)
+            compare(page.isKnownMode("shortcuts"), true)
+            compare(page.isKnownMode("not-an-entry"), false)
         }
 
-        // Selecting the footer action asks for the route; it must not rewrite the
-        // query, steal search focus, or emit a mode change.
-        function test_selectingTheFooterActionAsksForTheControlCenterRoute() {
+        // Opening the view must not touch the session at all. Every one of these
+        // is a piece of state the user would have to retype: the query text, the
+        // mode, the category lens and the result window. Asserted individually
+        // because a regression here is invisible - the list still looks right, it
+        // is just filtered by something the user never asked for.
+        function test_openingTheViewChangesNothingTheUserTyped() {
+            openWithResults([makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
+            svc().category = ""
+            keyClick(Qt.Key_B)
+            tryCompare(svc(), "query", "b")
+            var windowBefore = page._resultWindowExtra
+
+            page.handleSidebarSelected(page.controlCenterEntryId)
+
+            verify(page.controlCenterActive, "the view must be up")
+            compare(svc().query, "b", "the typed query must survive the switch")
+            compare(svc().mode, "apps", "the mode must not be rewritten")
+            compare(svc().category, "", "the category lens must survive the switch")
+            compare(modeSpy.count, 0, "a view switch is not a mode change")
+            compare(page._resultWindowExtra, windowBefore,
+                "the materialized result window must not be torn down")
+            compare(page.resultCount, 2, "the rows must still be materialized")
+        }
+
+        // The view is a cold path and then a retained one, in that order. A
+        // control center is four cards, a calendar and a summary; building it on
+        // every open is what the old route swap avoided by retaining its Loader.
+        function test_theViewIsBuiltOnFirstUseAndThenRetained() {
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+            compare(page.controlCenterBuilt, false,
+                "a control center nobody opened must not be constructed")
+            verify(page.controlCenterItem === null)
+
+            page.handleSidebarSelected(page.controlCenterEntryId)
+            tryVerify(function() { return page.controlCenterItem !== null }, 2000)
+            tryVerify(function() { return page.controlCenterVisible }, 500)
+            var built = page.controlCenterItem
+            tryVerify(function() { return built.controlCardCount === 4 }, 2000)
+
+            page.handleEscape()
+            verify(!page.controlCenterActive)
+            verify(page.controlCenterBuilt, "the view stays built across a switch back")
+
+            page.handleSidebarSelected(page.controlCenterEntryId)
+            tryVerify(function() { return page.controlCenterItem === built }, 1000,
+                "returning must restore the same instance, not rebuild it")
+        }
+
+        // The rail's own selection semantics: the accent strip follows the view.
+        // Asserted through the published id because that is what the host binds
+        // the rail's `selected` to - a flag that flipped but was never published
+        // would leave the strip on "apps" over a wall of toggles.
+        function test_theRailHighlightsTheViewWhileItIsUp() {
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+            compare(page.activeSidebarId, "apps")
+
+            page.handleSidebarSelected(page.controlCenterEntryId)
+            tryCompare(page, "activeSidebarId", page.controlCenterEntryId, 500)
+
+            page.handleEscape()
+            tryCompare(page, "activeSidebarId", "apps", 500)
+        }
+
+        // The header follows the view too, for the same reason: announcing
+        // "Search applications" over the control center is a claim about an input
+        // that is not there.
+        function test_theHeaderFollowsTheView() {
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+            compare(page.title, "Launcher")
+            verify(page.description.indexOf("Search") === 0)
+
+            page.handleSidebarSelected(page.controlCenterEntryId)
+            tryCompare(page, "title", "Control Center", 500)
+            verify(page.description.indexOf("Search") !== 0,
+                "the control center has nothing to search, so the header must not say so")
+
+            page.handleEscape()
+            tryCompare(page, "title", "Launcher", 500)
+        }
+
+        // The launcher's chrome leaves the content area for the view and comes
+        // back EXACTLY as it was. Hidden, never collapsed: a height animation or
+        // a collapsed rail would move the list under the viewport, and the user's
+        // selection would then point at a different row on the way back.
+        function test_theChromeIsHiddenForTheViewAndRestoredIntact() {
+            openWithResults([
+                makeItem("a", "Alpha", 0, 0),
+                makeItem("b", "Beta", 0, 0),
+                makeItem("c", "Gamma", 0, 0)
+            ])
+            compare(page.resultCount, 3)
+            var editorBefore = page.searchField.editorItem
+            var rowsBefore = []
+            for (var r = 0; r < page.resultCount; r++)
+                rowsBefore.push(page.resultsView.resultAt(r))
+            var listYBefore = page.resultsView.y
+            var listHeightBefore = page.resultsView.height
+
+            page.handleSidebarSelected(page.controlCenterEntryId)
+            tryVerify(function() { return page.controlCenterVisible }, 500)
+
+            verify(!page.chromeVisible, "the launcher chrome must leave for the view")
+            verify(!page.searchField.visible, "the search rail must be hidden")
+            verify(!page.resultsView.visible, "the result list must be hidden")
+
+            page.handleEscape()
+            tryVerify(function() { return page.chromeVisible }, 500)
+            verify(page.searchField.visible)
+            verify(page.resultsView.visible)
+            compare(page.searchField.editorItem, editorBefore,
+                "the editor must be the same instance, with its text and caret")
+            compare(page.resultsView.y, listYBefore, "the list must not shift")
+            compare(page.resultsView.height, listHeightBefore)
+            for (var i = 0; i < rowsBefore.length; i++)
+                compare(page.resultsView.resultAt(i), rowsBefore[i],
+                    "row " + i + " must be the same delegate after the round trip")
+        }
+
+        // A typed query survives the round trip by VALUE, which is what the user
+        // notices: they come back to the text they left, not to an empty box.
+        function test_theTypedQueryIsStillThereOnReturn() {
+            openWithResults([makeItem("a", "Alpha", 0, 0), makeItem("b", "Beta", 0, 0)])
+            keyClick(Qt.Key_B)
+            tryCompare(svc(), "query", "b")
+            tryCompare(page.searchField.editorItem, "text", "b", 500)
+
+            page.handleSidebarSelected(page.controlCenterEntryId)
+            tryVerify(function() { return page.controlCenterVisible }, 500)
+            // The editor is hidden, so the text lives in the editor AND the
+            // session. Both are asserted: a switch that only preserved the
+            // session would show an empty box when the view closed.
+            compare(page.searchField.editorItem.text, "b",
+                "the hidden editor keeps its text")
+
+            page.handleEscape()
+            tryVerify(function() { return page.chromeVisible }, 500)
+            compare(svc().query, "b")
+            compare(page.searchField.editorItem.text, "b")
+        }
+
+        // Focus must land somewhere real on both edges of the switch. Opening: the
+        // view's own landing, because the editor is invisible and Qt refuses
+        // focus on an invisible item - focusing it anyway would leave the whole
+        // surface with no keyboard owner. Returning: the editor, one turn later,
+        // after it is visible again.
+        function test_focusLandsOnEachSideOfTheSwitch() {
             openWithResults([makeItem("a", "Alpha", 0, 0)])
             tryVerify(function() { return page.searchField.activeFocus }, 300)
 
-            page.handleSidebarSelected("control-center")
+            page.handleSidebarSelected(page.controlCenterEntryId)
+            tryVerify(function() { return page.controlCenterItem !== null }, 2000)
+            tryVerify(function() { return page.controlCenterItem.activeFocus === true }, 1000,
+                "the view must own the keyboard while it is up")
+            verify(!page.searchField.activeFocus,
+                "the hidden editor must not hold focus")
 
-            compare(controlCenterSpy.count, 1)
-            compare(modeSpy.count, 0)
-            compare(svc().query, "")
-            compare(svc().mode, "apps")
-            verify(page.searchField.activeFocus,
-                   "a route switch must not take the search field's focus with it")
+            page.handleEscape()
+            tryVerify(function() { return page.searchField.activeFocus }, 1000,
+                "the editor must reclaim the keyboard when the view closes")
         }
 
-        // The other three ids must keep working through the same entry point -
-        // the split is a dispatch, not a second list.
+        // Choosing a mode filter from the rail while the view is up must leave the
+        // view as well. If it did not, the query would be rewritten behind a
+        // hidden editor and the user would come back to a filtered list with no
+        // visible sign of why.
+        function test_choosingAModeFilterReplacesTheView() {
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+            page.handleSidebarSelected(page.controlCenterEntryId)
+            tryVerify(function() { return page.controlCenterVisible }, 500)
+
+            page.handleSidebarSelected("clipboard")
+
+            verify(!page.controlCenterActive, "a mode filter must replace the view")
+            compare(svc().query, ">clip ")
+            compare(svc().mode, "clipboard")
+            tryVerify(function() { return page.searchField.activeFocus }, 500,
+                "the editor must be focused and visible again")
+            compare(page.activeSidebarId, "clipboard")
+        }
+
+        // --- back precedence, and the page's half of the host's contract ---
+
+        // Four steps, in order, and each one is a different owner. Asserted as a
+        // sequence rather than four separate tests because the ORDER is the whole
+        // contract: a detail page that could not be reached, or a query that
+        // cleared before the view closed, would each be a plausible-looking
+        // green suite.
+        function test_backGoesDetailThenViewThenQuery() {
+            // A ready network service, so the overview's network card is `ready`
+            // and its detail request passes the module's gate. With no service the
+            // card is `unavailable`, its action is `none`, and openNetworkDetails()
+            // correctly does nothing - which would make every step below pass for
+            // the wrong reason.
+            page.networkService = readyNetwork
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+            keyClick(Qt.Key_B)
+            tryCompare(svc(), "query", "b")
+
+            page.handleSidebarSelected(page.controlCenterEntryId)
+            tryVerify(function() { return page.controlCenterItem !== null }, 2000)
+            var view = page.controlCenterItem
+            compare(view.controlCardCount, 4)
+
+            tryVerify(function() { return view.networkCardData.action === "detail" }, 1000,
+                "the fixture must present a card that can request its detail page")
+
+            // The view must offer back to the host: this page is the authority,
+            // and `canGoBack: true` with no callable handler would take every
+            // press and do nothing with it.
+            verify(page.canGoBack, "the view must be offered back while it is up")
+            verify(typeof page.handleBack === "function")
+
+            // Step 1: a detail sub-page consumes the press, and the view stays up.
+            view.openNetworkDetails()
+            tryVerify(function() { return view.activeSubPage !== "" }, 1000)
+            verify(page.handleBack(), "the detail page must consume the press")
+            tryVerify(function() { return view.activeSubPage === "" }, 1000)
+            verify(page.controlCenterActive,
+                "popping a detail page must not close the view")
+            compare(svc().query, "b", "and it must not touch the query")
+
+            // Step 2: the view itself, and the query is still untouched.
+            verify(page.handleBack(), "the view must consume the next press")
+            verify(!page.controlCenterActive)
+            compare(svc().query, "b", "leaving the view must not clear the query")
+
+            // Step 3: typed text clears, back to the bare prefix for the mode.
+            verify(page.handleBack(), "the typed query must consume the next press")
+            compare(svc().query, "")
+
+            // Step 4: nothing left, so the press is declined and the host closes.
+            compare(page.canGoBack, false, "an idle launcher view offers no back")
+            compare(page.handleBack(), false,
+                "declining is what lets the host close the surface")
+        }
+
+        // One openControlCenter on an already-open view is a no-op, not a second
+        // focus hand-off: re-running it would steal the focus the view's own
+        // controls had.
+        // A mode filter chosen from the rail replaces the view, and a view closed while
+// holding a DETAIL sub-page must take that sub-page with it.
+//
+// The second half is the retention bug this guards, and it is only reachable by
+// closing the view with something mounted - the Escape path pops the sub-page
+// first, so a plain Escape walk would pass with the dismissal removed. Measured,
+// not assumed: focus followed straight into the retained detail page on the next
+// open, and the user would have had no way back to the overview.
+function test_leavingTheViewTakesItsDetailSubPageWithIt() {
+    page.networkService = readyNetwork
+    openWithResults([makeItem("a", "Alpha", 0, 0)])
+    page.handleSidebarSelected(page.controlCenterEntryId)
+    tryVerify(function() { return page.controlCenterVisible }, 2000)
+    var view = page.controlCenterItem
+
+    view.openNetworkDetails()
+    tryVerify(function() { return view.activeSubPage !== "" }, 1000)
+
+    // Leave through the rail, the way a mode filter does.
+    page.handleSidebarSelected("clipboard")
+
+    verify(!page.controlCenterActive)
+    verify(view.activeSubPage === "",
+        "the retained view must be back on its overview, not holding a stale sub-page")
+    // The view itself is still the retained instance - dismissing the sub-page is
+    // not rebuilding anything.
+    compare(page.controlCenterItem, view)
+    compare(page.controlCenterBuilt, true)
+}
+
+function test_openingTheViewTwiceChangesNothing() {
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+            page.handleSidebarSelected(page.controlCenterEntryId)
+            tryVerify(function() { return page.controlCenterItem !== null }, 2000)
+            var built = page.controlCenterItem
+
+            compare(page.openControlCenter(), false,
+                "opening an open view must report that it changed nothing")
+            compare(page.controlCenterItem, built)
+        }
+
+        function test_closingAViewThatIsNotUpChangesNothing() {
+            openWithResults([makeItem("a", "Alpha", 0, 0)])
+            keyClick(Qt.Key_B)
+            tryCompare(svc(), "query", "b")
+
+            compare(page.closeControlCenter(), false)
+            compare(svc().query, "b")
+            compare(modeSpy.count, 0)
+        }
+
+        // --- the rail's other three entries, unchanged ---
+
+        // The other three ids keep working through the same entry point - one
+        // dispatch, four peer ids.
         function test_theModeFiltersStillAnswerThroughTheRailEntryPoint() {
             openWithResults([makeItem("a", "Alpha", 0, 0)])
 
@@ -296,18 +596,44 @@ Item {
             compare(svc().mode, "clipboard")
             compare(modeSpy.count, 1)
             compare(modeSpy.signalArguments[0][0], "clipboard")
-            compare(controlCenterSpy.count, 0)
+            verify(!page.controlCenterActive, "a mode filter must not open the view")
         }
 
-        // An unknown id stays inert rather than falling into a mode rewrite.
+        // An unknown id stays inert rather than falling into a mode rewrite. The
+        // closing call is in the path on purpose: an unknown id is not a request
+        // to leave the view either.
         function test_anUnknownRailIdChangesNothing() {
             openWithResults([makeItem("a", "Alpha", 0, 0)])
 
             page.handleSidebarSelected("not-a-mode")
 
             compare(modeSpy.count, 0)
-            compare(controlCenterSpy.count, 0)
+            compare(page.controlCenterActive, false)
             compare(svc().query, "")
+        }
+
+        // Input isolation, the other half of the view switch. The editor is
+        // hidden while the view is up, so an arrow key that still moved the
+        // launcher's selection would move something the user cannot see - and
+        // would do it invisibly when they came back.
+        function test_arrowsAndReturnCannotActOnTheListBehindTheView() {
+            openWithResults([
+                makeItem("a", "Alpha", 0, 0),
+                makeItem("b", "Beta", 0, 0),
+                makeItem("c", "Gamma", 0, 0)
+            ])
+            page.handleSidebarSelected(page.controlCenterEntryId)
+            tryVerify(function() { return page.controlCenterVisible }, 500)
+            var indexBefore = svc().selectedIndex
+
+            keyClick(Qt.Key_Down)
+            keyClick(Qt.Key_Down)
+            compare(svc().selectedIndex, indexBefore,
+                "an arrow key must not move a selection behind the view")
+
+            keyClick(Qt.Key_Return)
+            compare(svc().selectedIndex, indexBefore,
+                "Return must not execute a row the user cannot see")
         }
 
         // --- result presentation and selection ---
