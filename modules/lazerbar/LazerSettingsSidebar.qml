@@ -80,7 +80,7 @@ Item {
     TrailIndicator {
         id: selectionIndicator
         z: 2
-        x: 10 + 4 + 5 * root.expansionProgress
+        crossAxis: 10 + 4 + 5 * root.expansionProgress
         markLength: 24
         markThickness: 4
         markRadius: 2
@@ -90,7 +90,7 @@ Item {
         targetValid: root.selectedAvailable
         opacity: root.sessionActive && root.selectedAvailable ? 1 : 0
 
-        Behavior on x {
+        Behavior on crossAxis {
             enabled: !MotionTokens.reducedMotion
             NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
         }

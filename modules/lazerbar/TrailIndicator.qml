@@ -43,14 +43,20 @@ Item {
     // --- Host contract ----------------------------------------------------
 
     // Axis the mark travels along: "y" for a vertical rail, "x" for a
-    // horizontal one. Cross-axis placement stays with the host, so a rail can
-    // slide its strip sideways while the selection moves it down.
+    // horizontal one.
     property string axis: "y"
     // The strip's resting extent along its axis, and its thickness across it.
     property real markLength: 24
     property real markThickness: 4
     property int markRadius: 2
     property color markColor: "transparent"
+    // Where the host wants the strip ACROSS its axis — a rail's left margin, a
+    // bar's baseline. The travel axis is the component's own and is NOT a host
+    // property, because the leading edge there is `start`, which is half the
+    // mark's geometry: a host that placed the mark itself would have to know the
+    // wake to get the position right, and the wake is the one thing it must not
+    // know.
+    property real crossAxis: 0
 
     // Where the mark's CENTRE belongs, in this item's own coordinates. The
     // host writes it; the tracker never writes it.
@@ -118,8 +124,15 @@ Item {
     // being short of its anchor is the honest test.
     readonly property bool inFlight: root._head !== root._anchor || root.wake > 0.5
 
+    // The mark's box, placed at the leading edge of the wake. Both of these are the
+    // mechanism rather than a convenience: a strip whose length animates while
+    // its position stays put is not a wake, it is a strip growing out of
+    // nowhere, and nothing in the numbers below can tell the difference — the
+    // position has to be asserted too.
     width: root._vertical ? root.markThickness : root.length
     height: root._vertical ? root.length : root.markThickness
+    x: root._vertical ? root.crossAxis : root.start
+    y: root._vertical ? root.start : root.crossAxis
 
     // Head on the widget's own curve, tail on its own slower one. Same gate on
     // both, so neither can be re-targeted a frame ahead of the other.

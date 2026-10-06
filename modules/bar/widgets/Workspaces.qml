@@ -629,7 +629,7 @@ Item {
         // also what keeps the first one a placement rather than a switch.
         targetValid: root.indicatorVisible
         visible: root.indicatorVisible
-        y: Math.round(root.height / 2 + (LazerTheme.barGlyphSize - 4) / 2 + 4)
+        crossAxis: Math.round(root.height / 2 + (LazerTheme.barGlyphSize - 4) / 2 + 4)
     }
 
     // Sliding active highlight behind the squares (z below the row).

@@ -79,7 +79,7 @@ Rectangle {
     TrailIndicator {
         id: selectionIndicator
         z: 2
-        x: 10 + 4 + 5 * root.expansionProgress
+        crossAxis: 10 + 4 + 5 * root.expansionProgress
         markLength: 24
         markThickness: 4
         markRadius: 2
@@ -98,7 +98,7 @@ Rectangle {
         targetValid: root.anySelected
         visible: root.anySelected
 
-        Behavior on x {
+        Behavior on crossAxis {
             enabled: !MotionTokens.reducedMotion
             NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
         }
