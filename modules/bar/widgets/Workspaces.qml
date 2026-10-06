@@ -40,11 +40,10 @@ Item {
     // delegates; icon opacity and the single indicator bind to this instead.
     property string focusedWinId: ""
     // Single indicator state: center X in root coordinates. The bar itself
-    // is one Rectangle below; only this value moves when the active
-    // workspace or the focused app changes.
+    // is the shared TrailIndicator below; only this value moves when the
+    // active workspace or the focused app changes.
     property real indicatorCenterX: 0
     property bool indicatorVisible: false
-    property bool _indicatorPlaced: false
 
     readonly property int iconSize: 16
     readonly property int iconSpacing: 4
@@ -391,15 +390,16 @@ Item {
         }
         if (!isFinite(centerX))
             return
-        // Assign while unplaced so the first show never slides in from zero.
-        // Key lands first so the tracker's change handler sees both values.
+        // Publish the identity and the position together. The indicator
+        // coalesces them into one commit per turn and treats its first valid
+        // target as a placement, so neither the write order nor the first show
+        // has to be defended here — the mark lands on its resting place instead
+        // of sliding in from zero.
         root.indicatorTargetKey = focusedIndex >= 0 ? "w" + root.focusedWinId
                                                     : "s" + targetIndex
         root.indicatorCenterX = centerX
         if (!root.indicatorVisible)
             root.indicatorVisible = true
-        if (!root._indicatorPlaced)
-            root._indicatorPlaced = true
     }
 
     onFocusedWinIdChanged: Qt.callLater(root.updateIndicator)
@@ -410,7 +410,6 @@ Item {
     onHeightChanged: Qt.callLater(root.updateIndicator)
 
     Component.onCompleted: {
-        snapEdgesTo(indicatorCenterX, indicatorTargetKey)
         root.refreshWindowMap()
         Qt.callLater(root.updateIndicator)
         Qt.callLater(root.updateHighlight)
@@ -607,142 +606,30 @@ Item {
     // width is owned by the dual-speed edge tracker below.
     readonly property int indicatorBarWidth: LazerTheme.barWidgetHeight - 16
     // Identity of the current indicator target (focused window or active
-    // workspace); lets the edge tracker tell genuine switches from re-anchors.
+    // workspace); lets the indicator tell genuine switches from re-anchors.
     property string indicatorTargetKey: ""
-    onIndicatorCenterXChanged: root.retargetEdges(root.indicatorCenterX,
-                                                  root.indicatorTargetKey)
 
-    // Dual-speed tracker (旧分支 capsule 遗留): the bar edge x converges
-    // fast while a shadow copy trails slowly, so the rendered span stretches
-    // toward travel direction and contracts on arrival. Hosted on the Item
-    // itself because Behaviors do not intercept plain QtObject properties.
-    property string _edgeTargetKey: ""
-    // Logical left-edge anchor: the committed target, never animated. All
-    // dedupe/drift decisions read this instead of _edgeX, whose value is the
-    // Behavior's in-flight animation frame (identical to _edgeShadowX until
-    // the first animation tick, which made same-frame events look "settled"
-    // and teleported the bar).
-    property real _edgeAnchorX: 0
-    property real _edgeX: 0
-    property real _edgeShadowX: 0
-    property bool _edgeSnapping: false
-    // Same-anchor drift that arrives while a trail is in flight; applied as
-    // one snap once the shadow catches up so the trail is never cut short.
-    property real _edgePendingCenterX: -1
-    readonly property real _edgeRectLeft: Math.min(_edgeX, _edgeShadowX)
-    readonly property real _edgeSpan: indicatorBarWidth + Math.abs(_edgeX - _edgeShadowX)
-
-    Timer {
-        interval: 16
-        repeat: true
-        running: root._edgePendingCenterX >= 0
-        onTriggered: {
-            if (Math.abs(root._edgeX - root._edgeShadowX) >= 0.5)
-                return
-            var pending = root._edgePendingCenterX
-            root._edgePendingCenterX = -1
-            root.snapEdgesTo(pending, root._edgeTargetKey)
-        }
-    }
-
-    Behavior on _edgeX {
-        enabled: root._indicatorPlaced && !MotionTokens.reducedMotion && !root._edgeSnapping
-        NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad }
-    }
-    Behavior on _edgeShadowX {
-        enabled: root._indicatorPlaced && !MotionTokens.reducedMotion && !root._edgeSnapping
-        // 3x the bar's own flight: the tail lingers long after the head
-        // lands, which is what keeps the stretch readable.
-        NumberAnimation { duration: MotionTokens.slow * 2; easing.type: Easing.OutSine }
-    }
-
-    // Commit bar and shadow together with the Behaviors suppressed. Both
-    // writes use a precomputed target: reading _edgeX back would return the
-    // Behavior's in-flight animation frame, not the committed value.
-    function snapEdgesTo(centerX, key) {
-        var target = centerX - indicatorBarWidth / 2
-        _edgeSnapping = true
-        _edgeTargetKey = key
-        _edgeAnchorX = target
-        _edgeX = target
-        _edgeShadowX = target
-        _edgeSnapping = false
-    }
-
-    // One white blink on the indicator per genuine target switch; no-op
-    // under reduced motion, matching the shared click-flash contract.
-    function flashIndicator() {
-        if (MotionTokens.reducedMotion)
-            return
-        indicatorFlash.restart()
-    }
-
-    // Route every indicator re-anchor through here. A genuine target switch
-    // (key change after placement) desyncs bar and shadow into the trail;
-    // duplicate updates are deduped against the logical anchor so an
-    // in-flight trail survives even in the same frame as the switch (x and
-    // shadow are numerically equal until the first animation tick); real
-    // same-target layout drift snaps both so content churn never stretches
-    // the bar; the first placement snaps so it never slides in from zero.
-    function retargetEdges(centerX, key) {
-        if (!isFinite(centerX))
-            return
-        var target = centerX - indicatorBarWidth / 2
-        if (key !== _edgeTargetKey && _indicatorPlaced) {
-            _edgePendingCenterX = -1
-            _edgeTargetKey = key
-            _edgeAnchorX = target
-            _edgeX = target
-            _edgeShadowX = target
-            flashIndicator()
-            return
-        }
-        if (Math.abs(target - _edgeAnchorX) < 3)
-            return
-        if (Math.abs(_edgeX - _edgeShadowX) > 0.5) {
-            _edgePendingCenterX = centerX
-            return
-        }
-        snapEdgesTo(centerX, key)
-    }
-
-    Rectangle {
+    // The indicator itself: the shell's shared dual-speed mark, so this widget
+    // and both rails carry one wake rather than three implementations of it.
+    // Its tracker used to live here verbatim (`_edgeX` / `_edgeShadowX` /
+    // `_edgeSpan` / `retargetEdges`); see `modules/lazerbar/TrailIndicator.qml`
+    // for the recipe and `pinned-head-trail-motion` for the record of what
+    // went wrong on the way there.
+    TrailIndicator {
         id: activeIndicator
 
-        width: root._edgeSpan
-        height: LazerTheme.barIndicatorHeight
-        radius: LazerTheme.barIndicatorRadius
-        color: LazerTheme.osuGreen
+        axis: "x"
+        markLength: root.indicatorBarWidth
+        markThickness: LazerTheme.barIndicatorHeight
+        markRadius: LazerTheme.barIndicatorRadius
+        markColor: LazerTheme.osuGreen
+        targetCenter: root.indicatorCenterX
+        targetKey: root.indicatorTargetKey
+        // Nothing to aim at until the widget has published a target, which is
+        // also what keeps the first one a placement rather than a switch.
+        targetValid: root.indicatorVisible
         visible: root.indicatorVisible
-        x: root._edgeRectLeft
         y: Math.round(root.height / 2 + (LazerTheme.barGlyphSize - 4) / 2 + 4)
-
-        // Switch flash: same tinted-glow blink as the media progress bar's
-        // beat flash, driven by the shared click-flash decay contract.
-        Rectangle {
-            id: indicatorFlashOverlay
-
-            anchors.fill: parent
-            radius: parent.radius
-            color: LazerTheme.flashWash
-            opacity: 0
-            enabled: false
-
-            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-        }
-
-        // Peak matches the media progress fill flash (1.8x click opacity)
-        // so the switch blink reads at the same strength.
-        NumberAnimation {
-            id: indicatorFlash
-
-            target: indicatorFlashOverlay
-            property: "opacity"
-            from: Math.min(1, MotionTokens.clickFlashOpacity * 1.8)
-            to: 0
-            duration: MotionTokens.clickFlashDuration
-            easing.type: MotionTokens.clickFlashEasing
-        }
     }
 
     // Sliding active highlight behind the squares (z below the row).

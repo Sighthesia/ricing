@@ -72,23 +72,25 @@ Item {
         color: LazerTheme.settingsRail
     }
 
-    // Move one shared accent strip between category entries.
-    Rectangle {
+    // Move one shared accent strip between category entries, carrying the
+    // workspace widget's dual-speed wake: the head runs `medium`/OutQuad to the
+    // new category, the tail runs `slow * 2`/OutSine to the SAME target, and
+    // the strip is drawn between them — so it stretches along the direction of
+    // travel and contracts as the tail lands.
+    TrailIndicator {
         id: selectionIndicator
         z: 2
         x: 10 + 4 + 5 * root.expansionProgress
-        y: root.indicatorY - height / 2
-        width: 4
-        height: 24
-        radius: 2
-        color: LazerTheme.settingsAccent
+        markLength: 24
+        markThickness: 4
+        markRadius: 2
+        markColor: LazerTheme.settingsAccent
+        targetCenter: root.indicatorY
+        targetKey: String(root.selectedIndex)
+        targetValid: root.selectedAvailable
         opacity: root.sessionActive && root.selectedAvailable ? 1 : 0
 
         Behavior on x {
-            enabled: !MotionTokens.reducedMotion
-            NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
-        }
-        Behavior on y {
             enabled: !MotionTokens.reducedMotion
             NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
         }

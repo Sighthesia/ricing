@@ -74,30 +74,31 @@ Rectangle {
     color: LazerTheme.settingsRail
 
     // Move one shared accent strip between category entries exactly like the
-    // settings sidebar does; NavItems render transparently under it.
-    Rectangle {
+    // settings sidebar does, wake included — NavItems render transparently
+    // under it.
+    TrailIndicator {
         id: selectionIndicator
         z: 2
         x: 10 + 4 + 5 * root.expansionProgress
+        markLength: 24
+        markThickness: 4
+        markRadius: 2
+        markColor: LazerTheme.settingsAccent
         // One strip, two bands: whichever owns the selection places it, and the
-        // anchor is a real y rather than a row number so a footer selection does
-        // not inherit the primary column's top-down arithmetic.
-        y: root.selectedIndex() >= 0
+        // anchor is a real y rather than a row number so a footer selection
+        // does not inherit the primary column's top-down arithmetic. A CENTRE,
+        // not a top edge — the mark owns its own length, because that length is
+        // the wake and a host that subtracted it would subtract the wake too.
+        targetCenter: root.selectedIndex() >= 0
             ? root.railTop + root.selectedIndex() * (root.itemHeight + root.itemSpacing)
-                + root.itemHeight / 2 - height / 2
+                + root.itemHeight / 2
             : footerRail.y + root.selectedFooterIndex() * (root.itemHeight + root.itemSpacing)
-                + root.itemHeight / 2 - height / 2
+                + root.itemHeight / 2
+        targetKey: String(root.selected)
+        targetValid: root.anySelected
         visible: root.anySelected
-        width: 4
-        height: 24
-        radius: 2
-        color: LazerTheme.settingsAccent
 
         Behavior on x {
-            enabled: !MotionTokens.reducedMotion
-            NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
-        }
-        Behavior on y {
             enabled: !MotionTokens.reducedMotion
             NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
         }
