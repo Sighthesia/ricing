@@ -64,6 +64,11 @@ Item {
             root.iconReloadToken++
     }
 
+    // A row waiting on its own layout must arrive, not animate in: this is one
+    // frame of bookkeeping, and the slow opacity/x curves would turn it into a
+    // visible fade on every recycle and every refill.
+    onContentPendingChanged: root.snapTransitions = root.contentPending
+
     // Clipboard image entries show a page-provided decoded thumbnail in
     // place of the app-icon slot; decoding and caching live on the page.
     readonly property bool isClipboardImage: !!result && result.isImage === true
@@ -193,7 +198,25 @@ Item {
     //    its way out. Folding to zero height is the intent here - a
     //    non-match leaves the list entirely.
     readonly property bool folded: hidden || _closing
-    readonly property bool concealed: revealHeld
+    // A row must never show its icon without its text. A RECYCLED row paints
+    // from a warm pixmap cache, so its icon is on screen on the first frame
+    // after the swap, while the title needs a layout pass for the NEW result
+    // and lands a frame later — the card renders with an icon and an empty
+    // title, which reads as a broken row rather than as a row arriving. After
+    // a pool swap that is a whole screenful of them at once.
+    //
+    // Holding the row until its own text has been laid out closes that window.
+    // `implicitWidth` is the honest test: it is non-zero exactly when the Text
+    // has run for the text it currently holds, and it is the natural width, so
+    // elision cannot disguise an unlaid-out row as a laid-out one.
+    readonly property bool textLaidOut: titleText.implicitWidth > 0
+            || descriptionLabel.implicitWidth > 0
+    readonly property bool contentPending: (root.displayName.length > 0
+            || root.descriptionText.length > 0) && !root.textLaidOut
+    // Deliberately NOT folded into `revealHeld`: the page's entrance gate reads
+    // that flag to decide when the list may be scrolled, and a row merely
+    // waiting on its own layout must not hold that gate open.
+    readonly property bool concealed: revealHeld || root.contentPending
     // True once the row is fully shown: neither concealed nor folded. The
     // owning page anchors the selection frame on rows that are actually there.
     readonly property bool fullyShown: !folded && !concealed

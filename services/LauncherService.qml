@@ -92,7 +92,24 @@ Singleton {
         launchCounts: Services.LaunchCountService,
         clipboardBackend: Services.ClipboardService,
         shortcutsBackend: Services.NiriShortcutService,
-        iconResolver: function(name) { return name ? String(Quickshell.iconPath(name, true)) : "" },
+        iconResolver: function(name) {
+            // `check = false` on purpose. The checked form asks Quickshell
+            // whether the name exists, and that check does not see the user's
+            // icon theme: with Papirus configured, every app whose icon ships
+            // only in Papirus came back "" (firefox, obsidian, blender, btop,
+            // inkscape, clash-verge, nvtop's neighbours…) while the handful that
+            // also exist under hicolor resolved fine — so the launcher showed an
+            // empty 40px rail for most of the list and read as a broken row.
+            //
+            // The unchecked form always hands back the `image://icon/<name>`
+            // URL, and the `image://` provider resolves it through the real
+            // theme chain, which is the only place that knows the answer. A name
+            // that genuinely has no icon now resolves to an image that fails to
+            // paint, and the row's existing `iconFailed` handling takes it from
+            // there — the decision belongs to the image loader, not to a
+            // lookup that cannot see the theme.
+            return name ? String(Quickshell.iconPath(name, false)) : ""
+        },
         appCategoryResolver: LauncherCategories.appCategoryOf,
         clipCategoryResolver: LauncherCategories.clipCategoryOf,
         commands: LauncherAdapters.builtinCommands(),
@@ -227,11 +244,17 @@ Singleton {
     // Both are kept as first-class code paths because the choice is a judgement
     // call the source cannot settle: the rail spends width on navigation and
     // gives the height back, the page bar does the opposite, and which reads
-    // better depends on the display and on habit. The env var picks the startup
-    // default and `chrome()` flips it live, so both can be compared against the
-    // same open session without restarting the shell.
-    property string chromeLayout: (Quickshell.env("AFLOAT_LAUNCHER_CHROME") || "blocks").trim() === "rail"
-            ? "rail" : "blocks"
+    // better depends on the display and on habit.
+    //
+    // "rail" is the default because on this desktop it reads better: the
+    // launcher is the one surface where the eye is already scanning a vertical
+    // list, and there a mode switch costing 44px of height costs more than the
+    // 170px of width the rail takes — with the collapsed rail costing less
+    // still. AFLOAT_LAUNCHER_CHROME=blocks names the other one, and `chrome()`
+    // flips it live, so both can be compared against the same open session
+    // without restarting the shell.
+    property string chromeLayout: (Quickshell.env("AFLOAT_LAUNCHER_CHROME") || "rail").trim() === "blocks"
+            ? "blocks" : "rail"
 
     function toggleChrome() {
         root.chromeLayout = root.chromeLayout === "rail" ? "blocks" : "rail"
