@@ -2082,8 +2082,10 @@ Item {
 
                         objectName: "wiredGroupCard" + wiredGroupCard.index
                         width: wifiColumn.width
-                        // The column starts 8px down, leaving a tighter 6px foot.
-                        height: wiredGroupColumn.height + 14
+                        // The column already owns the only 8px inset. Matching
+                        // the card height to that offset prevents an extra foot
+                        // of empty space below the final wired profile row.
+                        height: wiredGroupColumn.height + 8
                         radius: 6
                         color: LazerTheme.settingsCard
 
@@ -2176,7 +2178,7 @@ Item {
                                     Item {
                                         id: wiredProfileTextBlock
                                         anchors.left: parent.left
-                                        anchors.leftMargin: 12
+                                        anchors.leftMargin: 10
                                         anchors.right: wiredProfileStateText.left
                                         anchors.rightMargin: 6
                                         anchors.verticalCenter: parent.verticalCenter
