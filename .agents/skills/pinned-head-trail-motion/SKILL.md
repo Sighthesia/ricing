@@ -15,6 +15,38 @@ Most of what follows is not theory. Each item is a defect that shipped, survived
 several verified-looking rounds, and was found only by instrumenting the running
 shell.
 
+## Where the recipe lives
+
+`modules/lazerbar/TrailIndicator.qml` is the shared mark. Its tracker came out of
+`modules/bar/widgets/Workspaces.qml` (which still carries the widget's own
+geometry and colours) and is now the single implementation behind three hosts:
+
+| host | axis | `targetCenter` |
+| --- | --- | --- |
+| `modules/bar/widgets/Workspaces.qml` | x | the focus frame's centre |
+| `modules/lazerbar/LazerSettingsSidebar.qml` | y | `indicatorY`, the row centre |
+| `modules/lazerbar/FullscreenSidebar.qml` | y | the row centre of whichever band owns the selection |
+
+Do not re-implement it per rail, and do not hand the mark a leading edge: it owns
+its own length, because that length IS the wake, so a host that subtracted it
+would subtract the wake too. **Pass a CENTRE.**
+
+`modules/bar/BarWindowHintContent.qml` is deliberately NOT on it — see the two
+laws below.
+
+Two host-side traps were removed when it was lifted out, and neither is obvious
+enough to rediscover:
+
+- **Commits coalesce to one per event-loop turn** (`Qt.callLater`). A publish that
+  writes the identity and the position in one block used to have to write them in
+  that order, or the mark flew to a stale centre and then snapped — the wake dying
+  for no visible reason. Coalescing makes the order irrelevant.
+- **Placement versus switch is derived, not declared.** `targetValid` is how a host
+  says "not yet": the first valid target lands outright (`_committed`), so nothing
+  slides in from zero or blinks on boot. The widget carried `_indicatorPlaced`
+  because only the host could tell a first computation from a selection change —
+  a gap the widget could not fill from its own numbers.
+
 ## The mechanism, and the one thing that replaces it
 
 The widget's recipe: two ends, each a plain `Behavior` — head
@@ -24,6 +56,11 @@ cap, no clamp**. Both ends fly toward **one fixed target**, so the stretch opens
 as they separate and closes as the shadow lands. Its peak is analytically
 **55.5% of the travel at 121ms**, closing exactly at 480ms — check any new
 implementation against that number rather than against a screenshot.
+
+Measured on the shared component driving a 100px two-row switch, sampled in wall
+clock at 16ms: peak **55.33px at 128ms**, closed exactly at **480ms**. When you
+re-measure, divide by the **whole** travel — a probe that divides a two-row jump
+by one row's pitch reports 110% and looks like a broken cap.
 
 That recipe assumes the target is **fixed**. When the head must instead follow a
 **travelling** element, a `Behavior` cannot be re-targeted every frame and a

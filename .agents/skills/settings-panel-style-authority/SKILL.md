@@ -15,6 +15,7 @@ description: 在 Afloat 中实现任何新的可见 QML 表面、交互反馈、
 | 分类区块 / 压暗遮罩 / 标题分隔线 | `modules/lazerbar/LazerSettingsSection.qml` |
 | 通用滚动系统（接管区 / 阻力 / 回弹 / 波浪挂起） | `modules/lazerbar/LazerSettingsSections.qml` |
 | 导航项高亮 / 侧栏点击闪烁 | `modules/lazerbar/LazerSettingsSidebar.qml`、`LazerSettingsNavItem.qml` |
+| 选中指示条（拖尾动效） | `modules/lazerbar/TrailIndicator.qml`；配方见 `pinned-head-trail-motion` |
 | 全部时长与缓动常量 | `modules/lazerbar/MotionTokens.qml` |
 | 颜色令牌 | `modules/lazerbar/LazerTheme.qml` |
 
