@@ -838,7 +838,7 @@ Variants {
                 coordinator: overlayCoordinator
                 session: Services.LauncherService
                 startupPrewarmAllowed: root.startupPrewarmAllowed
-                // Owner edge for the control-center route: the same singletons
+                // Owner edge for the control-center view: the same singletons
                 // the bar's own popups read, so the overview, its same-surface
                 // sub-pages and the bar can never disagree about one service
                 // instance. Media is MediaService rather than

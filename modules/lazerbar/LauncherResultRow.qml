@@ -422,9 +422,14 @@ Item {
             x: 52
             width: Math.max(0, parent.width - x - 12)
             visible: root.displayName.length > 0
-            anchors.top: root.descriptionText.length > 0 ? parent.top : undefined
-            anchors.topMargin: 12
-            anchors.verticalCenter: root.descriptionText.length > 0 ? undefined : parent.verticalCenter
+            // Use one explicit vertical position instead of switching between
+            // top and center anchors. Count-model delegates are reused for
+            // different result shapes; conditional anchors can leave the old
+            // anchor active for one binding pass and place a title in the
+            // previous row's gap.
+            y: root.descriptionText.length > 0
+                    ? 12
+                    : Math.max(0, (parent.height - implicitHeight) / 2)
             text: root.displayName
             // Clipboard previews carry raw pasted markup; always plain.
             textFormat: Text.PlainText
@@ -438,10 +443,12 @@ Item {
             id: descriptionLabel
             x: titleText.x
             width: titleText.width
-            anchors.top: root.displayName.length > 0 ? titleText.bottom : undefined
-            anchors.topMargin: root.displayName.length > 0 ? 2 : 0
-            anchors.verticalCenter: root.displayName.length > 0 ? undefined : parent.verticalCenter
             visible: root.descriptionText.length > 0
+            // Match the title's explicit geometry so a recycled row cannot
+            // retain a previous top/center anchor when its metadata changes.
+            y: root.displayName.length > 0
+                    ? titleText.y + titleText.implicitHeight + 2
+                    : Math.max(0, (parent.height - implicitHeight) / 2)
             text: root.descriptionText
             color: LazerTheme.textMuted
             font.pixelSize: 11

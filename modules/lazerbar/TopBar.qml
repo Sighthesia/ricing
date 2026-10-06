@@ -133,7 +133,7 @@ Variants {
                 id: launcherSurface; anchors.fill: parent
                 coordinator: overlayCoordinator
                 session: Services.LauncherService
-                // Owner edge for the control-center route, same as the
+                // Owner edge for the control-center view, same as the
                 // production bar: injected here so this surface never imports a
                 // service and the route page stays fake-injectable.
                 networkService: Services.NetworkService
