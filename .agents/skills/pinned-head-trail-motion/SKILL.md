@@ -28,8 +28,10 @@ geometry and colours) and is now the single implementation behind three hosts:
 | `modules/lazerbar/FullscreenSidebar.qml` | y | the row centre of whichever band owns the selection |
 
 Do not re-implement it per rail, and do not hand the mark a leading edge: it owns
-its own length, because that length IS the wake, so a host that subtracted it
-would subtract the wake too. **Pass a CENTRE.**
+its own length **and its own position along that axis**, because both are half the
+mark's geometry — a host that placed the mark itself would have to know the wake to
+get the position right, and the wake is the one thing it must not know. **Pass a
+CENTRE and a `crossAxis`; set neither `x` nor `y`.**
 
 `modules/bar/BarWindowHintContent.qml` is deliberately NOT on it — see the two
 laws below.
@@ -71,7 +73,7 @@ follower replaces it:
 _tailY += (_headY - _tailY) * trailCatchUp
 ```
 
-## Nine ways this goes wrong, each measured
+## Ten ways this goes wrong, each measured
 
 1. **A `Behavior` re-targeted per frame is a latch, not a follower.** Restarting
    an easing every frame means it never gets past the start of its curve:
@@ -142,6 +144,11 @@ _tailY += (_headY - _tailY) * trailCatchUp
 
 - **Measure the target's path, and the mark's own motion, separately.** They have
   different clocks and the difference is where every defect above lives.
+- **Assert the drawn box, not the ends.** Position AND extent, against the row the
+  mark claims, in wall clock — driven through the real host component rather than a
+  bare `TrailIndicator`, because a host binding that silently stopped re-evaluating
+  looks exactly like a mechanism fault from the mark's side. The ends reading
+  correctly is not the mark being correct; it is one property of it.
 - **Prove a test bites** by reverting the fix. If reverting leaves it green, the
   test is decorative. QtTest returns from a test function on its *first* failed
   assertion, so to observe several clauses, neutralise their predecessors one at
