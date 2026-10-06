@@ -354,10 +354,10 @@ function effectiveCap(limit) {
 // What a back request resolves to, in precedence order: an active detail page
 // consumes back itself, then the sibling launcher route, then closing the
 // surface. The host may report the detail page as a boolean or by name.
-function backAction(route, detailPage, enteredFromLauncher) {
+function backAction(route, detailPage) {
     if (isDetailRoute(route) || isActiveDetail(detailPage))
         return "detail"
-    return enteredFromLauncher ? "launcher" : "close"
+    return "none"
 }
 
 function isActiveDetail(detailPage) {

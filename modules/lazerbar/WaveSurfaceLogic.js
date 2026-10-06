@@ -3,7 +3,7 @@
 // Pure wave-surface contracts: route validation, geometry, and escape precedence.
 // Content routes stay out; register future routes explicitly instead of editing call sites.
 
-var routes = ["launcher", "control-center"]
+var routes = ["launcher"]
 var waveAngles = [13, -7, 4, -2]
 
 function isRoute(route) {

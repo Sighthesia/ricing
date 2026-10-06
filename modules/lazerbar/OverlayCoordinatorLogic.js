@@ -4,8 +4,8 @@
 // and music keep dedicated owners. Deprecated Wiki/News/Beatmap content targets
 // are no longer routable.
 
-var targets = ["settings", "music", "launcher", "control-center"]
-var waveTargets = ["launcher", "control-center"]
+var targets = ["settings", "music", "launcher"]
+var waveTargets = ["launcher"]
 
 function normalizeTarget(target) {
     var candidate = target == null ? "" : String(target)
@@ -29,7 +29,7 @@ function entryMethodFor(target) {
     var normalized = normalizeTarget(target)
     if (waveTargets.indexOf(normalized) < 0)
         return ""
-    return normalized === "control-center" ? "requestControlCenter" : "requestOpen"
+    return "requestOpen"
 }
 
 // What the screen-scoped entry point must do with a target, given the wave owner

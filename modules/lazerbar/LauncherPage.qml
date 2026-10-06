@@ -12,6 +12,14 @@ Item {
     objectName: "launcherPage"
     property double _born: Date.now()
 
+    property var networkService: null
+    property var bluetoothService: null
+    property var volumeService: null
+    property var mediaService: null
+    property var batteryService: null
+    property var notificationService: null
+    property var weatherService: null
+
     // Session contract: any object exposing the observable LauncherService
     // state (visible, query, mode, results, loading, error, selectedIndex)
     // plus refresh/selectNext/selectPrevious/executeSelected/execute, where
@@ -60,15 +68,16 @@ Item {
     }
 
     // Data surfaced to the wave shell's three-block chrome.
-    readonly property string title: "Launcher"
+    readonly property string title: root.controlCenterActive ? "Control Center" : "Launcher"
     // The masthead's subtitle line, which only the rail layout has room to
     // mean anything in. Under "blocks" it is empty: band 2 already names the
     // mode twice, and a mode's description sitting under the launcher's own
     // name describes neither, so the wiki-shaped masthead carries the site name
     // alone. Empty is a defined state — the header drops the slot rather than
     // reserving it.
-    readonly property string description: root.chromeLayout === "rail"
-            ? root.modeDescription(activeMode) : ""
+    readonly property string description: root.controlCenterActive
+            ? "System, audio and media"
+            : (root.chromeLayout === "rail" ? root.modeDescription(activeMode) : "")
     // Identity glyph for the masthead.
     readonly property string titleIcon: "icons/launcher.svg"
     // The navigation entries, in the order the chrome shows them. They used to
@@ -76,24 +85,24 @@ Item {
     // layouts read this one list, which is why it is named for what it holds
     // rather than for where it is drawn.
     //
-    // Two kinds of entry share it. The three primaries are FILTERS of this
-    // page: they rewrite the query and change what the list shows. The footer
-    // entry is not a filter - it leaves this page and switches the surface to
-    // the control-center route, which is why it is marked `section: "footer"`
-    // and answered by a different handler below. Declaring them together is
-    // deliberate: they share one accent indicator, and the hairline is what
-    // tells them apart.
+    readonly property string controlCenterEntryId: "control-center"
     readonly property var sectionEntries: [
         { id: "apps", label: "Apps", icon: "icons/apps.svg" },
         { id: "clipboard", label: "Clipboard", icon: "icons/clipboard.svg" },
         { id: "shortcuts", label: "Shortcuts", icon: "icons/keyboard.svg" },
-        { id: "control-center", label: "Control Center", icon: "icons/control-center.svg", section: "footer" }
+        { id: "control-center", label: "Control Center", icon: "icons/control-center.svg" }
     ]
     readonly property string activeMode: root.session && root.session.mode != null ? String(root.session.mode) : ""
     // Chrome-facing spelling of the same thing: in the page bar a tab selects a
     // section, and here a section IS a mode. Both names are published so the
     // host never has to fall back on a guess.
-    readonly property string activeSectionId: root.activeMode
+    readonly property string activeSectionId: root.controlCenterActive
+        ? root.controlCenterEntryId : root.activeMode
+
+    property bool controlCenterActive: false
+    property bool controlCenterBuilt: false
+    readonly property bool chromeVisible: !root.controlCenterActive
+    readonly property Item controlCenterItem: controlCenterLoader.item
 
     // Normalized free-text portion of the query; rows fold themselves against
     // it exactly like settings rows do under a search filter.
@@ -124,13 +133,8 @@ Item {
         root.session.category = id == null ? "" : String(id)
     }
 
-    // Emitted when a sidebar-driven mode change is applied to the session.
+    // Emitted when a section-driven mode change is applied to the session.
     signal modeChangeRequested(string mode)
-    // Emitted when the rail's footer action is chosen. A page switch, not a
-    // filter, so it travels as its own signal rather than riding the mode one:
-    // the owner changes this surface's route, which the session knows nothing
-    // about.
-    signal controlCenterRequested()
     // Bubbled from the activated result row so the owning surface can replay
     // the card's parabolic exit in a layer above the closing panel.
     signal exitFlingRequested(var spec)
@@ -213,7 +217,8 @@ Item {
                             row.releaseInstantly()
                     }
                 }
-                root.focusSearch()
+                if (!root.controlCenterActive)
+                    root.focusSearch()
                 // The full entrance wave is for a genuinely first paint; when
                 // reopening onto already-materialized rows it would fold the
                 // list away and re-reveal it row by row, reading as stale rows
@@ -239,6 +244,7 @@ Item {
                 // else can ever hand that row a fresh one.
                 root.rearmFailedThumbs()
                 root.rearmFailedIcons()
+                root.closeControlCenter()
             }
         }
         function onSelectedIndexChanged() {
@@ -281,6 +287,8 @@ Item {
     // Fallback key handling for focus held by the page itself or by rows;
     // the search field handles its own keys first and stops propagation.
     Keys.onPressed: event => {
+        if (root.controlCenterActive && event.key !== Qt.Key_Escape)
+            return
         switch (event.key) {
         case Qt.Key_Up:
             event.accepted = root.navigateSelection(-1)
@@ -317,9 +325,10 @@ Item {
     // both layouts route through here, so the name has to cover both.
     function handleSectionSelected(id) {
         if (id === "control-center") {
-            root.controlCenterRequested()
+            root.openControlCenter()
             return
         }
+        root.closeControlCenter()
         root.handleModeSelected(id)
     }
 
@@ -344,8 +353,6 @@ Item {
         for (var i = 0; i < root.sectionEntries.length; i++) {
             if (root.sectionEntries[i].id !== modeId)
                 continue
-            if (String(root.sectionEntries[i].section || "") === "footer")
-                return false
             return true
         }
         return false
@@ -362,6 +369,8 @@ Item {
     function executeSelected() {
         var service = root.session
         if (!service)
+            return
+        if (root.controlCenterActive)
             return
         var current = service.results && service.selectedIndex >= 0
                 ? service.results[service.selectedIndex] : null
@@ -386,6 +395,8 @@ Item {
 
     function navigateSelection(direction) {
         if (!root.session)
+            return false
+        if (root.controlCenterActive)
             return false
         // Keyboard navigation reclaims the preview: a resting mouse would
         // otherwise keep the hovered row previewed while the highlight moves.
@@ -413,6 +424,12 @@ Item {
     // wave shell by leaving the key unaccepted. The page never tears down
     // its own session.
     function handleEscape() {
+        if (root.controlCenterActive) {
+            var view = root.controlCenterItem
+            if (view && typeof view.handleBack === "function" && view.handleBack() !== false)
+                return true
+            return root.closeControlCenter()
+        }
         if (!root.session)
             return false
         var esc = LauncherLogic.escapeAction(root.session.query)
@@ -421,6 +438,49 @@ Item {
             return true
         }
         return false
+    }
+
+    readonly property bool canGoBack: root.controlCenterActive
+    function handleBack() { return root.handleEscape() }
+
+    function openControlCenter() {
+        if (root.controlCenterActive)
+            return false
+        root.controlCenterActive = true
+        controlCenterFocusTimer.restart()
+        return true
+    }
+
+    function closeControlCenter() {
+        if (!root.controlCenterActive)
+            return false
+        root.controlCenterActive = false
+        var view = root.controlCenterItem
+        if (view && view.detailActive === true && typeof view.closeSubPage === "function")
+            view.closeSubPage()
+        controlCenterFocusTimer.restart()
+        resultsView.syncSelectionFrame()
+        return true
+    }
+
+    function handOverControlCenterFocus() {
+        if (!root.controlCenterActive)
+            return false
+        var view = root.controlCenterItem
+        if (view && typeof view.focusDefault === "function") {
+            view.focusDefault()
+            return true
+        }
+        root.forceActiveFocus()
+        return true
+    }
+
+    Timer {
+        id: controlCenterFocusTimer
+        interval: 0
+        repeat: false
+        onTriggered: root.controlCenterActive
+            ? root.handOverControlCenterFocus() : root.focusSearch()
     }
 
     function focusSearch() {
@@ -432,7 +492,8 @@ Item {
         // nothing at all.
         if (!root.enabled)
             return
-        searchSurface.focusEditor()
+        if (!root.controlCenterActive)
+            searchSurface.focusEditor()
     }
 
     // Grab search focus when mounting onto an already-open session and when
@@ -843,7 +904,7 @@ Item {
         // the column's height folds that away with it — so everything below
         // still starts under the field rather than under a gap.
         height: cardPadding * 2 + searchSurface.height
-              + (categoryBar.visible ? queryGap + categoryBar.height : 0)
+              + (root.categoryChips.length > 1 ? queryGap + categoryBar.height : 0)
 
         Rectangle {
             anchors.fill: parent
@@ -863,6 +924,7 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: queryColumn.cardPadding
             height: root.insetQuery ? 40 : 44
+            visible: !root.controlCenterActive
 
             // Last query value pushed from this page into the session; external
             // session changes always differ from it and are adopted below.
@@ -934,13 +996,13 @@ Item {
             id: categoryBar
             objectName: "launcherCategoryBar"
             anchors.top: searchSurface.bottom
-            anchors.topMargin: visible ? queryColumn.queryGap : 0
+            anchors.topMargin: root.categoryChips.length > 1 ? queryColumn.queryGap : 0
             anchors.left: parent.left
             anchors.leftMargin: queryColumn.cardPadding
             anchors.right: parent.right
             anchors.rightMargin: queryColumn.cardPadding
-            height: visible ? implicitHeight : 0
-            visible: root.categoryChips.length > 1
+            height: root.categoryChips.length > 1 ? implicitHeight : 0
+            visible: !root.controlCenterActive && root.categoryChips.length > 1
             chips: root.categoryChips
             selected: root.activeCategory
             onChipSelected: id => {
@@ -1354,7 +1416,7 @@ Item {
         anchors.rightMargin: root.insetQuery ? 14 : 8
         anchors.bottom: parent.bottom
         width: parent.width / 2
-        visible: shown
+        visible: root.chromeVisible && shown
         color: LazerTheme.settingsCard
         radius: 6
         clip: true
@@ -1523,7 +1585,7 @@ Item {
                 ? (root.insetQuery ? 14 : 12)
                 : (root.insetQuery ? 14 : 8)
         clip: true
-        visible: !root.sessionLoading && !root.sessionError
+        visible: !root.controlCenterActive && !root.sessionLoading && !root.sessionError
         contentWidth: width
         contentHeight: resultsColumn.height + listFooter.height
         // The decode queue ranks rows against this viewport, so every shape
@@ -1985,4 +2047,36 @@ Item {
             }
         }
     }
+
+    // Retained control-center view occupying the same content area as the launcher.
+    Loader {
+        id: controlCenterLoader
+        objectName: "launcherControlCenter"
+        anchors.fill: parent
+        active: root.controlCenterActive || root.controlCenterBuilt
+        visible: root.controlCenterActive
+        enabled: root.controlCenterActive
+        sourceComponent: controlCenterComponent
+        onLoaded: {
+            root.controlCenterBuilt = true
+            if (root.controlCenterActive)
+                root.handOverControlCenterFocus()
+        }
+    }
+
+    Component {
+        id: controlCenterComponent
+        ControlCenter {
+            networkService: root.networkService
+            bluetoothService: root.bluetoothService
+            volumeService: root.volumeService
+            mediaService: root.mediaService
+            batteryService: root.batteryService
+            notificationService: root.notificationService
+            weatherService: root.weatherService
+        }
+    }
+
+    readonly property bool controlCenterVisible: controlCenterLoader.visible
+        && controlCenterLoader.item !== null
 }

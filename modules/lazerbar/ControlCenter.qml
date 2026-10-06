@@ -1,13 +1,12 @@
 import QtQuick
 import "ControlCenterLogic.js" as CcLogic
 
-// B1 control-center overview: a balanced two-column surface on the shared Wave
-// host, sibling to the launcher and reached through
-// WaveSurfaceHost.openRoute("control-center").
+// B1 control-center overview: a balanced two-column view mounted inside the
+// launcher's content area. Apps, Clipboard, Shortcuts and this view are peers
+// owned by LauncherPage, so this component owns no route chrome.
 //
-// It implements the Wave route-page contract the host reads - title,
-// description, titleIcon, sectionEntries, activeSectionId, pageLabel,
-// canGoBack, handleBack(), focusDefault() - and adds exactly four core
+// It keeps detailActive, handleBack() and focusDefault() for its same-surface
+// detail stack, and adds exactly four core
 // controls: network, Bluetooth, volume and media. Battery is read-only header
 // state and weather is an optional header, so neither is a card, and neither
 // can block the first open.
@@ -27,9 +26,8 @@ import "ControlCenterLogic.js" as CcLogic
 // cannot drift apart. Every position comes from ControlCenterLogic's own section
 // order, so neither arrangement invents a vocabulary.
 //
-// The details are sub-pages of this one page, cross-faded in place on
-// MotionTokens.waveRoute - the same surface, the same viewport, the same timing
-// the host uses for a sibling-route swap - with the overview retained and alive
+// The details are sub-pages of this one view, cross-faded in place on
+// MotionTokens.waveRoute with the overview retained and alive
 // for the length of its own exit.
 //
 // Sharp language: every block is a right-angled rectangle, state is carried by
@@ -73,38 +71,15 @@ Item {
     // real Timer quickly instead of calling a function production never calls.
     property int clockTickInterval: 1000
 
-    // Focus landings, so a caller can prove the route's own focus target was used
+    // Focus landings, so a caller can prove the view's own focus target was used
     // rather than the launcher's search field. Diagnostics only.
     readonly property int focusDefaultCount: _focusDefaultCount
     property int _focusDefaultCount: 0
 
-    // --- Wave route-page contract ---
-
-    readonly property string title: "Control Center"
-    readonly property string description: "System, audio and media"
-    readonly property string titleIcon: "icons/control-center.svg"
-    // No section tabs: the host collapses the whole page band to zero height for
-    // an empty list, so the content column rises to sit under the masthead
-    // instead of reserving an empty strip. The control center's navigation is a
-    // back stack, not a set of siblings — which is exactly what pageLabel below
-    // is for.
-    readonly property var sectionEntries: []
-    readonly property string activeSectionId: ""
-    // The page band's name slot, which no tab could fill: the overview is the
-    // default, and a detail sub-page names itself (both sub-pages publish a
-    // title). Read through detailPageItem rather than a hardcoded id list, so
-    // the name and the mounted page cannot disagree.
-    readonly property string pageLabel: {
-        var detail = root.detailActive ? root.detailPageItem : null
-        if (detail && detail.title !== undefined && String(detail.title) !== "")
-            return String(detail.title)
-        return "Overview"
-    }
-
     // --- Same-surface sub-pages ---
     //
-    // The network and Bluetooth details are SUB-PAGES of this route, not sibling
-    // Wave routes: the host keeps ONE Loader on ONE surface, and this page swaps
+    // The network and Bluetooth details are SUB-PAGES of this view: the page keeps
+    // ONE Loader on ONE surface, and swaps
     // what that Loader shows. So the names come from the module - which is where
     // they are declared - and a name the module does not declare mounts nothing.
     //
@@ -113,53 +88,28 @@ Item {
     property string activeSubPage: ""
     readonly property bool detailActive: root.activeSubPage !== ""
 
-    // --- Entry context ---
-    //
-    // Where THIS open came from, handed in by the wave owner that opened the
-    // route. It cannot be worked out from inside the page: there is no session,
-    // no coordinator and no record of what was on screen a moment ago, and the
-    // two cases look identical from here - a control center that replaced a
-    // visible launcher and one opened straight from the bar entry are the same
-    // route with the same services.
-    //
-    // So the owner passes it explicitly, and the page's only job is to honour
-    // it. Default false is the conservative answer: a page that nobody gave
-    // entry context treats back as "close the surface", which is the behaviour
-    // that existed before entry context existed.
-    property bool enteredFromLauncher: false
-
-    // What one back press means here, from the module: an active detail page
-    // consumes it, then the sibling launcher route, then closing the surface.
-    // The host never learns about any of this - it asks whether the page can go
-    // back and hands the press over - so this is the one place the precedence
-    // in the spec is decided.
+    // What one back press means here: an active detail page consumes it. The
+    // surrounding LauncherPage owns the view-level and surface-level steps.
     readonly property string backAction: CcLogic.backAction(root.activeSubPage,
-        root.detailActive ? root.detailPageItem : null, root.enteredFromLauncher)
+        root.detailActive ? root.detailPageItem : null)
 
-    // Exactly the mirror of the module's "close": anything else is a step this
-    // page owns. Both halves of the host's contract are published together -
+    // Exactly the mirror of the module's "none": anything else is a step this
+    // view declines. Both halves of the local contract are published together -
     // `canGoBack` true with no callable `handleBack()` would take every press
     // and do nothing with it.
-    readonly property bool canGoBack: root.backAction !== "close"
+    readonly property bool canGoBack: root.backAction !== "none"
 
-    // Back is route-local. A detail page pops itself; the overview returns to the
-    // launcher only when that is where the route was entered from, which is a
-    // REQUEST the wave owner answers, because this page does not own the session
-    // and cannot route itself. Everything else declines, and declining is what
-    // lets the host fall through to closing the surface.
+    // Back is view-local. The overview declines so LauncherPage can leave the
+    // view or let the host close the surface.
     function handleBack() {
         if (root.backAction === "detail") {
             root.closeSubPage()
             return true
         }
-        if (root.backAction === "launcher") {
-            root.overviewBackRequested()
-            return true
-        }
         return false
     }
 
-    // Where keyboard focus lands when this route opens. The page itself, never a
+    // Where keyboard focus lands when this view opens. The page itself, never a
     // control: the cards join the tab chain on their own, so Tab moves from here
     // into the first ready card without the host having to know which that is.
     //
@@ -307,20 +257,9 @@ Item {
 
     // --- Requests out of the page ---
     //
-    // A card's activation is a REQUEST, and this page is also the component that
-    // answers it: the details live here, so the request never leaves the route.
+    // A card's activation is a REQUEST, and this view answers it locally.
     signal networkDetailsRequested()
     signal bluetoothDetailsRequested()
-
-    // The overview returning to the launcher, which is this route's one request
-    // it cannot answer itself - the launcher is a sibling route on the same wave
-    // surface, owned by the same wave owner, and this page holds neither the
-    // session nor the coordinator that would dispatch the change.
-    //
-    // So it is emitted and the wave owner answers it through the same
-    // `requestRoute()` funnel every other open and close of that surface goes
-    // through. A page that routed itself would be a second dispatch table.
-    signal overviewBackRequested()
 
     // Asking for the full notification list.
     //
@@ -1202,7 +1141,7 @@ Item {
 
     // --- Same-surface sub-page slot ---
     //
-    // ONE Loader for the whole route, holding whichever detail page is active.
+    // ONE Loader for the whole view, holding whichever detail page is active.
     // It is inside this page, not inside the wave host, which is what makes the
     // details sub-pages: the host keeps a single retained Loader on a single
     // surface, and this swaps its content without a route change, a second
