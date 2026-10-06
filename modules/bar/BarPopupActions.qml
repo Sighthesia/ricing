@@ -2082,7 +2082,8 @@ Item {
 
                         objectName: "wiredGroupCard" + wiredGroupCard.index
                         width: wifiColumn.width
-                        height: wiredGroupColumn.height + 16
+                        // The column starts 8px down, leaving a tighter 6px foot.
+                        height: wiredGroupColumn.height + 14
                         radius: 6
                         color: LazerTheme.settingsCard
 
@@ -2146,10 +2147,8 @@ Item {
                                     objectName: "wiredProfileRow" + wiredGroupCard.index
                                         + "_" + wiredProfileRow.index
                                     width: wiredGroupColumn.width
-                                    // Exactly the two text lines it holds (6 + 14 +
-                                    // 12), so the card's bottom padding matches its
-                                    // top. A row taller than its content reads as a
-                                    // card with a stray gap under the last line.
+                                    // Leave balanced space around the centered two-line
+                                    // identity while keeping the action on this row axis.
                                     height: 32
                                     color: wiredProfileHover.hovered
                                         ? LazerTheme.settingsCardHover : "transparent"
@@ -2172,42 +2171,47 @@ Item {
                                         }
                                     }
 
-                                    Text {
-                                        id: wiredProfileNameText
-                                        objectName: "wiredProfileNameText"
-                                            + wiredGroupCard.index + "_" + wiredProfileRow.index
+                                    // Keep the two-line profile identity centered on the same
+                                    // row axis as its action and active indicator.
+                                    Item {
+                                        id: wiredProfileTextBlock
                                         anchors.left: parent.left
                                         anchors.leftMargin: 12
                                         anchors.right: wiredProfileStateText.left
                                         anchors.rightMargin: 6
-                                        anchors.top: parent.top
-                                        anchors.topMargin: 6
-                                        height: 14
-                                        text: String(wiredProfileRow.modelData.name || "")
-                                        color: LazerTheme.textPrimary
-                                        font.pixelSize: 11
-                                        font.bold: true
-                                        elide: Text.ElideRight
-                                        maximumLineCount: 1
-                                    }
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        height: 26
 
-                                    // The address a static profile will hand out,
-                                    // or the method when it has none yet.
-                                    Text {
-                                        id: wiredProfileMetaText
-                                        objectName: "wiredProfileMetaText"
-                                            + wiredGroupCard.index + "_" + wiredProfileRow.index
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 12
-                                        anchors.right: parent.right
-                                        anchors.rightMargin: 10
-                                        anchors.top: wiredProfileNameText.bottom
-                                        height: 12
-                                        text: root.wiredProfileMeta(wiredProfileRow.modelData)
-                                        color: LazerTheme.textMuted
-                                        font.pixelSize: 9
-                                        elide: Text.ElideRight
-                                        maximumLineCount: 1
+                                        Text {
+                                            id: wiredProfileNameText
+                                            objectName: "wiredProfileNameText"
+                                                + wiredGroupCard.index + "_" + wiredProfileRow.index
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            anchors.top: parent.top
+                                            height: 14
+                                            text: String(wiredProfileRow.modelData.name || "")
+                                            color: LazerTheme.textPrimary
+                                            font.pixelSize: 11
+                                            font.bold: true
+                                            elide: Text.ElideRight
+                                            maximumLineCount: 1
+                                        }
+
+                                        Text {
+                                            id: wiredProfileMetaText
+                                            objectName: "wiredProfileMetaText"
+                                                + wiredGroupCard.index + "_" + wiredProfileRow.index
+                                            anchors.left: parent.left
+                                            anchors.right: parent.right
+                                            anchors.top: wiredProfileNameText.bottom
+                                            height: 12
+                                            text: root.wiredProfileMeta(wiredProfileRow.modelData)
+                                            color: LazerTheme.textMuted
+                                            font.pixelSize: 9
+                                            elide: Text.ElideRight
+                                            maximumLineCount: 1
+                                        }
                                     }
 
                                     // What a tap will do, stated on the row
