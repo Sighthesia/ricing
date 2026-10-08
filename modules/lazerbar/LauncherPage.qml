@@ -111,10 +111,11 @@ Item {
         { id: "control-center", label: "Control Center", icon: "icons/control-center.svg", section: "footer" }
     ]
     readonly property string activeMode: root.session && root.session.mode != null ? String(root.session.mode) : ""
-    // Chrome-facing spelling of the same thing: in the page bar a tab selects a
-    // section, and here a section IS a mode. Both names are published so the
-    // host never has to fall back on a guess.
-    readonly property string activeSectionId: root.activeMode
+    // Chrome-facing selection: the view on screen, not just the query mode.
+    // While the control center owns the content area the rail/page-bar
+    // selection follows it, so the shared accent strip can land on its entry.
+    readonly property string activeSectionId: root.controlCenterActive
+            ? root.controlCenterEntryId : root.activeMode
     readonly property string controlCenterEntryId: "control-center"
 
     // The control center is a retained view inside this page, not a launcher
