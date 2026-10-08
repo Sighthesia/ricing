@@ -966,6 +966,10 @@ Item {
     Item {
         id: queryColumn
         objectName: "launcherQueryColumn"
+        // The launcher's own query surface. It yields the content area to the
+        // control-center view, which paints its own header in the same space.
+        visible: root.chromeVisible
+        enabled: root.chromeVisible
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
