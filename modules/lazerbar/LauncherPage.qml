@@ -1040,7 +1040,9 @@ Item {
             OsuTextField {
                 id: editor
                 anchors.left: parent.left
-                anchors.leftMargin: 12
+                // Rail chrome: text starts flush with the sidebar edge like
+                // the chips below; blocks keeps the 12px text margin.
+                anchors.leftMargin: root.insetQuery ? 12 : 0
                 anchors.right: parent.right
                 anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
