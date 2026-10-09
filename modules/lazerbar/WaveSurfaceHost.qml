@@ -77,6 +77,17 @@ Item {
     property bool railExpanded: true
     readonly property int railWidth: root.railExpanded
             ? LazerTheme.settingsSidebarExpandedWidth : LazerTheme.settingsSidebarContractedWidth
+    // Top inset of the rail/content hairline, read from the mounted page: a
+    // page whose own header strip spans the full content width (the
+    // launcher's query surface) keeps the divider below it. Pages without
+    // the contract keep the full-height rule.
+    readonly property real dividerTopInset: {
+        var page = root.routePage
+        if (!page || page.dividerTopInset === undefined)
+            return 0
+        var inset = Number(page.dividerTopInset)
+        return isFinite(inset) && inset > 0 ? inset : 0
+    }
     // `final` keeps this intentional name from shadowing Item.palette.
     final property var palette: ({})
     // Route page components, keyed by route name. The host holds no knowledge of
@@ -369,11 +380,13 @@ Item {
                 }
             }
 
-            // Hairline between the rail and the content column. A full-height
-            // rule, because the rail runs to the bottom and the content scrolls
-            // against it for the whole session.
+            // Hairline between the rail and the content column. It starts below
+            // the page's full-width header strip (the launcher's query
+            // surface merges with the rail tone, so a rule through it reads
+            // as a stray tick) and separates the rail from the results.
             Rectangle {
                 anchors.top: header.bottom
+                anchors.topMargin: root.dividerTopInset
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
                 anchors.leftMargin: root.railWidth
