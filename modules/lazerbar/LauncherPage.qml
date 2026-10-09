@@ -1088,6 +1088,10 @@ Item {
             height: visible ? implicitHeight : 0
             visible: root.categoryChips.length > 1
             chips: root.categoryChips
+            // Rail chrome: the content column already starts at the sidebar's
+            // right edge, so the first chip sits flush with it instead of
+            // leaving a blank strip. Blocks keeps the inset to match the field.
+            railPadding: root.insetQuery ? 12 : 0
             selected: root.activeCategory
             onChipSelected: id => {
                 root.setCategory(id)
