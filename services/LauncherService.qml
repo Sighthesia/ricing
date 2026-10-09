@@ -190,6 +190,9 @@ Singleton {
     readonly property alias mode: session.mode
     // Active category chip; "" is the unfiltered "All" chip.
     property alias category: session.category
+    // Published chip counts for the current pool and query; the page builds
+    // its chip bar from this, so it must be re-exposed like category itself.
+    readonly property alias categorySummary: session.categorySummary
     property alias results: session.results
     // Stable per-mode pool the surface renders; text filtering is local.
     property alias displayPool: session.displayPool
