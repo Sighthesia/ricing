@@ -666,7 +666,12 @@ QtObject {
             // rather than dropping it on a transient source failure.
             if (!answered)
                 return
-            var sorted = LauncherLogic.sortResults(collected)
+            // Same transient-empty protection as the visible path: a
+            // background pull that resolves an app to an empty icon must
+            // not wipe the healthy pooled row, or the next open serves
+            // a batch of blank icons.
+            var sorted = LauncherLogic.preferStableIcons(
+                root.displayPool, LauncherLogic.sortResults(collected))
             if (!LauncherLogic.poolMatches(sorted, root.displayPool)) {
                 root.displayPool = sorted
                 root.publishCategorySummary(true)
