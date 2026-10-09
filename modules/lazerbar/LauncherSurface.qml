@@ -196,6 +196,30 @@ Item {
         function onVisibleChanged() { root.syncVisibility() }
     }
 
+    // Rail collapse round-trip with the session: the persisted value seeds
+    // the host once, and user toggles write back through the same seam.
+    // Seeding is one-shot, not a binding — assigning the toggle would
+    // silently drop a binding and strand later updates.
+    function syncRailFromSession() {
+        if (!root.session || root.session.railExpanded === undefined)
+            return
+        if (waveHost.railExpanded !== root.session.railExpanded)
+            waveHost.railExpanded = root.session.railExpanded
+    }
+
+    Component.onCompleted: root.syncRailFromSession()
+    onSessionChanged: root.syncRailFromSession()
+
+    Connections {
+        target: waveHost
+        function onRailExpandedChanged() {
+            if (!root.session || root.session.railExpanded === undefined)
+                return
+            if (root.session.railExpanded !== waveHost.railExpanded)
+                root.session.railExpanded = waveHost.railExpanded
+        }
+    }
+
     Connections {
         target: waveHost
         function onOpened() {

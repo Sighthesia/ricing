@@ -93,12 +93,15 @@ Rectangle {
     }
 
     // Bottom collapse toggle carrying the settings sidebar's flash contract.
+    // Sized like a category chip (26px tall, 4px radius) and inset like the
+    // nav column above it, so it reads as one more rail element rather than
+    // a separate bar.
     Item {
         id: collapseButton
-        x: 0
+        x: 10
         y: root.height - height - 8
-        width: root.width
-        height: 40
+        width: Math.max(0, root.width - 20)
+        height: 26
         Accessible.role: Accessible.Button
         Accessible.name: root.expanded ? "收起侧栏" : "展开侧栏"
 
@@ -107,7 +110,7 @@ Rectangle {
 
         Rectangle {
             anchors.fill: parent
-            radius: 12
+            radius: 4
             color: collapseHover.hovered ? LazerTheme.settingsRowHover : "transparent"
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
@@ -116,7 +119,7 @@ Rectangle {
             id: collapseFlashOverlay
             z: 1
             anchors.fill: parent
-            radius: 12
+            radius: 4
             color: LazerTheme.textPrimary
             opacity: 0
             enabled: false
@@ -125,8 +128,8 @@ Rectangle {
         Image {
             id: collapseIcon
             anchors.centerIn: parent
-            width: 20
-            height: 20
+            width: 16
+            height: 16
             source: root.expanded ? "icons/chevron-left.svg" : "icons/chevron-right.svg"
             fillMode: Image.PreserveAspectFit
         }

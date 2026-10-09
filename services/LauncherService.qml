@@ -267,6 +267,53 @@ Singleton {
         console.log("[launcher] chrome layout ->", root.chromeLayout)
     }
 
+    // Sidebar rail collapse state, persisted across restarts. Toggles are
+    // human-scale rare, so it persists immediately like launch counts
+    // rather than through a debounced queue.
+    property bool railExpanded: true
+    property bool _railAdopted: false
+
+    function _adoptRailState(text) {
+        if (root._railAdopted)
+            return
+        var expanded = true
+        try {
+            if (text) {
+                var parsed = JSON.parse(String(text))
+                if (parsed && typeof parsed.railExpanded === "boolean")
+                    expanded = parsed.railExpanded
+            }
+        } catch (err) {
+            console.warn("LauncherService: unreadable launcher.json:", err)
+            return
+        }
+        root._railAdopted = true
+        root.railExpanded = expanded
+    }
+
+    onRailExpandedChanged: {
+        if (root._railAdopted)
+            railStateFile.setText(JSON.stringify({ railExpanded: root.railExpanded }))
+    }
+
+    FileView {
+        id: railStateFile
+        path: Quickshell.statePath("launcher.json")
+        blockLoading: true
+        watchChanges: false
+        onLoaded: root._adoptRailState(railStateFile.text())
+        onLoadFailed: error => {
+            if (error !== FileViewError.FileNotFound) {
+                console.warn("LauncherService: failed to load launcher.json:", error)
+                return
+            }
+            // Materialize defaults so only the very first boot logs the
+            // missing file; later restarts read it back cleanly.
+            railStateFile.setText(JSON.stringify({ railExpanded: root.railExpanded }))
+            root._adoptRailState("")
+        }
+    }
+
     // IPC surface for the launcher entry and niri keybind integration.
     IpcHandler {
         target: "launcher"
