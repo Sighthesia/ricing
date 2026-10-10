@@ -1104,11 +1104,6 @@ Item {
         }
     }
 
-    // Divider contract for the host: the query strip spans the full
-    // content width and merges with the rail tone, so the rail/content
-    // hairline only separates the sidebar from the results below it.
-    readonly property real dividerTopInset: root.chromeVisible ? queryColumn.height : 0
-
     // Result viewport: settings-panel structure (Flickable + folding rows)
     // so entrance wave, query reordering, and the scroll contract behave
     // exactly like LazerSettingsSections.
