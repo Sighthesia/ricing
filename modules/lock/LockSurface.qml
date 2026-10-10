@@ -667,7 +667,8 @@ WlSessionLockSurface {
     }
 
     // Keep release ownership in the animation completion path.
-    // One driver sweeps bands and trailing mask as a single curtain.
+    // One driver sweeps bands and trailing mask as a single curtain, on osu's
+    // WaveContainer show easing (OutSine).
     NumberAnimation {
         id: enterAnimation
         target: root
@@ -675,19 +676,18 @@ WlSessionLockSurface {
         from: 0
         to: 1
         duration: Lazer.MotionTokens.waveEnter
-        easing.type: Easing.OutQuad
+        easing.type: Easing.OutSine
     }
 
-    // Unlock reverses the same curtain; release fires on landing. Fast start
-    // stays responsive while the gentle OutQuad tail settles the bands past
-    // the edge instead of rushing them into it.
+    // Unlock reverses the same curtain on osu's hide easing (InSine); release
+    // fires on landing.
     NumberAnimation {
         id: exitAnimation
         target: root
         property: "waveProgress"
         to: 0
         duration: Lazer.MotionTokens.waveExit
-        easing.type: Easing.OutQuad
+        easing.type: Easing.InSine
         onFinished: root.requestRelease()
     }
 

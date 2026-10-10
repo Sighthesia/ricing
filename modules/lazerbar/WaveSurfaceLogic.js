@@ -10,6 +10,10 @@
 // coordinator owner, all for content the same page already had to host.
 var routes = ["launcher"]
 var waveAngles = [13, -7, 4, -2]
+// osu!lazer WaveContainer.FinalPosition values, absolute pixels
+// (osu.Game/Graphics/Containers/WaveContainer.cs, https://github.com/ppy/osu).
+// Absolute like the source: they do not scale with viewport height.
+var waveFinalPositions = [-930, -560, -390, -220]
 
 function isRoute(route) {
     return routes.indexOf(route) >= 0
@@ -51,6 +55,12 @@ function waveAngle(index) {
     var candidate = Number(index)
     return isFinite(candidate) && candidate >= 0 && candidate < waveAngles.length
             ? waveAngles[Math.floor(candidate)] : 0
+}
+
+function waveFinalPosition(index) {
+    var candidate = Number(index)
+    return isFinite(candidate) && candidate >= 0 && candidate < waveFinalPositions.length
+            ? waveFinalPositions[Math.floor(candidate)] : 0
 }
 
 function sidebarWidth(value) {

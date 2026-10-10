@@ -429,8 +429,8 @@ Item {
         easing.type: Easing.OutQuint
         onFinished: if (root.phase === "opening") root.phase = "open"
     }
-    // Backdrop waves lead the body so they stay visible while content slides over them.
-    NumberAnimation { id: openWaves; target: root; property: "waveProgress"; to: 1; duration: MotionTokens.reducedMotion ? MotionTokens.fast : MotionTokens.waveBackdropEnter; easing.type: Easing.OutQuad }
+    // osu APPEAR_DURATION: waves ride the same 800ms as the body, OutSine.
+    NumberAnimation { id: openWaves; target: root; property: "waveProgress"; to: 1; duration: MotionTokens.reducedMotion ? MotionTokens.fast : MotionTokens.waveEnter; easing.type: Easing.OutSine }
     NumberAnimation {
         id: closeBody
         target: root

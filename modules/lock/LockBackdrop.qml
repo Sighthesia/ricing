@@ -146,33 +146,37 @@ Item {
         // the capture and the wallpaper, which is what lets them read as a wave
         // sweeping *something* — the capture for a manual lock, the wallpaper for
         // a session-start lock.
+        // Rest offsets are osu WaveContainer.FinalPosition absolutes; odd layers
+        // anchor right like osu's TopRight second/fourth waves.
         Lazer.FullscreenWave {
             anchors.fill: parent
             progress: root.progress
             angle: 13
             colour: Lazer.LazerTheme.wavePalette.light4
-            restOffset: -height * 0.72
+            restOffset: -930
         }
         Lazer.FullscreenWave {
             anchors.fill: parent
             progress: root.progress
             angle: -7
+            anchorRight: true
             colour: Lazer.LazerTheme.wavePalette.light3
-            restOffset: -height * 0.5
+            restOffset: -560
         }
         Lazer.FullscreenWave {
             anchors.fill: parent
             progress: root.progress
             angle: 4
             colour: Lazer.LazerTheme.wavePalette.dark4
-            restOffset: -height * 0.32
+            restOffset: -390
         }
         Lazer.FullscreenWave {
             anchors.fill: parent
             progress: root.progress
             angle: -2
+            anchorRight: true
             colour: Lazer.LazerTheme.wavePalette.dark3
-            restOffset: -height * 0.16
+            restOffset: -220
         }
     }
 

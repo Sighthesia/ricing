@@ -13,11 +13,11 @@ QtObject {
     readonly property int page: 320
     readonly property int backdropEnter: 120
 
-    // Match osu!lazer's full-screen wave and side-panel timing contracts.
+    // osu!lazer WaveContainer APPEAR/DISAPPEAR durations: body and backdrop
+    // waves share one duration; their easings differ at the call site
+    // (body OutQuint, waves OutSine / InSine).
     readonly property int waveEnter: 800
     readonly property int waveExit: 500
-    // Backdrop waves lead the body so they stay visible while content slides over them.
-    readonly property int waveBackdropEnter: 600
 
     // Lock-screen unlock: every content block drops away together on the osu
     // notification fling (gravity drop + InQuad fade) before the wave closes

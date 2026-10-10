@@ -25,11 +25,12 @@ Item {
             anchors.fill: parent
             progress: root.progress
             angle: Logic.waveAngle(index)
+            anchorRight: (index % 2) === 1
             colour: index === 0 ? (root.palette.light4 || "transparent")
                     : index === 1 ? (root.palette.light3 || "transparent")
                     : index === 2 ? (root.palette.dark4 || "transparent")
                     : (root.palette.dark3 || "transparent")
-            restOffset: -parent.height * ([0.72, 0.5, 0.32, 0.16][index])
+            restOffset: Logic.waveFinalPosition(index)
         }
     }
 }
