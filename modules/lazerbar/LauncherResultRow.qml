@@ -367,6 +367,12 @@ Item {
 
 
         // Colorful enlarged icon: original colors preserved.
+        // Synchronous on purpose: the in-process async pixmap pipeline can
+        // stall permanently in a long session (single reader thread parked
+        // with jobs queued - sync theme/workspace icons keep painting while
+        // every async load starves, and only a restart recovers). The sync
+        // provider path stays healthy, and a 28px theme lookup costs far
+        // less than the stall it routes around.
         Image {
             id: iconImage
             visible: root.iconSource.length > 0 && !root.iconFailed && !thumbImage.visible
@@ -379,7 +385,7 @@ Item {
             height: 28
             source: root.iconReloadToken % 2 === 0 ? root.iconSource : ""
             fillMode: Image.PreserveAspectFit
-            asynchronous: true
+            asynchronous: false
             onStatusChanged: {
                 if (status === Image.Error && root.iconSource.length > 0) {
                     root.iconFailed = true
@@ -397,6 +403,9 @@ Item {
         // icon rail with no extra frame - the pixels speak for themselves.
         // A failed load hides the slot via thumbFailed; the thumbPath
         // binding itself is never touched (see its declaration).
+        // Synchronous like the app icon above: same wedged-async-pipeline
+        // immunity, and the decode is capped at 2x display size so a
+        // full-resolution paste never blocks the row on full pixels.
         Image {
             id: thumbImage
             visible: root.isClipboardImage && root.thumbPath.length > 0 && !root.thumbFailed
@@ -406,8 +415,10 @@ Item {
             width: 36
             height: Math.min(52, root.rowHeight - 12)
             source: root.thumbPath
+            sourceSize.width: 72
+            sourceSize.height: 104
             fillMode: Image.PreserveAspectFit
-            asynchronous: true
+            asynchronous: false
             enabled: false
             onStatusChanged: {
                 if (status === Image.Error && root.thumbPath.length > 0) {

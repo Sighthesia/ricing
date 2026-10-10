@@ -321,6 +321,29 @@ Singleton {
         function openClipboard() { root.openClipboard() }
         function openShortcuts() { root.openShortcuts() }
         function chrome() { root.toggleChrome() }
+        // On-demand pool health probe for the disappearing-icons class:
+        // `scripts/afloat-ipc launcher iconStats` prints the pooled mode,
+        // pool size and empty-icon count, which tells a poisoned pool apart
+        // from a wedged image pipeline (healthy pool, blank rows).
+        function iconStats() {
+            var pool = session.displayPool || []
+            var emptyTotal = 0
+            var sample = []
+            for (var i = 0; i < pool.length; i++) {
+                var item = pool[i]
+                var icon = item && item.icon != null ? String(item.icon) : ""
+                if (!icon.length) {
+                    emptyTotal++
+                    if (sample.length < 10)
+                        sample.push(item && item.id != null ? String(item.id) : "?")
+                }
+            }
+            console.log("[launcher][iconstats] mode=" + session.mode
+                        + " pooledMode=" + session._pooledMode
+                        + " pool=" + pool.length
+                        + " emptyIcon=" + emptyTotal
+                        + " sample=" + JSON.stringify(sample))
+        }
     }
 
     Process {
