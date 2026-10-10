@@ -312,7 +312,12 @@ Item {
             height: root.height
             radius: 0
             color: LazerTheme.overlayContentSurface
-            opacity: root.bodyProgress
+            // Opaque while travelling: osu's content has no opacity animation,
+            // so the panel swallows the bands bottom-up in one gesture. Fading
+            // the panel mid-slide lets the bands bleed through and reads as a
+            // flash (appear, ghost, reappear). Reduced motion keeps the fade
+            // since it removes translation entirely.
+            opacity: MotionTokens.reducedMotion ? root.bodyProgress : 1
 
             // Band 1 in both layouts: the identity masthead.
             FullscreenHeader {
