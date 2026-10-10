@@ -15,6 +15,10 @@ Item {
     property color textColor
     property int pixelSize: 12
     property bool bold: false
+    // Optional low-contrast outline for text crossing animated backgrounds.
+    // Disabled by default so existing labels keep their original rendering.
+    property int textStyle: Text.Normal
+    property color textStyleColor: "transparent"
     readonly property bool overflowing: metrics.advanceWidth > root.maxWidth
     // Exposed for entrance/ghost choreography that needs the raw label or
     // the clipping slot (e.g. per-character fade-ins sharing this origin).
@@ -39,6 +43,8 @@ Item {
 
             text: root.text
             color: root.textColor
+            style: root.textStyle
+            styleColor: root.textStyleColor
             font.pixelSize: root.pixelSize
             font.bold: root.bold
             // Match the scan row's independent glyph layout at handback.
@@ -488,6 +494,8 @@ Item {
 
             font.pixelSize: root.pixelSize
             elide: Text.ElideNone
+            style: root.textStyle
+            styleColor: root.textStyleColor
 
             Behavior on y { NumberAnimation { duration: root.ghostFallTime; easing.type: Easing.InQuad } }
             Behavior on opacity { NumberAnimation { duration: root.ghostFallTime; easing.type: Easing.InQuad } }
@@ -554,6 +562,8 @@ Item {
                     x: xOffset
                     text: enterRow.chars[index]
                     color: root.textColor
+                    style: root.textStyle
+                    styleColor: root.textStyleColor
                     font.pixelSize: root.pixelSize
                     font.bold: root.bold
                     font.kerning: false
