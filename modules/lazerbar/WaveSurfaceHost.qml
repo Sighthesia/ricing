@@ -288,8 +288,6 @@ Item {
             id: waveLayers
             progress: root.waveProgress
             palette: root.palette
-            // Push the fan with the panel edge so no layer is ever swallowed.
-            edge: body.y
         }
 
         // Move the continuous body inside the fixed compositor-facing owner.
