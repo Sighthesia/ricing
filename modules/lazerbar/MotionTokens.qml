@@ -18,6 +18,10 @@ QtObject {
     // (body OutQuint, waves OutSine / InSine).
     readonly property int waveEnter: 800
     readonly property int waveExit: 500
+    // Backdrop waves run shorter than the body so the fan stays ahead of the
+    // fast-starting panel: with equal durations the OutQuint panel lands early
+    // and swallows the lower (darker) layers mid-transition.
+    readonly property int waveBackdropEnter: 600
 
     // Lock-screen unlock: every content block drops away together on the osu
     // notification fling (gravity drop + InQuad fade) before the wave closes
