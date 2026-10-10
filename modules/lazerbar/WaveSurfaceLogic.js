@@ -63,6 +63,13 @@ function waveFinalPosition(index) {
             ? waveFinalPositions[Math.floor(candidate)] : 0
 }
 
+// Push offset of one layer relative to the stack bottom (the fourth wave):
+// pinning every layer to the panel edge by this offset rides the whole fan
+// ahead of the panel instead of letting the panel swallow the lower layers.
+function wavePushOffset(index) {
+    return waveFinalPosition(index) - waveFinalPosition(waveFinalPositions.length - 1)
+}
+
 function sidebarWidth(value) {
     return clamp(value, 176, 280)
 }
