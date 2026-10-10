@@ -291,6 +291,11 @@ Item {
         }
 
         // Move the continuous body inside the fixed compositor-facing owner.
+        // It travels two viewport heights, like osu's content container
+        // (relative Y 2 -> 0): the body starts fully below the screen so the
+        // backdrop waves sweep visibly first and the panel follows and
+        // swallows them. Starting at one height kept the opaque body over the
+        // waves from the first frame and reduced the sweep to a late sliver.
         //
         // Both chrome layouts paint from the same ladder
         // (LazerTheme.overlay*Surface): the "blocks" stack's three bands meet
@@ -302,7 +307,7 @@ Item {
             id: body
             z: 5
             x: 0
-            y: MotionTokens.reducedMotion ? 0 : root.height * (1 - root.bodyProgress)
+            y: MotionTokens.reducedMotion ? 0 : root.height * 2 * (1 - root.bodyProgress)
             width: parent.width
             height: root.height
             radius: 0
