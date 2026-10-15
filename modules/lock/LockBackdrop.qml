@@ -33,18 +33,11 @@ Item {
     // gets the same bounded wait, and then opens onto the wallpaper too.
     property bool captureExpected: true
     property real progress: 0
-    // Whether the unlock choreography is under way. It flips the backdrop's
-    // geometry from "opened region at the bottom grows upward" to "covered
-    // region at the top shrinks downward", so the downward exit sweep unveils
-    // the live desktop beneath the lock surface instead of washing the
-    // wallpaper into the solid floor before the pop of release.
+    // Whether the unlock choreography is under way. It closes the entry-time
+    // opened region, hides the covered base, and brings the free-sweep exit
+    // bands up: the closing wave travels top-down and every region it passes
+    // shows the live desktop beneath the transparent lock surface.
     property bool exiting: false
-    // Fraction of the screen the exit sweep has already unveiled. The wave
-    // head travels top-down with `progress` falling 1 -> 0; the desktop shows
-    // through everywhere the head has passed. The maskDelay lead keeps the
-    // same head/tail relationship the entry has (bands sweep ahead of the
-    // desktop edge) but read from the closing side.
-    readonly property real exitCoverProgress: Math.max(0, Math.min(1, 1 - root.progress))
     // Device pixel ratio the wallpaper layer decodes for, supplied by the lock
     // owner as the highest ratio among the session's screens: one surface serves
     // every screen, so the maximum is the only estimate that cannot come out
@@ -81,36 +74,34 @@ Item {
 
     // The guaranteed-opaque floor, painted under everything. A session-lock
     // surface may not show the desktop before it has committed a frame, so the
-    // floor is unconditional and full-screen while the lock is in place — but
-    // it yields during the exit sweep, where the region below the wave head is
-    // the desktop the wave is unveiling and must not stay floored. Without
-    // this the exit reads as the wallpaper dissolving into a flat plate.
-    visible: !root.exiting
+    // floor is unconditional and full-screen while the lock is in place. It
+    // stands down only once the exit wave actually moves (progress < 1): the
+    // exit bands at rest cover the full screen from the first sweep frame, so
+    // the floor hands over to them seamlessly — while the content fall that
+    // precedes the wave still plays over the opaque floor instead of a
+    // desktop that pops in before the wave passes.
     Rectangle {
         id: baseRect
         anchors.fill: parent
+        visible: !root.exiting || root.progress >= 0.999
         // The theme surface, as the floor has always been.
         color: root.surfaceColor
         Behavior on color { ColorAnimation { duration: Lazer.MotionTokens.fast } }
     }
 
-    // Everything the wave has not opened yet: the pre-lock capture, and the four
-    // bands sweeping across it. On entry this covers everything above the
-    // trailing mask; on exit the wave closes top-down and the region it has
-    // swept must show the desktop beneath the lock surface, so this whole
-    // item shrinks to the region above the wave *head* (below it the desktop
-    // shows through the transparent surface). Clipped to that region, so it is
-    // cut away from the bottom as the wave passes.
+    // Everything the wave has not opened yet: the pre-lock capture, and the
+    // themed floor behind it. On entry this is the region above the trailing
+    // mask. On exit it stays closed — the exit sweep carries the bands on its
+    // own free layer below, and what the wave has passed must show the live
+    // desktop through the transparent surface, not a screenshot or a floor.
     Item {
         id: coveredBase
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        height: root.exiting
-                ? root.height * root.exitCoverProgress
-                : root.height * (1 - root.maskProgress)
+        height: root.height * (1 - root.maskProgress)
         clip: true
-        visible: height > 0.5
+        visible: !root.exiting && height > 0.5
 
         // The pre-lock capture is the base the wave sweeps across. It sits inside
         // this clip because the mask has to cut it away — a capture left outside
@@ -124,14 +115,24 @@ Item {
             asynchronous: false
             visible: String(root.snapshotSource).length > 0
         }
+    }
 
-        // Keep the four lock-surface wave layers static: WlSessionLockSurface does
-        // not reliably render dynamically created visual delegates. They sit above
-        // the capture, which is what lets them read as a wave sweeping *something*
-        // — the capture for a manual lock, the themed floor for a session-start
-        // lock. The wallpaper they unveil lives in the opened region below.
-        // Rest offsets are osu WaveContainer.FinalPosition absolutes; odd layers
-        // anchor right like osu's TopRight second/fourth waves.
+    // The exit sweep's own bands: the same four layers, full-screen and
+    // unclipped, travelling DOWN with the closing progress (rest -> hidden).
+    // Above (behind) each band's head the live desktop shows through the
+    // transparent lock surface; below (ahead) the band still covers. They
+    // live outside coveredBase because that clip would hide them: at exit
+    // start they sit above the viewport top while the covered region is
+    // zero-height, so nothing would ever be painted. On entry they stay
+    // invisible — coveredBase owns the entry sweep — and the exit keeps them
+    // opaque until the sweep lands. Reduced motion jumps progress to 0, the
+    // bands land on their hidden offsets and vanish with no flash.
+    Item {
+        id: exitBands
+        anchors.fill: parent
+        opacity: root.exiting ? 1 : 0
+        visible: root.exiting || opacity > 0
+
         Lazer.FullscreenWave {
             anchors.fill: parent
             progress: root.progress
@@ -164,18 +165,20 @@ Item {
         }
     }
 
-    // The opened region: the same geometry the reveal always had, because it is
-    // the same reveal. It carries the lock controls so they arrive with the
-    // wallpaper rather than sitting over the floor, and it holds nothing else —
-    // the wallpaper underneath is what the wave has uncovered. Gone during the
-    // exit: the downward sweep unveils the live desktop, not this entry-time
-    // wallpaper plate (whose controls have already fallen away).
+    // The opened region: the entry-time trailing mask, plus the exit plate.
+    // On entry it grows with the sweep and carries the wallpaper plus the
+    // lock controls. On exit it closes with raw `progress` — NOT this
+    // maskProgress, whose delay lead would swallow the plate at progress 0.3
+    // (70% through the animation) while the bands are still mid-screen. The
+    // raw progress matches the bands' own travel, so the wallpaper plate
+    // slides down under the wave column and only vanishes as the last band
+    // lands off the bottom edge.
     Item {
         id: openedRegion
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: root.exiting ? 0 : root.height * root.maskProgress
+        height: root.height * (root.exiting ? root.progress : root.maskProgress)
         clip: true
         visible: height > 0.5
 
