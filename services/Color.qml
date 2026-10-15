@@ -173,7 +173,17 @@ QtObject {
     // Late-instantiation sync: this singleton may be created after the
     // scheme registry's only schemesChanged emission, so resolve the preset
     // target once at startup instead of relying on change signals alone.
-    Component.onCompleted: root._updatePresetTarget()
+    // Force the initial palette load to completion before the shell builds
+    // its windows: the wallpaper floor and the lock theme snapshot both read
+    // mSurface in their first frames, and an async load let them paint the
+    // default dark palette first (black flash at session start). See the
+    // _colorsFile comment above for why blockLoading alone cannot do this.
+    Component.onCompleted: {
+        root._updatePresetTarget()
+        if (!colorsFile.loaded)
+            colorsFile.waitForJob()
+        root.applyColors()
+    }
 
     // Resolved preset file path (empty when no preset selected/known) —
     // exposed for consumers that must not re-resolve through the registry.
@@ -217,13 +227,15 @@ QtObject {
     }
 
     // --- FileView watching colors.json ---
-    // `blockLoading` is load-bearing: the lock surface freezes its theme
-    // snapshot (floor color included) the moment it prepares, which is early
-    // in boot. Without a synchronous load the first frames read the default
-    // palette, the frozen floor then disagrees with niri's own background
-    // (rendered from the same file's background token), and the session
-    // opens on a visible color jump. The file is a few KB; the sync read is
-    // cheaper than the wrong first frame.
+    // `blockLoading` alone is NOT enough: it only blocks text()/data() calls,
+    // while the adapter's JsonObject fields are still populated by the
+    // asynchronous `loaded` signal — so palette-token bindings read the dark
+    // defaults for the first frames. The lock surface freezes its theme
+    // snapshot (floor color included) in exactly those frames, and the session
+    // then opens on a black plate instead of the niri background rendered from
+    // this same file. The initial load is therefore forced to completion in
+    // Component.onCompleted below, before any window exists — the pattern the
+    // FileView docs recommend for files the shell must have at startup.
     property FileView _colorsFile: FileView {
         id: colorsFile
         path: Quickshell.cacheDir + "/colors.json"
