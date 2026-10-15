@@ -237,11 +237,19 @@ Variants {
             // Keep the window fully click-through; the desktop owns pointer input.
             mask: Region {}
 
-            // Theme-colored floor so the screen never flashes black while
-            // decoding or when no wallpaper is configured.
+            // Theme-colored floor so the screen never flashes black or white
+            // while decoding or when no wallpaper is configured. Read the
+            // palette token directly instead of through LazerTheme: this
+            // window is created before the shell injects the theme services,
+            // and an injected-token binding evaluates the static near-white
+            // fallback first — a white flash between niri's background and
+            // the lock surface's floor, which read the same token correctly.
+            // colors.json loads synchronously (see Color.qml), so the direct
+            // token is correct from the very first frame. Light and dark both
+            // resolve to mSurface — the scheme is what picks the palette half.
             Rectangle {
                 anchors.fill: parent
-                color: Services.SettingsService.effectiveColorScheme === "light" ? "#F2F0F5" : LazerTheme.bgDark
+                color: Services.Color.mSurface
 
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
             }
