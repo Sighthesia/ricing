@@ -507,14 +507,24 @@ Singleton {
             failedCurrentArtUrl: root._isFailedArtUrl(root.artUrl)
         })
 
-        // Player provides art URL directly: use and cache it.
-        if (nextArtUrl !== "" && !root._isFailedArtUrl(nextArtUrl)) {
+        // Player provides art URL directly: use and cache it, unless that
+        // URL is provably a stale cover from another track (e.g. a video's
+        // cover lingering in the MPRIS metadata during the title switch back
+        // to music). A stale direct URL must not overwrite, nor be cached
+        // under, the new track's key.
+        if (nextArtUrl !== "" && !root._isFailedArtUrl(nextArtUrl)
+                && !root._isArtUrlStaleForTrack(nextArtUrl, trackTitle, trackArtist)) {
             root._rememberArtContext(playerKey, artKey, trackTitle, trackArtist)
             root.artUrl = nextArtUrl
             root._artRecoveryPending = false
             root._artRecoveryStartedAt = 0
             root._cacheArtUrl(artKey, nextArtUrl)
             return
+        }
+        // A stale direct URL falls through to the cached/blank handling
+        // below so the previous track's cover is not resurrected.
+        if (nextArtUrl !== "" && root._isArtUrlStaleForTrack(nextArtUrl, trackTitle, trackArtist)) {
+            root._debugArtLog("stale-direct-art", player, nextArtUrl)
         }
 
         if (nextArtUrl !== "" && root._isFailedArtUrl(nextArtUrl)) {

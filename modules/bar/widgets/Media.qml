@@ -319,7 +319,7 @@ BarPill {
                 anchors.fill: parent
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
-                visible: root.hasCoverArt && status !== Image.Error && opacity > 0.01
+                visible: root.hasCoverArt && status === Image.Ready && opacity > 0.01
                 opacity: 0
 
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
@@ -332,8 +332,13 @@ BarPill {
                 source: Services.MediaControlService.artUrl
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
-                visible: root.hasCoverArt && status !== Image.Error
+                visible: root.hasCoverArt && status === Image.Ready
                 opacity: visible ? 1 : 0
+
+                onStatusChanged: {
+                    if (status === Image.Error)
+                        Services.MediaService.reportArtLoadFailure(source)
+                }
 
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             }
