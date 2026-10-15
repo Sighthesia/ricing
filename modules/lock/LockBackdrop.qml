@@ -130,6 +130,7 @@ Item {
     Item {
         id: exitBands
         anchors.fill: parent
+        z: 2
         opacity: root.exiting ? 1 : 0
         visible: root.exiting || opacity > 0
 
@@ -165,6 +166,25 @@ Item {
         }
     }
 
+    // Desktop image carried by the exit sweep. A transparent session-lock
+    // region is not guaranteed to composite the live desktop underneath it;
+    // on niri that path can expose the compositor's solid floor instead. The
+    // manual-lock snapshot is the exact desktop from before the lock, so use
+    // it as the transition surface. Startup locks intentionally have no
+    // snapshot and fall back to the configured wallpaper, which is the only
+    // desktop content that exists before the session is assembled.
+    Image {
+        id: exitDesktop
+        anchors.fill: parent
+        z: 0
+        visible: root.exiting
+        source: String(root.snapshotSource).length > 0
+                ? root.snapshotSource : root.wallpaperSource
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: false
+        sourceSize: root.wallpaperDecodeSize
+    }
+
     // The opened region: the entry-time trailing mask, plus the exit plate.
     // On entry it grows with the sweep and carries the wallpaper plus the
     // lock controls. On exit it closes with raw `progress` — NOT this
@@ -175,6 +195,7 @@ Item {
     // lands off the bottom edge.
     Item {
         id: openedRegion
+        z: 1
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
