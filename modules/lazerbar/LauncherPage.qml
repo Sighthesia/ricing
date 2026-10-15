@@ -108,7 +108,8 @@ Item {
         { id: "apps", label: "Apps", icon: "icons/apps.svg" },
         { id: "clipboard", label: "Clipboard", icon: "icons/clipboard.svg" },
         { id: "shortcuts", label: "Shortcuts", icon: "icons/keyboard.svg" },
-        { id: "control-center", label: "Control Center", icon: "icons/control-center.svg", section: "footer" }
+        // Temporarily hidden: control center launcher entry.
+// { id: "control-center", label: "Control Center", icon: "icons/control-center.svg", section: "footer" }
     ]
     readonly property string activeMode: root.session && root.session.mode != null ? String(root.session.mode) : ""
     // Chrome-facing selection: the view on screen, not just the query mode.
@@ -1040,9 +1041,9 @@ Item {
             OsuTextField {
                 id: editor
                 anchors.left: parent.left
-                // Rail chrome: text lines up with the result rows' left
-                // edge like the chips below; blocks keeps the 12px margin.
-                anchors.leftMargin: root.insetQuery ? 12 : 8
+                // Rail chrome: text starts flush with the sidebar edge like
+                // the chips below; blocks keeps the 12px text margin.
+                anchors.leftMargin: root.insetQuery ? 12 : 0
                 anchors.right: parent.right
                 anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
@@ -1090,9 +1091,10 @@ Item {
             height: visible ? implicitHeight : 0
             visible: root.categoryChips.length > 1
             chips: root.categoryChips
-            // Rail chrome: the first chip lines up with the result rows'
-            // left edge below; blocks keeps the inset to match the field.
-            railPadding: root.insetQuery ? 12 : 8
+            // Rail chrome: the content column already starts at the sidebar's
+            // right edge, so the first chip sits flush with it instead of
+            // leaving a blank strip. Blocks keeps the inset to match the field.
+            railPadding: root.insetQuery ? 12 : 0
             selected: root.activeCategory
             onChipSelected: id => {
                 root.setCategory(id)
