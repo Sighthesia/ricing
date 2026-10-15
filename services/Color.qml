@@ -217,11 +217,19 @@ QtObject {
     }
 
     // --- FileView watching colors.json ---
+    // `blockLoading` is load-bearing: the lock surface freezes its theme
+    // snapshot (floor color included) the moment it prepares, which is early
+    // in boot. Without a synchronous load the first frames read the default
+    // palette, the frozen floor then disagrees with niri's own background
+    // (rendered from the same file's background token), and the session
+    // opens on a visible color jump. The file is a few KB; the sync read is
+    // cheaper than the wrong first frame.
     property FileView _colorsFile: FileView {
         id: colorsFile
         path: Quickshell.cacheDir + "/colors.json"
         watchChanges: true
         printErrors: false
+        blockLoading: true
 
         onFileChanged: root._reloadTimer.restart()
 

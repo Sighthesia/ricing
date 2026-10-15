@@ -331,12 +331,15 @@ WlSessionLockSurface {
         screenHeight: Math.round(root.height)
     }
 
-    // Keep the screenshot visible for at least one settled frame before the mask
-    // starts. If capture fails, the opaque wallpaper layer still starts the reveal
-    // after a bounded wait rather than exposing the desktop immediately.
+    // Start the curtain after the base has had one settled frame. A capture
+    // owns that hold — it is the desktop the user was just looking at, and it
+    // must read before the mask starts. A session-start lock brings no capture
+    // (its base is the floor, which is the compositor background it replaces),
+    // so the wave leaves as soon as the wallpaper layer is decodable instead of
+    // parking the floor for a screenshot's settle that has nothing to settle.
     Timer {
         id: revealStartTimer
-        interval: 250
+        interval: root.captureExpected ? 250 : 0
         repeat: false
         onTriggered: {
             if (root.exitStarted || root.reducedMotion)
