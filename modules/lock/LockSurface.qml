@@ -34,6 +34,7 @@ WlSessionLockSurface {
     property real contentFallProgress: 0
     property bool reducedMotion: Lazer.MotionTokens.reducedMotion
     property bool exitStarted: false
+    property bool exitWavePending: false
     property bool releaseSent: false
     property int revealWaitTicks: 0
     property string authControlState: SurfaceLogic.AuthControlStates.idle
@@ -198,6 +199,11 @@ WlSessionLockSurface {
     }
 
     function startWaveExit(): void {
+        if (!backdrop.exitDesktopReady) {
+            exitWavePending = true
+            return
+        }
+        exitWavePending = false
         exitAnimation.from = waveProgress
         exitAnimation.start()
     }
@@ -729,6 +735,17 @@ WlSessionLockSurface {
                 else
                     failureAnimation.restart()
             }
+        }
+    }
+
+    // The exit image may finish decoding after the content-fall animation. Keep
+    // the lock surface intact until then, and start the same wave on the first
+    // ready frame rather than letting a dark compositor clear frame intervene.
+    Connections {
+        target: backdrop
+        function onExitDesktopReadyChanged() {
+            if (root.exitWavePending && backdrop.exitDesktopReady)
+                root.startWaveExit()
         }
     }
 }

@@ -65,6 +65,11 @@ Item {
     }
     readonly property bool imagesReady: snapshotReady
             && wallpaperBody.status === Image.Ready
+    // The exit handoff is not allowed to begin while its replacement desktop
+    // image is still decoding. Keeping this true until Image.Ready preserves
+    // the complete lock surface instead of exposing the compositor clear color.
+    readonly property bool exitDesktopReady: !root.exiting
+            || exitDesktop.status === Image.Ready
     readonly property bool revealContentInteractive: openedRegion.height > 0.5
     readonly property Item revealContentHost: foregroundBody
     readonly property color surfaceColor: root.surfaceColorOverride.a > 0.5
@@ -83,7 +88,11 @@ Item {
     Rectangle {
         id: baseRect
         anchors.fill: parent
-        visible: !root.exiting || root.progress >= 0.999
+        // Keep the lock floor until the exit image has decoded. The exit
+        // surface is enabled before its Image necessarily has pixels; dropping
+        // the floor on progress alone exposed the compositor's dark clear color
+        // for the first frames of unlock.
+        visible: !root.exiting || !root.exitDesktopReady || root.progress >= 0.999
         // The theme surface, as the floor has always been.
         color: root.surfaceColor
         Behavior on color { ColorAnimation { duration: Lazer.MotionTokens.fast } }
@@ -114,6 +123,41 @@ Item {
             fillMode: Image.PreserveAspectCrop
             asynchronous: false
             visible: String(root.snapshotSource).length > 0
+        }
+
+        // Entry wave bands: the startup lock and manual lock both use this
+        // clipped set while the bottom-open region grows. Keep them separate
+        // from exitBands, whose unclipped viewport is required for the reverse
+        // top-down sweep.
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: 13
+            colour: Lazer.LazerTheme.wavePalette.light4
+            restOffset: -930
+        }
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: -7
+            anchorRight: true
+            colour: Lazer.LazerTheme.wavePalette.light3
+            restOffset: -560
+        }
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: 4
+            colour: Lazer.LazerTheme.wavePalette.dark4
+            restOffset: -390
+        }
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: -2
+            anchorRight: true
+            colour: Lazer.LazerTheme.wavePalette.dark3
+            restOffset: -220
         }
     }
 
@@ -177,7 +221,7 @@ Item {
         id: exitDesktop
         anchors.fill: parent
         z: 0
-        visible: root.exiting
+        visible: root.exiting && status === Image.Ready
         source: String(root.snapshotSource).length > 0
                 ? root.snapshotSource : root.wallpaperSource
         fillMode: Image.PreserveAspectCrop
@@ -199,7 +243,8 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: root.height * (root.exiting ? root.progress : root.maskProgress)
+        height: root.height * (root.exiting && root.exitDesktopReady
+                ? root.progress : root.maskProgress)
         clip: true
         visible: height > 0.5
 
