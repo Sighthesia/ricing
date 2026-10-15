@@ -33,6 +33,18 @@ Item {
     // gets the same bounded wait, and then opens onto the wallpaper too.
     property bool captureExpected: true
     property real progress: 0
+    // Whether the unlock choreography is under way. It flips the backdrop's
+    // geometry from "opened region at the bottom grows upward" to "covered
+    // region at the top shrinks downward", so the downward exit sweep unveils
+    // the live desktop beneath the lock surface instead of washing the
+    // wallpaper into the solid floor before the pop of release.
+    property bool exiting: false
+    // Fraction of the screen the exit sweep has already unveiled. The wave
+    // head travels top-down with `progress` falling 1 -> 0; the desktop shows
+    // through everywhere the head has passed. The maskDelay lead keeps the
+    // same head/tail relationship the entry has (bands sweep ahead of the
+    // desktop edge) but read from the closing side.
+    readonly property real exitCoverProgress: Math.max(0, Math.min(1, 1 - root.progress))
     // Device pixel ratio the wallpaper layer decodes for, supplied by the lock
     // owner as the highest ratio among the session's screens: one surface serves
     // every screen, so the maximum is the only estimate that cannot come out
@@ -69,10 +81,11 @@ Item {
 
     // The guaranteed-opaque floor, painted under everything. A session-lock
     // surface may not show the desktop before it has committed a frame, so the
-    // floor is unconditional and full-screen. It is the visible base of a
-    // session-start lock — the wave sweeps across it and unveils the wallpaper
-    // from the opened region — and it stays the base whenever there is no
-    // wallpaper at all or the wallpaper failed to decode.
+    // floor is unconditional and full-screen while the lock is in place — but
+    // it yields during the exit sweep, where the region below the wave head is
+    // the desktop the wave is unveiling and must not stay floored. Without
+    // this the exit reads as the wallpaper dissolving into a flat plate.
+    visible: !root.exiting
     Rectangle {
         id: baseRect
         anchors.fill: parent
@@ -82,18 +95,20 @@ Item {
     }
 
     // Everything the wave has not opened yet: the pre-lock capture, and the four
-    // bands sweeping across it. Clipped to the region above the mask, so it is cut
-    // away from the bottom as the wave passes and the wallpaper underneath takes
-    // over — which is also what leaves the final frame as the wallpaper alone, no
-    // band resting on it. The themed floor is not in here any more: with the
-    // floor under the opened region, a request that brought no capture has
-    // nothing to sweep across but the floor, and one that did brings its capture.
+    // bands sweeping across it. On entry this covers everything above the
+    // trailing mask; on exit the wave closes top-down and the region it has
+    // swept must show the desktop beneath the lock surface, so this whole
+    // item shrinks to the region above the wave *head* (below it the desktop
+    // shows through the transparent surface). Clipped to that region, so it is
+    // cut away from the bottom as the wave passes.
     Item {
         id: coveredBase
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        height: root.height * (1 - root.maskProgress)
+        height: root.exiting
+                ? root.height * root.exitCoverProgress
+                : root.height * (1 - root.maskProgress)
         clip: true
         visible: height > 0.5
 
@@ -152,13 +167,15 @@ Item {
     // The opened region: the same geometry the reveal always had, because it is
     // the same reveal. It carries the lock controls so they arrive with the
     // wallpaper rather than sitting over the floor, and it holds nothing else —
-    // the wallpaper underneath is what the wave has uncovered.
+    // the wallpaper underneath is what the wave has uncovered. Gone during the
+    // exit: the downward sweep unveils the live desktop, not this entry-time
+    // wallpaper plate (whose controls have already fallen away).
     Item {
         id: openedRegion
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: root.height * root.maskProgress
+        height: root.exiting ? 0 : root.height * root.maskProgress
         clip: true
         visible: height > 0.5
 
