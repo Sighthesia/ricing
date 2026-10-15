@@ -197,6 +197,10 @@ WlSessionLockSurface {
         startWaveExit()
     }
 
+    // Close the curtain back to the top. The backdrop fades with the same
+    // progress (see LockBackdrop.exiting), so the downward sweep unveils the
+    // live desktop under the surface instead of washing the wallpaper into
+    // the solid floor before release pops it in.
     function startWaveExit(): void {
         exitAnimation.from = waveProgress
         exitAnimation.start()
@@ -318,6 +322,7 @@ WlSessionLockSurface {
         decodeRatio: root.decodeRatio
         captureExpected: root.captureExpected
         progress: root.waveProgress
+        exiting: root.exitStarted
         lightScheme: root.lightScheme
         surfaceColorOverride: root.themeSnapshotReady
                 ? root.lockThemeSnapshot.surface : "transparent"

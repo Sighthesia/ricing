@@ -33,6 +33,15 @@ Item {
     // gets the same bounded wait, and then opens onto the wallpaper too.
     property bool captureExpected: true
     property real progress: 0
+    // Whether the unlock choreography is under way. While exiting, the whole
+    // backdrop yields to the live desktop beneath the lock surface: opacity
+    // rides the same progress as the closing wave, so the sweep unveils the
+    // desktop instead of washing the wallpaper into the solid floor before
+    // the pop of release. A manual lock's screenshot base already read as
+    // the desktop there; a session-start lock has no capture, and without
+    // this fade its covered region is bare floor.
+    property bool exiting: false
+    opacity: root.exiting ? Math.max(0, Math.min(1, root.progress)) : 1
     // Device pixel ratio the wallpaper layer decodes for, supplied by the lock
     // owner as the highest ratio among the session's screens: one surface serves
     // every screen, so the maximum is the only estimate that cannot come out
