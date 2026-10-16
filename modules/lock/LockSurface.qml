@@ -34,6 +34,7 @@ WlSessionLockSurface {
     property real contentFallProgress: 0
     property bool reducedMotion: Lazer.MotionTokens.reducedMotion
     property bool exitStarted: false
+    property bool exitWaveActive: false
     property bool exitWavePending: false
     property bool releaseSent: false
     property int revealWaitTicks: 0
@@ -131,6 +132,8 @@ WlSessionLockSurface {
         })
         themeSnapshotReady = true
         exitStarted = false
+        exitWaveActive = false
+        exitWavePending = false
         releaseSent = false
         startupWaveStarted = false
         inputMode = false
@@ -186,6 +189,7 @@ WlSessionLockSurface {
         exitStarted = true
         if (reducedMotion) {
             contentFallProgress = 1
+            exitWaveActive = true
             SurfaceLogic.applyExitImmediately(root, allAnimations())
             requestRelease()
             return
@@ -204,6 +208,7 @@ WlSessionLockSurface {
             return
         }
         exitWavePending = false
+        exitWaveActive = true
         exitAnimation.from = waveProgress
         exitAnimation.start()
     }
@@ -324,7 +329,7 @@ WlSessionLockSurface {
         decodeRatio: root.decodeRatio
         captureExpected: root.captureExpected
         progress: root.waveProgress
-        exiting: root.exitStarted
+        exiting: root.exitWaveActive
         lightScheme: root.lightScheme
         surfaceColorOverride: root.themeSnapshotReady
                 ? root.lockThemeSnapshot.surface : "transparent"

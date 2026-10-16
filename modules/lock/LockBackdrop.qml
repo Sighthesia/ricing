@@ -217,16 +217,31 @@ Item {
     // it as the transition surface. Startup locks intentionally have no
     // snapshot and fall back to the configured wallpaper, which is the only
     // desktop content that exists before the session is assembled.
-    Image {
-        id: exitDesktop
-        anchors.fill: parent
-        z: 0
-        visible: root.exiting && status === Image.Ready
-        source: String(root.snapshotSource).length > 0
-                ? root.snapshotSource : root.wallpaperSource
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: false
-        sourceSize: root.wallpaperDecodeSize
+    Item {
+        id: exitDesktopRegion
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        // The desktop belongs only to the part already passed by the closing
+        // wave. Keeping the image full-screen here made it paint over the
+        // entire lock surface as soon as exitStarted flipped, so the screen
+        // changed to the dark desktop/theme image before the bands moved.
+        height: root.height * (1 - root.progress)
+        clip: true
+        z: 1
+        visible: root.exiting && exitDesktop.status === Image.Ready && height > 0.5
+
+        Image {
+            id: exitDesktop
+            width: root.width
+            height: root.height
+            anchors.top: parent.top
+            source: String(root.snapshotSource).length > 0
+                    ? root.snapshotSource : root.wallpaperSource
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: false
+            sourceSize: root.wallpaperDecodeSize
+        }
     }
 
     // The opened region: the entry-time trailing mask, plus the exit plate.
