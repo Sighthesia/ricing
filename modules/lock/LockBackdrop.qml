@@ -143,11 +143,38 @@ Item {
         z: 2
         visible: !root.exiting
 
-        // Reuse the launcher implementation so the lock carries the same
-        // angles, absolute stretched offsets, and layer ordering.
-        Lazer.WaveRevealLayers {
+        // Keep the launcher geometry, but declare the layers statically:
+        // WlSessionLockSurface does not reliably render Repeater delegates.
+        // These values mirror WaveSurfaceLogic/WaveRevealLayers exactly.
+        Lazer.FullscreenWave {
+            anchors.fill: parent
             progress: root.progress
-            palette: Lazer.LazerTheme.wavePalette
+            angle: 13
+            colour: Lazer.LazerTheme.wavePalette.light4
+            restOffset: -930
+        }
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: -7
+            anchorRight: true
+            colour: Lazer.LazerTheme.wavePalette.light3
+            restOffset: -560
+        }
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: 4
+            colour: Lazer.LazerTheme.wavePalette.dark4
+            restOffset: -390
+        }
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: -2
+            anchorRight: true
+            colour: Lazer.LazerTheme.wavePalette.dark3
+            restOffset: -220
         }
     }
 
@@ -168,13 +195,38 @@ Item {
         opacity: root.exiting ? 1 : 0
         visible: root.exiting || opacity > 0
 
-        // The same fixed full-surface wave is used in the launcher. The
-        // remaining lock wallpaper acts as the moving opaque body above it,
-        // while the desktop image sits below it, so the wave keeps its full
-        // stretched geometry instead of collapsing to a clipped hairline.
-        Lazer.WaveRevealLayers {
+        // Same launcher geometry, statically declared for the session-lock
+        // renderer. The wallpaper body stays above these layers and the desktop
+        // image stays below them, matching the launcher's moving body contract.
+        Lazer.FullscreenWave {
+            anchors.fill: parent
             progress: root.progress
-            palette: Lazer.LazerTheme.wavePalette
+            angle: 13
+            colour: Lazer.LazerTheme.wavePalette.light4
+            restOffset: -930
+        }
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: -7
+            anchorRight: true
+            colour: Lazer.LazerTheme.wavePalette.light3
+            restOffset: -560
+        }
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: 4
+            colour: Lazer.LazerTheme.wavePalette.dark4
+            restOffset: -390
+        }
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: -2
+            anchorRight: true
+            colour: Lazer.LazerTheme.wavePalette.dark3
+            restOffset: -220
         }
     }
 
