@@ -66,7 +66,14 @@ Variants {
 
                 anchors.fill: parent
                 visible: !backdropWindow.cfg.overviewBackgroundSolid
-                fillMode: Image.PreserveAspectCrop
+                fillMode: {
+                    var mode = backdropWindow.cfg.wallpaperMode || "crop"
+                    if (mode === "fit") return Image.PreserveAspectFit
+                    if (mode === "stretch") return Image.Stretch
+                    if (mode === "tile") return Image.Tile
+                    if (mode === "center") return Image.Pad
+                    return Image.PreserveAspectCrop
+                }
                 asynchronous: true
                 cache: false
                 source: backdropWindow.wallpaperSource

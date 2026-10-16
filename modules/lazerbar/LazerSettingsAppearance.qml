@@ -222,6 +222,27 @@ LazerSettingsSection {
     }
 
     LazerSettingsRow {
+        id: wallpaperModeRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: "壁纸显示"; descriptionText: "壁纸的缩放与填充方式"
+        defaultValue: root.defaultOf("wallpaperMode")
+        currentValue: wallpaperModeChoiceControl.currentValue
+        resetCallback: function() { root.resetKey("wallpaperMode") }
+        LazerSettingsChoice {
+            id: wallpaperModeChoiceControl
+            model: [{ value: "crop", label: "裁剪填充" }, { value: "fit", label: "完整显示" }, { value: "stretch", label: "拉伸" }, { value: "tile", label: "平铺" }, { value: "center", label: "居中" }]
+            currentValue: root.settingsObject && root.settingsObject.wallpaperMode ? root.settingsObject.wallpaperMode : "crop"
+            onValueSelected: function(value) {
+                if (root.settingsObject) {
+                    root.settingsObject.wallpaperMode = value
+                    root.save()
+                }
+            }
+        }
+    }
+
+    LazerSettingsRow {
         id: colorSchemeRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery

@@ -190,6 +190,14 @@ Variants {
             // DPR 1 (3840x2160 = 7.91 Mi px); anything larger is scaled down
             // proportionally by WallpaperSlotLogic.sourceSize().
             property int maxDecodePixels: 8 * 1024 * 1024
+            readonly property int wallpaperFillMode: {
+                var mode = String(Services.SettingsService.appearance.wallpaperMode || "crop")
+                if (mode === "fit") return Image.PreserveAspectFit
+                if (mode === "stretch") return Image.Stretch
+                if (mode === "tile") return Image.Tile
+                if (mode === "center") return Image.Pad
+                return Image.PreserveAspectCrop
+            }
 
             // Screen centre, used whenever no click triggered the switch.
             readonly property point centrePoint: Qt.point(width / 2, height / 2)
@@ -266,7 +274,7 @@ Variants {
             Image {
                 id: wallpaperSlot0
                 anchors.fill: parent
-                fillMode: Image.PreserveAspectCrop
+                fillMode: wallpaperWindow.wallpaperFillMode
                 sourceSize: wallpaperWindow.wallpaperDecodeSize
                 asynchronous: false
                 cache: false
@@ -278,7 +286,7 @@ Variants {
             Image {
                 id: wallpaperSlot1
                 anchors.fill: parent
-                fillMode: Image.PreserveAspectCrop
+                fillMode: wallpaperWindow.wallpaperFillMode
                 sourceSize: wallpaperWindow.wallpaperDecodeSize
                 asynchronous: false
                 cache: false
@@ -297,6 +305,7 @@ Variants {
             WallpaperReveal {
                 id: reveal
                 anchors.fill: parent
+                fillMode: wallpaperWindow.wallpaperFillMode
                 sourceItem: wallpaperWindow.incomingImage
                 origin: wallpaperWindow.activeRevealOrigin
                 radius: wallpaperWindow.revealRadius

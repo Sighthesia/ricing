@@ -20,6 +20,7 @@ QtObject {
     // Keep the settings-panel defaults beside the persisted category schemas.
     readonly property var appearanceDefaults: ({
         wallpaperPath: "",
+        wallpaperMode: "crop",
         colorScheme: "auto",
         colorSchemeAutoMode: "time",
         autoSunrise: "06:30",
@@ -457,6 +458,7 @@ QtObject {
 
             property JsonObject appearance: JsonObject {
                 property string wallpaperPath: ""
+                property string wallpaperMode: "crop"
                 property string colorScheme: "auto"
                 // Auto-mode source: "time" follows autoSunrise/autoSunset,
                 // "location" follows the solar timetable derived from

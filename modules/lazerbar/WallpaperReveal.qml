@@ -41,6 +41,9 @@ Item {
     // this false so their synchronous handover contract remains unchanged. Only
     // applies to the private image; a lent slot is decoded by its own host.
     property bool asynchronous: false
+    // Wallpaper display mode, mirrored from the host so the revealed pixels
+    // match the settled wallpaper.
+    property int fillMode: Image.PreserveAspectCrop
     // Circle centre, in this item's coordinates.
     property point origin: Qt.point(0, 0)
     // Current circle radius in pixels; 0 means nothing is revealed.
@@ -64,7 +67,7 @@ Item {
         id: nextWallpaper
         anchors.fill: parent
         source: root.sourceItem ? "" : root.source
-        fillMode: Image.PreserveAspectCrop
+        fillMode: root.fillMode
         asynchronous: root.asynchronous
         cache: false
         visible: false
