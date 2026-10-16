@@ -143,35 +143,11 @@ Item {
         z: 2
         visible: !root.exiting
 
-        Lazer.FullscreenWave {
-            anchors.fill: parent
+        // Reuse the launcher implementation so the lock carries the same
+        // angles, absolute stretched offsets, and layer ordering.
+        Lazer.WaveRevealLayers {
             progress: root.progress
-            angle: 13
-            colour: Lazer.LazerTheme.wavePalette.light4
-            restOffset: -930
-        }
-        Lazer.FullscreenWave {
-            anchors.fill: parent
-            progress: root.progress
-            angle: -7
-            anchorRight: true
-            colour: Lazer.LazerTheme.wavePalette.light3
-            restOffset: -560
-        }
-        Lazer.FullscreenWave {
-            anchors.fill: parent
-            progress: root.progress
-            angle: 4
-            colour: Lazer.LazerTheme.wavePalette.dark4
-            restOffset: -390
-        }
-        Lazer.FullscreenWave {
-            anchors.fill: parent
-            progress: root.progress
-            angle: -2
-            anchorRight: true
-            colour: Lazer.LazerTheme.wavePalette.dark3
-            restOffset: -220
+            palette: Lazer.LazerTheme.wavePalette
         }
     }
 
@@ -192,38 +168,13 @@ Item {
         opacity: root.exiting ? 1 : 0
         visible: root.exiting || opacity > 0
 
-        // Fixed full-surface geometry, matching WaveRevealLayers. The wallpaper
-        // region below is above these bands, so their oversized rectangles do
-        // not become a solid plate over the lock surface.
-        Lazer.FullscreenWave {
-            anchors.fill: parent
+        // The same fixed full-surface wave is used in the launcher. The
+        // remaining lock wallpaper acts as the moving opaque body above it,
+        // while the desktop image sits below it, so the wave keeps its full
+        // stretched geometry instead of collapsing to a clipped hairline.
+        Lazer.WaveRevealLayers {
             progress: root.progress
-            angle: 13
-            colour: Lazer.LazerTheme.wavePalette.light4
-            restOffset: -930
-        }
-        Lazer.FullscreenWave {
-            anchors.fill: parent
-            progress: root.progress
-            angle: -7
-            anchorRight: true
-            colour: Lazer.LazerTheme.wavePalette.light3
-            restOffset: -560
-        }
-        Lazer.FullscreenWave {
-            anchors.fill: parent
-            progress: root.progress
-            angle: 4
-            colour: Lazer.LazerTheme.wavePalette.dark4
-            restOffset: -390
-        }
-        Lazer.FullscreenWave {
-            anchors.fill: parent
-            progress: root.progress
-            angle: -2
-            anchorRight: true
-            colour: Lazer.LazerTheme.wavePalette.dark3
-            restOffset: -220
+            palette: Lazer.LazerTheme.wavePalette
         }
     }
 
