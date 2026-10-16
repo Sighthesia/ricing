@@ -183,35 +183,57 @@ Item {
         opacity: root.exiting ? 1 : 0
         visible: root.exiting || opacity > 0
 
-        Lazer.FullscreenWave {
-            anchors.fill: parent
-            progress: root.progress
-            angle: 13
-            colour: Lazer.LazerTheme.wavePalette.light4
-            restOffset: -930
-        }
-        Lazer.FullscreenWave {
-            anchors.fill: parent
-            progress: root.progress
-            angle: -7
-            anchorRight: true
-            colour: Lazer.LazerTheme.wavePalette.light3
-            restOffset: -560
-        }
-        Lazer.FullscreenWave {
-            anchors.fill: parent
-            progress: root.progress
-            angle: 4
-            colour: Lazer.LazerTheme.wavePalette.dark4
-            restOffset: -390
-        }
-        Lazer.FullscreenWave {
-            anchors.fill: parent
-            progress: root.progress
-            angle: -2
-            anchorRight: true
-            colour: Lazer.LazerTheme.wavePalette.dark3
-            restOffset: -220
+        // Keep the exit bands around the travelling boundary. The wave geometry
+        // intentionally uses oversized rectangles; letting those rectangles
+        // paint over the entire region behind the head turns the lower half of
+        // the screen into a solid theme-colored plate instead of revealing the
+        // lock wallpaper below the edge.
+        Item {
+            id: exitBandViewport
+            anchors.left: parent.left
+            anchors.right: parent.right
+            y: root.height * (1 - root.progress) - height / 2
+            height: Math.max(1, root.height * 0.28)
+            clip: true
+
+            // Keep the wave geometry in full-surface coordinates while the
+            // viewport clips only the narrow travelling band.
+            Item {
+                width: root.width
+                height: root.height
+                y: -exitBandViewport.y
+
+                Lazer.FullscreenWave {
+                    anchors.fill: parent
+                    progress: root.progress
+                    angle: 13
+                    colour: Lazer.LazerTheme.wavePalette.light4
+                    restOffset: -930
+                }
+                Lazer.FullscreenWave {
+                    anchors.fill: parent
+                    progress: root.progress
+                    angle: -7
+                    anchorRight: true
+                    colour: Lazer.LazerTheme.wavePalette.light3
+                    restOffset: -560
+                }
+                Lazer.FullscreenWave {
+                    anchors.fill: parent
+                    progress: root.progress
+                    angle: 4
+                    colour: Lazer.LazerTheme.wavePalette.dark4
+                    restOffset: -390
+                }
+                Lazer.FullscreenWave {
+                    anchors.fill: parent
+                    progress: root.progress
+                    angle: -2
+                    anchorRight: true
+                    colour: Lazer.LazerTheme.wavePalette.dark3
+                    restOffset: -220
+                }
+            }
         }
     }
 
