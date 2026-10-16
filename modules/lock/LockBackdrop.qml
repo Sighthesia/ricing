@@ -39,6 +39,7 @@ Item {
     // shows the live desktop beneath the transparent lock surface.
     property bool exiting: false
     property bool exitWaveActive: false
+    property real exitBodyProgress: 1
     // Device pixel ratio the wallpaper layer decodes for, supplied by the lock
     // owner as the highest ratio among the session's screens: one surface serves
     // every screen, so the maximum is the only estimate that cannot come out
@@ -295,7 +296,7 @@ Item {
             // above exitBands and hides the entire falling wave.
             clip: true
             y: root.exiting
-                    ? root.height * 2 * (1 - root.progress)
+                    ? root.height * 2 * (1 - root.exitBodyProgress)
                     : -(root.height - openedRegion.height)
 
         // The wallpaper the wave unveils, sitting under the lock controls so

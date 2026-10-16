@@ -29,6 +29,10 @@ WlSessionLockSurface {
     // Single reveal driver; the backdrop derives the trailing mask from it
     // so bands and wallpaper edge always move as one curtain.
     property real waveProgress: 0
+    // Exit body travel has its own clock, matching WaveSurfaceHost: the wave
+    // uses InSine while the opaque body uses InQuad. Binding both to
+    // waveProgress makes the body swallow the stretched wave too early.
+    property real exitBodyProgress: 1
     // Unlock fall driver: 0 keeps every content block in place, 1 has dropped
     // and faded all of them away. The wave sweep waits for it.
     property real contentFallProgress: 0
@@ -134,6 +138,7 @@ WlSessionLockSurface {
         exitStarted = false
         exitWaveActive = false
         exitWavePending = false
+        exitBodyProgress = 1
         releaseSent = false
         startupWaveStarted = false
         inputMode = false
@@ -190,6 +195,7 @@ WlSessionLockSurface {
         if (reducedMotion) {
             contentFallProgress = 1
             exitWaveActive = true
+            exitBodyProgress = 0
             SurfaceLogic.applyExitImmediately(root, allAnimations())
             requestRelease()
             return
@@ -209,6 +215,7 @@ WlSessionLockSurface {
         }
         exitWavePending = false
         exitWaveActive = true
+        exitBodyAnimation.restart()
         exitAnimation.from = waveProgress
         exitAnimation.start()
     }
@@ -221,7 +228,7 @@ WlSessionLockSurface {
     }
 
     function allAnimations(): var {
-        return [enterAnimation, exitAnimation, contentFallAnimation]
+        return [enterAnimation, exitAnimation, exitBodyAnimation, contentFallAnimation]
     }
 
     // One curve, one clock: the clock, the lock entry and the power row all
@@ -331,6 +338,7 @@ WlSessionLockSurface {
         progress: root.waveProgress
         exiting: root.exitWaveActive
         exitWaveActive: root.exitWaveActive
+        exitBodyProgress: root.exitBodyProgress
         lightScheme: root.lightScheme
         surfaceColorOverride: root.themeSnapshotReady
                 ? root.lockThemeSnapshot.surface : "transparent"
@@ -705,6 +713,19 @@ WlSessionLockSurface {
         duration: Lazer.MotionTokens.waveExit
         easing.type: Easing.InSine
         onFinished: root.requestRelease()
+    }
+
+    // Launcher parity: the body leaves on InQuad while the wave falls on
+    // InSine. A shared progress value lets the body cover the stretched wave
+    // too early, so keep its travel on its own clock.
+    NumberAnimation {
+        id: exitBodyAnimation
+        target: root
+        property: "exitBodyProgress"
+        from: 1
+        to: 0
+        duration: Lazer.MotionTokens.waveExit
+        easing.type: Easing.InQuad
     }
 
     // Content fall owner: a plain linear driver whose gravity and fade shapes
