@@ -38,6 +38,7 @@ Item {
     // bands up: the closing wave travels top-down and every region it passes
     // shows the live desktop beneath the transparent lock surface.
     property bool exiting: false
+    property bool exitWaveActive: false
     // Device pixel ratio the wallpaper layer decodes for, supplied by the lock
     // owner as the highest ratio among the session's screens: one surface serves
     // every screen, so the maximum is the only estimate that cannot come out
@@ -92,7 +93,11 @@ Item {
         // surface is enabled before its Image necessarily has pixels; dropping
         // the floor on progress alone exposed the compositor's dark clear color
         // for the first frames of unlock.
-        visible: !root.exiting || !root.exitDesktopReady || root.progress >= 0.999
+        // Keep the floor during the content-fall phase, but hand it off as
+        // soon as the closing wave is actually active. At that first exit
+        // frame progress is still 1; using progress as the visibility gate
+        // left this full-screen dark floor above the wave for a visible beat.
+        visible: !root.exiting || !root.exitWaveActive || !root.exitDesktopReady
         // The theme surface, as the floor has always been.
         color: root.surfaceColor
         Behavior on color { ColorAnimation { duration: Lazer.MotionTokens.fast } }

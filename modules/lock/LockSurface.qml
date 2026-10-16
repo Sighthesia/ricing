@@ -330,6 +330,7 @@ WlSessionLockSurface {
         captureExpected: root.captureExpected
         progress: root.waveProgress
         exiting: root.exitWaveActive
+        exitWaveActive: root.exitWaveActive
         lightScheme: root.lightScheme
         surfaceColorOverride: root.themeSnapshotReady
                 ? root.lockThemeSnapshot.surface : "transparent"
