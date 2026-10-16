@@ -289,6 +289,11 @@ Item {
             id: openedContent
             width: root.width
             height: root.height
+            // The wallpaper stays pinned to the surface, while this moving
+            // body clips its visible portion away during the exit. Without
+            // the clip, the counter-translated full-screen wallpaper remains
+            // above exitBands and hides the entire falling wave.
+            clip: true
             y: root.exiting
                     ? root.height * 2 * (1 - root.progress)
                     : -(root.height - openedRegion.height)
