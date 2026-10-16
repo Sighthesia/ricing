@@ -246,10 +246,9 @@ Item {
         // wave. Keeping the image full-screen here made it paint over the
         // entire lock surface as soon as exitStarted flipped, so the screen
         // changed to the dark desktop/theme image before the bands moved.
-        height: root.height * (1 - root.progress)
-        clip: true
+        height: root.height
         z: 1
-        visible: root.exiting && exitDesktop.status === Image.Ready && height > 0.5
+        visible: root.exiting && exitDesktop.status === Image.Ready
 
         Image {
             id: exitDesktop
@@ -277,11 +276,22 @@ Item {
         z: 3
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        height: root.height * (root.exiting && root.exitDesktopReady
-                ? root.progress : root.maskProgress)
+        anchors.top: root.exiting ? parent.top : undefined
+        anchors.bottom: root.exiting ? undefined : parent.bottom
+        height: root.exiting ? root.height : root.height * root.maskProgress
         clip: true
         visible: height > 0.5
+
+        // Move one full-height lock body through the viewport on exit, matching
+        // the launcher's two-viewport body travel so the oversized wave can
+        // fully unfold instead of being trapped between two one-height regions.
+        Item {
+            id: openedContent
+            width: root.width
+            height: root.height
+            y: root.exiting
+                    ? root.height * 2 * (1 - root.progress)
+                    : -(root.height - openedRegion.height)
 
         // The wallpaper the wave unveils, sitting under the lock controls so
         // both arrive with the same trailing edge. It is hosted in a full-height
@@ -304,8 +314,7 @@ Item {
             id: wallpaperHost
             width: root.width
             height: root.height
-            // Align with the full surface, like foregroundBody below.
-            y: -(root.height - openedRegion.height)
+            anchors.fill: parent
 
             Image {
                 id: wallpaperBody
@@ -327,8 +336,8 @@ Item {
             id: foregroundBody
             width: root.width
             height: root.height
-            // Align the full-surface content with the clipped region.
-            y: -(root.height - openedRegion.height)
+            anchors.fill: parent
+        }
         }
     }
 }
