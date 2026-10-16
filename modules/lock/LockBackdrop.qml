@@ -115,6 +115,7 @@ Item {
         anchors.top: parent.top
         height: root.height * (1 - root.maskProgress)
         clip: true
+        z: 1
         visible: !root.exiting && height > 0.5
 
         // The pre-lock capture is the base the wave sweeps across. It sits inside
@@ -130,10 +131,18 @@ Item {
             visible: String(root.snapshotSource).length > 0
         }
 
-        // Entry wave bands: the startup lock and manual lock both use this
-        // clipped set while the bottom-open region grows. Keep them separate
-        // from exitBands, whose unclipped viewport is required for the reverse
-        // top-down sweep.
+    }
+
+    // Entry wave viewport: fixed to the full lock surface like the launcher
+    // host. The opened region below is painted above it, so the oversized wave
+    // rectangles are naturally swallowed by the arriving wallpaper instead of
+    // being clipped to the shrinking covered region.
+    Item {
+        id: entryBands
+        anchors.fill: parent
+        z: 2
+        visible: !root.exiting
+
         Lazer.FullscreenWave {
             anchors.fill: parent
             progress: root.progress
@@ -183,57 +192,38 @@ Item {
         opacity: root.exiting ? 1 : 0
         visible: root.exiting || opacity > 0
 
-        // Keep the exit bands around the travelling boundary. The wave geometry
-        // intentionally uses oversized rectangles; letting those rectangles
-        // paint over the entire region behind the head turns the lower half of
-        // the screen into a solid theme-colored plate instead of revealing the
-        // lock wallpaper below the edge.
-        Item {
-            id: exitBandViewport
-            anchors.left: parent.left
-            anchors.right: parent.right
-            y: root.height * (1 - root.progress) - height / 2
-            height: Math.max(1, root.height * 0.28)
-            clip: true
-
-            // Keep the wave geometry in full-surface coordinates while the
-            // viewport clips only the narrow travelling band.
-            Item {
-                width: root.width
-                height: root.height
-                y: -exitBandViewport.y
-
-                Lazer.FullscreenWave {
-                    anchors.fill: parent
-                    progress: root.progress
-                    angle: 13
-                    colour: Lazer.LazerTheme.wavePalette.light4
-                    restOffset: -930
-                }
-                Lazer.FullscreenWave {
-                    anchors.fill: parent
-                    progress: root.progress
-                    angle: -7
-                    anchorRight: true
-                    colour: Lazer.LazerTheme.wavePalette.light3
-                    restOffset: -560
-                }
-                Lazer.FullscreenWave {
-                    anchors.fill: parent
-                    progress: root.progress
-                    angle: 4
-                    colour: Lazer.LazerTheme.wavePalette.dark4
-                    restOffset: -390
-                }
-                Lazer.FullscreenWave {
-                    anchors.fill: parent
-                    progress: root.progress
-                    angle: -2
-                    anchorRight: true
-                    colour: Lazer.LazerTheme.wavePalette.dark3
-                    restOffset: -220
-                }
-            }
+        // Fixed full-surface geometry, matching WaveRevealLayers. The wallpaper
+        // region below is above these bands, so their oversized rectangles do
+        // not become a solid plate over the lock surface.
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: 13
+            colour: Lazer.LazerTheme.wavePalette.light4
+            restOffset: -930
+        }
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: -7
+            anchorRight: true
+            colour: Lazer.LazerTheme.wavePalette.light3
+            restOffset: -560
+        }
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: 4
+            colour: Lazer.LazerTheme.wavePalette.dark4
+            restOffset: -390
+        }
+        Lazer.FullscreenWave {
+            anchors.fill: parent
+            progress: root.progress
+            angle: -2
+            anchorRight: true
+            colour: Lazer.LazerTheme.wavePalette.dark3
+            restOffset: -220
         }
     }
 
@@ -281,7 +271,7 @@ Item {
     // lands off the bottom edge.
     Item {
         id: openedRegion
-        z: 1
+        z: 3
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
