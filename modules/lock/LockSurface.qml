@@ -142,6 +142,7 @@ WlSessionLockSurface {
         exitBodyProgress = 1
         entryBodyProgress = reducedMotion ? 1 : 0
         releaseSent = false
+        exitReleaseSettleTimer.stop()
         startupWaveStarted = false
         inputMode = false
         contentFallProgress = 0
@@ -729,7 +730,21 @@ WlSessionLockSurface {
         to: 0
         duration: Lazer.MotionTokens.waveExit
         easing.type: Easing.InSine
-        onFinished: root.requestRelease()
+        // Keep the lock surface mapped for one compositor frame after the
+        // wave reaches its hidden offset. Releasing in this callback can tear
+        // down WlSessionLockSurface before Niri commits the final falling-wave
+        // frame, which makes the wave disappear just short of the bottom.
+        onFinished: exitReleaseSettleTimer.restart()
+    }
+
+    // Let the terminal wave position reach the compositor before unlocking the
+    // session surface. This is deliberately outside allAnimations: it is a
+    // post-animation release barrier, not another motion driver.
+    Timer {
+        id: exitReleaseSettleTimer
+        interval: 32
+        repeat: false
+        onTriggered: root.requestRelease()
     }
 
     // Launcher parity: the body leaves on InQuad while the wave falls on
