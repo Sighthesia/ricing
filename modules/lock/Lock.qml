@@ -18,6 +18,17 @@ Scope {
 
     readonly property bool locked: sessionLock.locked
     readonly property bool preparing: _state === LockLogic.States.preparing
+    // The desktop is owned by a lock from the moment a request is accepted until
+    // its exit wave has revealed the desktop again — including the preparation
+    // window, during which the lock is still off screen but the desktop is
+    // already clearing for it. The chrome's arrival and the desktop's stand-down
+    // both follow this, and every path back to idle clears it.
+    readonly property bool holdsDesktop: _state !== LockLogic.States.idle
+    // One capture per accepted request: the stand-down can report itself clear
+    // more than once (a surface may report late, and an empty desktop reports
+    // from `begin()`), and a second capture would bump the snapshot generation
+    // out from under the surfaces that already bound to it.
+    property bool _captureStarted: false
     property string _state: LockLogic.States.idle
     property int _requestGeneration: -1
     property bool _exitFailsafeArmed: false
@@ -132,6 +143,18 @@ Scope {
         report(index, image.status === Image.Ready ? url : "")
     }
 
+    // The desktop's stand-down follows this lock's own ownership of the screen
+    // rather than any individual exit path: preparation, cancellation, PAM
+    // release and the self-test teardown all pass through `_state`, and none of
+    // them may leave the desktop stood down. The surfaces themselves report the
+    // frame each one actually clears on (see Services.DesktopStandby).
+    onHoldsDesktopChanged: {
+        if (holdsDesktop)
+            Services.DesktopStandby.begin()
+        else
+            Services.DesktopStandby.end()
+    }
+
     // Begin a lock. `startup` marks the session-start auto-lock, which reveals
     // the wallpaper instead of capturing a desktop that has not finished
     // assembling; every other request keeps the configured capture.
@@ -154,13 +177,42 @@ Scope {
         for (const image of root._snapshotImages)
             image.destroy()
         root._snapshotImages = []
+        _captureStarted = false
+        // Armed before the state write below: that write is what raises the
+        // desktop's stand-down, and a desktop with nothing left on it reports
+        // itself clear from inside it. The capture has to be bounded by then.
+        _prepareFailsafe.restart()
         _state = LockLogic.States.preparing
+        // A capture photographs the desktop, so it waits for the desktop to have
+        // actually stood down. Deferred, because accepting the request is what
+        // raises the stand-down: an already-clear desktop reports back before this
+        // function returns.
+        Qt.callLater(root._captureWhenClear)
+        return true
+    }
+
+    // Capture once the desktop has stood down. Surfaces report the frame they are
+    // actually gone, so this waits on a real signal instead of guessing at a
+    // duration — a wave panel takes 500ms to fall and a bar slide 240ms, and a
+    // capture taken on either one bakes it into the lock's own background.
+    //
+    // A surface that never reports cannot strand the request: the preparation
+    // failsafe above commits anyway, with the same wallpaper fallback a failed
+    // capture already produces.
+    function _captureWhenClear(): void {
+        if (_state !== LockLogic.States.preparing || _captureStarted)
+            return
+        if (!Services.DesktopStandby.isClear())
+            return
+        _captureStarted = true
         snapshot.request(Quickshell.screens.length)
         _requestGeneration = snapshot.generation
+        // Re-armed over the capture itself, so the wait for the desktop to stand
+        // down cannot eat into the budget a slow capture is allowed. Both phases
+        // are bounded, and neither is bounded by the other.
         _prepareFailsafe.restart()
         if (snapshot.ready)
             _commitLock()
-        return true
     }
 
     // Request the compositor lock once per niri session, after the shell has
@@ -451,7 +503,21 @@ Scope {
         }
     }
 
-    // Bounded fallback so a silent snapshot provider can never block locking.
+    // The desktop reports itself clear on its own schedule, which is the only
+    // thing the capture may wait on. Deferred off the signal rather than read as
+    // state, because a desktop with nothing on it reports from inside the write
+    // that accepted the request — `lock()` has not finished by then.
+    Connections {
+        target: Services.DesktopStandby
+        function onCleared(): void {
+            Qt.callLater(root._captureWhenClear)
+        }
+    }
+
+    // Bounded fallback so neither a desktop that never reports itself clear nor a
+    // silent snapshot provider can block locking. Armed when a request is
+    // accepted, and again — over a full budget of its own — when the capture
+    // actually starts.
     property Timer _prepareFailsafe: Timer {
         interval: Controller.prepareFailsafeInterval(
                       root.backgroundMode, SurfaceLogic.backgroundModes,

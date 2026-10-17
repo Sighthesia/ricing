@@ -37,12 +37,15 @@ ShellRoot {
     property bool startupChromeReady: false
     property bool startupQuietReady: false
     property bool startupWorkFinished: false
-    // The bar's startup arrival waits for the session-start lock to leave the
-    // screen. Behind the lock the slide plays unseen, so the desktop would come
-    // up with the bar already at rest — the pop-in the arrival exists to remove.
-    // A session with no startup lock (a reload whose marker was spent) settles
-    // this immediately and keeps its arrival exactly as it was.
-    readonly property bool barRevealAllowed: lockModule.startupLockSettled
+    // The bar's arrival waits for the lock to leave the screen. Behind the lock
+    // the slide plays unseen, and the desktop would then appear with the bar
+    // already at rest — the pop-in the arrival exists to remove. Two terms,
+    // because they answer different questions: the session-start latch covers the
+    // window before a boot request has even been accepted (the marker read is
+    // asynchronous), and the lock's own ownership covers every accepted request —
+    // a manual one included, which is what the arrival after an unlock is for.
+    readonly property bool barArrivalAllowed: lockModule.startupLockSettled
+            && !lockModule.holdsDesktop
     // True once the bounded fallback below released a gate nothing ever
     // reported, so a degraded boot is visible in the log instead of silent.
     property bool startupFallbackUsed: false
@@ -678,7 +681,7 @@ ShellRoot {
                 id: topBar
                 startupStaging: true
                 startupPrewarmAllowed: root.startupWorkFinished
-                startupRevealAllowed: root.barRevealAllowed
+                arrivalAllowed: root.barArrivalAllowed
             }
 
             Loader {

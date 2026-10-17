@@ -6,7 +6,7 @@ import "../lazerbar/ScreenCornerMask.js" as CornerMask
 import "../lazerbar/OverlayCoordinatorLogic.js" as CoordLogic
 import "../lazerbar/WallpaperBootLogic.js" as BootLogic
 import "./FullscreenBarLogic.js" as RevealLogic
-import "./StartupBarRevealLogic.js" as StartupReveal
+import "./BarArrivalLogic.js" as ArrivalLogic
 import "../../services" as Services
 import "../../services/barlayout/BarLayoutSections.js" as BarLayoutSections
 
@@ -26,12 +26,13 @@ Variants {
     // quiet-ready phase; otherwise its first delegate/icon/font construction
     // competes with the startup reveal and bar staging.
     property bool startupPrewarmAllowed: false
-    // Whether each bar's startup arrival may play. Held false while a
-    // session-start lock still owns the screen: the slide would play behind the
-    // lock, and the desktop would then appear with the bar already expanded
-    // instead of arriving. The owning gate is the lock's own state, so a session
-    // with no startup lock is unaffected.
-    property bool startupRevealAllowed: true
+    // Whether each bar's arrival may play. Held false while the desktop is owned
+    // by a lock: a session-start lock has not left yet, or a request is standing
+    // the desktop down so it can be photographed. Either way the slide would play
+    // unseen, and the desktop would then appear with the bar already at rest
+    // instead of arriving with it. The owning gates are the lock's own state, so a
+    // session with no lock is unaffected.
+    property bool arrivalAllowed: true
     property var finishedStartupScreens: []
     readonly property bool startupReady: BootLogic.isReady(
         root.finishedStartupScreens, root.currentStartupKeys())
@@ -119,25 +120,33 @@ Variants {
         // match initialState() and so the first frame is correct before any
         // event arrives.
         property real revealProgress: 1
-        // Startup expansion. Starts slid out, so startup has an arrival rather
+        // Chrome arrival. Starts slid out, so a session has an arrival rather
         // than a pop-in, and it is deliberately NOT the state above: outside
         // fullscreen the auto-hide machine forces `revealed` true on every event
-        // it sees, so a startup expansion stored in that state would be undone by
-        // the next pointer move. The two are independent and combine into one
-        // slide, which is also why neither may collapse the bar on its own.
-        property real startupProgress: 0
-        // One-way latch, so nothing after the slide can un-expand the bar.
-        property bool startupExpanded: false
+        // it sees, so an arrival stored in that state would be undone by the next
+        // pointer move. The two are independent and combine into one slide,
+        // which is also why neither may collapse the bar on its own.
+        //
+        // It runs in both directions. In, once this screen's widgets are staged
+        // and nothing owns the screen; out, whenever a lock claims the desktop —
+        // the lock photographs the desktop, so the bar has to be off it before
+        // that capture (see Services.DesktopStandby).
+        property real arrivalProgress: 0
+        // Claimed for as long as the bar is meant to be at rest, so the full
+        // input region belongs to it from the frame the arrival starts; a
+        // stand-down hands the region back to the desktop.
+        property bool arrivalClaimed: false
         // The only value the slide geometry reads.
-        readonly property real slideProgress: StartupReveal.slideProgress(
-            screenScope.revealProgress, screenScope.startupProgress)
+        readonly property real slideProgress: ArrivalLogic.slideProgress(
+            screenScope.revealProgress, screenScope.arrivalProgress)
         // Same motion contract as the auto-hide reveal above — an explicit
         // NumberAnimation rather than a Behavior, because a Behavior cannot vary
-        // easing by direction and startup is a one-way arrival with no return leg.
+        // easing by direction and the arrival and the stand-down do not share a
+        // curve.
         NumberAnimation {
-            id: startupRevealMotion
+            id: arrivalMotion
             target: screenScope
-            property: "startupProgress"
+            property: "arrivalProgress"
             running: false
         }
         // This screen's widgets have staged. Staging is reported to the root
@@ -145,48 +154,163 @@ Variants {
         // on), but the arrival below is a separate decision.
         property bool startupStaged: false
 
-        // Start the arrival only when both this screen is staged and the
-        // session-start lock has left the screen. Called from either condition
-        // changing, so an unlock that lands before the widgets are staged still
-        // ends in an arrival, and the call is idempotent afterwards.
-        function maybeExpandAtStartup() {
-            if (!StartupReveal.shouldExpandAtStartup(
-                        screenScope.startupStaged, root.startupRevealAllowed))
+        // Start the arrival when both this screen is staged and the desktop is
+        // free again. Called from either condition changing, so an unlock that
+        // lands before the widgets are staged still ends in an arrival, and the
+        // call is idempotent afterwards.
+        function maybeArrive() {
+            if (!ArrivalLogic.shouldArrive(screenScope.startupStaged, root.arrivalAllowed))
                 return
-            screenScope.expandAtStartup()
+            screenScope.driveArrival(true)
         }
         // Qualified through the root, so the gate is unambiguous inside this
         // delegate: a Variants delegate resolves inherited handlers through a
         // scope chain that is not worth relying on.
         Connections {
             target: root
-            function onStartupRevealAllowedChanged() {
-                screenScope.maybeExpandAtStartup()
+            function onArrivalAllowedChanged() {
+                if (root.arrivalAllowed)
+                    screenScope.maybeArrive()
+                else
+                    screenScope.driveArrival(false)
             }
         }
 
-        // Slide in, once, after this screen's widgets are staged and no
-        // session-start lock is covering it. Per screen rather than on the
-        // root's aggregate readiness, so each bar arrives when its own content
-        // exists instead of waiting for the slowest monitor.
-        function expandAtStartup() {
-            screenScope.startupExpanded = StartupReveal.latchStartup(
-                true, screenScope.startupExpanded)
+        // Drive the slide toward `atRest`, out of the bar's own viewport or back
+        // into it. Per screen rather than on the root's aggregate readiness, so
+        // each bar arrives when its own content exists instead of waiting for the
+        // slowest monitor.
+        //
+        // The duration follows the distance still to travel, exactly like the
+        // auto-hide reveal: an interrupted arrival resumes at a proportional
+        // speed instead of jumping or lingering. The curves differ by direction
+        // for the same reason they do above: OutCubic front-loads the arrival's
+        // travel, while InOutQuad spends the whole duration visibly in motion, so
+        // a departing bar reads as leaving rather than being erased.
+        function driveArrival(atRest) {
+            const target = atRest ? 1 : 0
+            screenScope.arrivalClaimed = atRest === true
+            // A bar popup is anchored to this bar and cannot outlive it. The
+            // auto-hide collapse drops it outright for the same reason: the
+            // pointer cannot be on a popup whose bar is off screen.
+            if (!atRest)
+                popupHost.dismissImmediately()
+            arrivalMotion.stop()
             // Reduced motion arrives without travelling, the same way the
             // auto-hide reveal snaps when there is no distance left to cover.
-            if (MotionTokens.reducedMotion) {
-                startupRevealMotion.stop()
-                screenScope.startupProgress = 1
+            const distance = Math.abs(target - screenScope.arrivalProgress)
+            if (MotionTokens.reducedMotion || distance < 0.001) {
+                screenScope.arrivalProgress = target
                 return
             }
-            if (screenScope.startupProgress > 0.999)
+            arrivalMotion.duration = Math.max(MotionTokens.fast,
+                Math.round(MotionTokens.slow * distance))
+            arrivalMotion.easing.type = atRest ? Easing.OutCubic : Easing.InOutQuad
+            arrivalMotion.to = target
+            arrivalMotion.restart()
+        }
+
+        // ---- The desktop's stand-down for a lock capture --------------------
+        //
+        // A lock request is routinely made from inside the launcher, and it
+        // reaches the lock while the wave panel is still falling and the bar is
+        // still painted. The lock's background is a photograph of the desktop, so
+        // the capture waits for every surface that paints over the desktop to
+        // report that it is clear (see Services.DesktopStandby). Each surface
+        // registers while it exists and reports the frame it is actually gone;
+        // a surface that never reports cannot strand the lock, which bounds its
+        // own preparation and commits without a capture if this never settles.
+        readonly property string barStandDownKey: screenName + ":bar"
+        readonly property string waveStandDownKey: screenName + ":wave"
+        readonly property string settingsStandDownKey: screenName + ":settings"
+        // Per request, so a late report from the previous one cannot answer this
+        // one.
+        property bool _standDownReported: true
+
+        // Called from this scope's single destruction handler below: a Variants
+        // delegate may declare `Component.onDestruction` once and no more.
+        function releaseStandDown() {
+            Services.DesktopStandby.unregister(screenScope.barStandDownKey)
+            Services.DesktopStandby.unregister(screenScope.waveStandDownKey)
+            Services.DesktopStandby.unregister(screenScope.settingsStandDownKey)
+        }
+
+        Component.onCompleted: {
+            Services.DesktopStandby.register(screenScope.barStandDownKey)
+            Services.DesktopStandby.register(screenScope.waveStandDownKey)
+            Services.DesktopStandby.register(screenScope.settingsStandDownKey)
+            // A scope created inside a capture window — a screen plugged in
+            // mid-request — registered as owing a report and never saw the edge,
+            // so it answers for itself here.
+            screenScope.applyStandDown()
+        }
+
+        // Answer the current request with every surface this screen owns. Called
+        // on the request's own edge and from this scope's completion, so a scope
+        // that appears mid-request owes exactly what one that saw the edge owes.
+        function applyStandDown() {
+            screenScope._standDownReported = !Services.DesktopStandby.standby
+            screenScope.reportBarStandDown()
+            screenScope.standDownWave()
+            screenScope.standDownSettings()
+        }
+
+        Connections {
+            target: Services.DesktopStandby
+            function onStandbyChanged() { screenScope.applyStandDown() }
+        }
+
+        // The bar's own report, owed the frame it is actually off the desktop
+        // rather than a duration after it was asked: watched on the slide, so a
+        // reduced-motion snap and a slide that lands the ordinary way are the
+        // same event.
+        onSlideProgressChanged: screenScope.reportBarStandDown()
+
+        function reportBarStandDown() {
+            if (screenScope._standDownReported || !Services.DesktopStandby.standby)
                 return
-            // Reuses the bar's own reveal token and curve rather than
-            // introducing motion this bar does not already own.
-            startupRevealMotion.duration = MotionTokens.slow
-            startupRevealMotion.easing.type = Easing.OutCubic
-            startupRevealMotion.to = 1
-            startupRevealMotion.restart()
+            if (screenScope.slideProgress > 0.001)
+                return
+            screenScope._standDownReported = true
+            Services.DesktopStandby.report(screenScope.barStandDownKey)
+        }
+
+        // The wave panel is the surface a lock request most often arrives from:
+        // the launcher's own locked-session row fires the request and closes
+        // itself as it does, so the panel is still mid-fall when the lock would
+        // capture. This waits for the panel's own `closed` instead, and closes it
+        // itself when the request arrives by another route (a keybind).
+        function standDownWave() {
+            if (!Services.DesktopStandby.standby)
+                return
+            if (launcherSurface.host.phase === "closed") {
+                Services.DesktopStandby.report(screenScope.waveStandDownKey)
+                return
+            }
+            launcherSurface.host.close()
+        }
+
+        Connections {
+            target: launcherSurface.host
+            function onClosed() { screenScope.standDownWave() }
+        }
+
+        // A full-screen overlay in the same class: a lock request by keybind can
+        // arrive with settings open, and the panel would be photographed exactly
+        // like the wave panel would.
+        function standDownSettings() {
+            if (!Services.DesktopStandby.standby)
+                return
+            if (settingsOverlay.phase === "closed") {
+                Services.DesktopStandby.report(screenScope.settingsStandDownKey)
+                return
+            }
+            settingsOverlay.closeWithoutFocusRestore()
+        }
+
+        Connections {
+            target: settingsOverlay
+            function onClosed() { screenScope.standDownSettings() }
         }
         // Match the hover-popup reveal (see BarPopupHost.setRevealTarget): an
         // explicit NumberAnimation rather than a Behavior, because the popup
@@ -393,17 +517,21 @@ Variants {
             autoHideEnabled: autoHideEnabled,
             revealed: revealed,
             revealProgress: revealProgress,
-            // The startup side of the same question: a bar that is off screen
-            // because it has not arrived yet looks identical to one the
-            // auto-hide machine collapsed, and only these two fields tell them
-            // apart from outside the process.
-            startupExpanded: startupExpanded,
+            // The arrival side of the same question: a bar that is off screen
+            // because it has not arrived, or because it is standing down for a
+            // lock capture, looks identical to one the auto-hide machine
+            // collapsed, and only these two fields tell them apart from outside
+            // the process.
+            arrivalClaimed: arrivalClaimed,
             slideProgress: slideProgress,
             pinned: _pinned,
             state: _revealState
         })
         on_DebugEntryChanged: Services.BarDebugState.sync(screenName, _debugEntry)
-        Component.onDestruction: Services.BarDebugState.remove(screenName)
+        Component.onDestruction: {
+            Services.BarDebugState.remove(screenName)
+            screenScope.releaseStandDown()
+        }
 
         onFullscreenActiveChanged: _sendReveal("fullscreen", fullscreenActive)
         onAutoHideEnabledChanged: _sendReveal("enabled", autoHideEnabled)
@@ -545,7 +673,7 @@ Variants {
                     return
                 root.reportBarReady(screenScope.startupScreenKey)
                 screenScope.startupStaged = true
-                screenScope.maybeExpandAtStartup()
+                screenScope.maybeArrive()
             }
         }
 
@@ -783,8 +911,8 @@ Variants {
             Item {
                 id: revealProbe
                 width: barSlide.width
-                height: StartupReveal.claimsFullRegion(screenScope.revealed,
-                                                       screenScope.startupExpanded)
+                height: ArrivalLogic.claimsFullRegion(screenScope.revealed,
+                                                       screenScope.arrivalClaimed)
                         ? barSlide.height : RevealLogic.revealStripHeight
                 y: screenScope.atTop ? 0 : barSlide.height - height
             }
@@ -799,7 +927,13 @@ Variants {
                 radius: 0
                 color: Services.SettingsService.effectiveColorScheme === "light"
                         ? LazerTheme.bgLight : LazerTheme.bgDark
+                // Faded out with the arrival rather than switched off with it: a
+                // stand-down has to take this hint with it — the lock photographs
+                // the desktop, and a bar that is not in the picture must not leave
+                // a strip of itself in it. Multiplying is what makes the collapse
+                // of an already auto-hidden bar read as one motion.
                 opacity: (1 - screenScope.revealProgress)
+                        * screenScope.arrivalProgress
                         * Math.max(0.35, Math.min(1, Services.SettingsService.panelSurfaceOpacity)) * 0.7
 
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.medium } }
