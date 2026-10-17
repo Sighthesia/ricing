@@ -148,9 +148,15 @@ Scope {
     // release and the self-test teardown all pass through `_state`, and none of
     // them may leave the desktop stood down. The surfaces themselves report the
     // frame each one actually clears on (see Services.DesktopStandby).
+    //
+    // A capturing request also tells the desktop that its own geometry is going
+    // into a photograph, which is what makes a surface give back the space it
+    // reserves. The session-start lock never captures, so it never asks for
+    // that: nothing there is photographed, and the desktop is still assembling.
     onHoldsDesktopChanged: {
         if (holdsDesktop)
-            Services.DesktopStandby.begin()
+            Services.DesktopStandby.begin(
+                root.backgroundMode === SurfaceLogic.backgroundModes.screenshot)
         else
             Services.DesktopStandby.end()
     }

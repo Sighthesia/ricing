@@ -226,6 +226,29 @@ Variants {
         // Per request, so a late report from the previous one cannot answer this
         // one.
         property bool _standDownReported: true
+        // Whether this screen's tiles are still travelling into the strip this
+        // bar just gave back (see the exclusive zone above and
+        // reportBarStandDown below).
+        property bool _reflowPending: false
+
+        // The wait for the desktop to actually stand in that strip. niri
+        // re-tiles this screen's windows when the strip is released, and it
+        // animates that with its own window-movement spring: this machine's
+        // config is 0.75-damped, 323-stiff under a 1.5x global slowdown, a
+        // little over a second to settle. The compositor announces the new
+        // layout but never the end of the animation around it, so this is a
+        // budget rather than a signal — the one guessed wait in the stand-down,
+        // and the reason a capture taken inside it bakes a half-moved desktop
+        // into the lock's background.
+        readonly property int reflowBudgetMs: 1000
+        property Timer reflowTimer: Timer {
+            interval: screenScope.reflowBudgetMs
+            repeat: false
+            onTriggered: {
+                screenScope._reflowPending = false
+                screenScope.reportBarStandDown()
+            }
+        }
 
         // Called from this scope's single destruction handler below: a Variants
         // delegate may declare `Component.onDestruction` once and no more.
@@ -249,7 +272,20 @@ Variants {
         // on the request's own edge and from this scope's completion, so a scope
         // that appears mid-request owes exactly what one that saw the edge owes.
         function applyStandDown() {
-            screenScope._standDownReported = !Services.DesktopStandby.standby
+            const standby = Services.DesktopStandby.standby
+            // The release and the reflow it causes both start here, so the
+            // budget is measured from this edge rather than from the slide
+            // landing. A fullscreen covering tile is the one case with nothing to
+            // wait for: niri sizes it to the whole output, so the strip was never
+            // taken from it and releasing it moves no visible window. That is the
+            // same verdict the auto-hide above already runs on.
+            screenScope.reflowTimer.stop()
+            screenScope._reflowPending = standby
+                    && Services.DesktopStandby.photographsDesktop
+                    && !screenScope.fullscreenActive
+            if (screenScope._reflowPending)
+                screenScope.reflowTimer.restart()
+            screenScope._standDownReported = !standby
             screenScope.reportBarStandDown()
             screenScope.standDownWave()
             screenScope.standDownSettings()
@@ -263,13 +299,18 @@ Variants {
         // The bar's own report, owed the frame it is actually off the desktop
         // rather than a duration after it was asked: watched on the slide, so a
         // reduced-motion snap and a slide that lands the ordinary way are the
-        // same event.
+        // same event. Both this and the reflow budget above feed the same
+        // function, so whichever is the last to finish is what reports.
         onSlideProgressChanged: screenScope.reportBarStandDown()
 
         function reportBarStandDown() {
             if (screenScope._standDownReported || !Services.DesktopStandby.standby)
                 return
             if (screenScope.slideProgress > 0.001)
+                return
+            // Off the desktop, but the desktop itself is not standing still yet:
+            // the tiles are still arriving in the strip this bar gave back.
+            if (screenScope._reflowPending)
                 return
             screenScope._standDownReported = true
             Services.DesktopStandby.report(screenScope.barStandDownKey)
@@ -742,7 +783,16 @@ Variants {
             // fullscreen tile to the whole output, so the reserved strip is
             // invisible during fullscreen; dropping it would instead reflow every
             // tiled window twice per fullscreen toggle.
-            exclusiveZone: screenScope.floating ? 0 : implicitHeight
+            //
+            // It IS released for as long as a lock is capturing the desktop: that
+            // capture is a photograph of a desktop with no bar on it, and a strip
+            // the tiles stay excluded from would be photographed as a hole where
+            // the bar used to be (see Services.DesktopStandby.photographsDesktop).
+            // What the release sets in motion — niri re-tiling this screen's
+            // windows into the strip — is what the stand-down report waits out
+            // below, because the photograph is taken after that report.
+            exclusiveZone: (screenScope.floating
+                            || Services.DesktopStandby.photographsDesktop) ? 0 : implicitHeight
             anchors { top: screenScope.atTop; bottom: !screenScope.atTop; left: true; right: true }
             margins { top: screenScope.floatingMargin; bottom: screenScope.floatingMargin; left: screenScope.floatingMargin; right: screenScope.floatingMargin }
 

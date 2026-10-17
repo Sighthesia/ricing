@@ -29,7 +29,16 @@ QtObject {
     // until the lock's own exit wave has revealed the desktop again.
     readonly property bool standby: root._active
 
+    // ...and whether that capture is a photograph of the desktop itself. A
+    // photograph is only truthful if the desktop's own geometry is: space a
+    // surface reserves on it has to be given back, or the lock would show a
+    // strip no window is allowed to occupy — a hole where the bar used to be.
+    // A request that reveals the wallpaper instead has no desktop geometry to be
+    // faithful to and leaves the reservations alone.
+    readonly property bool photographsDesktop: root._active && root._photographs
+
     property bool _active: false
+    property bool _photographs: false
     // Key -> whether that surface has reported for the current request. A key's
     // presence is its registration, so one map carries both facts and no surface
     // can report into a request that never counted it.
@@ -37,8 +46,13 @@ QtObject {
 
     // Raise a request. Every registered surface now owes a report, so the capture
     // cannot be satisfied by whatever the previous request happened to leave
-    // behind.
-    function begin(): void {
+    // behind. `photographsDesktop` is what the request is going to do with the
+    // desktop once it is clear (see the property above).
+    function begin(photographsDesktop: bool): void {
+        // Before `_active` below, so a surface reading it inside its own
+        // notification already sees this request's value — and so the release
+        // itself costs one geometry commit rather than two.
+        root._photographs = photographsDesktop === true
         // Reset before the flag: surfaces react to `standby` below and report
         // inside that notification, and a report that landed before the reset
         // would be erased by it.
