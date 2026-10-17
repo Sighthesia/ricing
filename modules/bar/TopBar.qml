@@ -230,6 +230,12 @@ Variants {
         // bar just gave back (see the exclusive zone above and
         // reportBarStandDown below).
         property bool _reflowPending: false
+        // Whether this bar is still holding the strip open after the request
+        // that released it has ended (see the exclusive zone above and
+        // applyStandDown below). Cleared once the bar is back at rest, which is
+        // the first moment returning the strip cannot expose the wallpaper: the
+        // tiles then settle down behind a bar that already covers their edge.
+        property bool _reclaimHold: false
 
         // The wait for the desktop to actually stand in that strip. niri
         // re-tiles this screen's windows when the strip is released, and it
@@ -281,10 +287,16 @@ Variants {
             // same verdict the auto-hide above already runs on.
             screenScope.reflowTimer.stop()
             screenScope._reflowPending = standby
-                    && Services.DesktopStandby.photographsDesktop
+                    && Services.DesktopStandby.isPhotographingDesktop()
                     && !screenScope.fullscreenActive
             if (screenScope._reflowPending)
                 screenScope.reflowTimer.restart()
+            // The strip the exclusive zone just gave back is not handed straight
+            // back when the request ends: it waits until this bar is back at
+            // rest (see _reclaimHold above), so the tiles settle behind this bar
+            // rather than beside it.
+            if (standby && Services.DesktopStandby.isPhotographingDesktop())
+                screenScope._reclaimHold = true
             screenScope._standDownReported = !standby
             screenScope.reportBarStandDown()
             screenScope.standDownWave()
@@ -301,7 +313,15 @@ Variants {
         // reduced-motion snap and a slide that lands the ordinary way are the
         // same event. Both this and the reflow budget above feed the same
         // function, so whichever is the last to finish is what reports.
-        onSlideProgressChanged: screenScope.reportBarStandDown()
+        onSlideProgressChanged: {
+            screenScope.reportBarStandDown()
+            // Back at rest, whichever slide brought it back: `slideProgress` is
+            // the product of the reveal and the arrival, so 1 means both are in
+            // place and the strip can be returned without exposing anything —
+            // the tiles then settle down behind a bar that covers their edge.
+            if (screenScope.slideProgress >= 1)
+                screenScope._reclaimHold = false
+        }
 
         function reportBarStandDown() {
             if (screenScope._standDownReported || !Services.DesktopStandby.standby)
@@ -565,6 +585,9 @@ Variants {
             // the process.
             arrivalClaimed: arrivalClaimed,
             slideProgress: slideProgress,
+            arrivalProgress: arrivalProgress,
+            reflowPending: _reflowPending,
+            reclaimHold: _reclaimHold,
             pinned: _pinned,
             state: _revealState
         })
@@ -791,8 +814,14 @@ Variants {
             // What the release sets in motion — niri re-tiling this screen's
             // windows into the strip — is what the stand-down report waits out
             // below, because the photograph is taken after that report.
+            //
+            // It stays released past the end of the request until this bar is
+            // back at rest (_reclaimHold): giving the strip back the moment the
+            // request ends pushes the tiles down while the bar is still arriving
+            // above them, and the wallpaper shows in the gap between the two.
             exclusiveZone: (screenScope.floating
-                            || Services.DesktopStandby.photographsDesktop) ? 0 : implicitHeight
+                            || Services.DesktopStandby.photographsDesktop
+                            || screenScope._reclaimHold) ? 0 : implicitHeight
             anchors { top: screenScope.atTop; bottom: !screenScope.atTop; left: true; right: true }
             margins { top: screenScope.floatingMargin; bottom: screenScope.floatingMargin; left: screenScope.floatingMargin; right: screenScope.floatingMargin }
 

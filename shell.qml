@@ -613,6 +613,12 @@ ShellRoot {
                     + ",autoHideEnabled:" + b.autoHideEnabled
                     + ",revealed:" + b.revealed
                     + ",revealProgress:" + b.revealProgress
+                    + ",arrivalProgress:" + b.arrivalProgress
+                    + ",arrivalClaimed:" + b.arrivalClaimed
+                    + ",slideProgress:" + b.slideProgress
+                    + ",reflowPending:" + b.reflowPending
+                    + ",reclaimHold:" + b.reclaimHold
+                    + ",photographsDesktop:" + Services.DesktopStandby.photographsDesktop
                     + ",pinned:" + b.pinned
                     + ",state:" + JSON.stringify(b.state) + "}")
             }

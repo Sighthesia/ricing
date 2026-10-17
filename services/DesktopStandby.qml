@@ -74,6 +74,18 @@ QtObject {
         root._active = false
     }
 
+    // Whether the current request photographs the desktop, read at the moment a
+    // surface reacts to it. A function rather than the binding above, for the
+    // same reason `isClear` is one: a surface is notified from inside the write
+    // that raised the request (`_active` below), and a binding is still one
+    // notification behind there — it resolves after that cascade, so a surface
+    // reading `photographsDesktop` in its own `standby` handler sees the
+    // *previous* request's value and misses what this one asks of it. The binding
+    // above stays for bindings and for reads outside a cascade.
+    function isPhotographingDesktop(): bool {
+        return root._active && root._photographs
+    }
+
     // Whether a capture may run now: no request outstanding, or every registered
     // surface has reported. A function rather than a property because the lock
     // asks this at the moment it decides, and a binding read could see a request
