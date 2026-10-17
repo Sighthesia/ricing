@@ -278,9 +278,8 @@ Item {
         z: 3
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: root.exiting ? parent.top : undefined
-        anchors.bottom: root.exiting ? undefined : parent.bottom
-        height: root.exiting ? root.height : root.height * root.entryBodyProgress
+        anchors.top: parent.top
+        height: root.height
         clip: true
         visible: height > 0.5
 
@@ -291,14 +290,13 @@ Item {
             id: openedContent
             width: root.width
             height: root.height
-            // The wallpaper stays pinned to the surface, while this moving
-            // body clips its visible portion away during the exit. Without
-            // the clip, the counter-translated full-screen wallpaper remains
-            // above exitBands and hides the entire falling wave.
+            // Both directions use the launcher's two-viewport body travel. On
+            // entry this keeps the opaque lock body below the wave until the
+            // stretched bands have established themselves; on exit it leaves
+            // the pinned wallpaper behind the falling wave.
             clip: true
-            y: root.exiting
-                    ? root.height * 2 * (1 - root.exitBodyProgress)
-                    : -(root.height - openedRegion.height)
+            y: root.height * 2 * (1 - (root.exiting
+                    ? root.exitBodyProgress : root.entryBodyProgress))
 
         // The wallpaper the wave unveils, sitting under the lock controls so
         // both arrive with the same trailing edge. It is hosted in a full-height
