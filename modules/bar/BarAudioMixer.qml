@@ -431,6 +431,26 @@ Item {
                         root.streamVolumeSink(streamRow.modelData, Math.max(0, Math.min(1, Number(next) / 100)))
                 }
             }
+
+            // Keep the application card's hover emphasis consistent with the master control cards.
+            Rectangle {
+                objectName: "mixerRowHighlight"
+                anchors.fill: parent
+                radius: streamRow.radius
+                color: "transparent"
+                border.width: streamRowHover.hovered ? 1.5 : 0
+                border.color: streamRowHover.hovered ? LazerTheme.settingsAccent : "transparent"
+                enabled: false
+
+                Behavior on border.width {
+                    enabled: !MotionTokens.reducedMotion
+                    NumberAnimation { duration: MotionTokens.fast }
+                }
+                Behavior on border.color {
+                    enabled: !MotionTokens.reducedMotion
+                    ColorAnimation { duration: MotionTokens.fast }
+                }
+            }
         }
     }
 
