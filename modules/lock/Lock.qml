@@ -21,6 +21,8 @@ Scope {
     property string _state: LockLogic.States.idle
     property int _requestGeneration: -1
     property bool _exitFailsafeArmed: false
+    property int _exitSurfaceCount: 0
+    property var _exitFinishedScreens: ({})
     property bool _startupLockArmed: true
     // The startup auto-lock is a per-compositor-session event, not a per-shell
     // event: a Quickshell reload must never re-lock a desktop that was already
@@ -138,6 +140,8 @@ Scope {
         if (startupRequest)
             root.startupLockEngaged()
         _startupWaveEmitted = false
+        _exitSurfaceCount = Math.max(1, Quickshell.screens.length)
+        _exitFinishedScreens = ({})
         lockContext.reset()
         for (const image of root._snapshotImages)
             image.destroy()
@@ -279,6 +283,22 @@ Scope {
         _exitFailsafeArmed = false
     }
 
+    // WlSessionLock creates one LockSurface per output. Do not release the
+    // compositor lock when the first output finishes: that destroys the other
+    // surfaces while their closing waves are still travelling downward.
+    function _surfaceExitFinished(screenIndex): void {
+        if (_state !== LockLogic.States.exiting)
+            return
+        const key = Number(screenIndex) >= 0 ? String(screenIndex) : "unknown"
+        if (_exitFinishedScreens[key] === true)
+            return
+        const finished = Object.assign({}, _exitFinishedScreens)
+        finished[key] = true
+        _exitFinishedScreens = finished
+        if (Object.keys(finished).length >= _exitSurfaceCount)
+            _finishRelease()
+    }
+
     // Self-test release: bypasses PAM strictly while the startup test is
     // armed; arming happens only in Component.onCompleted below.
     function _selfTestRelease(): void {
@@ -352,7 +372,8 @@ Scope {
                     || StartupRevealLogic.waveAllowed(true,
                                                       root.startupWallpaperReady,
                                                       root.startupChromeReady)
-            onReleaseRequested: root._finishRelease()
+            onReleaseRequested: root._surfaceExitFinished(root.screenIndex)
+            onExitWaveStarted: root._exitFailsafe.restart()
             // One surface exists per screen and each waves in turn; only the
             // first startup wave notifies the root coordinator (Task 5), and
             // manual waves never do.
@@ -427,10 +448,13 @@ Scope {
     // Bounded fallback so a stalled exit can never hold the lock after a
     // successful authentication; it stays armed only in the exiting state. The
     // budget covers the whole unlock choreography — unlock feedback, the
-    // control collapse, the content fall, then the wave sweep — plus a margin.
+    // control collapse, the content fall, the exit-image decode wait, then the
+    // wave sweep — plus a margin. The image wait is separate because the wave
+    // cannot start until its desktop replacement is ready.
     property Timer _exitFailsafe: Timer {
         interval: Lazer.MotionTokens.medium + Lazer.MotionTokens.instant
                   + Lazer.MotionTokens.lockContentFall
+                  + Lazer.MotionTokens.lockExitDesktopWait
                   + Lazer.MotionTokens.waveExit
                   + Lazer.MotionTokens.slow
         repeat: false

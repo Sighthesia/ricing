@@ -32,6 +32,10 @@ QtObject {
 
     // Wallpaper swaps are large-surface reveals; keep them calm but not slow.
     readonly property int wallpaperSwap: 480
+    // Exit desktop decoding happens after authentication and before the closing
+    // wave may start. Keep that bounded wait outside the motion duration so a
+    // slow synchronous image decode cannot make the lock release mid-wave.
+    readonly property int lockExitDesktopWait: 1200
     // The boot reveal is a separate contract from a live switch. Its DURATION is
     // DymicShell's: 3000ms, its `Math.round(3000 / speedFactor)` at the default
     // speedFactor of 1.0 (DymicShell/modules/background/BackgroundWindow.qml).

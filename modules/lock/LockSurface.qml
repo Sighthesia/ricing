@@ -95,6 +95,10 @@ WlSessionLockSurface {
     property bool inputMode: false
 
     signal releaseRequested()
+    // Emitted only after the exit desktop is ready and the closing wave has
+    // actually started. The lock owner uses it to re-arm its failsafe from
+    // the visible wave, rather than counting image-decode time as animation.
+    signal exitWaveStarted()
     // Startup gating: a session-start surface prepares immediately but holds
     // its entry wave until the wallpaper reveal has settled and the bar chrome
     // has finished staging. Manual surfaces wave at once. The boolean records
@@ -221,6 +225,7 @@ WlSessionLockSurface {
         exitBodyAnimation.restart()
         exitAnimation.from = waveProgress
         exitAnimation.start()
+        root.exitWaveStarted()
     }
 
     function requestRelease(): void {
