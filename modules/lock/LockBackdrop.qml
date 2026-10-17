@@ -319,12 +319,12 @@ Item {
             id: wallpaperHost
             width: root.width
             height: root.height
-            // The lock controls travel with the launcher-style body on exit,
-            // but the wallpaper must stay pinned to the lock surface. Cancel
-            // the body's translation here so the closing wave moves across a
-            // stationary wallpaper instead of dragging the image downward.
+            // The lock controls travel with the launcher-style body in both
+            // directions, but the wallpaper must stay pinned to the lock
+            // surface. Cancel the body's translation here so the wave reveals
+            // a stationary image instead of dragging the wallpaper with it.
             x: 0
-            y: root.exiting ? -openedContent.y : 0
+            y: -openedContent.y
 
             Image {
                 id: wallpaperBody
