@@ -55,6 +55,14 @@ Scope {
     // boot that is not one. Read-only: it reports state and requests nothing.
     readonly property bool startupLockExpected: !_startupGateResolved
             || startupRequest || _startupLockArmed
+    // Whether the session-start lock has stopped owning the screen — either it
+    // released, or it is settled that none is coming for this session. Consumers
+    // that must not play their own work behind the lock wait on this instead of
+    // on `startupLockExpected`, which deliberately stays true for the rest of a
+    // session that did start a lock (its request is sticky).
+    readonly property bool startupLockSettled: _startupLockReleased
+            || !startupLockExpected
+    property bool _startupLockReleased: false
     // Emitted once per accepted startup request, when the first surface's
     // entry wave is scheduled: the surface has committed to wave (its bounded
     // image wait is armed and the 800ms enter follows), or, under reduced
@@ -270,6 +278,8 @@ Scope {
         _prepareFailsafe.stop()
         _state = LockLogic.States.idle
         _requestGeneration = -1
+        // No lock ever reached the screen, so nothing is holding it any more.
+        _startupLockReleased = true
     }
 
     function _finishRelease(): void {
@@ -281,6 +291,9 @@ Scope {
         _requestGeneration = -1
         _exitFailsafe.stop()
         _exitFailsafeArmed = false
+        // The compositor lock is gone and its surfaces are being torn down, so
+        // the screen is free for work that was held behind the lock.
+        _startupLockReleased = true
     }
 
     // WlSessionLock creates one LockSurface per output. Do not release the
@@ -315,6 +328,9 @@ Scope {
             if (next !== null) {
                 _state = next
                 sessionLock.locked = false
+                // Self-test release goes straight to idle instead of through
+                // _finishRelease, so the screen-freed claim is made here too.
+                _startupLockReleased = true
             }
         }
         if (sessionLock.locked)

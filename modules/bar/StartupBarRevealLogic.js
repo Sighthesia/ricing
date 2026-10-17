@@ -41,6 +41,16 @@ function latchStartup(expanded, startupExpanded) {
     return expanded === true || startupExpanded === true
 }
 
+// Whether the startup arrival may start. Two independent conditions, both
+// required: this screen's widgets have staged, and no session-start lock still
+// owns the screen. Behind such a lock the slide plays unseen, and the desktop
+// then comes up with the bar already at rest instead of arriving with it — so
+// the expansion is deferred until the lock has left, not merely until staging
+// finished.
+function shouldExpandAtStartup(staged, startupRevealAllowed) {
+    return staged === true && startupRevealAllowed === true
+}
+
 // Whether the bar claims its full input region. Once it has arrived the
 // auto-hide machine owns that decision alone; while it is still arriving the bar
 // keeps the same thin strip a collapsed bar claims, so an invisible startup bar

@@ -26,6 +26,12 @@ Variants {
     // quiet-ready phase; otherwise its first delegate/icon/font construction
     // competes with the startup reveal and bar staging.
     property bool startupPrewarmAllowed: false
+    // Whether each bar's startup arrival may play. Held false while a
+    // session-start lock still owns the screen: the slide would play behind the
+    // lock, and the desktop would then appear with the bar already expanded
+    // instead of arriving. The owning gate is the lock's own state, so a session
+    // with no startup lock is unaffected.
+    property bool startupRevealAllowed: true
     property var finishedStartupScreens: []
     readonly property bool startupReady: BootLogic.isReady(
         root.finishedStartupScreens, root.currentStartupKeys())
@@ -134,9 +140,35 @@ Variants {
             property: "startupProgress"
             running: false
         }
-        // Slide in, once, as soon as this screen's widgets are staged. Per screen
-        // rather than on the root's aggregate readiness, so each bar arrives when
-        // its own content exists instead of waiting for the slowest monitor.
+        // This screen's widgets have staged. Staging is reported to the root
+        // immediately (it is what closes the chrome gate the lock wave waits
+        // on), but the arrival below is a separate decision.
+        property bool startupStaged: false
+
+        // Start the arrival only when both this screen is staged and the
+        // session-start lock has left the screen. Called from either condition
+        // changing, so an unlock that lands before the widgets are staged still
+        // ends in an arrival, and the call is idempotent afterwards.
+        function maybeExpandAtStartup() {
+            if (!StartupReveal.shouldExpandAtStartup(
+                        screenScope.startupStaged, root.startupRevealAllowed))
+                return
+            screenScope.expandAtStartup()
+        }
+        // Qualified through the root, so the gate is unambiguous inside this
+        // delegate: a Variants delegate resolves inherited handlers through a
+        // scope chain that is not worth relying on.
+        Connections {
+            target: root
+            function onStartupRevealAllowedChanged() {
+                screenScope.maybeExpandAtStartup()
+            }
+        }
+
+        // Slide in, once, after this screen's widgets are staged and no
+        // session-start lock is covering it. Per screen rather than on the
+        // root's aggregate readiness, so each bar arrives when its own content
+        // exists instead of waiting for the slowest monitor.
         function expandAtStartup() {
             screenScope.startupExpanded = StartupReveal.latchStartup(
                 true, screenScope.startupExpanded)
@@ -512,7 +544,8 @@ Variants {
                 if (!barContent.startupReady)
                     return
                 root.reportBarReady(screenScope.startupScreenKey)
-                screenScope.expandAtStartup()
+                screenScope.startupStaged = true
+                screenScope.maybeExpandAtStartup()
             }
         }
 
