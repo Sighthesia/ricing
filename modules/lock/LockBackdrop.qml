@@ -39,6 +39,7 @@ Item {
     // shows the live desktop beneath the transparent lock surface.
     property bool exiting: false
     property bool exitWaveActive: false
+    property real entryBodyProgress: 0
     property real exitBodyProgress: 1
     // Device pixel ratio the wallpaper layer decodes for, supplied by the lock
     // owner as the highest ratio among the session's screens: one surface serves
@@ -279,7 +280,7 @@ Item {
         anchors.right: parent.right
         anchors.top: root.exiting ? parent.top : undefined
         anchors.bottom: root.exiting ? undefined : parent.bottom
-        height: root.exiting ? root.height : root.height * root.maskProgress
+        height: root.exiting ? root.height : root.height * root.entryBodyProgress
         clip: true
         visible: height > 0.5
 

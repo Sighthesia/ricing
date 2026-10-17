@@ -29,6 +29,7 @@ WlSessionLockSurface {
     // Single reveal driver; the backdrop derives the trailing mask from it
     // so bands and wallpaper edge always move as one curtain.
     property real waveProgress: 0
+    property real entryBodyProgress: 0
     // Exit body travel has its own clock, matching WaveSurfaceHost: the wave
     // uses InSine while the opaque body uses InQuad. Binding both to
     // waveProgress makes the body swallow the stretched wave too early.
@@ -139,6 +140,7 @@ WlSessionLockSurface {
         exitWaveActive = false
         exitWavePending = false
         exitBodyProgress = 1
+        entryBodyProgress = reducedMotion ? 1 : 0
         releaseSent = false
         startupWaveStarted = false
         inputMode = false
@@ -228,7 +230,8 @@ WlSessionLockSurface {
     }
 
     function allAnimations(): var {
-        return [enterAnimation, exitAnimation, exitBodyAnimation, contentFallAnimation]
+        return [enterAnimation, entryBodyAnimation, exitAnimation, exitBodyAnimation,
+            contentFallAnimation]
     }
 
     // One curve, one clock: the clock, the lock entry and the power row all
@@ -339,6 +342,7 @@ WlSessionLockSurface {
         exiting: root.exitWaveActive
         exitWaveActive: root.exitWaveActive
         exitBodyProgress: root.exitBodyProgress
+        entryBodyProgress: root.entryBodyProgress
         lightScheme: root.lightScheme
         surfaceColorOverride: root.themeSnapshotReady
                 ? root.lockThemeSnapshot.surface : "transparent"
@@ -372,6 +376,7 @@ WlSessionLockSurface {
             }
             // Retarget from the live value so a re-reveal never jumps.
             enterAnimation.from = root.waveProgress
+            entryBodyAnimation.restart()
             enterAnimation.start()
         }
     }
@@ -690,17 +695,29 @@ WlSessionLockSurface {
         }
     }
 
-    // Keep release ownership in the animation completion path.
-    // One driver sweeps bands and trailing mask as a single curtain, on osu's
-    // WaveContainer show easing (OutSine).
+    // Keep release ownership in the animation completion path. Match the
+    // launcher backdrop contract: the wave layers use the shorter 600ms
+    // OutQuad sweep, while the launcher body has its own longer 800ms motion.
     NumberAnimation {
         id: enterAnimation
         target: root
         property: "waveProgress"
         from: 0
         to: 1
+        duration: Lazer.MotionTokens.waveBackdropEnter
+        easing.type: Easing.OutQuad
+    }
+
+    // Launcher parity: the body follows the longer panel motion and swallows
+    // the backdrop after the shorter stretched-wave sweep has established it.
+    NumberAnimation {
+        id: entryBodyAnimation
+        target: root
+        property: "entryBodyProgress"
+        from: 0
+        to: 1
         duration: Lazer.MotionTokens.waveEnter
-        easing.type: Easing.OutSine
+        easing.type: Easing.OutQuint
     }
 
     // Unlock reverses the same curtain on osu's hide easing (InSine); release
