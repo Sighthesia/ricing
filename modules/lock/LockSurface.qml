@@ -89,10 +89,11 @@ WlSessionLockSurface {
             ? root.lockThemeSnapshot.clock
             : SurfaceLogic.clockThemeColor(Lazer.LazerTheme.accentColor,
                                            root.clockLuminance, root.lightScheme)
-    readonly property color clockDateColor: root.themeSnapshotReady
-            ? root.lockThemeSnapshot.clockMuted
-            : SurfaceLogic.clockThemeMutedColor(Lazer.LazerTheme.accentColor,
-                                                root.clockLuminance, root.lightScheme)
+    // The date shares the clock's ink: size alone carries the hierarchy, so the
+    // pair reads as one instrument instead of two differently-tinted texts.
+    readonly property color clockDateColor: root.clockColor
+    // Distance between the bottom of the time's glyphs and the top of the date's.
+    readonly property real clockLineGap: 12
     readonly property bool authFailureVisible: root.lockContext
             ? root.lockContext.showFailure : false
     property date now: new Date()
@@ -174,8 +175,8 @@ WlSessionLockSurface {
     // Repaint the clock from a placement answer that landed after the cycle's
     // snapshot was frozen. The accent is taken from that frozen snapshot (not
     // from the live theme) so the clock cannot drift away from the rest of the
-    // lock surface; only the two roles whose value depends on the wallpaper
-    // region are recomputed.
+    // lock surface; only the role whose value depends on the wallpaper region
+    // is recomputed.
     function refreshClockTheme(): void {
         if (!root.themeSnapshotReady || !clockLayout.ready)
             return
@@ -183,7 +184,6 @@ WlSessionLockSurface {
                                             root.clockLuminance, root.lightScheme)
         var next = Object.assign({}, root.lockThemeSnapshot)
         next.clock = roles.clock
-        next.clockMuted = roles.clockMuted
         root.lockThemeSnapshot = next
     }
 
@@ -482,7 +482,15 @@ WlSessionLockSurface {
             id: timeContent
             x: root.clockCenterX * parent.width - width / 2
             y: root.clockCenterY * parent.height - height / 2
-            spacing: 8
+            // The two lines are stacked by their *ink*, not by their item boxes.
+            // A rolling digit strip carries roll overscan above and below the
+            // glyphs, and a Text box carries ascent/descent the glyphs never
+            // reach, so box-to-box spacing put far more air between the time and
+            // the date than the same number would between two ordinary labels.
+            // Measuring both ink boxes (below) lets this stay a real, small gap.
+            spacing: root.clockLineGap
+                - (clockTime.height - clockTime.digitInkBottom)
+                - (dateFont.ascent + dateInk.tightBoundingRect.top)
             // The clock and its date fall with everything else. The drop
             // rides a transform so the centered layout binding above stays
             // authoritative.
@@ -537,6 +545,22 @@ WlSessionLockSurface {
                     enabled: !root.reducedMotion
                     ColorAnimation { duration: Lazer.MotionTokens.medium }
                 }
+            }
+
+            FontMetrics {
+                id: dateFont
+                font.family: clockDate.font.family
+                font.pixelSize: clockDate.font.pixelSize
+                font.weight: clockDate.font.weight
+            }
+
+            // Ink box of the date's own glyphs, in the date Text's coordinates.
+            TextMetrics {
+                id: dateInk
+                font.family: clockDate.font.family
+                font.pixelSize: clockDate.font.pixelSize
+                font.weight: clockDate.font.weight
+                text: "0123456789."
             }
         }
 

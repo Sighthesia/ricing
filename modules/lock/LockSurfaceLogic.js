@@ -264,18 +264,16 @@ function lockThemeSnapshot(lightScheme, palette, clockLuminance) {
         sessionText: _detach(readableThemeColor(rawAccent, light)),
         // The clock is the only lock element with no surface under it, so its
         // ink follows the wallpaper region it sits on rather than the scheme.
-        clock: _detach(clockThemeColor(rawAccent, clockLuminance, light)),
-        clockMuted: _detach(clockThemeMutedColor(rawAccent, clockLuminance, light))
+        clock: _detach(clockThemeColor(rawAccent, clockLuminance, light))
     }
 }
 
-// Re-derive only the clock roles from an already-frozen accent. A placement
-// answer can land after prepareReveal(), and the clock must then repaint without
+// Re-derive the clock role from an already-frozen accent. A placement answer
+// can land after prepareReveal(), and the clock must then repaint without
 // re-reading a theme that may have moved on since the cycle was frozen.
 function clockRoles(accent, clockLuminance, lightScheme) {
     return {
-        clock: _detach(clockThemeColor(accent, clockLuminance, lightScheme)),
-        clockMuted: _detach(clockThemeMutedColor(accent, clockLuminance, lightScheme))
+        clock: _detach(clockThemeColor(accent, clockLuminance, lightScheme))
     }
 }
 
@@ -296,14 +294,10 @@ var clockInkBands = {
     light: { soft: 0.74, extreme: 0.99 },
     dark: { soft: 0.32, extreme: 0.01 }
 }
-// The date sits under the time, so it may ask for less: 3.3:1 still clears the
-// large-text threshold while staying visibly secondary to the digits.
-var clockMutedBands = {
-    light: { soft: 0.66, extreme: 0.99 },
-    dark: { soft: 0.40, extreme: 0.01 }
-}
+// One target for both lines. The date is already half the time's size, so size
+// carries the hierarchy; a second, weaker ink on top of it only made the date
+// look like a different colour that had drifted out of the same material.
 var clockInkContrast = 4.5
-var clockMutedContrast = 3.3
 
 // sRGB channel -> linear light, the space WCAG ratios are defined in.
 function _linearChannel(channel) {
@@ -411,10 +405,10 @@ function _solveInkLightness(hue, saturation, region, target, band) {
     return contrastAt(accepted) >= target ? accepted : band.extreme
 }
 
-function _clockInk(accent, backgroundLuminance, lightScheme, bands, target) {
+function _clockInk(accent, backgroundLuminance, lightScheme, target) {
     var ink = _inkHueSaturation(accent)
     var polarity = clockInkPolarity(accent, backgroundLuminance, lightScheme)
-    var band = bands[polarity]
+    var band = clockInkBands[polarity]
     var region = _regionLuminance(backgroundLuminance)
     if (region < 0)
         return Qt.hsla(ink.hue, ink.saturation, band.soft, 1)
@@ -423,14 +417,9 @@ function _clockInk(accent, backgroundLuminance, lightScheme, bands, target) {
 }
 
 function clockThemeColor(accent, backgroundLuminance, lightScheme) {
-    return _clockInk(accent, backgroundLuminance, lightScheme,
-                     clockInkBands, clockInkContrast)
+    return _clockInk(accent, backgroundLuminance, lightScheme, clockInkContrast)
 }
 
-function clockThemeMutedColor(accent, backgroundLuminance, lightScheme) {
-    return _clockInk(accent, backgroundLuminance, lightScheme,
-                     clockMutedBands, clockMutedContrast)
-}
 
 // Resolve a surface's snapshot slot from the shared screen list; an unknown
 // screen resolves to no slot instead of another screen's image.

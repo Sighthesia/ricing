@@ -52,6 +52,32 @@ Item {
         + root.digitSpacing * (root.showSeconds ? 3 : 2)
     implicitHeight: Math.max(hourGroup.implicitHeight, minuteGroup.implicitHeight, secondDigits.implicitHeight)
 
+    // Ink box of the digits actually drawn, in this item's coordinates. The
+    // strip a digit rolls inside is taller than the glyphs it shows (the roll
+    // needs over- and underscan so a mid-transition frame never clips), so a
+    // caller stacking a second line underneath cannot use this item's height as
+    // the distance to its own text: it has to ask where the ink ends instead.
+    readonly property real digitInkTop: root._digitBaseline + _digitInk.tightBoundingRect.top
+    readonly property real digitInkBottom: root._digitBaseline + _digitInk.tightBoundingRect.bottom
+    readonly property real _digitBaseline: (root.implicitHeight - _digitFont.height) / 2
+        + _digitFont.ascent
+
+    FontMetrics {
+        id: _digitFont
+        font.family: root.digitFontFamily
+        font.pixelSize: root.digitPixelSize
+        font.weight: root.digitWeight
+    }
+
+    // The widest digit set, so the measured ink covers every numeral.
+    TextMetrics {
+        id: _digitInk
+        font.family: root.digitFontFamily
+        font.pixelSize: root.digitPixelSize
+        font.weight: root.digitWeight
+        text: "0123456789"
+    }
+
     // Time row: hour pair, separator, minute pair, optional seconds pair.
     Row {
         id: clockRow
