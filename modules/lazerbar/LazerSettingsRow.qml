@@ -96,11 +96,14 @@ Item {
     // Footer lives under a standard stacked control (label above field);
     // inline/split/choice rows never host one.
     readonly property bool standardPresentation: !root.inlinePresentation && !root.splitPresentation && !root.choicePresentation
-    readonly property bool footerVisible: root.standardPresentation && root.footerText !== ""
+    // The single 44px zone an inline row gives its label and control; a footer
+    // hint is added below it rather than inside it.
+    readonly property real inlineHeight: 44
+    readonly property bool footerVisible: root.footerText !== ""
     readonly property real footerGap: 4
     readonly property real footerHeight: 16
     readonly property real footerReserved: root.footerVisible ? root.footerGap + root.footerHeight : 0
-    readonly property real cardContentHeight: inlinePresentation ? 44
+    readonly property real cardContentHeight: inlinePresentation ? root.inlineHeight + footerReserved
                                            : (choicePresentation ? safeControlHeight
                                               : (splitPresentation ? 52
                                                   : 10 + labelItem.implicitHeight + labelControlGap + safeControlHeight + 10 + footerReserved))
@@ -409,7 +412,7 @@ Item {
         width: Math.max(0, root.width - (root.choicePresentation
                                         ? root.reservedResetWidth
                                         : contentPadding * 2 + root.reservedResetGap + root.reservedResetWidth))
-        height: root.inlinePresentation ? 44
+        height: root.inlinePresentation ? root.inlineHeight + root.footerReserved
                 : (root.choicePresentation ? root.safeControlHeight
                    : (root.splitPresentation ? 52
                        : root.implicitHeight - 20))
@@ -419,7 +422,7 @@ Item {
             id: labelItem
             width: root.inlinePresentation ? Math.max(0, parent.width - controlHost.width - 12) : parent.width
             visible: !root.controlOwnsLabel
-            height: root.inlinePresentation ? parent.height : implicitHeight
+            height: root.inlinePresentation ? root.inlineHeight : implicitHeight
             anchors.verticalCenter: root.inlinePresentation ? parent.verticalCenter : undefined
             anchors.top: root.splitPresentation ? undefined : parent.top
             anchors.bottom: root.splitPresentation ? valueItem.top : undefined
@@ -451,7 +454,7 @@ Item {
             x: root.inlinePresentation || root.splitPresentation
                ? Math.max(0, parent.width - width) : 0
             y: root.choicePresentation ? 0
-               : root.inlinePresentation ? Math.max(0, (parent.height - height) / 2)
+               : root.inlinePresentation ? Math.max(0, (root.inlineHeight - height) / 2)
                : root.splitPresentation ? Math.max(0, (parent.height - height) / 2)
                : labelItem.implicitHeight + root.labelControlGap
             width: root.inlinePresentation ? root.inlineControlWidth
@@ -467,10 +470,12 @@ Item {
         // line grows and fades with the shared slow/fast pair.
         Item {
             id: footerHost
-            y: labelItem.implicitHeight + root.labelControlGap + root.safeControlHeight + root.footerGap
+            y: root.inlinePresentation
+               ? root.inlineHeight + root.footerGap
+               : labelItem.implicitHeight + root.labelControlGap + root.safeControlHeight + root.footerGap
             width: parent.width
             height: root.footerVisible ? root.footerHeight : 0
-            visible: root.standardPresentation && (height > 0.5 || footerRow.opacity > 0.01)
+            visible: root.footerVisible && (height > 0.5 || footerRow.opacity > 0.01)
             enabled: false
             Behavior on height {
                 enabled: !MotionTokens.reducedMotion
