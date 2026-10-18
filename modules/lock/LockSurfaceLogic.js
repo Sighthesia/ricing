@@ -283,8 +283,21 @@ function clockRoles(accent, clockLuminance, lightScheme) {
 // placed on, and a fixed light ink at 0.76 lightness clears only ~1.3:1 against a
 // bright region -- which is exactly how the clock used to dissolve into the
 // wallpaper. Hue and saturation still come from the accent, but lightness is now
-// solved for a WCAG contrast target against the measured region.
+// solved for a contrast target against the measured region.
 //
+// The target is 3:1, not 4.5:1. WCAG asks 3:1 of *large* text, and this is a 72px
+// Black clock -- twelve times the 18pt threshold. Aiming at the normal-text ratio
+// forced the ink to near-white on any mid-tone region, and at that lightness an
+// HSL colour has no chroma left: the clock stopped being the accent's colour at
+// all. 3:1 is the correct standard for this size and is what keeps the hue alive.
+var clockInkTarget = 3.0
+
+// Lightness is not free: as it approaches the extreme, HSL saturation can no
+// longer produce chroma, so the accent's own saturation is too timid to read at
+// the lightness the target demands. Pushing saturation up buys back the hue that
+// the lightness spends.
+var clockInkSaturationBoost = 1.5
+
 // Each polarity keeps a band: `soft` is the tone the accent reads best at, and
 // the solver only travels towards `extreme` (white or black) as far as the target
 // demands. On a dark region the clock therefore stays at its natural 0.74 rather
@@ -294,10 +307,6 @@ var clockInkBands = {
     light: { soft: 0.74, extreme: 0.99 },
     dark: { soft: 0.32, extreme: 0.01 }
 }
-// One target for both lines. The date is already half the time's size, so size
-// carries the hierarchy; a second, weaker ink on top of it only made the date
-// look like a different colour that had drifted out of the same material.
-var clockInkContrast = 4.5
 
 // sRGB channel -> linear light, the space WCAG ratios are defined in.
 function _linearChannel(channel) {
@@ -371,11 +380,18 @@ function clockInkPolarity(accent, backgroundLuminance, lightScheme) {
     if (region < 0)
         return lightScheme === true ? "dark" : "light"
     var ink = _inkHueSaturation(accent)
-    var bright = _contrastRatio(_hslLuminance(ink.hue, ink.saturation,
+    var saturation = _clockSaturation(ink)
+    var bright = _contrastRatio(_hslLuminance(ink.hue, saturation,
                                               clockInkBands.light.extreme), region)
-    var deep = _contrastRatio(_hslLuminance(ink.hue, ink.saturation,
+    var deep = _contrastRatio(_hslLuminance(ink.hue, saturation,
                                             clockInkBands.dark.extreme), region)
     return deep > bright ? "dark" : "light"
+}
+
+// The saturation actually painted: the accent's own, raised so the hue survives
+// the lightness the contrast target forces. See clockInkSaturationBoost.
+function _clockSaturation(ink) {
+    return Math.min(1, ink.saturation * clockInkSaturationBoost)
 }
 
 // Travel from the band's soft tone towards its extreme only until the target is
@@ -405,19 +421,21 @@ function _solveInkLightness(hue, saturation, region, target, band) {
     return contrastAt(accepted) >= target ? accepted : band.extreme
 }
 
-function _clockInk(accent, backgroundLuminance, lightScheme, target) {
+function _clockInk(accent, backgroundLuminance, lightScheme) {
     var ink = _inkHueSaturation(accent)
+    var saturation = _clockSaturation(ink)
     var polarity = clockInkPolarity(accent, backgroundLuminance, lightScheme)
     var band = clockInkBands[polarity]
     var region = _regionLuminance(backgroundLuminance)
     if (region < 0)
-        return Qt.hsla(ink.hue, ink.saturation, band.soft, 1)
-    return Qt.hsla(ink.hue, ink.saturation,
-                   _solveInkLightness(ink.hue, ink.saturation, region, target, band), 1)
+        return Qt.hsla(ink.hue, saturation, band.soft, 1)
+    return Qt.hsla(ink.hue, saturation,
+                   _solveInkLightness(ink.hue, saturation, region,
+                                      clockInkTarget, band), 1)
 }
 
 function clockThemeColor(accent, backgroundLuminance, lightScheme) {
-    return _clockInk(accent, backgroundLuminance, lightScheme, clockInkContrast)
+    return _clockInk(accent, backgroundLuminance, lightScheme)
 }
 
 

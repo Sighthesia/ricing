@@ -93,7 +93,9 @@ WlSessionLockSurface {
     // pair reads as one instrument instead of two differently-tinted texts.
     readonly property color clockDateColor: root.clockColor
     // Distance between the bottom of the time's glyphs and the top of the date's.
-    readonly property real clockLineGap: 12
+    // Scales with the time so a larger size never collapses the two lines onto
+    // each other: 0.33 of 72px is 24px of real air between the ink boxes.
+    readonly property real clockLineGap: Math.round(clockTime.digitPixelSize * 0.33)
     readonly property bool authFailureVisible: root.lockContext
             ? root.lockContext.showFailure : false
     property date now: new Date()
