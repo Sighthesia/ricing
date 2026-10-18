@@ -90,6 +90,7 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 import cv2
 import numpy as np
@@ -190,6 +191,40 @@ def load_image(path: Path, work_width: int) -> tuple[np.ndarray, float]:
         rgb = cv2.resize(rgb, (max(1, round(width * scale)), max(1, round(height * scale))),
                          interpolation=cv2.INTER_AREA)
     return rgb.astype(np.float32) / 255.0, scale
+
+
+def local_path(value: str) -> Path:
+    """A path from either a plain path or a `file://` URL, as QML hands one over."""
+    parsed = urlparse(str(value))
+    if parsed.scheme == "file":
+        return Path(unquote(parsed.path))
+    return Path(value).expanduser()
+
+
+def load_wallpaper(path: Path, screen: tuple[int, int], work_width: int) -> np.ndarray:
+    """The wallpaper as the *screen* presents it: PreserveAspectCrop, then shrunk.
+
+    A clock placement is a screen coordinate, so the analysis has to see the same
+    crop the compositor shows -- a portrait wallpaper on a landscape screen is
+    mostly hidden, and a region blank in the file can be off-screen entirely.
+    Cropping before the resize also means one resample instead of two.
+    """
+    raw = cv2.imread(str(path), cv2.IMREAD_COLOR)
+    if raw is None:
+        raise RuntimeError(f"cannot read image: {path}")
+    rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
+    height, width = rgb.shape[:2]
+    screen_w, screen_h = screen
+    if screen_w <= 0 or screen_h <= 0:
+        raise ValueError("screen dimensions must be positive")
+    cover = max(screen_w / float(width), screen_h / float(height))  # source px per screen px
+    crop_w, crop_h = int(round(screen_w / cover)), int(round(screen_h / cover))
+    x0, y0 = int(round((width - crop_w) / 2.0)), int(round((height - crop_h) / 2.0))
+    visible = rgb[max(0, y0):y0 + crop_h, max(0, x0):x0 + crop_w]
+    shift = work_width / float(max(screen_w, screen_h))
+    work = cv2.resize(visible, (max(1, round(screen_w * shift)), max(1, round(screen_h * shift))),
+                      interpolation=cv2.INTER_AREA if shift < 1.0 else cv2.INTER_CUBIC)
+    return work.astype(np.float32) / 255.0
 
 
 def line_share(img8: np.ndarray) -> np.ndarray:
@@ -772,6 +807,34 @@ def parse_box(value: str) -> list[float]:
     return [x, y, w, h]
 
 
+def analyze_screen(image_path: Path, screen: tuple[int, int], clock: tuple[float, float],
+                   work_width: int, margin: float) -> dict:
+    """Where the clock goes on this wallpaper as the screen shows it.
+
+    The result carries the keys the lock surface already reads -- `ok`,
+    `center_x`, `center_y`, `luminance` -- so wiring this in is a change of
+    command line, not a change of protocol.
+    """
+    img = load_wallpaper(image_path, screen, work_width)
+    height, width = img.shape[:2]
+    win = (max(8, round(clock[0] * width)), max(8, round(clock[1] * height)))
+    maps = feature_maps(img, win)
+    _, candidates = find_candidates(maps, win, 1, margin)
+    if not candidates:
+        raise RuntimeError("no clock window fits inside the screen margins")
+    best = candidates[0]
+    return {
+        "ok": True,
+        "center_x": best["centre_norm"][0],
+        "center_y": best["centre_norm"][1],
+        "luminance": best["luminance"],
+        "score": best["score"],
+        "qualified": best["qualified"],
+        "clock_norm": [round(win[0] / width, 4), round(win[1] / height, 4)],
+        "work_size": [width, height],
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -799,14 +862,26 @@ def main() -> int:
                              "auto-detect faces; 'auto' fetches it")
     parser.add_argument("--model-dir", default=DEFAULT_MODEL_DIR,
                         help=f"where 'auto' keeps models (default {DEFAULT_MODEL_DIR})")
+    parser.add_argument("--screen-width", type=int, default=None,
+                        help="analyse the wallpaper as this screen shows it "
+                             "(PreserveAspectCrop).  With --screen-height, print one "
+                             "JSON placement and write no files")
+    parser.add_argument("--screen-height", type=int, default=None, help="see --screen-width")
     parser.add_argument("--scales", type=float, nargs="*", default=None,
                         help="also report the best window per clock width, e.g. 0.10 0.16 0.22")
     args = parser.parse_args()
 
-    image_path = Path(args.image).expanduser()
+    image_path = local_path(args.image)
+    if args.screen_width or args.screen_height:
+        if not (args.screen_width and args.screen_height):
+            parser.error("--screen-width and --screen-height go together")
+        placement = analyze_screen(image_path, (args.screen_width, args.screen_height),
+                                   args.clock, args.work_width, args.margin)
+        print(json.dumps(placement))
+        return 0
+
     outdir = Path(args.outdir).expanduser()
     outdir.mkdir(parents=True, exist_ok=True)
-
     img, _ = load_image(image_path, args.work_width)
     height, width = img.shape[:2]
 
