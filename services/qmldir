@@ -17,6 +17,7 @@ singleton BluetoothService 1.0 BluetoothService.qml
 singleton NetworkService 1.0 NetworkService.qml
 singleton WallpaperService 1.0 WallpaperService.qml
 singleton SettingsService 1.0 SettingsService.qml
+singleton ClockPlacementService 1.0 ClockPlacementService.qml
 singleton ClipboardService 1.0 ClipboardService.qml
 singleton FontService 1.0 FontService.qml
 FluidText 1.0 FluidText.qml

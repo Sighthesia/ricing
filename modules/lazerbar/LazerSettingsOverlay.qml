@@ -39,6 +39,9 @@ Item {
     property bool coordsValid: Services.SettingsService.locationCoordsValid
     property string locationError: Services.LocationService.lastError
     property string locationDisplayName: Services.LocationService.displayName
+    // Lock-clock placement: whether the Python/OpenCV runtime behind it exists.
+    property bool clockPlacementAvailable: Services.ClockPlacementService.available
+    property string clockPlacementHint: Services.ClockPlacementService.hint
     // The panel handle. Read-only in practice: the panel is built on first use,
     // so this is null until then, and every internal use goes through
     // panelOrNull(). Writes are only valid after an open has armed the loader.
@@ -281,6 +284,8 @@ Item {
                     coordsValid: root.coordsValid
                     locationError: root.locationError
                     locationDisplayName: root.locationDisplayName
+                    clockPlacementAvailable: root.clockPlacementAvailable
+                    clockPlacementHint: root.clockPlacementHint
                     onCloseRequested: root.requestClose()
                 }
             }

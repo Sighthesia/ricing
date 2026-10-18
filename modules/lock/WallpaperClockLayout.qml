@@ -1,8 +1,10 @@
 import QtQuick
-import Quickshell
-import Quickshell.Io
+import "../../services" as Services
 
-// Adapt the wallpaper scan into a non-blocking lock-surface layout provider.
+// Hand the lock surface the clock placement ClockPlacementService has cached
+// for this screen and wallpaper.  Nothing is scanned here: the service scans on
+// its own schedule so the entrance wave never waits for a Python process, and
+// this component only decides whether the cached result applies right now.
 Item {
     id: root
 
@@ -14,83 +16,64 @@ Item {
     property real luminance: 0.5
     property bool ready: false
 
+    // The placement only applies when the feature is switched on in settings
+    // *and* the Python runtime behind it exists.  Otherwise `ready` stays false
+    // and the surface keeps the clock at its default centre; the settings row
+    // that owns the switch is greyed out in that case, so the toggle never
+    // claims to work while nothing moves.
+    readonly property bool autoPlacement:
+        Services.SettingsService.appearance.lockClockAutoPlacement === true
+    readonly property bool runtimeReady: Services.ClockPlacementService.ready
+    readonly property bool active: root.autoPlacement && root.runtimeReady
+    readonly property var placement: root.active
+        ? Services.ClockPlacementService.placement(root.screenWidth, root.screenHeight,
+                                                   root.wallpaperPath)
+        : null
+
     signal analysisApplied()
 
     function clamp(value, minimum, maximum) {
         return Math.max(minimum, Math.min(maximum, Number(value)))
     }
 
-    function analyze(): void {
-        root.ready = false
-        if (!root.wallpaperPath || root.screenWidth <= 0 || root.screenHeight <= 0)
+    function applyPlacement(): void {
+        if (!root.placement) {
+            root.ready = false
             return
-        analysisProcess.running = false
-        analysisProcess.command = [
-            "nice",
-            "-n", "19",
-            "python3",
-            Quickshell.shellDir + "/scripts/semantic_blank_region.py",
-            "--image", root.wallpaperPath,
-            "--screen-width", String(root.screenWidth),
-            "--screen-height", String(root.screenHeight),
-            // The clock's own footprint plus room to breathe, kept off the
-            // screen edge by the same 6% the scan uses.
-            "--clock", "0.22x0.16",
-            "--margin", "0.06",
-        ]
-        analysisProcess.running = true
+        }
+        root.centerX = root.clamp(root.placement.center_x, 0.06, 0.94)
+        root.centerY = root.clamp(root.placement.center_y, 0.10, 0.90)
+        root.luminance = root.clamp(root.placement.luminance, 0, 1)
+        root.ready = true
+        root.analysisApplied()
     }
 
-    function applyResult(raw): void {
-        try {
-            const result = JSON.parse(String(raw || "").trim())
-            if (!result || result.ok !== true)
-                return
-            root.centerX = root.clamp(result.center_x, 0.06, 0.94)
-            root.centerY = root.clamp(result.center_y, 0.10, 0.90)
-            root.luminance = root.clamp(result.luminance, 0, 1)
-            root.ready = true
-            root.analysisApplied()
-        } catch (error) {
-            console.warn("WallpaperClockLayout: invalid analyzer output", error)
+    // A miss is not an error: the service may still be warming up, and asking
+    // again is what turns a cold cache into a placement.
+    function requestPlacement(): void {
+        if (!root.active)
+            return
+        Services.ClockPlacementService.request(root.screenWidth, root.screenHeight,
+                                               root.wallpaperPath)
+    }
+
+    onPlacementChanged: root.applyPlacement()
+    onActiveChanged: {
+        if (root.active) {
+            root.applyPlacement()
+            root.requestPlacement()
+        } else {
+            root.ready = false
         }
     }
-
-    onWallpaperPathChanged: analyzeTimer.restart()
-    onScreenWidthChanged: analyzeTimer.restart()
-    onScreenHeightChanged: analyzeTimer.restart()
-
-    // Debounce resize and wallpaper changes so one lock surface cannot queue
-    // several obsolete image scans during startup. The window also has to
-    // outlast the wallpaper reveal (MotionTokens.wallpaperSwap = 480ms): the
-    // semantic scan is ~1.4s of CPU (it reads ink, chroma, saliency and long
-    // straight structure across the whole page), and starting it while the
-    // reveal is animating starves the render thread and stalls the transition.
-    // The result is only needed when the session actually locks, which is far
-    // later; until it lands the clock stays at its default centre.
-    Timer {
-        id: analyzeTimer
-        interval: 600
-        repeat: false
-        onTriggered: root.analyze()
+    onScreenWidthChanged: root.requestPlacement()
+    onScreenHeightChanged: root.requestPlacement()
+    onWallpaperPathChanged: {
+        root.applyPlacement()
+        root.requestPlacement()
     }
-
-    // Keep image analysis outside the QML render thread and PAM conversation.
-    Process {
-        id: analysisProcess
-
-        stdout: StdioCollector {
-            onStreamFinished: root.applyResult(this.text)
-        }
-
-        stderr: StdioCollector {
-            onStreamFinished: {
-                const message = this.text.trim()
-                if (message)
-                    console.warn("WallpaperClockLayout:", message)
-            }
-        }
+    Component.onCompleted: {
+        root.applyPlacement()
+        root.requestPlacement()
     }
-
-    Component.onCompleted: analyzeTimer.restart()
 }

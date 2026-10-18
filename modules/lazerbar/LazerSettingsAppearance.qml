@@ -20,6 +20,10 @@ LazerSettingsSection {
     property bool coordsValid: false
     property string locationError: ""
     property string locationDisplayName: ""
+    // Lock-clock placement runtime availability.  Injected by the host for the
+    // same reason as the location wiring above: this page stays singleton-free.
+    property bool clockPlacementAvailable: true
+    property string clockPlacementHint: ""
     title: "外观"
 
     property alias wallpaperField: wallpaperFieldControl
@@ -37,6 +41,8 @@ LazerSettingsSection {
     property alias themeAdaptationToggle: themeAdaptationToggleControl
     property alias ripplePulseToggle: ripplePulseToggleControl
     property alias wallpaperRow: wallpaperRow
+    property alias lockClockRow: lockClockRow
+    property alias lockClockToggle: lockClockToggleControl
     property alias colorSchemeRow: colorSchemeRow
     property alias autoModeRow: autoModeRow
     property alias sunriseRow: sunriseRow
@@ -236,6 +242,35 @@ LazerSettingsSection {
             onValueSelected: function(value) {
                 if (root.settingsObject) {
                     root.settingsObject.wallpaperMode = value
+                    root.save()
+                }
+            }
+        }
+    }
+
+    // Lock-screen clock placement.  The description stays searchable; the
+    // visible reason for a greyed row goes in the footer, under the toggle.
+    LazerSettingsRow {
+        id: lockClockRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: "锁屏时钟自动定位"
+        descriptionText: root.clockPlacementAvailable
+                         ? "按壁纸的空白处摆放锁屏时钟"
+                         : root.clockPlacementHint
+        footerText: root.clockPlacementAvailable ? "" : root.clockPlacementHint
+        enabled: root.clockPlacementAvailable
+        defaultValue: root.defaultOf("lockClockAutoPlacement")
+        currentValue: root.settingsObject ? root.settingsObject.lockClockAutoPlacement : true
+        resetCallback: function() { root.resetKey("lockClockAutoPlacement") }
+        LazerSettingsToggle {
+            id: lockClockToggleControl
+            checked: root.settingsObject
+                     ? root.settingsObject.lockClockAutoPlacement === true
+                     : true
+            onToggled: function(value) {
+                if (root.settingsObject) {
+                    root.settingsObject.lockClockAutoPlacement = value
                     root.save()
                 }
             }

@@ -54,6 +54,10 @@ optional -- `--segment-model auto` downloads and hash-checks it once, and
 without it the script falls back to the local measurements alone (which is what
 `--face-model`, kept for the same purpose, is a weaker version of).
 
+The dependencies, the settings toggle that turns this on in the lock screen and
+the runtime contract the QML side expects are written down in
+docs/lock-clock-placement.md.
+
 The window scan itself (searching every position, and the idea of picking the
 "least busy region" for a clock) follows end-4's least_busy_region.py in
 dots-hyprland:

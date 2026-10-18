@@ -63,6 +63,8 @@ QtObject {
         // Fake rounded display corners: a black bezel masks the screen corners.
         screenRoundedCorners: true,
         screenCornerRadius: 16,
+        // Place the lock-screen clock over the blankest part of the wallpaper.
+        lockClockAutoPlacement: true,
     })
     readonly property var barDefaults: ({
         height: 48,
@@ -529,6 +531,11 @@ QtObject {
                 // the screen corners, with their radius in pixels.
                 property bool screenRoundedCorners: true
                 property int screenCornerRadius: 16
+                // Place the lock-screen clock over the blankest part of the
+                // wallpaper (scripts/semantic_blank_region.py, run through
+                // WallpaperClockLayout).  Off leaves it centred; the settings
+                // row greys out when the Python runtime cannot run the scan.
+                property bool lockClockAutoPlacement: true
      }
 
             property JsonObject notifications: JsonObject {
