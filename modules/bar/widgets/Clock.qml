@@ -94,7 +94,7 @@ Item {
             showSeconds: root.showSeconds
             digitPixelSize: 14
             digitFontFamily: "monospace"
-            digitBold: true
+            digitWeight: Font.Bold
             digitColor: LazerTheme.textPrimary
             mutedDigitColor: LazerTheme.textMuted
             separatorColor: LazerTheme.textPrimary

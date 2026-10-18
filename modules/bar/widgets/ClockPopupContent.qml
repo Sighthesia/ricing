@@ -48,7 +48,7 @@ Item {
             showSeconds: true
             digitPixelSize: 20
             digitFontFamily: "monospace"
-            digitBold: true
+            digitWeight: Font.Bold
             digitColor: LazerTheme.textPrimary
             mutedDigitColor: LazerTheme.textMuted
             separatorColor: LazerTheme.textPrimary

@@ -72,7 +72,7 @@ settings.json ──► SettingsService.appearance.lockClockAutoPlacement / wall
 - `center_x/center_y`：归一化到**屏幕**（不是原图）的时钟中心。
 - `luminance`：命中区域的平均亮度，留给主题挑文字色。
 - `qualified`：该尺寸下是否存在真正干净（角色覆盖 ≤ 1%）的窗口；为 false 时仍会给出最优解。
-- 时钟框固定 `--clock 0.22x0.16`、`--margin 0.06`（约等于 48px 数字的 "23:45" 加呼吸空间，见 `ClockPlacementService.clockShape`）。
+- 时钟框固定 `--clock 0.22x0.16`、`--margin 0.06`（约等于 72px 数字的 "23:45" 加 36px 日期，见 `ClockPlacementService.clockShape`）。
 
 ## 设计期用法
 
@@ -115,7 +115,8 @@ scripts/semantic_blank_region.py --image art.jpg --scales 0.12 0.18 0.24
 - 区域均值是 `sRGB 编码` 值，对比度计算前会先线性化；直接把 0.46 当线性亮度会让阈值整体偏亮。
 - 区域亮度缺失时（冷缓存，`clockLuminance = -1`）回退到主题方案（浅色方案用深墨、深色方案用亮墨），定位结果到达后 `refreshClockTheme()` 只重算时钟两个角色，不动其余快照。
 - 区域极性交叉点随 accent 色相/饱和度略微移动（实测 0.46–0.47），不是一条固定阈值线。
-- **不加描边**：时钟字号大，48px 的字形边缘本身就足以撑开，而 `Text.Outline` 在 48px 下会把每道笔画撑粗约 1px，浅色壁纸上直接读成「糊」。局部结构问题交给对比度解决，不再用描边兜底。
+- **不加描边**：时钟字号大（72px，`Font.Black`），字形本身足够撑开，而 `Text.Outline` 会把每道笔画再撑粗约 1px，浅色壁纸上直接读成「糊」。局部结构问题交给对比度解决，不再用描边兜底。
+- **日期是时间的一半**：日期字号绑定到 `clockTime.digitPixelSize / 2`，两者一起改，不再各自写死。
 
 ## 验证
 

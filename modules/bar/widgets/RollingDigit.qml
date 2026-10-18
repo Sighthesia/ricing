@@ -16,7 +16,9 @@ Item {
     property int digitPixelSize: 14
     property real digitScale: 1.0
     property string digitFontFamily: "monospace"
-    property bool digitBold: true
+    // Weight rather than a bold flag: the lock clock asks for the heaviest face
+    // the monospace stack has, and a bool cannot express that.
+    property int digitWeight: Font.Bold
     property real overscanFactor: 1.35
     property int transitionDuration: 180
     property int transitionEasing: Easing.InOutCubic
@@ -36,7 +38,7 @@ Item {
         text: "8"
         font.family: root.digitFontFamily
         font.pixelSize: Math.round(root.digitPixelSize * root.digitScale)
-        font.bold: root.digitBold
+        font.weight: root.digitWeight
     }
 
     property real _displayDigit: root.targetDigit
@@ -63,7 +65,7 @@ Item {
             color: index === root.targetDigit ? root.digitColor : root.mutedDigitColor
             font.family: root.digitFontFamily
             font.pixelSize: root.digitPixelSize
-            font.bold: root.digitBold
+            font.weight: root.digitWeight
         }
     }
 }

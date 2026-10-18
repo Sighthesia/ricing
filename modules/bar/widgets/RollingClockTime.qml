@@ -17,7 +17,7 @@ Item {
     property int digitPixelSize: 14
     property real digitScale: 1.0
     property string digitFontFamily: "monospace"
-    property bool digitBold: true
+    property int digitWeight: Font.Bold
     property int digitSpacing: 0
     property int hourTransitionDuration: 180
     property int minuteTransitionDuration: 180
@@ -68,7 +68,7 @@ Item {
                 digitPixelSize: root.digitPixelSize
                 digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily
-                digitBold: root.digitBold
+                digitWeight: root.digitWeight
                 transitionDuration: root.hourTransitionDuration
                 transitionEasing: root.transitionEasing
             }
@@ -80,7 +80,7 @@ Item {
                 digitPixelSize: root.digitPixelSize
                 digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily
-                digitBold: root.digitBold
+                digitWeight: root.digitWeight
                 transitionDuration: root.hourTransitionDuration
                 transitionEasing: root.transitionEasing
             }
@@ -94,7 +94,7 @@ Item {
             opacity: root.separatorOpacity
             font.family: root.digitFontFamily
             font.pixelSize: root.digitPixelSize
-            font.bold: root.digitBold
+            font.weight: root.digitWeight
         }
 
         Row {
@@ -108,7 +108,7 @@ Item {
                 digitPixelSize: root.digitPixelSize
                 digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily
-                digitBold: root.digitBold
+                digitWeight: root.digitWeight
                 transitionDuration: root.minuteTransitionDuration
                 transitionEasing: root.transitionEasing
             }
@@ -120,7 +120,7 @@ Item {
                 digitPixelSize: root.digitPixelSize
                 digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily
-                digitBold: root.digitBold
+                digitWeight: root.digitWeight
                 transitionDuration: root.minuteTransitionDuration
                 transitionEasing: root.transitionEasing
             }
@@ -139,7 +139,7 @@ Item {
                 opacity: root.separatorOpacity
                 font.family: root.digitFontFamily
                 font.pixelSize: root.digitPixelSize
-                font.bold: root.digitBold
+                font.weight: root.digitWeight
             }
 
             Row {
@@ -153,7 +153,7 @@ Item {
                     digitPixelSize: root.digitPixelSize
                     digitScale: root.digitScale
                     digitFontFamily: root.digitFontFamily
-                    digitBold: root.digitBold
+                    digitWeight: root.digitWeight
                     transitionDuration: root.secondTransitionDuration
                     transitionEasing: root.transitionEasing
                 }
@@ -165,7 +165,7 @@ Item {
                     digitPixelSize: root.digitPixelSize
                     digitScale: root.digitScale
                     digitFontFamily: root.digitFontFamily
-                    digitBold: root.digitBold
+                    digitWeight: root.digitWeight
                     transitionDuration: root.secondTransitionDuration
                     transitionEasing: root.transitionEasing
                 }

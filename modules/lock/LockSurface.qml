@@ -177,7 +177,7 @@ WlSessionLockSurface {
     // lock surface; only the two roles whose value depends on the wallpaper
     // region are recomputed.
     function refreshClockTheme(): void {
-        if (!root.themeSnapshotReady || !root.clockLayout.ready)
+        if (!root.themeSnapshotReady || !clockLayout.ready)
             return
         var roles = SurfaceLogic.clockRoles(root.lockThemeSnapshot.accent,
                                             root.clockLuminance, root.lightScheme)
@@ -478,62 +478,66 @@ WlSessionLockSurface {
         enabled: backdrop.revealContentInteractive
 
         // Keep the primary clock above the interaction control.
-            Column {
-                id: timeContent
-                x: root.clockCenterX * parent.width - width / 2
-                y: root.clockCenterY * parent.height - height / 2
-                spacing: 8
-                // The clock and its date fall with everything else. The drop
-                // rides a transform so the centered layout binding above stays
-                // authoritative.
-                opacity: 1 - root.contentFall.fade
-                transform: Translate { y: root.contentFall.drop * root.fallDistance }
+        Column {
+            id: timeContent
+            x: root.clockCenterX * parent.width - width / 2
+            y: root.clockCenterY * parent.height - height / 2
+            spacing: 8
+            // The clock and its date fall with everything else. The drop
+            // rides a transform so the centered layout binding above stays
+            // authoritative.
+            opacity: 1 - root.contentFall.fade
+            transform: Translate { y: root.contentFall.drop * root.fallDistance }
 
-                Behavior on x {
+            Behavior on x {
+                enabled: !root.reducedMotion
+                NumberAnimation {
+                    duration: Lazer.MotionTokens.medium
+                    easing.type: Easing.OutQuint
+                }
+            }
+            Behavior on y {
+                enabled: !root.reducedMotion
+                NumberAnimation {
+                    duration: Lazer.MotionTokens.medium
+                    easing.type: Easing.OutQuint
+                }
+            }
+
+            // Show hours and minutes with the shared rolling digit component.
+            // The lock clock is the surface's hero: the heaviest face the
+            // monospace stack carries, at a size that reads across the room.
+            BarWidgets.RollingClockTime {
+                id: clockTime
+                anchors.horizontalCenter: parent.horizontalCenter
+                currentTime: root.now
+                digitPixelSize: 72
+                digitFontFamily: "monospace"
+                digitWeight: Font.Black
+                showSeconds: false
+                digitColor: root.clockColor
+                mutedDigitColor: root.clockDateColor
+                separatorColor: root.clockColor
+                hourTransitionDuration: Lazer.MotionTokens.clockHourFlip
+                minuteTransitionDuration: Lazer.MotionTokens.clockMinuteFlip
+                transitionEasing: Lazer.MotionTokens.clockFlipEasing
+            }
+
+            // Keep the calendar date directly below the primary time, at
+            // exactly half its size so the pair scales as one unit.
+            Text {
+                id: clockDate
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: Qt.formatDate(root.now, "yyyy.MM.dd")
+                color: root.clockDateColor
+                font.family: "monospace"
+                font.pixelSize: clockTime.digitPixelSize / 2
+                font.weight: Font.Black
+                Behavior on color {
                     enabled: !root.reducedMotion
-                    NumberAnimation {
-                        duration: Lazer.MotionTokens.medium
-                        easing.type: Easing.OutQuint
-                    }
+                    ColorAnimation { duration: Lazer.MotionTokens.medium }
                 }
-                Behavior on y {
-                    enabled: !root.reducedMotion
-                    NumberAnimation {
-                        duration: Lazer.MotionTokens.medium
-                        easing.type: Easing.OutQuint
-                    }
-                }
-
-                // Show hours and minutes with the shared rolling digit component.
-                BarWidgets.RollingClockTime {
-                    id: clockTime
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    currentTime: root.now
-                    digitPixelSize: 48
-                    digitFontFamily: "monospace"
-                    digitBold: true
-                    showSeconds: false
-                    digitColor: root.clockColor
-                    mutedDigitColor: root.clockDateColor
-                    separatorColor: root.clockColor
-                    hourTransitionDuration: Lazer.MotionTokens.clockHourFlip
-                    minuteTransitionDuration: Lazer.MotionTokens.clockMinuteFlip
-                    transitionEasing: Lazer.MotionTokens.clockFlipEasing
-                }
-
-                // Keep the calendar date directly below the primary time.
-                Text {
-                    id: clockDate
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: Qt.formatDate(root.now, "yyyy.MM.dd")
-                    color: root.clockDateColor
-                    font.family: "monospace"
-                    font.pixelSize: 16
-                    Behavior on color {
-                        enabled: !root.reducedMotion
-                        ColorAnimation { duration: Lazer.MotionTokens.medium }
-                    }
-                }
+            }
         }
 
         // Keep the lock entry centered at the bottom in both visual states.
