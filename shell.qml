@@ -616,6 +616,8 @@ ShellRoot {
                     + ",arrivalProgress:" + b.arrivalProgress
                     + ",arrivalClaimed:" + b.arrivalClaimed
                     + ",slideProgress:" + b.slideProgress
+                    + ",stripReleased:" + b.stripReleased
+                    + ",stripMovedTiles:" + b.stripMovedTiles
                     + ",reflowPending:" + b.reflowPending
                     + ",reclaimHold:" + b.reclaimHold
                     + ",photographsDesktop:" + Services.DesktopStandby.photographsDesktop

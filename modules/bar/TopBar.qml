@@ -97,12 +97,43 @@ Variants {
         readonly property bool autoHideEnabled: Services.SettingsService.bar.autoHideFullscreen === true
         // Per-output: a fullscreen window on a background workspace of another
         // monitor must not collapse this screen's bar.
-        readonly property bool fullscreenActive: {
-            // Read the map, don't call the lookup: a binding needs a property it
-            // can subscribe to, and this is the one the service reassigns.
+        //
+        // Read the map, don't call the lookup: a binding needs a property it can
+        // subscribe to, and this is the one the service reassigns.
+        readonly property bool reportedFullscreen: {
             const verdicts = Services.NiriService.fullscreenOutputs
             const name = screenScope.modelData ? String(screenScope.modelData.name || "") : ""
             return screenScope.autoHideEnabled && !!verdicts && verdicts[name] === true
+        }
+        // The service's verdict, masked while this bar's own released strip is
+        // what makes the tile measure fullscreen. The verdict is geometry alone,
+        // and a maximized tile grows into the strip the frame that strip is
+        // released — unmasked, the bar would read its own release as a
+        // fullscreen window and stay hidden, and staying hidden is what keeps
+        // the strip released: the bar returns only if this says false, and the
+        // strip returns only once the bar has. Scoped to strips the release
+        // actually moved tiles into (_stripMovedTiles), so a genuinely
+        // fullscreen tile — which fills the output either way — still collapses
+        // the bar.
+        readonly property bool fullscreenActive: screenScope.reportedFullscreen
+                && !(screenScope._stripMovedTiles && screenScope.stripReleased)
+        // Whether this bar is holding its strip released right now: for as long
+        // as a lock is photographing the desktop, and until this bar is back at
+        // rest afterwards (_reclaimHold).
+        readonly property bool stripReleased: Services.DesktopStandby.photographsDesktop
+                || screenScope._reclaimHold
+        // The masking above is dropped as soon as the service stops reporting
+        // this output as filled — the reflow that returning the strip causes
+        // lands in one geometry event, and until it arrives the verdict is still
+        // reading this bar's own release. Not dropped while the release is still
+        // this bar's to hold: during a request the bar has to stay off the
+        // desktop whatever the tiles do.
+        onReportedFullscreenChanged: {
+            if (screenScope.reportedFullscreen)
+                return
+            if (Services.DesktopStandby.photographsDesktop || screenScope._reclaimHold)
+                return
+            screenScope._stripMovedTiles = false
         }
 
         // Fullscreen auto-hide state machine. `pinned` keeps the bar on screen
@@ -230,6 +261,15 @@ Variants {
         // bar just gave back (see the exclusive zone above and
         // reportBarStandDown below).
         property bool _reflowPending: false
+        // Whether the strip this request gave back is one niri actually moves
+        // tiles into, read from the verdict as it stands *before* the release
+        // can have changed it (see the exclusive zone and applyStandDown). A
+        // genuinely fullscreen covering tile is sized to the whole output
+        // regardless, so releasing the strip moves no window: nothing to wait
+        // for, and nothing to hold back when the request ends either. Latched
+        // across the reclaim, since it is also what keeps the released strip
+        // from being read back as a fullscreen window while the bar returns.
+        property bool _stripMovedTiles: false
         // Whether this bar is still holding the strip open after the request
         // that released it has ended (see the exclusive zone above and
         // applyStandDown below). Cleared once the bar is back at rest, which is
@@ -279,24 +319,33 @@ Variants {
         // that appears mid-request owes exactly what one that saw the edge owes.
         function applyStandDown() {
             const standby = Services.DesktopStandby.standby
+            const photographing = standby && Services.DesktopStandby.isPhotographingDesktop()
             // The release and the reflow it causes both start here, so the
             // budget is measured from this edge rather than from the slide
-            // landing. A fullscreen covering tile is the one case with nothing to
-            // wait for: niri sizes it to the whole output, so the strip was never
-            // taken from it and releasing it moves no visible window. That is the
-            // same verdict the auto-hide above already runs on.
+            // landing. Whether there is a reflow at all is decided from the
+            // verdict as it stands before the release can have moved anything.
             screenScope.reflowTimer.stop()
-            screenScope._reflowPending = standby
-                    && Services.DesktopStandby.isPhotographingDesktop()
-                    && !screenScope.fullscreenActive
-            if (screenScope._reflowPending)
-                screenScope.reflowTimer.restart()
-            // The strip the exclusive zone just gave back is not handed straight
-            // back when the request ends: it waits until this bar is back at
-            // rest (see _reclaimHold above), so the tiles settle behind this bar
-            // rather than beside it.
-            if (standby && Services.DesktopStandby.isPhotographingDesktop())
-                screenScope._reclaimHold = true
+            if (photographing) {
+                // Latched rather than reconsidered per edge: this is what tells
+                // the verdict above to keep ignoring a strip this bar released,
+                // and it has to outlive the request, right through the reclaim
+                // below. It is dropped by the verdict itself coming back down.
+                screenScope._stripMovedTiles = !screenScope.reportedFullscreen
+                if (screenScope._stripMovedTiles) {
+                    screenScope._reclaimHold = true
+                    screenScope._reflowPending = true
+                    screenScope.reflowTimer.restart()
+                }
+            } else {
+                // A request that photographs nothing has nothing to reclaim, and
+                // one that ends has already latched what its reclaim needs.
+                screenScope._reflowPending = false
+            }
+            // The bar has to be off the desktop for the capture whether or not
+            // the release moved anything, so the reveal machine is told the
+            // desktop is owned instead of being left to a fullscreen verdict
+            // that a maximized tile only reaches because of this release.
+            screenScope._sendReveal("standdown", photographing)
             screenScope._standDownReported = !standby
             screenScope.reportBarStandDown()
             screenScope.standDownWave()
@@ -586,6 +635,8 @@ Variants {
             arrivalClaimed: arrivalClaimed,
             slideProgress: slideProgress,
             arrivalProgress: arrivalProgress,
+            stripReleased: stripReleased,
+            stripMovedTiles: _stripMovedTiles,
             reflowPending: _reflowPending,
             reclaimHold: _reclaimHold,
             pinned: _pinned,
@@ -820,8 +871,7 @@ Variants {
             // request ends pushes the tiles down while the bar is still arriving
             // above them, and the wallpaper shows in the gap between the two.
             exclusiveZone: (screenScope.floating
-                            || Services.DesktopStandby.photographsDesktop
-                            || screenScope._reclaimHold) ? 0 : implicitHeight
+                            || screenScope.stripReleased) ? 0 : implicitHeight
             anchors { top: screenScope.atTop; bottom: !screenScope.atTop; left: true; right: true }
             margins { top: screenScope.floatingMargin; bottom: screenScope.floatingMargin; left: screenScope.floatingMargin; right: screenScope.floatingMargin }
 
