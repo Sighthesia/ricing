@@ -20,6 +20,8 @@ Item {
     property bool coordsValid: false
     property string locationError: ""
     property string locationDisplayName: ""
+    property bool clockPlacementAvailable: true
+    property string clockPlacementHint: ""
     property var appearanceDefaults: ({})
     property var barDefaults: ({})
     property var notificationDefaults: ({})
@@ -287,6 +289,8 @@ Item {
                     coordsValid: root.coordsValid
                     locationError: root.locationError
                     locationDisplayName: root.locationDisplayName
+                    clockPlacementAvailable: root.clockPlacementAvailable
+                    clockPlacementHint: root.clockPlacementHint
                     defaults: root.appearanceDefaults
                     resetCallback: function(key, value) { if (root.settingsReset) root.settingsReset("appearance", key, value) }
                     onActivated: root.selectCategory("appearance")
