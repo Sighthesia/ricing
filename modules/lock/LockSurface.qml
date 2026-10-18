@@ -70,17 +70,21 @@ WlSessionLockSurface {
             ? root.lockThemeSnapshot.text
             : SurfaceLogic.readableTextColor(Lazer.LazerTheme.accentColor, root.lightScheme)
     // Keep the lock glyph as an accent landmark instead of merging it with
-    // the password text that occupies the same control.
+    // the password text that occupies the same control. It sits on that control,
+    // not on the wallpaper, so it follows the scheme rather than the clock's
+    // wallpaper-region ink.
     readonly property color authIconColor: root.themeSnapshotReady
             ? root.lockThemeSnapshot.icon
-            : SurfaceLogic.clockThemeColor(Lazer.LazerTheme.accentColor,
-                                           root.clockLuminance, root.lightScheme)
+            : SurfaceLogic.readableThemeColor(Lazer.LazerTheme.accentColor,
+                                              root.lightScheme)
     readonly property color authDateColor: root.themeSnapshotReady
             ? root.lockThemeSnapshot.muted
             : (root.lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted)
     readonly property real clockCenterX: clockLayout.ready ? clockLayout.centerX : 0.5
     readonly property real clockCenterY: clockLayout.ready ? clockLayout.centerY : 0.5
-    readonly property real clockLuminance: clockLayout.ready ? clockLayout.luminance : 0.5
+    // -1 means "no measurement": the clock ink then follows the scheme so a cold
+    // placement cache can never paint a polarity the wallpaper contradicts.
+    readonly property real clockLuminance: clockLayout.ready ? clockLayout.luminance : -1
     readonly property color clockColor: root.themeSnapshotReady
             ? root.lockThemeSnapshot.clock
             : SurfaceLogic.clockThemeColor(Lazer.LazerTheme.accentColor,
@@ -89,6 +93,14 @@ WlSessionLockSurface {
             ? root.lockThemeSnapshot.clockMuted
             : SurfaceLogic.clockThemeMutedColor(Lazer.LazerTheme.accentColor,
                                                 root.clockLuminance, root.lightScheme)
+    // Persistent edge separation for the time and date. The measured mean luma
+    // says which ink the *region* needs, not what sits behind each glyph edge,
+    // so the clock keeps the bar's treatment: a faint outline running against
+    // the ink, invisible where the fill already separates.
+    readonly property color clockOutlineColor: root.themeSnapshotReady
+            ? root.lockThemeSnapshot.clockOutline
+            : SurfaceLogic.clockOutlineColor(Lazer.LazerTheme.accentColor,
+                                             root.clockLuminance, root.lightScheme)
     readonly property bool authFailureVisible: root.lockContext
             ? root.lockContext.showFailure : false
     property date now: new Date()
@@ -138,7 +150,7 @@ WlSessionLockSurface {
             focus: Lazer.LazerTheme.focusRing,
             muted: lightScheme ? "#5F5A66" : Lazer.LazerTheme.textMuted,
             divider: Lazer.LazerTheme.divider,
-        })
+        }, root.clockLuminance)
         themeSnapshotReady = true
         exitStarted = false
         exitWaveActive = false
@@ -165,6 +177,23 @@ WlSessionLockSurface {
     function startReveal(): void {
         prepareReveal()
         beginEntryWave()
+    }
+
+    // Repaint the clock from a placement answer that landed after the cycle's
+    // snapshot was frozen. The accent is taken from that frozen snapshot (not
+    // from the live theme) so the clock cannot drift away from the rest of the
+    // lock surface; only the three roles whose value depends on the wallpaper
+    // region are recomputed.
+    function refreshClockTheme(): void {
+        if (!root.themeSnapshotReady || !root.clockLayout.ready)
+            return
+        var roles = SurfaceLogic.clockRoles(root.lockThemeSnapshot.accent,
+                                            root.clockLuminance, root.lightScheme)
+        var next = Object.assign({}, root.lockThemeSnapshot)
+        next.clock = roles.clock
+        next.clockMuted = roles.clockMuted
+        next.clockOutline = roles.clockOutline
+        root.lockThemeSnapshot = next
     }
 
     // Startup entry: prepare now, wave only once the gates allow it. Called
@@ -360,6 +389,9 @@ WlSessionLockSurface {
         wallpaperPath: root.wallpaperPath
         screenWidth: Math.round(root.width)
         screenHeight: Math.round(root.height)
+        // Placement (and the region's luma) usually arrives before the lock, but
+        // a cold cache answers during the surface's life: repaint the clock then.
+        onAnalysisApplied: root.refreshClockTheme()
     }
 
     // Start the curtain after the base has had one settled frame. A capture
@@ -493,6 +525,8 @@ WlSessionLockSurface {
                     digitColor: root.clockColor
                     mutedDigitColor: root.clockDateColor
                     separatorColor: root.clockColor
+                    digitStyle: Text.Outline
+                    digitStyleColor: root.clockOutlineColor
                 hourTransitionDuration: Lazer.MotionTokens.clockHourFlip
                 minuteTransitionDuration: Lazer.MotionTokens.clockMinuteFlip
                 transitionEasing: Lazer.MotionTokens.clockFlipEasing
@@ -504,6 +538,8 @@ WlSessionLockSurface {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: Qt.formatDate(root.now, "yyyy.MM.dd")
                     color: root.clockDateColor
+                    style: Text.Outline
+                    styleColor: root.clockOutlineColor
                     font.family: "monospace"
                     font.pixelSize: 16
                     Behavior on color {

@@ -130,11 +130,11 @@ function authControlTransition(state, event) {
     return state
 }
 
-// Keep lock-surface text readable while preserving the active wallpaper hue.
-// Theme files are reloaded asynchronously, so transparent/black intermediate
-// values must never reach a visible lock label. The fallback follows Afloat's
+// The accent hue/saturation every lock role is built from. Theme files are
+// reloaded asynchronously, so transparent or colourless intermediate values
+// must never reach a visible lock label; the fallback follows Afloat's
 // osu-pink accent rather than an arbitrary violet hue.
-function readableThemeColor(accent, lightScheme) {
+function _inkHueSaturation(accent) {
     var hue = Number(accent && accent.hslHue)
     var saturation = Number(accent && accent.hslSaturation)
     var alpha = Number(accent && accent.a)
@@ -144,7 +144,13 @@ function readableThemeColor(accent, lightScheme) {
         saturation = 0.65
     }
     saturation = Math.max(0.42, Math.min(0.86, saturation))
-    return Qt.hsla(hue, saturation, lightScheme === true ? 0.28 : 0.76, 1)
+    return { hue: hue, saturation: saturation }
+}
+
+// Keep lock-surface text readable while preserving the active wallpaper hue.
+function readableThemeColor(accent, lightScheme) {
+    var ink = _inkHueSaturation(accent)
+    return Qt.hsla(ink.hue, ink.saturation, lightScheme === true ? 0.28 : 0.76, 1)
 }
 
 // Use a separate extreme tonal role for password/status text so it remains
@@ -199,7 +205,13 @@ function _modeSurface(candidate, lightScheme, fallback) {
 
 // Freeze all lock-surface colors for one lock cycle. This prevents each child
 // from sampling a different frame of Color.qml's animated palette transition.
-function lockThemeSnapshot(lightScheme, palette) {
+//
+// `clockLuminance` is the wallpaper region's measured luma under the clock.
+// prepareReveal() runs before the placement cache has necessarily answered, so
+// this is the *initial* snapshot; LockSurface.refreshClockTheme() re-snapshots
+// the clock roles when a real measurement arrives, because the ink polarity
+// depends on it and a stale 0.5 produced a fixed light clock over light regions.
+function lockThemeSnapshot(lightScheme, palette, clockLuminance) {
     var light = lightScheme === true
     var fallbackAccent = Qt.rgba(1, 0.4, 0.667, 1)
     var rawAccent = palette ? palette.accent : null
@@ -250,21 +262,186 @@ function lockThemeSnapshot(lightScheme, palette) {
         icon: _detach(readableThemeColor(rawAccent, light)),
         rowIcon: _detach(muted),
         sessionText: _detach(readableThemeColor(rawAccent, light)),
-        clock: _detach(readableThemeColor(rawAccent, light)),
-        clockMuted: _detach(clockThemeMutedColor(rawAccent, 0.5, light))
+        // The clock is the only lock element with no surface under it, so its
+        // ink follows the wallpaper region it sits on rather than the scheme.
+        clock: _detach(clockThemeColor(rawAccent, clockLuminance, light)),
+        clockMuted: _detach(clockThemeMutedColor(rawAccent, clockLuminance, light)),
+        clockOutline: _detach(clockOutlineColor(rawAccent, clockLuminance, light))
     }
 }
 
-// Pick a readable tonal variant of the wallpaper-derived accent without
-// falling back to unrelated pure white or pure black text.
+// Re-derive only the clock roles from an already-frozen accent. A placement
+// answer can land after prepareReveal(), and the clock must then repaint without
+// re-reading a theme that may have moved on since the cycle was frozen.
+function clockRoles(accent, clockLuminance, lightScheme) {
+    return {
+        clock: _detach(clockThemeColor(accent, clockLuminance, lightScheme)),
+        clockMuted: _detach(clockThemeMutedColor(accent, clockLuminance, lightScheme)),
+        clockOutline: _detach(clockOutlineColor(accent, clockLuminance, lightScheme))
+    }
+}
+
+// The clock is the only lock element with no surface under it, so its ink has to
+// survive whatever wallpaper sits behind it. Picking one of two fixed tones was
+// not enough: `backgroundLuminance` is the mean luma of the region the clock was
+// placed on, and a fixed light ink at 0.76 lightness clears only ~1.3:1 against a
+// bright region -- which is exactly how the clock used to dissolve into the
+// wallpaper. Hue and saturation still come from the accent, but lightness is now
+// solved for a WCAG contrast target against the measured region.
+//
+// Each polarity keeps a band: `soft` is the tone the accent reads best at, and
+// the solver only travels towards `extreme` (white or black) as far as the target
+// demands. On a dark region the clock therefore stays at its natural 0.74 rather
+// than being bleached to white, and on a bright one it darkens to the exact
+// lightness that clears the target instead of jumping to near-black.
+var clockInkBands = {
+    light: { soft: 0.74, extreme: 0.99 },
+    dark: { soft: 0.32, extreme: 0.01 }
+}
+// The date sits under the time, so it may ask for less: 3.3:1 still clears the
+// large-text threshold while staying visibly secondary to the digits.
+var clockMutedBands = {
+    light: { soft: 0.66, extreme: 0.99 },
+    dark: { soft: 0.40, extreme: 0.01 }
+}
+var clockInkContrast = 4.5
+var clockMutedContrast = 3.3
+
+// sRGB channel -> linear light, the space WCAG ratios are defined in.
+function _linearChannel(channel) {
+    var value = Number(channel)
+    if (!isFinite(value))
+        return 0
+    value = value < 0 ? 0 : (value > 1 ? 1 : value)
+    return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4)
+}
+
+// HSL -> sRGB, matching Qt.hsla's hue/saturation/lightness convention. The
+// solver needs the channels themselves, since contrast is quadratic in them.
+function _hslChannels(hue, saturation, lightness) {
+    var h = Number(hue)
+    var s = Math.max(0, Math.min(1, Number(saturation)))
+    var l = Math.max(0, Math.min(1, Number(lightness)))
+    if (!isFinite(h))
+        h = 0
+    h = h - Math.floor(h)
+    if (s <= 0)
+        return { r: l, g: l, b: l }
+    var q = l < 0.5 ? l * (1 + s) : l + s - l * s
+    var p = 2 * l - q
+    function channel(offset) {
+        var t = h + offset
+        if (t < 0)
+            t += 1
+        if (t > 1)
+            t -= 1
+        if (t < 1 / 6)
+            return p + (q - p) * 6 * t
+        if (t < 1 / 2)
+            return q
+        if (t < 2 / 3)
+            return p + (q - p) * (2 / 3 - t) * 6
+        return p
+    }
+    return { r: channel(1 / 3), g: channel(0), b: channel(-1 / 3) }
+}
+
+// WCAG relative luminance of an HSL triple.
+function _hslLuminance(hue, saturation, lightness) {
+    var rgb = _hslChannels(hue, saturation, lightness)
+    return 0.2126 * _linearChannel(rgb.r) + 0.7152 * _linearChannel(rgb.g)
+        + 0.0722 * _linearChannel(rgb.b)
+}
+
+// The analyzer reports the region's *encoded* mean luma (cv2 RGB2GRAY / 255), so
+// a measurement of 0.46 is sRGB grey 0.46, not linear 0.46. Contrast maths needs
+// the linearized value, otherwise every threshold would drift bright.
+function _regionLuminance(backgroundLuminance) {
+    var luma = Number(backgroundLuminance)
+    if (!isFinite(luma) || luma < 0)
+        return -1
+    return _linearChannel(luma)
+}
+
+function _contrastRatio(first, second) {
+    var high = Math.max(first, second)
+    var low = Math.min(first, second)
+    return (high + 0.05) / (low + 0.05)
+}
+
+// Whichever extreme can put more distance between the ink and the region wins the
+// polarity. Saturation matters here: a saturated hue cannot reach white, so on
+// mid-tone regions a deep ink often beats a washed-out bright one. A negative or
+// non-finite measurement means "no answer yet" and the scheme still decides, so a
+// cold placement cache never paints an ink the wallpaper contradicts.
+function clockInkPolarity(accent, backgroundLuminance, lightScheme) {
+    var region = _regionLuminance(backgroundLuminance)
+    if (region < 0)
+        return lightScheme === true ? "dark" : "light"
+    var ink = _inkHueSaturation(accent)
+    var bright = _contrastRatio(_hslLuminance(ink.hue, ink.saturation,
+                                              clockInkBands.light.extreme), region)
+    var deep = _contrastRatio(_hslLuminance(ink.hue, ink.saturation,
+                                            clockInkBands.dark.extreme), region)
+    return deep > bright ? "dark" : "light"
+}
+
+// Travel from the band's soft tone towards its extreme only until the target is
+// met, then stop. Contrast improves monotonically along that path, so the binary
+// search is valid; the final check keeps the answer honest if it ever is not, and
+// the extreme is the best the band can do when nothing reaches the target.
+function _solveInkLightness(hue, saturation, region, target, band) {
+    function contrastAt(lightness) {
+        return _contrastRatio(_hslLuminance(hue, saturation, lightness), region)
+    }
+    if (contrastAt(band.soft) >= target)
+        return band.soft
+    if (contrastAt(band.extreme) < target)
+        return band.extreme
+    var soft = band.soft
+    var extreme = band.extreme
+    var accepted = extreme
+    for (var i = 0; i < 16; ++i) {
+        var middle = (soft + extreme) / 2
+        if (contrastAt(middle) >= target) {
+            accepted = middle
+            extreme = middle
+        } else {
+            soft = middle
+        }
+    }
+    return contrastAt(accepted) >= target ? accepted : band.extreme
+}
+
+function _clockInk(accent, backgroundLuminance, lightScheme, bands, target) {
+    var ink = _inkHueSaturation(accent)
+    var polarity = clockInkPolarity(accent, backgroundLuminance, lightScheme)
+    var band = bands[polarity]
+    var region = _regionLuminance(backgroundLuminance)
+    if (region < 0)
+        return Qt.hsla(ink.hue, ink.saturation, band.soft, 1)
+    return Qt.hsla(ink.hue, ink.saturation,
+                   _solveInkLightness(ink.hue, ink.saturation, region, target, band), 1)
+}
+
 function clockThemeColor(accent, backgroundLuminance, lightScheme) {
-    return readableThemeColor(accent, lightScheme)
+    return _clockInk(accent, backgroundLuminance, lightScheme,
+                     clockInkBands, clockInkContrast)
 }
 
 function clockThemeMutedColor(accent, backgroundLuminance, lightScheme) {
-    var main = clockThemeColor(accent, backgroundLuminance, lightScheme)
-    var lightness = lightScheme === true ? 0.40 : 0.64
-    return Qt.hsla(main.hslHue, main.hslSaturation, lightness, 1)
+    return _clockInk(accent, backgroundLuminance, lightScheme,
+                     clockMutedBands, clockMutedContrast)
+}
+
+// The region's *mean* luma is what the analyzer can report, but the wallpaper
+// under individual glyphs still carries structure: a fence, a window frame or a
+// character outline can sit at either extreme of the range. A faint outline
+// running against the ink keeps the glyph edge separated from that detail without
+// changing the fill, the same treatment the bar's secondary lines use.
+function clockOutlineColor(accent, backgroundLuminance, lightScheme) {
+    var polarity = clockInkPolarity(accent, backgroundLuminance, lightScheme)
+    return polarity === "dark" ? Qt.rgba(1, 1, 1, 0.20) : Qt.rgba(0, 0, 0, 0.28)
 }
 
 // Resolve a surface's snapshot slot from the shared screen list; an unknown
