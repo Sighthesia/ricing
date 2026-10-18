@@ -167,6 +167,17 @@ Singleton {
     }
 
     function syncBlurConfig() {
+        root._blurPending = true
+        if (_blurWriter.running)
+            return
+        root.writeBlurConfig()
+    }
+
+    // The one place the writer is started from: the pending request is served,
+    // the command is set, and the start is deferred a turn so it never carries
+    // the previous argv.
+    function writeBlurConfig() {
+        root._blurPending = false
         _blurWriter.command = [
             "sh", "-c",
             "mkdir -p \"$1\"; tmp=$(mktemp \"$2.XXXXXX\") || exit 1; printf '%s' \"$3\" > \"$tmp\" && mv \"$tmp\" \"$2\"",
@@ -175,8 +186,7 @@ Singleton {
             root._blurConfigFile,
             root._blurConfigText()
         ]
-        _blurWriter.running = false
-        _blurWriter.running = true
+        Qt.callLater(function () { _blurWriter.running = true })
     }
 
     function updateWindows(windowListArray) {
@@ -538,14 +548,41 @@ Singleton {
     }
 
     // Write blur.kdl from SettingsService values and reload niri config.
+    //
+    // `command` is a binding input, so the launch happens a turn after it is
+    // set: starting in the same turn can run the previous argv. That deferral
+    // also collapses the two requests that arrive in the same turn while the
+    // shell loads into a single run, which is what the writer used to answer by
+    // stopping the first one — `sh` stopped by SIGTERM reports exitCode 15, and
+    // that read as a failed write next to the run that wrote the file. A
+    // request that lands while a write really is in flight is held instead and
+    // served when that run exits, so no run is stopped either way.
     property Process _blurWriter: Process {
         onExited: (exitCode) => {
-            if (exitCode !== 0) {
+            if (exitCode !== 0)
                 console.warn("NiriService: failed to write blur.kdl, exitCode =", exitCode)
+
+            // A request that arrived mid-write: the file on disk is one write
+            // behind, so this writes it before niri is reloaded.
+            if (root._blurPending) {
+                root.writeBlurConfig()
                 return
             }
 
-            root.reloadConfig()
+            if (exitCode === 0)
+                root.reloadConfig()
+        }
+
+        // `running` reads true until the process is gone, so a request can be
+        // recorded with no exit left to serve it: this exit is the one that
+        // does.
+        onRunningChanged: {
+            if (!running && root._blurPending)
+                root.writeBlurConfig()
         }
     }
+
+    // Set by every syncBlurConfig request and cleared by the write that serves
+    // it, so a request that cannot start a run yet is not forgotten.
+    property bool _blurPending: false
 }

@@ -55,10 +55,16 @@ QtObject {
     readonly property color modeContainerBorder: "#0FFFFFFF"
     readonly property color osuPink: adapt && colorService ? colorService.mPrimary : "#FF66AA"
     readonly property color osuGreen: adapt && colorService ? colorService.mTertiary : "#00FFA2"
-    // Wave-curtain pinks shared by the launcher wave panel and the lock
-    // screen reveal. Anchored on the osu pink family and independent of
-    // wallpaper adaptation so every wave surface carries the same bands.
-    readonly property var wavePalette: ({
+    // Wave-curtain bands shared by the launcher wave panel and the lock
+    // screen reveal. Anchored on the (wallpaper-adapted) osu pink so every
+    // wave surface carries the wallpaper hue; the adaptation opt-out keeps
+    // the original fixed pinks pixel-identical.
+    readonly property var wavePalette: adapt && colorService ? ({
+        light4: mix(osuPink, paperWhite, 0.30),
+        light3: mix(osuPink, paperWhite, 0.12),
+        dark4: mix(osuPink, Qt.rgba(0, 0, 0, 1), 0.25),
+        dark3: mix(osuPink, Qt.rgba(0, 0, 0, 1), 0.45)
+    }) : ({
         light4: "#F492B8",
         light3: "#E56E97",
         dark4: "#AC3F63",

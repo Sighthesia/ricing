@@ -190,6 +190,9 @@ Singleton {
     readonly property alias mode: session.mode
     // Active category chip; "" is the unfiltered "All" chip.
     property alias category: session.category
+    // Published chip counts for the current pool and query; the page builds
+    // its chip bar from this, so it must be re-exposed like category itself.
+    readonly property alias categorySummary: session.categorySummary
     property alias results: session.results
     // Stable per-mode pool the surface renders; text filtering is local.
     property alias displayPool: session.displayPool
@@ -264,6 +267,53 @@ Singleton {
         console.log("[launcher] chrome layout ->", root.chromeLayout)
     }
 
+    // Sidebar rail collapse state, persisted across restarts. Toggles are
+    // human-scale rare, so it persists immediately like launch counts
+    // rather than through a debounced queue.
+    property bool railExpanded: true
+    property bool _railAdopted: false
+
+    function _adoptRailState(text) {
+        if (root._railAdopted)
+            return
+        var expanded = true
+        try {
+            if (text) {
+                var parsed = JSON.parse(String(text))
+                if (parsed && typeof parsed.railExpanded === "boolean")
+                    expanded = parsed.railExpanded
+            }
+        } catch (err) {
+            console.warn("LauncherService: unreadable launcher.json:", err)
+            return
+        }
+        root._railAdopted = true
+        root.railExpanded = expanded
+    }
+
+    onRailExpandedChanged: {
+        if (root._railAdopted)
+            railStateFile.setText(JSON.stringify({ railExpanded: root.railExpanded }))
+    }
+
+    FileView {
+        id: railStateFile
+        path: Quickshell.statePath("launcher.json")
+        blockLoading: true
+        watchChanges: false
+        onLoaded: root._adoptRailState(railStateFile.text())
+        onLoadFailed: error => {
+            if (error !== FileViewError.FileNotFound) {
+                console.warn("LauncherService: failed to load launcher.json:", error)
+                return
+            }
+            // Materialize defaults so only the very first boot logs the
+            // missing file; later restarts read it back cleanly.
+            railStateFile.setText(JSON.stringify({ railExpanded: root.railExpanded }))
+            root._adoptRailState("")
+        }
+    }
+
     // IPC surface for the launcher entry and niri keybind integration.
     IpcHandler {
         target: "launcher"
@@ -271,6 +321,29 @@ Singleton {
         function openClipboard() { root.openClipboard() }
         function openShortcuts() { root.openShortcuts() }
         function chrome() { root.toggleChrome() }
+        // On-demand pool health probe for the disappearing-icons class:
+        // `scripts/afloat-ipc launcher iconStats` prints the pooled mode,
+        // pool size and empty-icon count, which tells a poisoned pool apart
+        // from a wedged image pipeline (healthy pool, blank rows).
+        function iconStats() {
+            var pool = session.displayPool || []
+            var emptyTotal = 0
+            var sample = []
+            for (var i = 0; i < pool.length; i++) {
+                var item = pool[i]
+                var icon = item && item.icon != null ? String(item.icon) : ""
+                if (!icon.length) {
+                    emptyTotal++
+                    if (sample.length < 10)
+                        sample.push(item && item.id != null ? String(item.id) : "?")
+                }
+            }
+            console.log("[launcher][iconstats] mode=" + session.mode
+                        + " pooledMode=" + session._pooledMode
+                        + " pool=" + pool.length
+                        + " emptyIcon=" + emptyTotal
+                        + " sample=" + JSON.stringify(sample))
+        }
     }
 
     Process {

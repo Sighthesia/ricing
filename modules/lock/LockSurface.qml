@@ -29,11 +29,18 @@ WlSessionLockSurface {
     // Single reveal driver; the backdrop derives the trailing mask from it
     // so bands and wallpaper edge always move as one curtain.
     property real waveProgress: 0
+    property real entryBodyProgress: 0
+    // Exit body travel has its own clock, matching WaveSurfaceHost: the wave
+    // uses InSine while the opaque body uses InQuad. Binding both to
+    // waveProgress makes the body swallow the stretched wave too early.
+    property real exitBodyProgress: 1
     // Unlock fall driver: 0 keeps every content block in place, 1 has dropped
     // and faded all of them away. The wave sweep waits for it.
     property real contentFallProgress: 0
     property bool reducedMotion: Lazer.MotionTokens.reducedMotion
     property bool exitStarted: false
+    property bool exitWaveActive: false
+    property bool exitWavePending: false
     property bool releaseSent: false
     property int revealWaitTicks: 0
     property string authControlState: SurfaceLogic.AuthControlStates.idle
@@ -88,6 +95,10 @@ WlSessionLockSurface {
     property bool inputMode: false
 
     signal releaseRequested()
+    // Emitted only after the exit desktop is ready and the closing wave has
+    // actually started. The lock owner uses it to re-arm its failsafe from
+    // the visible wave, rather than counting image-decode time as animation.
+    signal exitWaveStarted()
     // Startup gating: a session-start surface prepares immediately but holds
     // its entry wave until the wallpaper reveal has settled and the bar chrome
     // has finished staging. Manual surfaces wave at once. The boolean records
@@ -130,7 +141,12 @@ WlSessionLockSurface {
         })
         themeSnapshotReady = true
         exitStarted = false
+        exitWaveActive = false
+        exitWavePending = false
+        exitBodyProgress = 1
+        entryBodyProgress = reducedMotion ? 1 : 0
         releaseSent = false
+        exitReleaseSettleTimer.stop()
         startupWaveStarted = false
         inputMode = false
         contentFallProgress = 0
@@ -185,6 +201,8 @@ WlSessionLockSurface {
         exitStarted = true
         if (reducedMotion) {
             contentFallProgress = 1
+            exitWaveActive = true
+            exitBodyProgress = 0
             SurfaceLogic.applyExitImmediately(root, allAnimations())
             requestRelease()
             return
@@ -198,8 +216,16 @@ WlSessionLockSurface {
     }
 
     function startWaveExit(): void {
+        if (!backdrop.exitDesktopReady) {
+            exitWavePending = true
+            return
+        }
+        exitWavePending = false
+        exitWaveActive = true
+        exitBodyAnimation.restart()
         exitAnimation.from = waveProgress
         exitAnimation.start()
+        root.exitWaveStarted()
     }
 
     function requestRelease(): void {
@@ -210,7 +236,8 @@ WlSessionLockSurface {
     }
 
     function allAnimations(): var {
-        return [enterAnimation, exitAnimation, contentFallAnimation]
+        return [enterAnimation, entryBodyAnimation, exitAnimation, exitBodyAnimation,
+            contentFallAnimation]
     }
 
     // One curve, one clock: the clock, the lock entry and the power row all
@@ -318,6 +345,10 @@ WlSessionLockSurface {
         decodeRatio: root.decodeRatio
         captureExpected: root.captureExpected
         progress: root.waveProgress
+        exiting: root.exitWaveActive
+        exitWaveActive: root.exitWaveActive
+        exitBodyProgress: root.exitBodyProgress
+        entryBodyProgress: root.entryBodyProgress
         lightScheme: root.lightScheme
         surfaceColorOverride: root.themeSnapshotReady
                 ? root.lockThemeSnapshot.surface : "transparent"
@@ -331,12 +362,15 @@ WlSessionLockSurface {
         screenHeight: Math.round(root.height)
     }
 
-    // Keep the screenshot visible for at least one settled frame before the mask
-    // starts. If capture fails, the opaque wallpaper layer still starts the reveal
-    // after a bounded wait rather than exposing the desktop immediately.
+    // Start the curtain after the base has had one settled frame. A capture
+    // owns that hold — it is the desktop the user was just looking at, and it
+    // must read before the mask starts. A session-start lock brings no capture
+    // (its base is the floor, which is the compositor background it replaces),
+    // so the wave leaves as soon as the wallpaper layer is decodable instead of
+    // parking the floor for a screenshot's settle that has nothing to settle.
     Timer {
         id: revealStartTimer
-        interval: 250
+        interval: root.captureExpected ? 250 : 0
         repeat: false
         onTriggered: {
             if (root.exitStarted || root.reducedMotion)
@@ -348,6 +382,7 @@ WlSessionLockSurface {
             }
             // Retarget from the live value so a re-reveal never jumps.
             enterAnimation.from = root.waveProgress
+            entryBodyAnimation.restart()
             enterAnimation.start()
         }
     }
@@ -666,29 +701,68 @@ WlSessionLockSurface {
         }
     }
 
-    // Keep release ownership in the animation completion path.
-    // One driver sweeps bands and trailing mask as a single curtain.
+    // Keep release ownership in the animation completion path. Match the
+    // launcher backdrop contract: the wave layers use the shorter 600ms
+    // OutQuad sweep, while the launcher body has its own longer 800ms motion.
     NumberAnimation {
         id: enterAnimation
         target: root
         property: "waveProgress"
         from: 0
         to: 1
-        duration: Lazer.MotionTokens.waveEnter
+        duration: Lazer.MotionTokens.waveBackdropEnter
         easing.type: Easing.OutQuad
     }
 
-    // Unlock reverses the same curtain; release fires on landing. Fast start
-    // stays responsive while the gentle OutQuad tail settles the bands past
-    // the edge instead of rushing them into it.
+    // Launcher parity: the body follows the longer panel motion and swallows
+    // the backdrop after the shorter stretched-wave sweep has established it.
+    NumberAnimation {
+        id: entryBodyAnimation
+        target: root
+        property: "entryBodyProgress"
+        from: 0
+        to: 1
+        duration: Lazer.MotionTokens.waveEnter
+        easing.type: Easing.OutQuint
+    }
+
+    // Unlock reverses the same curtain on osu's hide easing (InSine); release
+    // fires on landing.
     NumberAnimation {
         id: exitAnimation
         target: root
         property: "waveProgress"
         to: 0
         duration: Lazer.MotionTokens.waveExit
-        easing.type: Easing.OutQuad
-        onFinished: root.requestRelease()
+        easing.type: Easing.InSine
+        // Keep the lock surface mapped for one compositor frame after the
+        // wave reaches its hidden offset. Releasing in this callback can tear
+        // down WlSessionLockSurface before Niri commits the final falling-wave
+        // frame, which makes the wave disappear just short of the bottom.
+        onFinished: exitReleaseSettleTimer.restart()
+    }
+
+    // Let the terminal wave position reach the compositor before unlocking the
+    // session surface. This is deliberately outside allAnimations: it is a
+    // post-animation release barrier, not another motion driver.
+    Timer {
+        id: exitReleaseSettleTimer
+        interval: 32
+        repeat: false
+        onTriggered: root.requestRelease()
+    }
+
+    // Launcher parity: the body leaves on InQuad while the wave falls on
+    // InSine. A shared progress value lets the body cover the stretched wave
+    // too early, so keep its travel on its own clock.
+    NumberAnimation {
+        id: exitBodyAnimation
+        target: root
+        property: "exitBodyProgress"
+        from: 1
+        to: 0
+        duration: Lazer.MotionTokens.waveExit
+        easing.type: Easing.InQuad
     }
 
     // Content fall owner: a plain linear driver whose gravity and fade shapes
@@ -725,6 +799,17 @@ WlSessionLockSurface {
                 else
                     failureAnimation.restart()
             }
+        }
+    }
+
+    // The exit image may finish decoding after the content-fall animation. Keep
+    // the lock surface intact until then, and start the same wave on the first
+    // ready frame rather than letting a dark compositor clear frame intervene.
+    Connections {
+        target: backdrop
+        function onExitDesktopReadyChanged() {
+            if (root.exitWavePending && backdrop.exitDesktopReady)
+                root.startWaveExit()
         }
     }
 }

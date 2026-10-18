@@ -77,6 +77,11 @@ Item {
     property bool railExpanded: true
     readonly property int railWidth: root.railExpanded
             ? LazerTheme.settingsSidebarExpandedWidth : LazerTheme.settingsSidebarContractedWidth
+    // No hairline between the rail and the content column: the rail tone
+    // already separates them, and a 1px rule through the query strip read
+    // as a stray tick (visible in light mode even after insetting it below
+    // the strip). Matches the block stack, which likewise draws no
+    // dividers between bands.
     // `final` keeps this intentional name from shadowing Item.palette.
     final property var palette: ({})
     // Route page components, keyed by route name. The host holds no knowledge of
@@ -286,6 +291,11 @@ Item {
         }
 
         // Move the continuous body inside the fixed compositor-facing owner.
+        // It travels two viewport heights, like osu's content container
+        // (relative Y 2 -> 0): the body starts fully below the screen so the
+        // backdrop waves sweep visibly first and the panel follows and
+        // swallows them. Starting at one height kept the opaque body over the
+        // waves from the first frame and reduced the sweep to a late sliver.
         //
         // Both chrome layouts paint from the same ladder
         // (LazerTheme.overlay*Surface): the "blocks" stack's three bands meet
@@ -297,12 +307,17 @@ Item {
             id: body
             z: 5
             x: 0
-            y: MotionTokens.reducedMotion ? 0 : root.height * (1 - root.bodyProgress)
+            y: MotionTokens.reducedMotion ? 0 : root.height * 2 * (1 - root.bodyProgress)
             width: parent.width
             height: root.height
             radius: 0
             color: LazerTheme.overlayContentSurface
-            opacity: root.bodyProgress
+            // Opaque while travelling: osu's content has no opacity animation,
+            // so the panel swallows the bands bottom-up in one gesture. Fading
+            // the panel mid-slide lets the bands bleed through and reads as a
+            // flash (appear, ghost, reappear). Reduced motion keeps the fade
+            // since it removes translation entirely.
+            opacity: MotionTokens.reducedMotion ? root.bodyProgress : 1
 
             // Band 1 in both layouts: the identity masthead.
             FullscreenHeader {
@@ -369,19 +384,6 @@ Item {
                 }
             }
 
-            // Hairline between the rail and the content column. A full-height
-            // rule, because the rail runs to the bottom and the content scrolls
-            // against it for the whole session.
-            Rectangle {
-                anchors.top: header.bottom
-                anchors.bottom: parent.bottom
-                anchors.left: parent.left
-                anchors.leftMargin: root.railWidth
-                width: 1
-                visible: root.railChrome
-                color: LazerTheme.divider
-            }
-
             // Content column. It anchors to the page band's BOTTOM edge, which is
             // the masthead's own bottom edge in the rail layout (the band
             // collapses to zero there) and one band lower in the block stack —
@@ -391,7 +393,7 @@ Item {
                 id: viewport
                 anchors.top: pageBand.bottom
                 anchors.left: parent.left
-                anchors.leftMargin: root.railChrome ? root.railWidth + 1 : 0
+                anchors.leftMargin: root.railChrome ? root.railWidth : 0
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 clip: true
@@ -437,7 +439,8 @@ Item {
         easing.type: Easing.OutQuint
         onFinished: if (root.phase === "opening") root.phase = "open"
     }
-    // Backdrop waves lead the body so they stay visible while content slides over them.
+    // Backdrop waves finish ahead of the body (OutQuad): equal durations let
+    // the OutQuint panel land early and eat the darker layers mid-transition.
     NumberAnimation { id: openWaves; target: root; property: "waveProgress"; to: 1; duration: MotionTokens.reducedMotion ? MotionTokens.fast : MotionTokens.waveBackdropEnter; easing.type: Easing.OutQuad }
     NumberAnimation {
         id: closeBody

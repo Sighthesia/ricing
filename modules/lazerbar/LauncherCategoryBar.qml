@@ -15,7 +15,10 @@ Item {
     property var chips: []
     property string selected: ""
     readonly property int chipSpacing: 6
-    readonly property int railPadding: 12
+    // Chip-row inset from the rail edges. Writable so the hosting page can
+    // flush the first chip against its own edge: the rail chrome's content
+    // column already starts at the sidebar, so it overrides this to 0.
+    property int railPadding: 12
     signal chipSelected(string id)
 
     implicitHeight: 26

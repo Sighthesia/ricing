@@ -13,6 +13,15 @@
 // is already sitting on the edge would immediately re-trigger on the reveal
 // strip and flap the bar forever, so a reveal consumes the arm, and only a
 // pointer that travels back out past the strip re-arms it.
+//
+// Two things collapse the bar and they are not the same kind of reason. A
+// fullscreen window is a property of the desktop the bar found, and it stays
+// true until that window leaves, so the bar is hidden for as long as it holds. A
+// lock photographing the desktop is a request that ends by itself, and the
+// desktop is the bar's again the moment it does — so it is a field of its own
+// (`owned`), and clearing it is enough to bring the bar back, pointer or no
+// pointer. It cannot be folded into `fullscreen`: the release that request asks
+// for is itself what makes a maximized tile measure as fullscreen.
 
 // Painted edge hint, and the input region the collapsed bar keeps.
 var revealStripHeight = 3
@@ -39,6 +48,7 @@ function initialState() {
     return {
         enabled: true,
         fullscreen: false,
+        owned: false,
         pinned: false,
         revealed: true,
         armed: true,
@@ -50,6 +60,7 @@ function _copy(state) {
     return {
         enabled: !!state.enabled,
         fullscreen: !!state.fullscreen,
+        owned: !!state.owned,
         pinned: !!state.pinned,
         revealed: !!state.revealed,
         armed: !!state.armed,
@@ -60,7 +71,7 @@ function _copy(state) {
 // The bar is pinned open by anything that anchors to it: an open bar popup or a
 // full-screen overlay would otherwise render against a bar that is off-screen.
 function forcedVisible(state) {
-    return !state.enabled || !state.fullscreen || state.pinned
+    return !state.enabled || (!state.fullscreen && !state.owned) || state.pinned
 }
 
 function _settle(state) {
@@ -71,8 +82,9 @@ function _settle(state) {
     return state
 }
 
-// events: { type: "fullscreen" | "enabled" | "pinned" | "enter" | "leave" |
-//           "move" | "hover" | "idle" | "reset", value, distance, slack }
+// events: { type: "fullscreen" | "enabled" | "standdown" | "pinned" | "enter" |
+//           "leave" | "move" | "hover" | "idle" | "reset", value, distance,
+//           slack }
 function reduce(state, event) {
     var next = _copy(state || initialState())
     const type = event && event.type ? String(event.type) : ""
@@ -102,6 +114,21 @@ function reduce(state, event) {
         return _settle(next)
     }
 
+    // The desktop is being photographed by a lock: the bar has to be off it.
+    // Collapses like a fullscreen window and disarms for the same reason, but
+    // unlike that verdict it is cleared by the end of the request, and `_settle`
+    // then brings the bar back on its own — which is the point: the strip the
+    // request released is what makes a maximized tile measure fullscreen, so the
+    // bar cannot be waiting on that verdict to decide it may return.
+    if (type === "standdown") {
+        next.owned = event.value === true
+        if (next.owned) {
+            next.revealed = false
+            next.armed = false
+        }
+        return _settle(next)
+    }
+
     if (type === "pinned") {
         next.pinned = event.value === true
         if (next.pinned) {
@@ -113,7 +140,10 @@ function reduce(state, event) {
 
     if (type === "enter") {
         next.hovered = true
-        if (next.armed) {
+        // Not while the desktop is owned: a pointer that happens to be sitting
+        // on the strip cannot undo a lock's stand-down, which is waiting on this
+        // bar to be off the desktop before it photographs it.
+        if (next.armed && !next.owned) {
             next.revealed = true
             next.armed = false
         }

@@ -1,25 +1,29 @@
 import QtQuick
 import "ControlCenterLogic.js" as CcLogic
 
-// B1 control-center overview: a balanced two-column view mounted inside the
-// launcher's content area. Apps, Clipboard, Shortcuts and this view are peers
-// owned by LauncherPage, so this component owns no route chrome.
+// B1 control-center overview: a balanced two-column surface shown inside the
+// LAUNCHER PAGE's content area, mounted by that page through one Loader.
 //
-// It keeps detailActive, handleBack() and focusDefault() for its same-surface
-// detail stack, and adds exactly four core
-// controls: network, Bluetooth, volume and media. Battery is read-only header
-// state and weather is an optional header, so neither is a card, and neither
-// can block the first open.
+// It is not a Wave route. Apps / Clipboard / Shortcuts / Control Center are four
+// peer rail entries and this is the fourth one's view of the same content area,
+// so it has no title, description, sidebarEntries or activeSidebarId of its own:
+// the surrounding page owns that chrome and switches it. It does not know where
+// it was entered from either - a view inside the launcher cannot be opened
+// without the launcher being there - so the entry context that once lived on this
+// file is gone rather than defaulted.
+//
+// It adds exactly four core controls: network, Bluetooth, volume and media.
+// Battery is read-only header state and weather is an optional header, so
+// neither is a card, and neither can block the first open.
 //
 // Services arrive as injected properties; the production owner edge passes
 // Services.* singletons and a test passes fakes. This page therefore never
 // imports a service. Its own side effects are exactly the four a control
 // performs when the user acts on it (set volume, toggle mute, media transport);
-// opening a detail page, returning to the launcher, or asking for the full
-// notification list is a REQUEST, because this page does not own those
-// destinations. It creates no window and opens no overlay: it is content inside
-// the host's one retained Loader, which is what keeps the launcher and the
-// control center siblings on a single surface.
+// opening a detail page or asking for the full notification list is a REQUEST,
+// because this page does not own those destinations. It creates no window and
+// opens no overlay: it is content inside the launcher's own retained Loader,
+// which is what keeps the launcher and the control center on a single surface.
 //
 // One set of sections, two arrangements. Each section is declared exactly once
 // and only its x/y/width differs between wide and narrow, so the two layouts
@@ -27,7 +31,8 @@ import "ControlCenterLogic.js" as CcLogic
 // order, so neither arrangement invents a vocabulary.
 //
 // The details are sub-pages of this one view, cross-faded in place on
-// MotionTokens.waveRoute with the overview retained and alive
+// MotionTokens.waveRoute - the same surface, the same viewport, the same timing
+// the host uses for a sibling-route swap - with the overview retained and alive
 // for the length of its own exit.
 //
 // Sharp language: every block is a right-angled rectangle, state is carried by
@@ -78,40 +83,42 @@ Item {
 
     // --- Same-surface sub-pages ---
     //
-    // The network and Bluetooth details are SUB-PAGES of this view: the page keeps
-    // ONE Loader on ONE surface, and swaps
-    // what that Loader shows. So the names come from the module - which is where
-    // they are declared - and a name the module does not declare mounts nothing.
+    // The network and Bluetooth details are SUB-PAGES of this view, not Wave routes
+    // of their own: the surface keeps ONE Loader, and this page swaps what that
+    // Loader shows. So the names come from the module - which is where they are
+    // declared - and a name the module does not declare mounts nothing.
     //
     // Empty string is the overview. It is not a route name, so it can never be
     // confused with one, and no caller has to invent a third vocabulary.
     property string activeSubPage: ""
     readonly property bool detailActive: root.activeSubPage !== ""
 
-    // What one back press means here: an active detail page consumes it. The
-    // surrounding LauncherPage owns the view-level and surface-level steps.
+    // What one back press means INSIDE this view, from the module: an active
+    // detail page consumes it, and anything else is declined so the page that
+    // shows this view owns the next step - leaving the view, or letting the
+    // surface close.
     readonly property string backAction: CcLogic.backAction(root.activeSubPage,
         root.detailActive ? root.detailPageItem : null)
 
     // Exactly the mirror of the module's "none": anything else is a step this
-    // view declines. Both halves of the local contract are published together -
+    // view owns. Both halves of the owner's contract are published together -
     // `canGoBack` true with no callable `handleBack()` would take every press
     // and do nothing with it.
     readonly property bool canGoBack: root.backAction !== "none"
 
-    // Back is view-local. The overview declines so LauncherPage can leave the
-    // view or let the host close the surface.
+    // Back is local. A detail page pops itself; the overview DECLINES, because
+    // where back goes from here belongs to the page that mounts this view and
+    // holds the session - it is not a step this file can take on its own.
     function handleBack() {
-        if (root.backAction === "detail") {
-            root.closeSubPage()
-            return true
-        }
-        return false
+        if (root.backAction !== "detail")
+            return false
+        root.closeSubPage()
+        return true
     }
 
     // Where keyboard focus lands when this view opens. The page itself, never a
     // control: the cards join the tab chain on their own, so Tab moves from here
-    // into the first ready card without the host having to know which that is.
+    // into the first ready card without the owner having to know which that is.
     //
     // While a sub-page is mounted, the focus target is that page's own: a card
     // under an invisible overview must not swallow the keystroke meant for the
@@ -176,10 +183,10 @@ Item {
     // What the sub-page Loader currently holds, which is NOT the same question as
     // `activeSubPage`.
     //
-    // `activeSubPage` is the authority: back precedence, the focus target and the
-    // module's own backAction all read it, so they answer in the same turn as the
-    // press. This one is what the Loader mounts, and - like WaveSurfaceHost's own
-    // `_loadedRoute` - it outlives the request by exactly one exit, because a
+    // `activeSubPage` is the authority: back precedence, the focus target and
+    // the module's own backAction all read it, so they answer in the same turn as
+    // the press. This one is what the Loader mounts, and - like the launcher's own
+    // retained Loader - it outlives the request by exactly one exit, because a
     // component dropped on the turn the route was cleared would cut the outgoing
     // page's fade-out short and make the hand-off asymmetric.
     property string _mountedSubPage: ""
@@ -257,7 +264,7 @@ Item {
 
     // --- Requests out of the page ---
     //
-    // A card's activation is a REQUEST, and this view answers it locally.
+    // The details live here, so the request never leaves this view.
     signal networkDetailsRequested()
     signal bluetoothDetailsRequested()
 
@@ -266,7 +273,7 @@ Item {
     // Deliberately UNWIRED, and the summary therefore renders its action inert.
     // The full notification view is the bar's own notification popup, reachable
     // only through a bar widget's hover intent on a different surface family, and
-    // there is no coordinator target, service seam or launcher route that names
+    // there is no coordinator target, service seam or launcher view that names
     // it - so the honest state is "no destination", not an enabled button whose
     // press is dropped. The signal stays as the documented extension point, and
     // the summary's own gate is what keeps the row from claiming to be a button.
@@ -572,9 +579,9 @@ Item {
     implicitHeight: 640
 
     // The clock tick. It writes `liveClock` and never `now`, so it cannot break the
-    // binding an injected clock depends on. It keeps running while the surface is
-    // retained rather than only while visible, so a header that was hidden behind
-    // another route reads the right time the moment it comes back.
+    // binding an injected clock depends on. It keeps running while the view is
+    // retained rather than only while visible, so a header that was hidden
+    // behind another rail entry reads the right time the moment it comes back.
     Timer {
         id: clockTick
         objectName: "clockTick"
@@ -1141,7 +1148,7 @@ Item {
 
     // --- Same-surface sub-page slot ---
     //
-    // ONE Loader for the whole view, holding whichever detail page is active.
+    // ONE Loader for this whole view, holding whichever detail page is active.
     // It is inside this page, not inside the wave host, which is what makes the
     // details sub-pages: the host keeps a single retained Loader on a single
     // surface, and this swaps its content without a route change, a second

@@ -351,9 +351,16 @@ function effectiveCap(limit) {
     return isFinite(requested) && requested > 0 ? Math.floor(requested) : notificationEntryCap
 }
 
-// What a back request resolves to, in precedence order: an active detail page
-// consumes back itself, then the sibling launcher route, then closing the
-// surface. The host may report the detail page as a boolean or by name.
+// What a back request resolves to inside this view, in precedence order: an
+// active detail page consumes back itself, and anything else is the OWNER's
+// step - the launcher page that shows this view decides what leaves it and what
+// closes the surface. The owner may report the detail page as a boolean or by
+// name.
+//
+// "none" is deliberately not "close". The control center is a view inside the
+// launcher's content area, not a sibling route, so it no longer owns the
+// decision that ends the surface; naming that decision here would let a page
+// that cannot act on it advertise an exit it never performs.
 function backAction(route, detailPage) {
     if (isDetailRoute(route) || isActiveDetail(detailPage))
         return "detail"

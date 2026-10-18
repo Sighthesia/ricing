@@ -102,8 +102,28 @@ Singleton {
                 Services.NeteaseWebLyricsService.title,
                 Services.NeteaseWebLyricsService.artist)
         }
-        if (root._mprisPlaying)
+        if (root._mprisPlaying) {
+            // When a video briefly steals playback and the title switches
+            // back to the still-playing music, an MPRIS player can keep
+            // publishing its stale video cover for one or more syncs. Drop
+            // any cover that is not actually cached under the now-playing
+            // track instead of letting it linger behind the music title.
+            const currentTitle = Services.MediaService.title
+            const currentArtist = Services.MediaService.artist
+            if (mprisArt !== ""
+                    && currentTitle !== ""
+                    && Services.MediaService._isArtUrlStaleForTrack(mprisArt,
+                        currentTitle, currentArtist)) {
+                if (neteaseArt !== "")
+                    return neteaseArt
+                const staleCachedArt = Services.MediaService._cachedArtForTrack(
+                    currentTitle, currentArtist)
+                if (staleCachedArt !== "")
+                    return staleCachedArt
+                return ""
+            }
             return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")
+        }
         // A paused/stopped MPRIS video can retain its last cover even after
         // the lyric session becomes the visible media source again. Never
         // let that stale video cover survive the source switch: prefer the
@@ -117,6 +137,20 @@ Singleton {
                 Services.NeteaseWebLyricsService.artist)
             if (cachedMusicArt !== "")
                 return cachedMusicArt
+            return ""
+        }
+        const bottomTitle = Services.MediaService.title
+        const bottomArtist = Services.MediaService.artist
+        if (mprisArt !== ""
+                && bottomTitle !== ""
+                && Services.MediaService._isArtUrlStaleForTrack(mprisArt,
+                    bottomTitle, bottomArtist)) {
+            if (neteaseArt !== "")
+                return neteaseArt
+            const bottomCachedArt = Services.MediaService._cachedArtForTrack(
+                bottomTitle, bottomArtist)
+            if (bottomCachedArt !== "")
+                return bottomCachedArt
             return ""
         }
         return mprisArt !== "" ? mprisArt : (neteaseArt !== "" ? neteaseArt : "")

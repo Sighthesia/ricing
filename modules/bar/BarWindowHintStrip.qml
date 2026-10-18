@@ -230,8 +230,47 @@ Item {
     // `top` may exceed the card's height and `height` may come back zero or
     // negative; the caller clamps nothing, because a zero-height overlay IS the
     // answer for "the frame is not on this card" and `visible` reads it.
+    // The card's strip-space Y: its own `y` plus every ancestor's `y` up to (but
+    // not including) the strip itself. The active list lives in an inner content
+    // Column offset by `-scrollOffset` inside an outer viewport Item pinned at y=0,
+    // so summing the chain is what keeps the mask on the scrolled row rather than
+    // on its unscrolled position. A single `parent.y` term was correct only while
+    // the scrolled Column was also the clipped viewport - which moved its own clip
+    // rect with the offset and left a blank band at the bottom (see the delegate).
+    function _cardTopInStrip(card) {
+        var top = card.y
+        var p = card.parent
+        while (p && p !== root) {
+            top += p.y || 0
+            p = p.parent
+        }
+        return top
+    }
+
+    // The card's strip-space X, same walk as above. The inner content Column sits
+    // at x=0 inside the outer viewport, so reading the direct parent alone would
+    // report the padding without the column's own placement.
+    function _cardLeftInStrip(card) {
+        var column = card.parent
+        while (column && column.parent && column.parent !== root
+            && column.isActiveSlot === undefined)
+            column = column.parent
+        if (!column)
+            return root.cellPaddingX
+        return (column.x || 0) + root.cellPaddingX
+    }
+
+    function _cardWidthInStrip(card) {
+        var column = card.parent
+        while (column && column.parent && column.parent !== root
+            && column.isActiveSlot === undefined)
+            column = column.parent
+        var w = column ? column.width || 0 : 0
+        return Math.max(0, w - root.cellPaddingX * 2)
+    }
+
     function frameMaskOverCard(card) {
-        const top = card.parent.y + card.y
+        const top = root._cardTopInStrip(card)
         const maskedFrom = Math.max(top, root.focusFrameTop)
         const maskedTo = Math.min(top + root.rowHeight,
             root.focusFrameTop + root.focusFrameHeight)
@@ -259,9 +298,8 @@ Item {
     // An overlap test rather than an equality, because mid-crossing the frame is as
     // wide as the card it is over and that card changes width as its column narrows.
     function frameOverCard(card) {
-        const column = card.parent
-        const left = column.x + root.cellPaddingX
-        const width = Math.max(0, column.width - root.cellPaddingX * 2)
+        const left = root._cardLeftInStrip(card)
+        const width = root._cardWidthInStrip(card)
         return Math.min(left + width, root.focusFrameLeft + root.focusFrameWidth)
             - Math.max(left, root.focusFrameLeft) > 0
     }
@@ -349,7 +387,16 @@ Item {
         // overflow line; its neighbours are plain labels. Which is which is the
         // index, not a flag on the model, so a column cannot claim to be the
         // active one and disagree with the body about it.
-        Column {
+        //
+        // The active column is a VIEWPORT plus a scrolling list, and the two are
+        // deliberately two objects: the outer Item is the viewport - pinned at y=0,
+        // clipped to the viewport height - and the inner Column is the full list,
+        // offset by `-scrollOffset`. One object cannot be both: a Column that clips
+        // itself AND offsets itself moves its own clip rect with the offset, so a
+        // list scrolled by one row painted the same five rows one row higher and
+        // left a blank band at the bottom. Past five windows every scrolled card
+        // read as disappearing into that band.
+        Item {
             id: stripColumn
             required property int index
             required property var modelData
@@ -360,19 +407,19 @@ Item {
             // instead of needing a scale or a second clock.
             x: root.columnXFor(stripColumn.modelData.position)
             width: root.columnWidthFor(stripColumn.modelData.position)
-            spacing: root.listSpacing
+            y: 0
             readonly property bool isActiveSlot: stripColumn.index === root.activeSlot
-            // The active column is a VIEWPORT: clipped to the window's height and
-            // scrolled within it. The neighbours are not - they are capped by the logic
-            // and drawn whole, which is why they need neither.
+            // The viewport: the full list for a neighbour, the window's height for
+            // the active column. The neighbours are capped by the logic and drawn
+            // whole, which is why they need no clip.
             clip: stripColumn.isActiveSlot
             height: stripColumn.isActiveSlot
-                ? Math.min(implicitHeight, root.viewportHeight) : implicitHeight
-            y: stripColumn.isActiveSlot ? -root.scrollOffset : 0
-            // The column's own unclamped height, for the scroll range. A `Column`'s
-            // `height` is the viewport once the clamp above binds, so the range needs
-            // this rather than the height.
-            readonly property int contentHeight: implicitHeight
+                ? Math.min(contentColumn.implicitHeight, root.viewportHeight)
+                : contentColumn.implicitHeight
+            // The column's own unclamped height, for the scroll range. The outer
+            // `height` is the viewport once the clamp above binds, so the range
+            // needs this rather than the height.
+            readonly property int contentHeight: contentColumn.implicitHeight
             // Announce a resize, because the strip measures its columns through
             // `itemAt` and has no binding that could see this one. See
             // `strip.remeasureHeight`.
@@ -384,6 +431,16 @@ Item {
             // different widths on a frame where the column is mid-resize.
             readonly property real cardWidth: Math.max(
                 0, stripColumn.width - root.cellPaddingX * 2)
+
+            // The full list. Only this moves on scroll; the viewport above stays
+            // put, which is what keeps the clip rect over the panel while the rows
+            // travel under it.
+            Column {
+                id: contentColumn
+                width: stripColumn.width
+                spacing: root.listSpacing
+                y: stripColumn.isActiveSlot ? -root.scrollOffset : 0
+                onImplicitHeightChanged: root.remeasureHeight()
 
             // Window rows: cards in the active column, plain labels either side.
             // Two Repeaters over mutually exclusive models rather than one
@@ -628,7 +685,8 @@ Item {
                     || stripColumn.modelData.rows.length === 0
             }
 
-        }
+            } // contentColumn
+        } // stripColumn viewport
     }
 
     // --- scrolling the active column ---------------------------------------

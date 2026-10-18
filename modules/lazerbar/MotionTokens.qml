@@ -13,10 +13,14 @@ QtObject {
     readonly property int page: 320
     readonly property int backdropEnter: 120
 
-    // Match osu!lazer's full-screen wave and side-panel timing contracts.
+    // osu!lazer WaveContainer APPEAR/DISAPPEAR durations: body and backdrop
+    // waves share one duration; their easings differ at the call site
+    // (body OutQuint, waves OutSine / InSine).
     readonly property int waveEnter: 800
     readonly property int waveExit: 500
-    // Backdrop waves lead the body so they stay visible while content slides over them.
+    // Backdrop waves run shorter than the body so the fan stays ahead of the
+    // fast-starting panel: with equal durations the OutQuint panel lands early
+    // and swallows the lower (darker) layers mid-transition.
     readonly property int waveBackdropEnter: 600
 
     // Lock-screen unlock: every content block drops away together on the osu
@@ -28,6 +32,10 @@ QtObject {
 
     // Wallpaper swaps are large-surface reveals; keep them calm but not slow.
     readonly property int wallpaperSwap: 480
+    // Exit desktop decoding happens after authentication and before the closing
+    // wave may start. Keep that bounded wait outside the motion duration so a
+    // slow synchronous image decode cannot make the lock release mid-wave.
+    readonly property int lockExitDesktopWait: 1200
     // The boot reveal is a separate contract from a live switch. Its DURATION is
     // DymicShell's: 3000ms, its `Math.round(3000 / speedFactor)` at the default
     // speedFactor of 1.0 (DymicShell/modules/background/BackgroundWindow.qml).

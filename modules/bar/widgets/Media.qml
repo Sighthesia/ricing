@@ -319,7 +319,7 @@ BarPill {
                 anchors.fill: parent
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
-                visible: root.hasCoverArt && status !== Image.Error && opacity > 0.01
+                visible: root.hasCoverArt && status === Image.Ready && opacity > 0.01
                 opacity: 0
 
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
@@ -332,8 +332,13 @@ BarPill {
                 source: Services.MediaControlService.artUrl
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
-                visible: root.hasCoverArt && status !== Image.Error
+                visible: root.hasCoverArt && status === Image.Ready
                 opacity: visible ? 1 : 0
+
+                onStatusChanged: {
+                    if (status === Image.Error)
+                        Services.MediaService.reportArtLoadFailure(source)
+                }
 
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             }
@@ -436,6 +441,14 @@ BarPill {
                 maxWidth: root.maxTextWidth
                 textColor: LazerTheme.barSubtitle
                 pixelSize: 10
+                // Keep the subtitle's resting tone unchanged. A very light
+                // outline appears only while live spectrum bars cross it,
+                // improving edge separation without brightening the text.
+                textStyle: root.needsSpectrum && !Services.SpectrumService.isIdle
+                    ? Text.Outline : Text.Normal
+                textStyleColor: LazerTheme.lightScheme
+                    ? Qt.rgba(1, 1, 1, 0.16)
+                    : Qt.rgba(0, 0, 0, 0.24)
 
                 Behavior on height { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }

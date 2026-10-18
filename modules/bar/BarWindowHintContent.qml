@@ -327,6 +327,29 @@ Item {
     readonly property real noRowTop: _offTop
     readonly property real focusedRowTop: focusedRowIndex < 0 ? noRowTop
         : focusedRowIndex * rowPitch - strip.scrollOffset
+    // The frame's glide target in UNSCROLLED list coordinates: the row's own top
+    // edge, before the viewport offset is applied. The drawn `y` below subtracts
+    // the scroll on the way out, so one glide covers both a focus step and the
+    // reveal scroll that carries it into view.
+    //
+    // This used to be a `Behavior` on the frame's `y` itself, whose binding already
+    // carried `- strip.scrollOffset`. A reveal animates that offset over 300ms, so
+    // every tick of the scroll re-aimed the glide at a new target and restarted its
+    // easing from scratch: the frame sat pinned near its old card until the scroll
+    // settled, while the indicator - whose anchor never carried the scroll - moved
+    // on time. The anchor here carries no scroll term while a row is focused, so a
+    // scroll in flight cannot retarget the glide; the drawn `y` simply follows the
+    // offset underneath it, the way `_barTop` already does for the indicator.
+    property real _frameAnchorY: focusedRowIndex < 0
+        ? noRowTop + strip.scrollOffset : focusedRowIndex * rowPitch
+    Behavior on _frameAnchorY {
+        enabled: !root._markerCrossing && !MotionTokens.reducedMotion
+        NumberAnimation {
+            id: focusFrameGlide
+            duration: MotionTokens.settingsSidebarCollapse * debugTimeScale
+            easing.type: Easing.OutQuint
+        }
+    }
     // The leaving frame's own height, from the row counts of the frame being held
     // rather than from a second strip. A crossing's strip is as tall as the tallest
     // of the two frames already, so this only matters for the instant between a
@@ -2040,7 +2063,11 @@ Item {
         // it left from while it leaves, and on the one it arrives at when it lands.
         x: root._markerCrossing ? root.markerLeft
             : strip.activeColumnX + root.cellPaddingX
-        y: root._markerCrossing ? root.crossingTop : root.focusedRowTop
+        // At rest the glide lives on `_frameAnchorY` above and this is its drawn
+        // position: anchor minus scroll, with no `Behavior` of its own. A `Behavior`
+        // here would chase a target the reveal scroll rewrites every tick and pin
+        // the frame until the scroll lands - see `_frameAnchorY`.
+        y: root._markerCrossing ? root.crossingTop : root._frameAnchorY - strip.scrollOffset
         width: root._markerCrossing ? root.markerWidth : strip.activeCardWidth
         height: root.rowHeight
         opacity: root.markerHasTarget ? 1 : 0
@@ -2049,19 +2076,6 @@ Item {
             enabled: !MotionTokens.reducedMotion
             NumberAnimation { duration: MotionTokens.fast * debugTimeScale
                 easing.type: Easing.OutQuint }
-        }
-        // The focus glide, and ONLY the focus glide. The displacement is a pure function
-        // of the crossing's clock, so a `Behavior` on the same property would be a second
-        // animation fighting it. Gated on `_markerCrossing`, which is a flag rather than
-        // `crossingClock < 1` precisely so that gate is already false by the time this
-        // property is re-evaluated at the landing.
-        Behavior on y {
-            enabled: !root._markerCrossing && !MotionTokens.reducedMotion
-            NumberAnimation {
-                id: focusFrameGlide
-                duration: MotionTokens.settingsSidebarCollapse * debugTimeScale
-                easing.type: Easing.OutQuint
-            }
         }
     }
 

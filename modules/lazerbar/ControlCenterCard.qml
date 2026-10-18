@@ -139,7 +139,10 @@ Item {
         radius: 0
         color: root.hoverHighlighted ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
 
-        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+        Behavior on color {
+            enabled: !MotionTokens.reducedMotion
+            ColorAnimation { duration: MotionTokens.fast }
+        }
     }
 
     // Shared click flash: a textPrimary wash over the whole card. Played only by
@@ -170,7 +173,10 @@ Item {
             enabled: !MotionTokens.reducedMotion
             NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
         }
-        Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
+        Behavior on border.color {
+            enabled: !MotionTokens.reducedMotion
+            ColorAnimation { duration: MotionTokens.fast }
+        }
     }
 
     // Content column, inset from the square surface by the shared padding.
@@ -203,7 +209,10 @@ Item {
                 fillMode: Image.PreserveAspectFit
                 opacity: root.stateKnown ? 0.55 : 1
 
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+                Behavior on opacity {
+                    enabled: !MotionTokens.reducedMotion
+                    NumberAnimation { duration: MotionTokens.fast }
+                }
             }
         }
 
@@ -234,7 +243,10 @@ Item {
             font.pixelSize: 12
             elide: Text.ElideRight
 
-            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            Behavior on color {
+                enabled: !MotionTokens.reducedMotion
+                ColorAnimation { duration: MotionTokens.fast }
+            }
         }
     }
 
@@ -265,7 +277,10 @@ Item {
             height: root.badgeHeight
             color: root.errorState ? LazerTheme.settingsWarning : LazerTheme.settingsAccent
 
-            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            Behavior on color {
+                enabled: !MotionTokens.reducedMotion
+                ColorAnimation { duration: MotionTokens.fast }
+            }
         }
 
         Text {
@@ -277,7 +292,10 @@ Item {
             font.pixelSize: 10
             font.weight: Font.DemiBold
 
-            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            Behavior on color {
+                enabled: !MotionTokens.reducedMotion
+                ColorAnimation { duration: MotionTokens.fast }
+            }
         }
     }
 

@@ -18,9 +18,22 @@ Scope {
 
     readonly property bool locked: sessionLock.locked
     readonly property bool preparing: _state === LockLogic.States.preparing
+    // The desktop is owned by a lock from the moment a request is accepted until
+    // its exit wave has revealed the desktop again — including the preparation
+    // window, during which the lock is still off screen but the desktop is
+    // already clearing for it. The chrome's arrival and the desktop's stand-down
+    // both follow this, and every path back to idle clears it.
+    readonly property bool holdsDesktop: _state !== LockLogic.States.idle
+    // One capture per accepted request: the stand-down can report itself clear
+    // more than once (a surface may report late, and an empty desktop reports
+    // from `begin()`), and a second capture would bump the snapshot generation
+    // out from under the surfaces that already bound to it.
+    property bool _captureStarted: false
     property string _state: LockLogic.States.idle
     property int _requestGeneration: -1
     property bool _exitFailsafeArmed: false
+    property int _exitSurfaceCount: 0
+    property var _exitFinishedScreens: ({})
     property bool _startupLockArmed: true
     // The startup auto-lock is a per-compositor-session event, not a per-shell
     // event: a Quickshell reload must never re-lock a desktop that was already
@@ -53,6 +66,14 @@ Scope {
     // boot that is not one. Read-only: it reports state and requests nothing.
     readonly property bool startupLockExpected: !_startupGateResolved
             || startupRequest || _startupLockArmed
+    // Whether the session-start lock has stopped owning the screen — either it
+    // released, or it is settled that none is coming for this session. Consumers
+    // that must not play their own work behind the lock wait on this instead of
+    // on `startupLockExpected`, which deliberately stays true for the rest of a
+    // session that did start a lock (its request is sticky).
+    readonly property bool startupLockSettled: _startupLockReleased
+            || !startupLockExpected
+    property bool _startupLockReleased: false
     // Emitted once per accepted startup request, when the first surface's
     // entry wave is scheduled: the surface has committed to wave (its bounded
     // image wait is armed and the 800ms enter follows), or, under reduced
@@ -122,6 +143,24 @@ Scope {
         report(index, image.status === Image.Ready ? url : "")
     }
 
+    // The desktop's stand-down follows this lock's own ownership of the screen
+    // rather than any individual exit path: preparation, cancellation, PAM
+    // release and the self-test teardown all pass through `_state`, and none of
+    // them may leave the desktop stood down. The surfaces themselves report the
+    // frame each one actually clears on (see Services.DesktopStandby).
+    //
+    // A capturing request also tells the desktop that its own geometry is going
+    // into a photograph, which is what makes a surface give back the space it
+    // reserves. The session-start lock never captures, so it never asks for
+    // that: nothing there is photographed, and the desktop is still assembling.
+    onHoldsDesktopChanged: {
+        if (holdsDesktop)
+            Services.DesktopStandby.begin(
+                root.backgroundMode === SurfaceLogic.backgroundModes.screenshot)
+        else
+            Services.DesktopStandby.end()
+    }
+
     // Begin a lock. `startup` marks the session-start auto-lock, which reveals
     // the wallpaper instead of capturing a desktop that has not finished
     // assembling; every other request keeps the configured capture.
@@ -138,17 +177,48 @@ Scope {
         if (startupRequest)
             root.startupLockEngaged()
         _startupWaveEmitted = false
+        _exitSurfaceCount = Math.max(1, Quickshell.screens.length)
+        _exitFinishedScreens = ({})
         lockContext.reset()
         for (const image of root._snapshotImages)
             image.destroy()
         root._snapshotImages = []
+        _captureStarted = false
+        // Armed before the state write below: that write is what raises the
+        // desktop's stand-down, and a desktop with nothing left on it reports
+        // itself clear from inside it. The capture has to be bounded by then.
+        _prepareFailsafe.restart()
         _state = LockLogic.States.preparing
+        // A capture photographs the desktop, so it waits for the desktop to have
+        // actually stood down. Deferred, because accepting the request is what
+        // raises the stand-down: an already-clear desktop reports back before this
+        // function returns.
+        Qt.callLater(root._captureWhenClear)
+        return true
+    }
+
+    // Capture once the desktop has stood down. Surfaces report the frame they are
+    // actually gone, so this waits on a real signal instead of guessing at a
+    // duration — a wave panel takes 500ms to fall and a bar slide 240ms, and a
+    // capture taken on either one bakes it into the lock's own background.
+    //
+    // A surface that never reports cannot strand the request: the preparation
+    // failsafe above commits anyway, with the same wallpaper fallback a failed
+    // capture already produces.
+    function _captureWhenClear(): void {
+        if (_state !== LockLogic.States.preparing || _captureStarted)
+            return
+        if (!Services.DesktopStandby.isClear())
+            return
+        _captureStarted = true
         snapshot.request(Quickshell.screens.length)
         _requestGeneration = snapshot.generation
+        // Re-armed over the capture itself, so the wait for the desktop to stand
+        // down cannot eat into the budget a slow capture is allowed. Both phases
+        // are bounded, and neither is bounded by the other.
         _prepareFailsafe.restart()
         if (snapshot.ready)
             _commitLock()
-        return true
     }
 
     // Request the compositor lock once per niri session, after the shell has
@@ -266,6 +336,8 @@ Scope {
         _prepareFailsafe.stop()
         _state = LockLogic.States.idle
         _requestGeneration = -1
+        // No lock ever reached the screen, so nothing is holding it any more.
+        _startupLockReleased = true
     }
 
     function _finishRelease(): void {
@@ -277,6 +349,25 @@ Scope {
         _requestGeneration = -1
         _exitFailsafe.stop()
         _exitFailsafeArmed = false
+        // The compositor lock is gone and its surfaces are being torn down, so
+        // the screen is free for work that was held behind the lock.
+        _startupLockReleased = true
+    }
+
+    // WlSessionLock creates one LockSurface per output. Do not release the
+    // compositor lock when the first output finishes: that destroys the other
+    // surfaces while their closing waves are still travelling downward.
+    function _surfaceExitFinished(screenIndex): void {
+        if (_state !== LockLogic.States.exiting)
+            return
+        const key = Number(screenIndex) >= 0 ? String(screenIndex) : "unknown"
+        if (_exitFinishedScreens[key] === true)
+            return
+        const finished = Object.assign({}, _exitFinishedScreens)
+        finished[key] = true
+        _exitFinishedScreens = finished
+        if (Object.keys(finished).length >= _exitSurfaceCount)
+            _finishRelease()
     }
 
     // Self-test release: bypasses PAM strictly while the startup test is
@@ -295,6 +386,9 @@ Scope {
             if (next !== null) {
                 _state = next
                 sessionLock.locked = false
+                // Self-test release goes straight to idle instead of through
+                // _finishRelease, so the screen-freed claim is made here too.
+                _startupLockReleased = true
             }
         }
         if (sessionLock.locked)
@@ -352,7 +446,8 @@ Scope {
                     || StartupRevealLogic.waveAllowed(true,
                                                       root.startupWallpaperReady,
                                                       root.startupChromeReady)
-            onReleaseRequested: root._finishRelease()
+            onReleaseRequested: root._surfaceExitFinished(root.screenIndex)
+            onExitWaveStarted: root._exitFailsafe.restart()
             // One surface exists per screen and each waves in turn; only the
             // first startup wave notifies the root coordinator (Task 5), and
             // manual waves never do.
@@ -414,7 +509,21 @@ Scope {
         }
     }
 
-    // Bounded fallback so a silent snapshot provider can never block locking.
+    // The desktop reports itself clear on its own schedule, which is the only
+    // thing the capture may wait on. Deferred off the signal rather than read as
+    // state, because a desktop with nothing on it reports from inside the write
+    // that accepted the request — `lock()` has not finished by then.
+    Connections {
+        target: Services.DesktopStandby
+        function onCleared(): void {
+            Qt.callLater(root._captureWhenClear)
+        }
+    }
+
+    // Bounded fallback so neither a desktop that never reports itself clear nor a
+    // silent snapshot provider can block locking. Armed when a request is
+    // accepted, and again — over a full budget of its own — when the capture
+    // actually starts.
     property Timer _prepareFailsafe: Timer {
         interval: Controller.prepareFailsafeInterval(
                       root.backgroundMode, SurfaceLogic.backgroundModes,
@@ -427,10 +536,13 @@ Scope {
     // Bounded fallback so a stalled exit can never hold the lock after a
     // successful authentication; it stays armed only in the exiting state. The
     // budget covers the whole unlock choreography — unlock feedback, the
-    // control collapse, the content fall, then the wave sweep — plus a margin.
+    // control collapse, the content fall, the exit-image decode wait, then the
+    // wave sweep — plus a margin. The image wait is separate because the wave
+    // cannot start until its desktop replacement is ready.
     property Timer _exitFailsafe: Timer {
         interval: Lazer.MotionTokens.medium + Lazer.MotionTokens.instant
                   + Lazer.MotionTokens.lockContentFall
+                  + Lazer.MotionTokens.lockExitDesktopWait
                   + Lazer.MotionTokens.waveExit
                   + Lazer.MotionTokens.slow
         repeat: false
