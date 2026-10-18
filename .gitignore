@@ -33,3 +33,13 @@ __pycache__/
 /*.mp3
 /aubio.err
 /live_beats.txt
+
+# Ad-hoc QML harnesses and scratch probes. They must sit at the repo root for
+# relative imports to resolve, so keep them out of version control by naming.
+/harness_*.qml
+/*_harness.qml
+/*_probe.qml
+/*_stress.qml
+/*_e2e.qml
+/task-*-report.md
+/stream.wav
