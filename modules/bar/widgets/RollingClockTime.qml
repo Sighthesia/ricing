@@ -13,8 +13,6 @@ Item {
     property color digitColor: "white"
     property color mutedDigitColor: "white"
     property color separatorColor: "white"
-    property int digitStyle: Text.Normal
-    property color digitStyleColor: "transparent"
     property real separatorOpacity: 1.0
     property int digitPixelSize: 14
     property real digitScale: 1.0
@@ -71,8 +69,6 @@ Item {
                 digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily
                 digitBold: root.digitBold
-                digitStyle: root.digitStyle
-                digitStyleColor: root.digitStyleColor
                 transitionDuration: root.hourTransitionDuration
                 transitionEasing: root.transitionEasing
             }
@@ -85,8 +81,6 @@ Item {
                 digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily
                 digitBold: root.digitBold
-                digitStyle: root.digitStyle
-                digitStyleColor: root.digitStyleColor
                 transitionDuration: root.hourTransitionDuration
                 transitionEasing: root.transitionEasing
             }
@@ -97,8 +91,6 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: ":"
             color: root.separatorColor
-            style: root.digitStyle
-            styleColor: root.digitStyleColor
             opacity: root.separatorOpacity
             font.family: root.digitFontFamily
             font.pixelSize: root.digitPixelSize
@@ -117,8 +109,6 @@ Item {
                 digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily
                 digitBold: root.digitBold
-                digitStyle: root.digitStyle
-                digitStyleColor: root.digitStyleColor
                 transitionDuration: root.minuteTransitionDuration
                 transitionEasing: root.transitionEasing
             }
@@ -131,8 +121,6 @@ Item {
                 digitScale: root.digitScale
                 digitFontFamily: root.digitFontFamily
                 digitBold: root.digitBold
-                digitStyle: root.digitStyle
-                digitStyleColor: root.digitStyleColor
                 transitionDuration: root.minuteTransitionDuration
                 transitionEasing: root.transitionEasing
             }
@@ -148,8 +136,6 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: ":"
                 color: root.separatorColor
-                style: root.digitStyle
-                styleColor: root.digitStyleColor
                 opacity: root.separatorOpacity
                 font.family: root.digitFontFamily
                 font.pixelSize: root.digitPixelSize
@@ -168,8 +154,6 @@ Item {
                     digitScale: root.digitScale
                     digitFontFamily: root.digitFontFamily
                     digitBold: root.digitBold
-                    digitStyle: root.digitStyle
-                    digitStyleColor: root.digitStyleColor
                     transitionDuration: root.secondTransitionDuration
                     transitionEasing: root.transitionEasing
                 }
@@ -182,8 +166,6 @@ Item {
                     digitScale: root.digitScale
                     digitFontFamily: root.digitFontFamily
                     digitBold: root.digitBold
-                    digitStyle: root.digitStyle
-                    digitStyleColor: root.digitStyleColor
                     transitionDuration: root.secondTransitionDuration
                     transitionEasing: root.transitionEasing
                 }

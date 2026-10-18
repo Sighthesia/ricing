@@ -265,8 +265,7 @@ function lockThemeSnapshot(lightScheme, palette, clockLuminance) {
         // The clock is the only lock element with no surface under it, so its
         // ink follows the wallpaper region it sits on rather than the scheme.
         clock: _detach(clockThemeColor(rawAccent, clockLuminance, light)),
-        clockMuted: _detach(clockThemeMutedColor(rawAccent, clockLuminance, light)),
-        clockOutline: _detach(clockOutlineColor(rawAccent, clockLuminance, light))
+        clockMuted: _detach(clockThemeMutedColor(rawAccent, clockLuminance, light))
     }
 }
 
@@ -276,8 +275,7 @@ function lockThemeSnapshot(lightScheme, palette, clockLuminance) {
 function clockRoles(accent, clockLuminance, lightScheme) {
     return {
         clock: _detach(clockThemeColor(accent, clockLuminance, lightScheme)),
-        clockMuted: _detach(clockThemeMutedColor(accent, clockLuminance, lightScheme)),
-        clockOutline: _detach(clockOutlineColor(accent, clockLuminance, lightScheme))
+        clockMuted: _detach(clockThemeMutedColor(accent, clockLuminance, lightScheme))
     }
 }
 
@@ -432,16 +430,6 @@ function clockThemeColor(accent, backgroundLuminance, lightScheme) {
 function clockThemeMutedColor(accent, backgroundLuminance, lightScheme) {
     return _clockInk(accent, backgroundLuminance, lightScheme,
                      clockMutedBands, clockMutedContrast)
-}
-
-// The region's *mean* luma is what the analyzer can report, but the wallpaper
-// under individual glyphs still carries structure: a fence, a window frame or a
-// character outline can sit at either extreme of the range. A faint outline
-// running against the ink keeps the glyph edge separated from that detail without
-// changing the fill, the same treatment the bar's secondary lines use.
-function clockOutlineColor(accent, backgroundLuminance, lightScheme) {
-    var polarity = clockInkPolarity(accent, backgroundLuminance, lightScheme)
-    return polarity === "dark" ? Qt.rgba(1, 1, 1, 0.20) : Qt.rgba(0, 0, 0, 0.28)
 }
 
 // Resolve a surface's snapshot slot from the shared screen list; an unknown

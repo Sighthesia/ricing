@@ -17,11 +17,6 @@ Item {
     property real digitScale: 1.0
     property string digitFontFamily: "monospace"
     property bool digitBold: true
-    // Optional glyph outline, same contract as MarqueeLabel's: normal rendering
-    // by default, and a host that sits directly on a wallpaper can ask for edge
-    // separation without changing the ink colour.
-    property int digitStyle: Text.Normal
-    property color digitStyleColor: "transparent"
     property real overscanFactor: 1.35
     property int transitionDuration: 180
     property int transitionEasing: Easing.InOutCubic
@@ -66,8 +61,6 @@ Item {
             verticalAlignment: Text.AlignVCenter
             text: index.toString()
             color: index === root.targetDigit ? root.digitColor : root.mutedDigitColor
-            style: root.digitStyle
-            styleColor: root.digitStyleColor
             font.family: root.digitFontFamily
             font.pixelSize: root.digitPixelSize
             font.bold: root.digitBold

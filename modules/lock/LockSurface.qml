@@ -93,14 +93,6 @@ WlSessionLockSurface {
             ? root.lockThemeSnapshot.clockMuted
             : SurfaceLogic.clockThemeMutedColor(Lazer.LazerTheme.accentColor,
                                                 root.clockLuminance, root.lightScheme)
-    // Persistent edge separation for the time and date. The measured mean luma
-    // says which ink the *region* needs, not what sits behind each glyph edge,
-    // so the clock keeps the bar's treatment: a faint outline running against
-    // the ink, invisible where the fill already separates.
-    readonly property color clockOutlineColor: root.themeSnapshotReady
-            ? root.lockThemeSnapshot.clockOutline
-            : SurfaceLogic.clockOutlineColor(Lazer.LazerTheme.accentColor,
-                                             root.clockLuminance, root.lightScheme)
     readonly property bool authFailureVisible: root.lockContext
             ? root.lockContext.showFailure : false
     property date now: new Date()
@@ -182,7 +174,7 @@ WlSessionLockSurface {
     // Repaint the clock from a placement answer that landed after the cycle's
     // snapshot was frozen. The accent is taken from that frozen snapshot (not
     // from the live theme) so the clock cannot drift away from the rest of the
-    // lock surface; only the three roles whose value depends on the wallpaper
+    // lock surface; only the two roles whose value depends on the wallpaper
     // region are recomputed.
     function refreshClockTheme(): void {
         if (!root.themeSnapshotReady || !root.clockLayout.ready)
@@ -192,7 +184,6 @@ WlSessionLockSurface {
         var next = Object.assign({}, root.lockThemeSnapshot)
         next.clock = roles.clock
         next.clockMuted = roles.clockMuted
-        next.clockOutline = roles.clockOutline
         root.lockThemeSnapshot = next
     }
 
@@ -517,29 +508,25 @@ WlSessionLockSurface {
                 BarWidgets.RollingClockTime {
                     id: clockTime
                     anchors.horizontalCenter: parent.horizontalCenter
-                currentTime: root.now
-                digitPixelSize: 48
-                digitFontFamily: "monospace"
-                digitBold: true
-                showSeconds: false
+                    currentTime: root.now
+                    digitPixelSize: 48
+                    digitFontFamily: "monospace"
+                    digitBold: true
+                    showSeconds: false
                     digitColor: root.clockColor
                     mutedDigitColor: root.clockDateColor
                     separatorColor: root.clockColor
-                    digitStyle: Text.Outline
-                    digitStyleColor: root.clockOutlineColor
-                hourTransitionDuration: Lazer.MotionTokens.clockHourFlip
-                minuteTransitionDuration: Lazer.MotionTokens.clockMinuteFlip
-                transitionEasing: Lazer.MotionTokens.clockFlipEasing
-            }
+                    hourTransitionDuration: Lazer.MotionTokens.clockHourFlip
+                    minuteTransitionDuration: Lazer.MotionTokens.clockMinuteFlip
+                    transitionEasing: Lazer.MotionTokens.clockFlipEasing
+                }
 
-            // Keep the calendar date directly below the primary time.
+                // Keep the calendar date directly below the primary time.
                 Text {
                     id: clockDate
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: Qt.formatDate(root.now, "yyyy.MM.dd")
                     color: root.clockDateColor
-                    style: Text.Outline
-                    styleColor: root.clockOutlineColor
                     font.family: "monospace"
                     font.pixelSize: 16
                     Behavior on color {
