@@ -116,6 +116,8 @@ Item {
             font.bold: true
         }
 
+        // Date line carries the shared bar-subtitle outline so the clock's
+        // secondary line matches Media/ActiveWindow over any background.
         Text {
             id: dateLabel
 
@@ -123,6 +125,8 @@ Item {
             visible: root.showDate
             text: root.dateText
             color: LazerTheme.barSubtitle
+            style: Text.Outline
+            styleColor: LazerTheme.barSubtitleOutline
             font.family: "monospace"
             font.pixelSize: 10
         }

@@ -77,6 +77,17 @@ QtObject {
     // textPrimary (white/mOnSurface) at 0.82 alpha so 10px subtitles
     // stay readable on bgDark/mSurface without collapsing hierarchy.
     readonly property color barSubtitle: shade(textPrimary, 0.82)
+    // Persistent edge separation for 10px secondary lines. A very light
+    // outline has to follow the scheme's polarity, not its background: an
+    // outline in the surface's own direction (white on a light surface)
+    // disappears into the wash it is meant to separate from, so both
+    // variants darken/lighten AGAINST the ink instead. The subtitle's
+    // resting tone is unchanged — the glyph fill is what the eye reads,
+    // the outline only firms up the edge over animated surfaces (spectrum,
+    // wallpaper) and busy wallpaper regions.
+    readonly property color barSubtitleOutline: lightScheme
+        ? Qt.rgba(1, 1, 1, 0.16)
+        : Qt.rgba(0, 0, 0, 0.24)
     readonly property color hoverForeground: lightScheme ? barIcon : "#FFFFFF"
     // Interactive feedback inverts with the scheme: light surfaces take a
     // low-alpha ink wash (white washes are invisible there); pressed stays

@@ -327,6 +327,11 @@ Item {
                 maxWidth: root.maxTitleWidth
                 textColor: LazerTheme.barSubtitle
                 pixelSize: 10
+                // Same persistent secondary-line outline as Media's artist
+                // line, so every 10px bar subtitle reads with one edge
+                // contract instead of per-widget improvisation.
+                textStyle: Text.Outline
+                textStyleColor: LazerTheme.barSubtitleOutline
 
                 Behavior on height { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }

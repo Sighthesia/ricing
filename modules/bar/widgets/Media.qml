@@ -441,14 +441,12 @@ BarPill {
                 maxWidth: root.maxTextWidth
                 textColor: LazerTheme.barSubtitle
                 pixelSize: 10
-                // Keep the subtitle's resting tone unchanged. A very light
-                // outline appears only while live spectrum bars cross it,
-                // improving edge separation without brightening the text.
-                textStyle: root.needsSpectrum && !Services.SpectrumService.isIdle
-                    ? Text.Outline : Text.Normal
-                textStyleColor: LazerTheme.lightScheme
-                    ? Qt.rgba(1, 1, 1, 0.16)
-                    : Qt.rgba(0, 0, 0, 0.24)
+                // Persistent edge separation for the 10px line: the outline
+                // no longer waits for live spectrum bars, so the subtitle
+                // reads the same over a paused pill, a wallpaper behind it,
+                // and a beat-driven bar field. Tone and fill stay untouched.
+                textStyle: Text.Outline
+                textStyleColor: LazerTheme.barSubtitleOutline
 
                 Behavior on height { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
