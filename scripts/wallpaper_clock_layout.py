@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """Find a low-texture region for the lock-screen clock.
 
+Superseded: the lock surface now runs `semantic_blank_region.py`, which reads
+line structure, colour spread and distance to a character instead of plain
+variance.  This file is kept as the dependency-light baseline it replaced --
+ImageMagick plus the standard library, no OpenCV -- and still writes the same
+JSON the lock surface reads.
+
 The window scan is adapted from end-4/dots-hyprland's least_busy_region.py:
 https://github.com/end-4/dots-hyprland/blob/main/dots/.config/quickshell/ii/scripts/images/least_busy_region.py
 This version keeps the scan dependency-light and returns normalized coordinates

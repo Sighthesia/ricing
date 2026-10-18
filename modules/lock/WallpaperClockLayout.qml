@@ -29,10 +29,14 @@ Item {
             "nice",
             "-n", "19",
             "python3",
-            Quickshell.shellDir + "/scripts/wallpaper_clock_layout.py",
+            Quickshell.shellDir + "/scripts/semantic_blank_region.py",
             "--image", root.wallpaperPath,
             "--screen-width", String(root.screenWidth),
             "--screen-height", String(root.screenHeight),
+            // The clock's own footprint plus room to breathe, kept off the
+            // screen edge by the same 6% the scan uses.
+            "--clock", "0.22x0.16",
+            "--margin", "0.06",
         ]
         analysisProcess.running = true
     }
@@ -59,9 +63,11 @@ Item {
     // Debounce resize and wallpaper changes so one lock surface cannot queue
     // several obsolete image scans during startup. The window also has to
     // outlast the wallpaper reveal (MotionTokens.wallpaperSwap = 480ms): the
-    // scan is ~0.6s of CPU, and starting it while the reveal is animating
-    // starves the render thread and stalls the transition. The result is only
-    // needed when the session actually locks, which is far later.
+    // semantic scan is ~1.4s of CPU (it reads ink, chroma, saliency and long
+    // straight structure across the whole page), and starting it while the
+    // reveal is animating starves the render thread and stalls the transition.
+    // The result is only needed when the session actually locks, which is far
+    // later; until it lands the clock stays at its default centre.
     Timer {
         id: analyzeTimer
         interval: 600
