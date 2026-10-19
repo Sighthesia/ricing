@@ -22,6 +22,10 @@ Singleton {
 
     property real _reportedBpm: 0
     property real _reportedPulse: 0
+    // Consecutive bridge exits without a single beat in between; a crash loop
+    // must stop retrying, but a device change must not disable BPM for the
+    // rest of the session.
+    property int _beatCrashCount: 0
     // Dockzone spectrum override — set by the active media widget.
     property real dockzoneHeightScale: 1.0
     property real dockzoneMaxHeightRatio: 1.0
@@ -174,6 +178,7 @@ Singleton {
 
         // Caelestia-style passthrough: trust aubio's own tempo estimate.
         const bpm = Number(payload.bpm)
+        root._beatCrashCount = 0
         root._reportedBpm = isFinite(bpm) && bpm > 0 ? bpm : root._reportedBpm
         root._reportedPulse = 1
         root.beat()
@@ -188,6 +193,7 @@ Singleton {
 
         if (root._shouldRun && !beatProcess.running) {
             root._reportedBpm = 0
+            root._beatCrashCount = 0
             beatProcess.running = true
         } else if (!root._shouldRun && beatProcess.running) {
             beatProcess.running = false
@@ -264,9 +270,21 @@ Singleton {
             }
         }
 
-        onExited: {
+        // The bridge survives monitor loss on its own, so reaching this handler
+        // means a real failure (missing python/aubio, bad override). Without a
+        // retry, BPM stayed dead for the whole session after a single exit.
+        onExited: exitCode => {
             root._reportedPulse = 0
             root._reportedBpm = 0
+
+            if (!root._shouldRun)
+                return
+
+            root._beatCrashCount += 1
+            if (root._beatCrashCount <= 5)
+                beatRestartTimer.restart()
+            else
+                console.warn("SpectrumService: beat tracker exited repeatedly, code =", exitCode)
         }
     }
 
@@ -279,6 +297,19 @@ Singleton {
         onTriggered: {
             if (root._shouldRun && !cavaProcess.running)
                 cavaProcess.running = true
+        }
+    }
+
+    // Bridge restarts are rarer than cava's (it reconnects its own capture),
+    // so give a failed spawn more room before retrying.
+    Timer {
+        id: beatRestartTimer
+
+        interval: 2000
+        repeat: false
+        onTriggered: {
+            if (root._shouldRun && !beatProcess.running)
+                beatProcess.running = true
         }
     }
 }
