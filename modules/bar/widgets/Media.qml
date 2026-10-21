@@ -217,6 +217,14 @@ BarPill {
         subtitleMarquee.transitionFrom(oldSec, root.secondaryText)
     }
 
+    // Browser MPRIS exporters write rotating temp files and delete the
+    // previous track's artwork immediately. Reloading one of those URLs for
+    // the outgoing crossfade frame can only fail, so those changes fade in
+    // instead of crossfading from a file that is already gone.
+    function _isVolatileCoverUrl(url) {
+        return url !== "" && url.indexOf("-mpris/") !== -1
+    }
+
     Connections {
         target: Services.MediaControlService
         function onArtUrlChanged() {
@@ -228,6 +236,11 @@ BarPill {
             const oldUrl = root.trackedArtUrl
             const newUrl = Services.MediaControlService.artUrl
             if (oldUrl === "" || oldUrl === newUrl) {
+                root.trackedArtUrl = newUrl
+                coverPrevImage.opacity = 0
+                return
+            }
+            if (root._isVolatileCoverUrl(oldUrl)) {
                 root.trackedArtUrl = newUrl
                 coverPrevImage.opacity = 0
                 return
