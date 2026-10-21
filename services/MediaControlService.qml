@@ -1,6 +1,7 @@
 pragma Singleton
 
 import Quickshell
+import Quickshell.Io
 import QtQuick
 import "./" as Services
 
@@ -581,5 +582,52 @@ Singleton {
         function onNextTranslatedLyricChanged() { root._scheduleLyricsRefresh() }
         function onPlaybackStateChanged() { root._scheduleLyricsRefresh() }
         function onBoundToActivePlayerChanged() { root._scheduleLyricsRefresh() }
+    }
+
+    // Quickshell 0.3.2 only exposes MPRIS players that finish their initial
+    // GetAll. Firefox re-registers its MPRIS service while the exported object
+    // still answers UnknownMethod, so that player never becomes ready and is
+    // silently absent from `Mpris.players` for the rest of the shell session —
+    // taking the cover and the transport with it. playerctld republishes the
+    // active player through its own (well-behaved) MPRIS service, so start it
+    // only in that broken state: media is playing through the lyric session,
+    // yet no MPRIS player is visible.
+    readonly property bool _mprisMissingWhilePlaying:
+        !Services.MediaService.hasPlayer
+            && (Services.NeteaseWebLyricsService.playbackState === "playing"
+                || Services.NeteaseWebLyricsService.active)
+    property real _lastPlayerctldStart: 0
+    property bool _playerctldStartLogged: false
+
+    function _ensurePlayerctld() {
+        const now = Date.now()
+        if (now - root._lastPlayerctldStart < 15000)
+            return
+
+        root._lastPlayerctldStart = now
+        if (!root._playerctldStartLogged) {
+            root._playerctldStartLogged = true
+            console.info("[Media] MPRIS player missing while media plays; starting playerctld")
+        }
+        playerctldStart.running = true
+    }
+
+    Timer {
+        interval: 3000
+        repeat: true
+        running: root._mprisMissingWhilePlaying
+        onTriggered: root._ensurePlayerctld()
+    }
+
+    // `daemon` activates the packaged D-Bus service and exits; the daemon
+    // itself outlives this process.
+    Process {
+        id: playerctldStart
+
+        command: ["playerctld", "daemon"]
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0)
+                console.warn("[Media] playerctld daemon exited with", exitCode)
+        }
     }
 }
