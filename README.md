@@ -8,6 +8,8 @@ A quickshell theme inspired by osu!lazer, focusing on faithfully recreating the 
 - Uses a dual-layer hover menu structure identical to the settings sidebar  
 - Recreates osu!lazer's fun parabolic falling effect for notification messages  
 - Bar ripple glow effects during notifications and transient messages  
+- Reordering animation for loading and filtering of settings and launcher list items
 - Smooth transition between desktop and lock screen  
+- Smooth and continuous window hint indicator bar with a single instance displacement of the focus frame
 - Detailed window that appears when holding down the Hint key in Niri
 - Automatically detects visually blank areas (such as backgrounds without complex elements like characters) on the wallpaper and adjusts the lock screen clock accordingly  
