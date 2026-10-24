@@ -298,8 +298,6 @@ var strings = {
     "widget.bluetooth.noDevices": { zh: "已开启 · 无设备", en: "On · No devices" },
     "widget.network.connecting": { zh: "正在连接 {ssid}", en: "Connecting {ssid}" },
     "widget.network.connectingGeneric": { zh: "正在连接", en: "Connecting" },
-    "widget.volume.muted": { zh: "静音 · {level}", en: "Muted · {level}" },
-    "widget.notifications.dnd": { zh: "勿扰", en: "DND" },
     "clock.uptime.unknown": { zh: "已运行 --:--:--", en: "Uptime --:--:--" },
     "calendar.month": { zh: "{year} 年 {month} 月", en: "{monthName} {year}" },
     // Every {name} in a line must exist in both languages; the Chinese form

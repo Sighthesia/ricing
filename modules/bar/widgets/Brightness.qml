@@ -30,7 +30,10 @@ BarPill {
             try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
         }
         if (!isFinite(centerX)) centerX = 0
-        var summaryText = Math.round(root.level * 100) + "%"
+        // No second line: the panel body opens with the slider row, which
+        // already reads "Brightness 80%". Restating the percentage here printed
+        // the same number twice inside one 200px panel.
+        var summaryText = ""
         return {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,

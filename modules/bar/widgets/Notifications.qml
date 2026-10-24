@@ -30,10 +30,11 @@ BarPill {
             try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
         }
         if (!isFinite(centerX)) centerX = 0
+        // Unread count only. Do-not-disturb already names itself on the body's
+        // own button, so repeating it here said the same word twice.
         var summaryText = root.unread > 0
             ? Services.Tr.n("cc.notifications.unread", root.unread)
             : Services.Tr.q("cc.notifications.noUnread")
-        if (root.dnd) summaryText += " \u00B7 " + Services.Tr.q("widget.notifications.dnd")
         return {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,

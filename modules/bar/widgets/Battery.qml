@@ -58,13 +58,15 @@ BarPill {
             try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
         }
         if (!isFinite(centerX)) centerX = 0
-        var summaryText = Services.Tr.q("widget.battery.none")
-        if (root.available && root.ready) {
-            summaryText = root.percentage + "%"
-            if (root.showStateLabel && root.stateLabel !== "") summaryText += " · " + root.stateLabel
-        } else if (root.available) {
+        // A ready battery is fully described by the card below (percentage,
+        // state, rates), so the header adds nothing and stays silent. Only the
+        // states the card cannot name - no battery, not readable yet - are said
+        // here, where they are the one line that explains the empty card.
+        var summaryText = ""
+        if (!root.available)
+            summaryText = Services.Tr.q("widget.battery.none")
+        else if (!root.ready)
             summaryText = Services.Tr.q("common.unknown")
-        }
         return {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,

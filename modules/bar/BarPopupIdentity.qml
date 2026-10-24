@@ -11,6 +11,11 @@ Rectangle {
     // Monochrome module glyphs opt in to the scheme-aware barIcon tint;
     // colored intents (tray icons) leave this off.
     property bool tintIcon: false
+    // Second line under the title. Contract: it carries what the panel BODY does
+    // not already show. A widget whose content is the value itself (a slider
+    // reading 80%, a card printing 80%) leaves this empty, otherwise the same
+    // number appears twice within one small panel - the header says "Brightness
+    // 80%" and the slider underneath says "Brightness 80%" again.
     property string summary
     property real hostWidth: 260
     property bool showClose: false
