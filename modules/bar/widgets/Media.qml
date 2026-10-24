@@ -124,19 +124,19 @@ BarPill {
             try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
         }
         if (!isFinite(centerX)) centerX = 0
-        var titleText = Services.MediaControlService.title || Services.MediaService.title || "Media"
-        if (titleText === "") titleText = "Media"
+        var titleText = Services.MediaControlService.title || Services.MediaService.title || Services.Tr.q("widget.media")
+        if (titleText === "") titleText = Services.Tr.q("widget.media")
         var artistText = Services.MediaControlService.artist || Services.MediaService.artist || Services.MediaService.playerName || ""
         // Header follows the other widgets: fixed widget name plus live
         // playback state; the track identity lives in the card body.
         var playbackRaw = String(Services.MediaControlService.playbackState || "")
-        var stateText = playbackRaw === "playing" ? "Playing"
-            : (playbackRaw === "paused" ? "Paused" : "Stopped")
+        var stateText = playbackRaw === "playing" ? Services.Tr.q("media.playing")
+            : (playbackRaw === "paused" ? Services.Tr.q("media.paused") : Services.Tr.q("media.stopped"))
         return {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,
             screenName: root.screenName,
-            title: "Media",
+            title: Services.Tr.q("widget.media"),
             iconSource: Qt.resolvedUrl("../../lazerbar/icons/music.svg"),
             tintIcon: true,
             summary: stateText,

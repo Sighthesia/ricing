@@ -1,5 +1,6 @@
 import QtQuick
 import "ControlCenterLogic.js" as CcLogic
+import "../../services" as Services
 
 // B1 control-center overview: a balanced two-column surface shown inside the
 // LAUNCHER PAGE's content area, mounted by that page through one Loader.
@@ -411,11 +412,41 @@ Item {
     //
     // One call per kind through the module. Nothing in this file decides a state.
 
-    readonly property var networkCardData: CcLogic.normalizeCard("network", root.networkSnapshot)
-    readonly property var bluetoothCardData: CcLogic.normalizeCard(
-        "bluetooth", root.bluetoothSnapshot)
-    readonly property var volumeCardState: CcLogic.normalizeCard("volume", root.volumeSnapshot)
-    readonly property var mediaCardState: CcLogic.normalizeCard("media", root.mediaSnapshot)
+    // The module hands over i18n keys (it stays Qt-free), so the page is where a
+    // card's title and state line become words. A value the module derived from
+    // data - a network name, "72%" - is not a key and comes back unchanged,
+    // which is why the lookup is tolerant rather than a strict map.
+    function localizedCard(card) {
+        if (!card)
+            return card
+        var copy = {}
+        for (var name in card)
+            copy[name] = card[name]
+        copy.title = Services.Tr.q(String(card.title || ""))
+        copy.summary = root.localizedSummary(card)
+        return copy
+    }
+
+    function localizedSummary(card) {
+        var raw = String(card.summary == null ? "" : card.summary)
+        if (raw === "")
+            return ""
+        // A counted line carries `{n}`; the module hands the count over beside
+        // the key, so the plural form is chosen from the real number.
+        var count = Number(card.summaryCount)
+        if (isFinite(count) && count > 0)
+            return Services.Tr.n(raw, count)
+        return Services.Tr.q(raw)
+    }
+
+    readonly property var networkCardData: root.localizedCard(
+        CcLogic.normalizeCard("network", root.networkSnapshot))
+    readonly property var bluetoothCardData: root.localizedCard(
+        CcLogic.normalizeCard("bluetooth", root.bluetoothSnapshot))
+    readonly property var volumeCardState: root.localizedCard(
+        CcLogic.normalizeCard("volume", root.volumeSnapshot))
+    readonly property var mediaCardState: root.localizedCard(
+        CcLogic.normalizeCard("media", root.mediaSnapshot))
 
     readonly property var cardList: [root.networkCardData, root.bluetoothCardData,
         root.volumeCardState, root.mediaCardState]
@@ -475,6 +506,19 @@ Item {
     readonly property bool weatherReady: root.weatherState === "ready"
             || root.weatherState === "stale"
 
+    // The service reports a language-free condition id ("partly-cloudy"), so the
+    // wording is resolved here instead of being baked into the reading.
+    function weatherConditionLabel(condition) {
+        var id = String(condition == null ? "" : condition)
+        if (id === "" || id === "unknown")
+            return Services.Tr.q("weather.condition.unknown")
+        if (id === "partly-cloudy")
+            return Services.Tr.q("weather.condition.partlyCloudy")
+        var key = "weather.condition." + id
+        var label = Services.Tr.q(key)
+        return label === key ? id : label
+    }
+
     // How old the reading is, in the module's own compact vocabulary and against
     // the injectable clock rather than a second Date() - so the age is
     // deterministic under test and ticks with the same `now` the clock column
@@ -485,9 +529,21 @@ Item {
     // cache has nothing to date, and dating a placeholder would be the one lie
     // this header must not tell.
     readonly property string weatherAgeLabel: root.weatherReady
-            ? CcLogic.weatherAgeLabel(root.weatherSnapshot.updatedAt,
-                                      root.now.getTime())
+            ? root.localizedWeatherAge(root.weatherSnapshot.updatedAt)
             : ""
+
+    // The module reports the age as "key:count" (or a bare key for "now"), so the
+    // unit word and the plural form are chosen by the translation table instead
+    // of by a formatter written in one language.
+    function localizedWeatherAge(updatedAtMs) {
+        var raw = CcLogic.weatherAgeLabel(updatedAtMs, root.now.getTime())
+        if (raw === "")
+            return ""
+        var split = raw.indexOf(":")
+        if (split < 0)
+            return Services.Tr.q(raw)
+        return Services.Tr.n(raw.slice(0, split), Number(raw.slice(split + 1)))
+    }
 
     readonly property var batterySnapshot: {
         var service = root.batteryService
@@ -685,7 +741,9 @@ Item {
                 Text {
                     id: dateText
                     width: parent.width
-                    text: Qt.formatDate(root.now, "yyyy-MM-dd dddd")
+                    // The weekday name follows the interface language, not the
+                    // process locale, so a forced language stays consistent.
+                    text: root.now.toLocaleString(Qt.locale(Services.Tr.qtLocaleName), "yyyy-MM-dd dddd")
                     color: LazerTheme.textMuted
                     font.pixelSize: 12
                     elide: Text.ElideRight
@@ -724,9 +782,14 @@ Item {
                     id: weatherCondition
                     height: 22
                     verticalAlignment: Text.AlignVCenter
-                    text: root.weatherReady ? root.weatherSnapshot.condition
-                        : (root.weatherState === "loading" ? "Loading"
-                           : (root.weatherState === "stale" ? "Stale" : "Unavailable"))
+                    // The service reports a language-free condition id; the
+                    // wording lives in the translation table so both the header
+                    // and any future surface name it the same way.
+                    text: root.weatherReady
+                        ? root.weatherConditionLabel(root.weatherSnapshot.condition)
+                        : (root.weatherState === "loading" ? Services.Tr.q("weather.loading")
+                           : (root.weatherState === "stale" ? Services.Tr.q("weather.stale")
+                              : Services.Tr.q("weather.unavailable")))
                     color: root.weatherState === "stale"
                            ? LazerTheme.textMuted : LazerTheme.textPrimary
                     font.pixelSize: 12
@@ -930,7 +993,7 @@ Item {
                         root.claimEmbeddedTap()
                         root.setVolume(next)
                     }
-                    accessibleName: "Output volume"
+                    accessibleName: Services.Tr.q("cc.volume.output")
                 }
 
                 // Mute toggle: a square action, the card's second control. A
@@ -951,7 +1014,8 @@ Item {
                     activeFocusOnTab: enabled
                     Accessible.role: enabled ? Accessible.Button : Accessible.StaticText
                     Accessible.name: root.volumeService && root.volumeService.sinkMuted
-                                         ? "Unmute" : "Mute"
+                                         ? Services.Tr.q("cc.media.unmute")
+                                         : Services.Tr.q("cc.media.mute")
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -1054,9 +1118,11 @@ Item {
                                    ? "icons/pause.svg" : "icons/play.svg")
                                 : "icons/" + transportButton.transportId + ".svg"
                             readonly property string label: transportButton.transportId === "toggle"
-                                ? (root.mediaSnapshot.playing ? "Pause" : "Play")
+                                ? (root.mediaSnapshot.playing ? Services.Tr.q("cc.media.pause")
+                                   : Services.Tr.q("cc.media.play"))
                                 : (transportButton.transportId === "previous"
-                                   ? "Previous" : "Next")
+                                   ? Services.Tr.q("cc.media.previous")
+                                   : Services.Tr.q("cc.media.next"))
 
                             width: 26
                             height: 26
@@ -1371,7 +1437,7 @@ Item {
     // seam that lets a test walk several ages on one frozen page instead of
     // rebuilding a page per stamp.
     function weatherAgeLabelFor(updatedAtMs) {
-        return CcLogic.weatherAgeLabel(updatedAtMs, root.now.getTime())
+        return root.localizedWeatherAge(updatedAtMs)
     }
     readonly property Item weatherStateItem: weatherHost
     readonly property Item headerItem: headerHost

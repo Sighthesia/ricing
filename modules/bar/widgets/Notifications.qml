@@ -30,13 +30,15 @@ BarPill {
             try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
         }
         if (!isFinite(centerX)) centerX = 0
-        var summaryText = root.unread > 0 ? root.unread + " unread" : "No unread"
-        if (root.dnd) summaryText += " \u00B7 DND"
+        var summaryText = root.unread > 0
+            ? Services.Tr.n("cc.notifications.unread", root.unread)
+            : Services.Tr.q("cc.notifications.noUnread")
+        if (root.dnd) summaryText += " \u00B7 " + Services.Tr.q("widget.notifications.dnd")
         return {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,
             screenName: root.screenName,
-            title: "Notifications",
+            title: Services.Tr.q("widget.notifications"),
             iconSource: Qt.resolvedUrl("../../lazerbar/icons/bell.svg"),
             tintIcon: true,
             summary: summaryText,

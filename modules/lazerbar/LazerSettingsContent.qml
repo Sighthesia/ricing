@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Effects
 import "LazerSettingsLogic.js" as Logic
+import "../../services" as Services
 
 // Own the settings content chrome: search and the flat section viewport.
 Item {
@@ -267,7 +268,7 @@ Item {
             anchors.left: searchEditor.left
             anchors.verticalCenter: searchEditor.verticalCenter
             visible: !searchEditor.text && !searchEditor.activeFocus
-            text: "输入以搜索"
+            text: Services.Tr.q("settings.searchPlaceholder")
             color: LazerTheme.textMuted
             font.pixelSize: 13
         }
@@ -363,13 +364,13 @@ Item {
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "没有匹配的设置"
+                text: Services.Tr.q("settings.noMatches")
                 color: LazerTheme.textPrimary
                 font.pixelSize: 15
             }
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "尝试其他关键词"
+                text: Services.Tr.q("settings.tryOtherKeywords")
                 color: LazerTheme.textMuted
                 font.pixelSize: 12
             }

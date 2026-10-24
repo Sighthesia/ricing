@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Effects
+import "../../services" as Services
 
 // Own the launcher navigation rail using the settings-sidebar contract:
 // collapsible width, icon nav items with staggered appear, one shared accent
@@ -103,7 +104,7 @@ Rectangle {
         width: Math.max(0, root.width - 20)
         height: 26
         Accessible.role: Accessible.Button
-        Accessible.name: root.expanded ? "收起侧栏" : "展开侧栏"
+        Accessible.name: root.expanded ? Services.Tr.q("settings.collapseSidebar") : Services.Tr.q("settings.expandSidebar")
 
         scale: collapsePress.pressed ? MotionTokens.pressScale : 1
         Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }

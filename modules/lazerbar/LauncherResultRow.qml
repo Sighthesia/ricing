@@ -1,5 +1,6 @@
 import QtQuick
 import "../../services/LauncherLogic.js" as LauncherLogic
+import "../../services" as Services
 
 // Present one launcher result as a notification-like card: 6px rounded
 // settingsCard surface with a 40px icon rail, colorful enlarged icon,
@@ -96,13 +97,24 @@ Item {
     // in-place metadata merges repaint the row without rebuilding it.
     property int metaStamp: 0
 
+    // Row text is resolved through the translation table, so a data source may
+    // hand over an i18n key instead of a sentence (the built-in shell commands
+    // do exactly that). A real name is returned untouched: an unknown key comes
+    // back as itself, so an app whose name merely looks like a key still renders
+    // its own name rather than disappearing.
+    function localized(value) {
+        if (value == null)
+            return ""
+        var text = String(value)
+        return text === "" ? "" : Services.Tr.q(text)
+    }
     readonly property string displayName: {
         metaStamp
-        return result && result.displayName != null ? String(result.displayName) : ""
+        return result && result.displayName != null ? root.localized(result.displayName) : ""
     }
     readonly property string descriptionText: {
         metaStamp
-        return result && result.description != null ? String(result.description) : ""
+        return result && result.description != null ? root.localized(result.description) : ""
     }
 
     readonly property real rowHeight: 64

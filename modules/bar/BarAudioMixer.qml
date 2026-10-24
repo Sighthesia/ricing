@@ -1,5 +1,6 @@
 import QtQuick
 import "../lazerbar"
+import "../../services" as Services
 
 // Per-application mixer for the volume panel: one row per playback stream with
 // its own level, mute and output route.
@@ -73,15 +74,16 @@ Item {
 
     function headerTitle() {
         if (!routeMode)
-            return "Applications"
+            return Services.Tr.q("popup.audio.applications")
         var name = typeof root.appNameOf === "function" ? root.appNameOf(routeTarget) : ""
-        return name === "" ? "Output" : "Output for " + name
+        return name === "" ? Services.Tr.q("popup.audio.output")
+                           : Services.Tr.q("popup.audio.outputFor", { name: name })
     }
 
     function emptyLabel() {
         if (routeMode)
-            return "No output devices"
-        return "Nothing is playing"
+            return Services.Tr.q("popup.audio.noOutputDevices")
+        return Services.Tr.q("popup.audio.nothingPlaying")
     }
 
     // Route label for one stream; empty means the route has not been read yet,
@@ -549,9 +551,9 @@ Item {
                 horizontalAlignment: Text.AlignRight
                 text: {
                     if (pickerRow.isCurrent)
-                        return "Current"
+                        return Services.Tr.q("popup.audio.current")
                     if (pickerRow.isDefault)
-                        return "System default"
+                        return Services.Tr.q("popup.audio.systemDefault")
                     return ""
                 }
                 color: pickerRow.isCurrent ? LazerTheme.settingsAccent : LazerTheme.textMuted

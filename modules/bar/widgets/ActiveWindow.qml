@@ -20,7 +20,7 @@ Item {
     readonly property bool showIcon: widgetSettings ? widgetSettings.showIcon !== false : true
     readonly property int maxTitleWidth: widgetSettings && widgetSettings.maxTitleWidth ? widgetSettings.maxTitleWidth : 200
     readonly property int maxWidth: widgetSettings && widgetSettings.maxWidth ? widgetSettings.maxWidth : 240
-    readonly property string desktopLabel: widgetSettings && widgetSettings.desktopLabel && String(widgetSettings.desktopLabel).length > 0 ? String(widgetSettings.desktopLabel) : "桌面"
+    readonly property string desktopLabel: widgetSettings && widgetSettings.desktopLabel && String(widgetSettings.desktopLabel).length > 0 ? String(widgetSettings.desktopLabel) : Services.Tr.q("widget.activeWindow.desktop")
     readonly property string displayTitle:
         Services.NiriService.activeTitle.length > 0 ? Services.NiriService.activeTitle : root.desktopLabel
     readonly property string activeAppId: Services.NiriService.activeAppId

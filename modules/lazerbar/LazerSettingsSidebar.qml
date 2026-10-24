@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Effects
 import "LazerSettingsLogic.js" as Logic
+import "../../services" as Services
 
 // Own the settings sidebar rail: collapse toggle, staggered nav, back entry.
 Item {
@@ -13,7 +14,7 @@ Item {
     property int selectedIndex: 0
     // Per-category search availability; an emptied category never highlights.
     property var categoryAvailable: [true, true, true]
-    property var labels: ["外观", "顶部栏", "通知"]
+    property var labels: [Services.Tr.q("settings.appearance"), Services.Tr.q("settings.bar"), Services.Tr.q("settings.notifications")]
     property var icons: ["icons/settings.svg", "icons/podium.svg", "icons/bell.svg"]
     readonly property bool showLabels: root.expanded && root.width >= Logic.sidebarContractedWidth + 60
     readonly property bool selectedAvailable: root.indexAvailable(root.selectedIndex)
@@ -110,7 +111,7 @@ Item {
         enabled: root.interactive
         activeFocusOnTab: root.interactive
         Accessible.role: Accessible.Button
-        Accessible.name: root.expanded ? "收起侧栏" : "展开侧栏"
+        Accessible.name: root.expanded ? Services.Tr.q("settings.collapseSidebar") : Services.Tr.q("settings.expandSidebar")
         readonly property bool flashActive: collapseFlashAnimation.running || collapseFlashOverlay.opacity > 0
         readonly property Item flashOverlayItem: collapseFlashOverlay
         readonly property Animation flashAnimationItem: collapseFlashAnimation
@@ -268,7 +269,7 @@ Item {
         enabled: root.interactive
         activeFocusOnTab: root.interactive
         Accessible.role: Accessible.Button
-        Accessible.name: "返回"
+        Accessible.name: Services.Tr.q("settings.back")
         readonly property bool flashActive: backFlashAnimation.running || backFlashOverlay.opacity > 0
         readonly property Item flashOverlayItem: backFlashOverlay
         readonly property Animation flashAnimationItem: backFlashAnimation

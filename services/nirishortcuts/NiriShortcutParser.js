@@ -124,9 +124,12 @@ function _extractActionSummary(actionBody) {
     return firstStatement
 }
 
+// No wording here: the parser stays language-free so its output is stable
+// data, and the shell names an unnamed action at render time (see
+// NiriShortcutService).
 function _prettyActionLabel(actionSummary) {
     if (!actionSummary)
-        return "未命名快捷键"
+        return ""
 
     return actionSummary.replace(/[-_]/g, " ")
 }

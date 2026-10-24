@@ -5,6 +5,7 @@ import Quickshell.Services.SystemTray
 import ".."
 import "../../lazerbar"
 import "TraySlotLogic.js" as SlotLogic
+import "../../services" as Services
 
 // StatusNotifier tray icons with activate and secondary actions.
 //
@@ -120,8 +121,8 @@ Item {
     }
 
     function labelFor(item) {
-        if (!item) return "Tray item"
-        return item.title || item.tooltipTitle || item.id || "Tray item"
+        if (!item) return Services.Tr.q("tray.item")
+        return item.title || item.tooltipTitle || item.id || Services.Tr.q("tray.item")
     }
 
     function slotIndexFor(key) {
@@ -252,7 +253,7 @@ Item {
             try { centerX = delegateItem.mapToItem(root, delegateItem.width / 2, 0).x + root.mapToGlobal(0, 0).x } catch (e2) { centerX = 0 }
         }
         if (!isFinite(centerX)) centerX = 0
-        var titleText = (delegateItem && delegateItem.label) ? delegateItem.label : (modelData.title || modelData.tooltipTitle || modelData.id || "Tray item")
+        var titleText = (delegateItem && delegateItem.label) ? delegateItem.label : (modelData.title || modelData.tooltipTitle || modelData.id || Services.Tr.q("tray.item"))
         // Tray delegates share widgetId/instanceKey, so the host tells icons
         // apart by this key. It must be the slot key: an item's own `id` is not
         // unique across registered items, and a collision here makes the popup

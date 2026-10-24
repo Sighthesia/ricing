@@ -15,7 +15,7 @@ Item {
     property var settingsObject: null
     property var saveCallback: null
 
-    readonly property bool matchesSearch: Logic.matchesSearch("配色方案", "配色方案预设 scheme preset", searchQuery)
+    readonly property bool matchesSearch: Logic.matchesSearch(Services.Tr.q("settings.presetScheme"), "preset scheme 配色", searchQuery)
     readonly property bool searchVisible: matchesSearch
     readonly property bool searchHidden: Logic.normalizeSearchQuery(searchQuery).length > 0 && !matchesSearch
     // The preset only paints while wallpaper adaptation is off.
@@ -60,7 +60,7 @@ Item {
         anchors.leftMargin: 12
         anchors.top: parent.top
         anchors.topMargin: 10
-        text: "配色方案"
+        text: Services.Tr.q("settings.presetScheme")
         color: LazerTheme.textMuted
         font.pixelSize: 11
     }
@@ -71,7 +71,7 @@ Item {
         anchors.leftMargin: 12
         anchors.top: titleText.bottom
         anchors.topMargin: 2
-        text: root.presetActive ? "" : "关闭「壁纸主题色」后生效"
+        text: root.presetActive ? "" : Services.Tr.q("settings.presetScheme.blocked")
         color: LazerTheme.textMuted
         font.pixelSize: 10
         opacity: 0.85

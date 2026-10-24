@@ -1,5 +1,6 @@
 import QtQuick
 import "../../lazerbar"
+import "../../../services" as Services
 import "../../../services/WidgetSettingsRegistry.js" as WidgetSettingsRegistry
 
 // Two-line clock driven by the clock widget's registry defaults. The time
@@ -38,7 +39,10 @@ Item {
     }
     property date now: new Date()
     readonly property string timeText: Qt.formatTime(root.now, root.timeFormat)
-    readonly property string dateText: Qt.formatDate(root.now, root.dateFormat)
+    // A user format may name the weekday ("dddd"), so the locale is the
+    // interface language rather than whatever the process inherited.
+    readonly property string dateText: root.now.toLocaleString(
+        Qt.locale(Services.Tr.qtLocaleName), root.dateFormat)
     // Rolling strips only model HH:mm[:ss]; fall back to static text for
     // exotic formats, otherwise show the seconds pair when configured.
     readonly property bool useRollingDigits: root.timeFormat === "HH:mm" || root.timeFormat === "hh:mm"
@@ -55,7 +59,7 @@ Item {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,
             screenName: root.screenName,
-            title: "Calendar",
+            title: Services.Tr.q("widget.calendar"),
             iconSource: Qt.resolvedUrl("../../lazerbar/icons/clock.svg"),
             tintIcon: true,
             summary: root.dateText,

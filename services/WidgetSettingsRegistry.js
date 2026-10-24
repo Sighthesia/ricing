@@ -2,7 +2,7 @@
 
 var _definitions = {
     "active-window": {
-        title: "Active Window Settings",
+        title: "widgetSettings.activeWindow",
         settingsKey: "activeWindow",
         panelKey: "active-window",
         defaults: {
@@ -13,7 +13,7 @@ var _definitions = {
         },
     },
     "clock": {
-        title: "Clock Settings",
+        title: "widgetSettings.clock",
         settingsKey: "clock",
         panelKey: "clock",
         defaults: {
@@ -23,7 +23,7 @@ var _definitions = {
         },
     },
     "battery": {
-        title: "Battery Settings",
+        title: "widgetSettings.battery",
         panelKey: "battery",
         instanceScoped: true,
         defaults: {
@@ -32,7 +32,7 @@ var _definitions = {
         },
     },
     "system-monitor": {
-        title: "System Monitor Settings",
+        title: "widgetSettings.systemMonitor",
         panelKey: "system-monitor",
         instanceScoped: true,
         defaults: {
@@ -43,7 +43,7 @@ var _definitions = {
         },
     },
     "media": {
-        title: "Media Settings",
+        title: "widgetSettings.media",
         panelKey: "media",
         instanceScoped: true,
         defaults: {
@@ -59,19 +59,19 @@ var _definitions = {
         },
     },
     "bluetooth": {
-        title: "Bluetooth Settings",
+        title: "widgetSettings.bluetooth",
         panelKey: "bluetooth",
         instanceScoped: true,
         defaults: {},
     },
     "network": {
-        title: "Network Settings",
+        title: "widgetSettings.network",
         panelKey: "network",
         instanceScoped: true,
         defaults: {},
     },
     "volume": {
-        title: "Volume Settings",
+        title: "widgetSettings.volume",
         panelKey: "volume",
         instanceScoped: true,
         defaults: {},

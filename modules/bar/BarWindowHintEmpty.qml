@@ -1,6 +1,7 @@
 import QtQuick
 import "../lazerbar"
 import "./WindowHintMenuLogic.js" as HintLogic
+import "../../services" as Services
 
 // The placeholder a column shows when its workspace has no windows.
 //
@@ -48,7 +49,7 @@ Item {
         objectName: "windowHintEmptySlotLabel"
         anchors.centerIn: parent
         width: parent.width - 16
-        text: HintLogic.NEIGHBOUR_EMPTY_LABEL
+        text: Services.Tr.q(HintLogic.NEIGHBOUR_EMPTY_LABEL)
         color: LazerTheme.textMuted
         font.pixelSize: 10
         horizontalAlignment: Text.AlignHCenter

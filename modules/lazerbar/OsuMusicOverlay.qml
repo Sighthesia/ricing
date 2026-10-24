@@ -1,9 +1,10 @@
 import QtQuick
+import "../../services" as Services
 
 // Present fixed music metadata and controls with an interruptible reveal.
 Item {
     id: root
-    property string titleText: "暂无播放内容"
+    property string titleText: Services.Tr.q("media.nothingPlaying")
     property string artistText: ""
     property bool playing: false
     property real progress: 0
@@ -79,7 +80,7 @@ Item {
             anchors.right: parent.right
             anchors.topMargin: 13
             spacing: 2
-            Text { width: parent.width - 28; anchors.horizontalCenter: parent.horizontalCenter; text: root.titleText || "暂无播放内容"; color: "white"; font.pixelSize: 16; font.bold: true; elide: Text.ElideRight }
+            Text { width: parent.width - 28; anchors.horizontalCenter: parent.horizontalCenter; text: root.titleText || Services.Tr.q("media.nothingPlaying"); color: "white"; font.pixelSize: 16; font.bold: true; elide: Text.ElideRight }
             Text { width: parent.width - 28; anchors.horizontalCenter: parent.horizontalCenter; text: root.artistText; color: LazerTheme.musicMuted; font.pixelSize: 12; elide: Text.ElideRight }
         }
 
@@ -89,11 +90,11 @@ Item {
             anchors.bottom: progressTrack.top
             anchors.bottomMargin: 13
             spacing: 12
-            MusicControlButton { id: shuffleButton; iconSource: "icons/shuffle.svg"; accessibleName: "Shuffle"; active: root.shuffleActive; onClicked: { root.shuffleActive = !root.shuffleActive; root.shuffleRequested(root.shuffleActive) } KeyNavigation.right: previousButton }
-            MusicControlButton { id: previousButton; iconSource: "icons/previous.svg"; accessibleName: "Previous"; enabled: root.canGoPrevious; onClicked: root.previousRequested(); KeyNavigation.left: shuffleButton; KeyNavigation.right: playButton }
-            MusicControlButton { id: playButton; iconSource: root.playing ? "icons/pause.svg" : "icons/play.svg"; accessibleName: root.playing ? "Pause" : "Play"; outlined: true; enabled: root.canTogglePlayback; onClicked: root.playPauseRequested(); KeyNavigation.left: previousButton; KeyNavigation.right: nextButton }
-            MusicControlButton { id: nextButton; iconSource: "icons/next.svg"; accessibleName: "Next"; enabled: root.canGoNext; onClicked: root.nextRequested(); KeyNavigation.left: playButton; KeyNavigation.right: playlistButton }
-            MusicControlButton { id: playlistButton; iconSource: "icons/playlist.svg"; accessibleName: "Playlist"; onClicked: root.playlistRequested(); KeyNavigation.left: nextButton }
+            MusicControlButton { id: shuffleButton; iconSource: "icons/shuffle.svg"; accessibleName: Services.Tr.q("media.shuffle"); active: root.shuffleActive; onClicked: { root.shuffleActive = !root.shuffleActive; root.shuffleRequested(root.shuffleActive) } KeyNavigation.right: previousButton }
+            MusicControlButton { id: previousButton; iconSource: "icons/previous.svg"; accessibleName: Services.Tr.q("cc.media.previous"); enabled: root.canGoPrevious; onClicked: root.previousRequested(); KeyNavigation.left: shuffleButton; KeyNavigation.right: playButton }
+            MusicControlButton { id: playButton; iconSource: root.playing ? "icons/pause.svg" : "icons/play.svg"; accessibleName: root.playing ? Services.Tr.q("cc.media.pause") : Services.Tr.q("cc.media.play"); outlined: true; enabled: root.canTogglePlayback; onClicked: root.playPauseRequested(); KeyNavigation.left: previousButton; KeyNavigation.right: nextButton }
+            MusicControlButton { id: nextButton; iconSource: "icons/next.svg"; accessibleName: Services.Tr.q("cc.media.next"); enabled: root.canGoNext; onClicked: root.nextRequested(); KeyNavigation.left: playButton; KeyNavigation.right: playlistButton }
+            MusicControlButton { id: playlistButton; iconSource: "icons/playlist.svg"; accessibleName: Services.Tr.q("media.playlist"); onClicked: root.playlistRequested(); KeyNavigation.left: nextButton }
         }
 
         Rectangle {

@@ -41,7 +41,8 @@ BarPill {
         }
         if (!isFinite(centerX)) centerX = 0
         var percentText = Math.round(root.level * 100) + "%"
-        var levelText = root.muted ? "Muted \u00B7 " + percentText : percentText
+        var levelText = root.muted
+            ? Services.Tr.q("widget.volume.muted", { level: percentText }) : percentText
         // Device first when it is known: that is the fact the popup is about to
         // let the user change, and the percentage is already on the bar itself.
         var summaryText = root.deviceLabel !== "" ? root.deviceLabel + " \u00B7 " + levelText : levelText
@@ -49,7 +50,7 @@ BarPill {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,
             screenName: root.screenName,
-            title: "Volume",
+            title: Services.Tr.q("widget.volume"),
             iconSource: Qt.resolvedUrl("../icons/volume.svg"),
             tintIcon: true,
             summary: summaryText,

@@ -5,11 +5,14 @@
 // absent because the surface is already locked, and reboot is not part of the
 // row; SessionService still knows both ids, so neither capability is removed
 // from the service.
+//
+// `label` is an i18n KEY (this module is Qt-free); the row resolves it through
+// Services.Tr so the spoken name and the status copy share one wording.
 function actions() {
     return [
-        { id: "suspend", label: "Suspend", requiresConfirmation: true, icon: "suspend" },
-        { id: "shutdown", label: "Shut down", requiresConfirmation: true, icon: "power" },
-        { id: "logout", label: "Log out", requiresConfirmation: true, icon: "logout" }
+        { id: "suspend", label: "lock.action.suspend", requiresConfirmation: true, icon: "suspend" },
+        { id: "shutdown", label: "lock.action.shutdown", requiresConfirmation: true, icon: "power" },
+        { id: "logout", label: "lock.action.logout", requiresConfirmation: true, icon: "logout" }
     ]
 }
 
@@ -49,12 +52,17 @@ function canTrigger(actionId, available, running) {
 
 // One status line explains the row: a failure first, then the armed
 // confirmation, then whatever the service reported last.
+// The status line as an i18n KEY (plus the action key inside it), or the
+// caller's own already-resolved text: a failure and a result message arrive as
+// words, while the armed-confirmation line has to be composed here.
 function statusMessage(pendingAction, errorText, resultText) {
     if (errorText)
         return String(errorText)
     if (pendingAction) {
         var action = actionFor(pendingAction)
-        return action ? "Confirm " + action.label + "?" : "Select again to confirm"
+        return action
+            ? { key: "lock.confirm", action: action.label }
+            : { key: "lock.confirmAgain" }
     }
     return String(resultText || "")
 }

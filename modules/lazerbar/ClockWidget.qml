@@ -1,5 +1,6 @@
 import QtQuick
 import "LazerBarLogic.js" as Logic
+import "../../services" as Services
 
 // Show local time and real Linux system uptime.
 Item {
@@ -8,13 +9,15 @@ Item {
     property string testUptimeText: ""
     property bool enableSystemUptime: true
     property string currentTimeText: "00:00:00"
-    property string uptimeText: "已运行 --:--:--"
+    property string uptimeText: Services.Tr.q("clock.uptime.unknown")
     implicitWidth: content.implicitWidth
     implicitHeight: 34
 
     function applyUptime(text) {
         var seconds = Logic.parseUptime(text)
-        uptimeText = seconds >= 0 ? "已运行 " + Logic.formatDuration(seconds) : "已运行 --:--:--"
+        uptimeText = seconds >= 0
+            ? Services.Tr.q("clock.uptime", { duration: Logic.formatDuration(seconds) })
+            : Services.Tr.q("clock.uptime.unknown")
     }
     function refresh() {
         currentTimeText = Qt.formatTime(new Date(), "hh:mm:ss")

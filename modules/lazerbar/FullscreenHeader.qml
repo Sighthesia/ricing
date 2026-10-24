@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Effects
+import "../../services" as Services
 
 // Band 1 of the overlay's three-block stack: the identity masthead.
 //
@@ -92,6 +93,8 @@ Rectangle {
             enabled: !MotionTokens.reducedMotion
             NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
         }
+        Accessible.role: Accessible.Button
+        Accessible.name: Services.Tr.q("common.close")
         Text { anchors.centerIn: parent; text: "x"; color: LazerTheme.textMuted; font.pixelSize: 14 }
         HoverHandler { id: closeHover }
         TapHandler { id: closePress; onTapped: root.closeRequested() }

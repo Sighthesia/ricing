@@ -1,5 +1,6 @@
 import QtQuick
 import "ControlCenterLogic.js" as CcLogic
+import "../../services" as Services
 
 // Same-surface Bluetooth detail page: a sub-page of the control-center route,
 // not a sibling Wave route.
@@ -41,8 +42,8 @@ Item {
     readonly property string detailRoute: CcLogic.detailRoutes.bluetooth
 
     // Host chrome for this sub-page, in the same shape the overview publishes.
-    readonly property string title: "Bluetooth"
-    readonly property string description: "Devices and adapter"
+    readonly property string title: Services.Tr.q("cc.bluetooth.title")
+    readonly property string description: Services.Tr.q("cc.bluetooth.description")
     readonly property var sectionEntries: []
     readonly property string activeSectionId: ""
 
@@ -114,20 +115,20 @@ Item {
                         : (root.deviceList.length === 0 ? "empty" : "ready")))))
     readonly property string stateLabel: {
         if (!root.serviceAvailable)
-            return "Bluetooth service unavailable"
+            return Services.Tr.q("cc.bluetooth.unavailable")
         if (!root.adapterAvailable)
-            return "No Bluetooth adapter"
+            return Services.Tr.q("cc.bluetooth.noAdapterLong")
         if (root.blocked)
-            return "Blocked by rfkill"
+            return Services.Tr.q("cc.bluetooth.blocked")
         if (!root.enabled)
-            return "Bluetooth is off"
+            return Services.Tr.q("cc.bluetooth.off")
         if (root.scanningActive)
-            return "Scanning…"
+            return Services.Tr.q("cc.bluetooth.scanning")
         if (root.deviceList.length === 0)
-            return "No devices"
+            return Services.Tr.q("cc.card.noDevices")
         return root.connectedCount > 0
-            ? root.connectedCount + " connected"
-            : root.deviceList.length + " devices"
+            ? Services.Tr.n("cc.bluetooth.connectedCount", root.connectedCount)
+            : Services.Tr.n("cc.bluetooth.deviceCount", root.deviceList.length)
     }
 
     // --- Devices ---
@@ -253,9 +254,9 @@ Item {
     }
 
     readonly property var actionLabels: ({
-        "pair": "Pair",
-        "connect": "Connect",
-        "disconnect": "Disconnect",
+        "pair": Services.Tr.q("cc.bluetooth.pair"),
+        "connect": Services.Tr.q("common.connect"),
+        "disconnect": Services.Tr.q("common.disconnect"),
         "none": ""
     })
 
@@ -426,8 +427,9 @@ Item {
                     anchors.right: scanButton.left
                     anchors.rightMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.blocked ? "Blocked by rfkill"
-                        : (root.adapterAvailable ? "Bluetooth" : "No adapter")
+                    text: root.blocked ? Services.Tr.q("cc.bluetooth.blocked")
+                        : (root.adapterAvailable ? Services.Tr.q("cc.bluetooth.title")
+                           : Services.Tr.q("cc.bluetooth.noAdapter"))
                     color: LazerTheme.textPrimary
                     font.pixelSize: 13
                     elide: Text.ElideRight
@@ -450,7 +452,8 @@ Item {
                     activeFocusOnTab: enabled
                     Accessible.role: enabled ? Accessible.Button : Accessible.StaticText
                     Accessible.name: root.scanningActive
-                        ? "Scanning" : "Scan for devices"
+                        ? Services.Tr.q("cc.bluetooth.scanningA11y")
+                        : Services.Tr.q("cc.bluetooth.scanForDevices")
 
                     // The one activation path, so a key press, a click and a probe
                     // cannot diverge.
@@ -464,7 +467,9 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: root.scanningActive ? "Scanning…" : "Scan"
+                        text: root.scanningActive
+                              ? Services.Tr.q("cc.bluetooth.scanning")
+                              : Services.Tr.q("cc.bluetooth.scan")
                         color: root.scanningActive ? LazerTheme.settingsAccent
                                                   : LazerTheme.textPrimary
                         font.pixelSize: 11
@@ -494,7 +499,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     checked: root.enabled
                     enabled: root.powerAvailable
-                    accessibleName: "Bluetooth"
+                    accessibleName: Services.Tr.q("cc.bluetooth.title")
                     onToggled: function (value) { root.setBluetoothEnabled(value) }
                 }
 
@@ -547,7 +552,7 @@ Item {
                         id: deviceHeaderTitle
                         x: deviceHeaderBar.width + 6
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Devices"
+                        text: Services.Tr.q("cc.bluetooth.devices")
                         color: LazerTheme.textPrimary
                         font.pixelSize: 13
                         font.weight: Font.DemiBold
@@ -578,10 +583,11 @@ Item {
                         verticalAlignment: Text.AlignVCenter
                         text: root.serviceAvailable
                             ? (root.adapterAvailable
-                               ? (root.enabled ? CcLogic.emptyLabels.bluetooth
-                                  : "Bluetooth is off")
-                               : "No Bluetooth adapter")
-                            : "No Bluetooth service"
+                               ? (root.enabled
+                                  ? Services.Tr.q(CcLogic.emptyLabels.bluetooth)
+                                  : Services.Tr.q("cc.bluetooth.off"))
+                               : Services.Tr.q("cc.bluetooth.noAdapterLong"))
+                            : Services.Tr.q("cc.bluetooth.noService")
                         color: LazerTheme.textMuted
                         font.pixelSize: 12
                         visible: root.deviceCount === 0
@@ -813,8 +819,7 @@ Item {
                                         activeFocusOnTab: enabled
                                         Accessible.role: enabled ? Accessible.Button
                                                                  : Accessible.StaticText
-                                        Accessible.name: "Forget "
-                                            + deviceRow.rowLabel
+                                        Accessible.name: Services.Tr.q("cc.bluetooth.forget", { name: deviceRow.rowLabel })
 
                                         function activate() {
                                             if (!forgetTarget.enabled)

@@ -1,4 +1,5 @@
 import QtQuick
+import "../../services" as Services
 
 // Group system controls with the game-mode selector.
 Item {
@@ -17,12 +18,12 @@ Item {
         OsuTopBarButton {
             id: settingsButton
             iconSource: "icons/settings.svg"
-            titleText: "设置"
-            subtitleText: "个性化 Afloat"
+            titleText: Services.Tr.q("sidebar.settings")
+            subtitleText: Services.Tr.q("sidebar.settings.subtitle")
             isActive: root.settingsActive
             onClicked: root.settingsRequested()
         }
-        IconButton { source: "icons/home.svg"; accessibleName: "Home" }
+        IconButton { source: "icons/home.svg"; accessibleName: Services.Tr.q("sidebar.home") }
         Rectangle { width: 1; height: 22; anchors.verticalCenter: parent.verticalCenter; color: LazerTheme.divider }
         ModeSelector {
             id: modes

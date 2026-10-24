@@ -2,6 +2,7 @@ import QtQuick
 import "../../services/launcher"
 import "../../services/LauncherLogic.js" as LauncherLogic
 import "../../services/launcher/LauncherCategories.js" as LauncherCategories
+import "../../services" as Services
 
 // Keyboard-first launcher content page for the wave surface: auto-focused
 // search rail, mode sidebar data with prefix rewriting, service-driven result
@@ -81,7 +82,7 @@ Item {
     }
 
     // Data surfaced to the wave shell's three-block chrome.
-    readonly property string title: "Launcher"
+    readonly property string title: Services.Tr.q("launcher.title")
     // The masthead's subtitle line, which only the rail layout has room to
     // mean anything in. Under "blocks" it is empty: band 2 already names the
     // mode twice, and a mode's description sitting under the launcher's own
@@ -105,9 +106,9 @@ Item {
     // deliberate: they share one accent indicator, and the hairline is what
     // tells them apart.
     readonly property var sectionEntries: [
-        { id: "apps", label: "Apps", icon: "icons/apps.svg" },
-        { id: "clipboard", label: "Clipboard", icon: "icons/clipboard.svg" },
-        { id: "shortcuts", label: "Shortcuts", icon: "icons/keyboard.svg" },
+        { id: "apps", label: Services.Tr.q("launcher.apps"), icon: "icons/apps.svg" },
+        { id: "clipboard", label: Services.Tr.q("launcher.clipboard"), icon: "icons/clipboard.svg" },
+        { id: "shortcuts", label: Services.Tr.q("launcher.shortcuts"), icon: "icons/keyboard.svg" },
         // Temporarily hidden: control center launcher entry.
 // { id: "control-center", label: "Control Center", icon: "icons/control-center.svg", section: "footer" }
     ]
@@ -391,10 +392,10 @@ Item {
 
     function modeDescription(mode) {
         if (mode === "clipboard")
-            return "Search clipboard history"
+            return Services.Tr.q("launcher.searchClipboard")
         if (mode === "shortcuts")
-            return "Search keybinds"
-        return "Search applications"
+            return Services.Tr.q("launcher.searchKeybinds")
+        return Services.Tr.q("launcher.searchApplications")
     }
 
     // The chrome's contract entry point: the surface asks this, never the mode
@@ -1068,7 +1069,7 @@ Item {
                 anchors.left: editor.left
                 anchors.verticalCenter: editor.verticalCenter
                 visible: !editor.text && !editor.activeFocus
-                text: "Search..."
+                text: Services.Tr.q("launcher.placeholder")
                 color: LazerTheme.textMuted
                 font.pixelSize: 14
             }
@@ -2074,7 +2075,7 @@ Item {
             Text {
                 objectName: "launcherLoadingText"
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "Searching…"
+                text: Services.Tr.q("common.searching")
                 color: LazerTheme.textMuted
                 font.pixelSize: 14
             }
@@ -2092,7 +2093,9 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             // An empty lens and an empty query are different failures: name
             // the half of the filter that came up dry.
-            text: root.activeCategory.length > 0 ? "No results in this category" : "No results"
+            text: root.activeCategory.length > 0
+                ? Services.Tr.q("launcher.noResultsCategory")
+                : Services.Tr.q("launcher.noResults")
             color: LazerTheme.textMuted
             font.pixelSize: 14
         }
@@ -2135,7 +2138,7 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: "Retry"
+                    text: Services.Tr.q("common.retry")
                     color: LazerTheme.textPrimary
                     font.pixelSize: 13
                 }

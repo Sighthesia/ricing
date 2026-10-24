@@ -1,5 +1,6 @@
 import QtQuick
 import "../lazerbar"
+import "../../services" as Services
 
 // Settings-panel slider row, optionally followed by a mute toggle row.
 Item {
@@ -60,7 +61,7 @@ Item {
         y: sliderRow.height
         visible: root.showMute
         height: root.showMute ? implicitHeight + listGap : 0
-        labelText: "Mute"
+        labelText: Services.Tr.q("popup.audio.mute")
         currentValue: root.effectiveMuted
 
         LazerSettingsToggle {

@@ -1,4 +1,5 @@
 import QtQuick
+import "../../services" as Services
 
 // Category lens for the launcher: one chip per category of the active mode
 // plus the unfiltered "All" chip, ordered by the mode taxonomy. It sits
@@ -102,7 +103,7 @@ Item {
                     required property int index
                     required property var modelData
                     height: rail.height
-                    label: modelData.label
+                    label: Services.Tr.q(String(modelData.label))
                     count: modelData.count
                     selected: root.selected === modelData.id
                     onActivated: root.chipSelected(modelData.id)

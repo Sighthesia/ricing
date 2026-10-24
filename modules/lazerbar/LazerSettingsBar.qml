@@ -1,4 +1,5 @@
 import QtQuick
+import "../../services" as Services
 
 // Present the supported top-bar settings as one flat section block.
 LazerSettingsSection {
@@ -7,7 +8,7 @@ LazerSettingsSection {
     property var saveCallback: null
     property var defaults: ({})
     property var resetCallback: null
-    title: "顶部栏"
+    title: Services.Tr.q("settings.bar")
 
     property alias heightSlider: heightSliderControl
     property alias positionChoice: positionChoiceControl
@@ -39,7 +40,7 @@ LazerSettingsSection {
         id: heightRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "顶部栏高度"; descriptionText: "范围 40 到 64 像素"
+        labelText: Services.Tr.q("settings.bar.height"); descriptionText: Services.Tr.q("settings.bar.height.description")
         defaultValue: root.defaultOf("height")
         currentValue: root.settingsObject ? root.settingsObject.height : null
         resetCallback: function() { root.resetKey("height") }
@@ -49,17 +50,17 @@ LazerSettingsSection {
         id: positionRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "栏位置"
+        labelText: Services.Tr.q("settings.bar.position")
         defaultValue: root.defaultOf("position")
         currentValue: positionChoiceControl.currentValue
         resetCallback: function() { root.resetKey("position") }
-        LazerSettingsChoice { id: positionChoiceControl; model: [{ value: "top", label: "顶部" }, { value: "bottom", label: "底部" }]; currentValue: root.normalizePosition(root.settingsObject ? root.settingsObject.position : "top"); onValueSelected: function(value) { if (root.settingsObject && (value === "top" || value === "bottom")) { root.settingsObject.position = value; root.save() } } }
+        LazerSettingsChoice { id: positionChoiceControl; model: [{ value: "top", label: Services.Tr.q("settings.bar.position.top") }, { value: "bottom", label: Services.Tr.q("settings.bar.position.bottom") }]; currentValue: root.normalizePosition(root.settingsObject ? root.settingsObject.position : "top"); onValueSelected: function(value) { if (root.settingsObject && (value === "top" || value === "bottom")) { root.settingsObject.position = value; root.save() } } }
     }
     LazerSettingsRow {
         id: floatingRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "浮动模式"
+        labelText: Services.Tr.q("settings.bar.floating")
         defaultValue: root.defaultOf("floating")
         currentValue: root.settingsObject ? root.settingsObject.floating : null
         resetCallback: function() { root.resetKey("floating") }
@@ -69,7 +70,7 @@ LazerSettingsSection {
         id: floatingMarginRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        enabled: root.settingsObject ? root.settingsObject.floating : false; labelText: "浮动边距"; descriptionText: "范围 0 到 24 像素"
+        enabled: root.settingsObject ? root.settingsObject.floating : false; labelText: Services.Tr.q("settings.bar.floatingMargin"); descriptionText: Services.Tr.q("settings.bar.floatingMargin.description")
         defaultValue: root.defaultOf("floatingMargin")
         currentValue: root.settingsObject ? root.settingsObject.floatingMargin : null
         resetCallback: function() { root.resetKey("floatingMargin") }
@@ -79,7 +80,7 @@ LazerSettingsSection {
         id: cornerRadiusRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "圆角半径"; descriptionText: "范围 0 到 24 像素"
+        labelText: Services.Tr.q("settings.bar.cornerRadius"); descriptionText: Services.Tr.q("settings.bar.cornerRadius.description")
         defaultValue: root.defaultOf("cornerRadius")
         currentValue: root.settingsObject ? root.settingsObject.cornerRadius : null
         resetCallback: function() { root.resetKey("cornerRadius") }
@@ -89,7 +90,7 @@ LazerSettingsSection {
         id: autoHideFullscreenRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "全屏时自动隐藏"; descriptionText: "窗口全屏时收起顶部栏，鼠标移回边缘唤出"
+        labelText: Services.Tr.q("settings.bar.autoHideFullscreen"); descriptionText: Services.Tr.q("settings.bar.autoHideFullscreen.description")
         defaultValue: root.defaultOf("autoHideFullscreen")
         currentValue: root.settingsObject ? root.settingsObject.autoHideFullscreen : null
         resetCallback: function() { root.resetKey("autoHideFullscreen") }

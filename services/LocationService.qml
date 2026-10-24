@@ -56,7 +56,7 @@ QtObject {
         xhr.timeout = 12000
         xhr.ontimeout = function () {
             root.isGeocoding = false
-            root._fail("城市解析超时，检查网络后重试")
+            root._fail(Services.Tr.q("location.timeout"))
         }
         xhr.onreadystatechange = function () {
             if (xhr.readyState !== XMLHttpRequest.DONE)
@@ -77,17 +77,18 @@ QtObject {
                                 + (first.country ? ", " + first.country : "")
                             Services.SettingsService.save()
                             var times = SolarCalc.sunTimesForDate(new Date(), lat, lon)
-                            Services.TransientMessageService.announce("已定位到 " + root.displayName,
-                                "日出 " + times.sunrise + " · 日落 " + times.sunset)
+                            Services.TransientMessageService.announce(
+                                Services.Tr.q("location.found", { city: root.displayName }),
+                                Services.Tr.q("location.sunTimes", { sunrise: times.sunrise, sunset: times.sunset }))
                             return
                         }
                     }
-                    root._fail("未找到该城市「" + name + "」，换个写法试试")
+                    root._fail(Services.Tr.q("location.unknownCity", { city: name }))
                 } catch (e) {
-                    root._fail("城市结果解析失败，稍后重试")
+                    root._fail(Services.Tr.q("location.parseFailed"))
                 }
             } else {
-                root._fail("城市解析失败（网络 " + xhr.status + "），检查网络后重试")
+                root._fail(Services.Tr.q("location.httpFailed", { status: xhr.status }))
             }
         }
         xhr.open("GET", geocodeUrl(name))
@@ -95,7 +96,7 @@ QtObject {
             xhr.send()
         } catch (e) {
             root.isGeocoding = false
-            root._fail("城市解析请求失败，检查网络后重试")
+            root._fail(Services.Tr.q("location.requestFailed"))
         }
     }
 

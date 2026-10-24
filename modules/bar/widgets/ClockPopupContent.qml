@@ -1,6 +1,7 @@
 import QtQuick
 import "../../lazerbar"
 import "ClockCalendar.js" as Calendar
+import "../../../services" as Services
 
 // Clock hover card body: live rolling HH:MM:SS above the ported month
 // calendar. Self-sufficient (own 1s clock); the host only toggles section
@@ -67,7 +68,16 @@ Item {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 width: parent.width - 60
-                text: Calendar.monthLabel(root.viewYear, root.viewMonth)
+                // Month and weekday names come from the SAME locale the rest of
+                // the interface is in, not from the process locale: a user who
+                // picked English in settings should not get Chinese weekday
+                // glyphs because their ambient locale is zh_CN.
+                text: Services.Tr.q("calendar.month", {
+                    year: root.viewYear,
+                    month: root.viewMonth + 1,
+                    monthName: new Date(root.viewYear, root.viewMonth, 1)
+                        .toLocaleString(Qt.locale(Services.Tr.qtLocaleName), "MMMM")
+                })
                 color: LazerTheme.textPrimary
                 font.pixelSize: 13
             }
@@ -125,7 +135,15 @@ Item {
             spacing: 0
 
             Repeater {
-                model: ["\u65E5", "\u4E00", "\u4E8C", "\u4E09", "\u56DB", "\u4E94", "\u516D"]
+                // Sunday-first strip, named by the interface language rather than
+                // by one language's characters.
+                model: {
+                    var strip = []
+                    for (var day = 0; day < 7; day++)
+                        strip.push(new Date(2024, 0, 7 + day)
+                            .toLocaleString(Qt.locale(Services.Tr.qtLocaleName), "ddd"))
+                    return strip
+                }
 
                 Text {
                     required property var modelData

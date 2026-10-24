@@ -17,11 +17,14 @@
 // an optional header, so neither is a card.
 var cardKinds = ["network", "bluetooth", "volume", "media"]
 
+// i18n KEYS, not sentences. This module is deliberately Qt-free (the headless
+// logic suites load it directly), so it cannot call the translation table; the
+// page resolves each key through Services.Tr when it renders a card.
 var cardTitles = {
-    network: "Network",
-    bluetooth: "Bluetooth",
-    volume: "Volume",
-    media: "Media"
+    network: "widget.network",
+    bluetooth: "widget.bluetooth",
+    volume: "widget.volume",
+    media: "widget.media"
 }
 
 var cardIcons = {
@@ -39,18 +42,18 @@ var detailRoutes = {
 }
 
 // Fixed labels for the states a card can report. The card frame shows one of
-// these instead of opening a modal error surface.
-var loadingLabel = "Loading…"
-var unavailableLabel = "Unavailable"
+// these instead of opening a modal error surface. Keys, resolved by the page.
+var loadingLabel = "cc.card.loading"
+var unavailableLabel = "cc.card.unavailable"
 
 var emptyLabels = {
-    network: "No networks",
-    bluetooth: "No devices",
-    volume: "No output",
-    media: "No media"
+    network: "cc.card.noNetworks",
+    bluetooth: "cc.card.noDevices",
+    volume: "cc.card.noOutput",
+    media: "cc.card.noMedia"
 }
 
-var defaultEmptyLabel = "Nothing to show"
+var defaultEmptyLabel = "cc.card.nothing"
 
 // Fixed, not derived from content: a longer notification history must never
 // change the layout.
@@ -74,6 +77,11 @@ function normalizeCard(kind, snapshot) {
     return {
         title: titleFor(kind),
         summary: summaryFor(kind, value),
+        // The count behind a plural summary line, or 0 when the line has none.
+        // Kept beside the key rather than baked into the sentence: the page
+        // needs the number to choose a plural form, and reconstructing it from
+        // the key alone would guess.
+        summaryCount: summaryCountFor(kind, value),
         status: statusFor(kind, value),
         icon: iconFor(kind),
         available: value.available !== false,
@@ -123,6 +131,18 @@ function titleFor(kind) {
     if (typeof kind !== "string" || kind === "")
         return ""
     return cardTitles[kind] || kind.charAt(0).toUpperCase() + kind.slice(1)
+}
+
+// How many items a plural summary line is counting. Zero for every line that
+// is not a count.
+function summaryCountFor(kind, value) {
+    if (kind !== "bluetooth")
+        return 0
+    if (summaryFor(kind, value) === "cc.card.connectedCount")
+        return countOf(value.connectedDevices)
+    if (summaryFor(kind, value) === "common.devices")
+        return countOf(value.devices)
+    return 0
 }
 
 function iconFor(kind) {
@@ -188,35 +208,35 @@ function readySummary(kind, value) {
 
 function networkSummary(value) {
     if (value.connected === true || value.wifiConnected === true)
-        return text(value.ssid) || text(value.activeSsid) || "Connected"
+        return text(value.ssid) || text(value.activeSsid) || "common.connected"
     if (value.ethernetConnected === true)
-        return text(value.activeEthernetConnection) || "Wired"
+        return text(value.activeEthernetConnection) || "common.wired"
     if (value.wifiEnabled === false)
-        return "Off"
-    return "Not connected"
+        return "common.off"
+    return "common.notConnected"
 }
 
 function bluetoothSummary(value) {
     var connected = countOf(value.connectedDevices)
     if (connected > 0)
-        return connected + " connected"
+        return "cc.card.connectedCount"   // carries {n} for the page to fill
     if (value.blocked === true)
-        return "Blocked"
+        return "cc.card.blocked"
     if (value.enabled === false)
-        return "Off"
+        return "common.off"
     if (value.scanningActive === true)
-        return "Scanning"
+        return "cc.card.scanning"
     var known = countOf(value.devices)
     if (known > 0)
-        return known + " devices"
-    return "Not connected"
+        return "common.devices"           // carries {n}
+    return "common.notConnected"
 }
 
 function volumeSummary(value) {
     if (value.sinkMuted === true)
-        return "Muted"
+        return "cc.card.muted"
     var volume = toNumber(value.sinkVolume, Number.NaN)
-    return isFinite(volume) ? Math.round(volume * 100) + "%" : "No output device"
+    return isFinite(volume) ? Math.round(volume * 100) + "%" : "cc.card.noOutputDevice"
 }
 
 function mediaSummary(value) {
@@ -229,8 +249,8 @@ function mediaSummary(value) {
     if (artist !== "")
         return artist
     if (value.playbackState === "playing" || value.playing === true)
-        return "Playing"
-    return "Paused"
+        return "cc.card.playing"
+    return "cc.card.paused"
 }
 
 // The header's weather state. Optional weather must never block the first
@@ -297,13 +317,16 @@ function weatherAgeLabel(updatedAt, now) {
     var age = current - stamp
     if (age < 0)
         return ""
+    // i18n KEY plus the count, so the page can choose the plural form and the
+    // unit word in the user's language. The compact "Nm ago" shape was an
+    // English assumption baked into a formatter.
     if (age < weatherMinuteMs)
-        return "now"
+        return "weather.age.now"
     if (age < weatherHourMs)
-        return Math.floor(age / weatherMinuteMs) + "m ago"
+        return "weather.age.minutes:" + Math.floor(age / weatherMinuteMs)
     if (age < weatherDayMs)
-        return Math.floor(age / weatherHourMs) + "h ago"
-    return Math.floor(age / weatherDayMs) + "d ago"
+        return "weather.age.hours:" + Math.floor(age / weatherHourMs)
+    return "weather.age.days:" + Math.floor(age / weatherDayMs)
 }
 
 var weatherMinuteMs = 60 * 1000

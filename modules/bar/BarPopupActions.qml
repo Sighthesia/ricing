@@ -3,6 +3,7 @@ import "../lazerbar"
 import "widgets" as ClockWidgets
 import "widgets/BatteryMetrics.js" as BatteryMetrics
 import "./BarTrayMenuLogic.js" as Logic
+import "../../services" as Services
 
 // Content body for volume, brightness, media, notifications, tray and clock.
 // Bound via BarPopupHost contentData; intent actionKind/payload drive visible kind.
@@ -294,23 +295,25 @@ Item {
         return isFinite(raw) && raw > 0 ? raw : 0
     }
     readonly property bool batteryChargeMode: root.batteryCharging || root.batteryPluggedIn
-    readonly property string batteryRateLabel: root.batteryChargeMode ? "Charge rate" : "Discharge rate"
+    readonly property string batteryRateLabel: root.batteryChargeMode
+        ? Services.Tr.q("popup.battery.chargeRate") : Services.Tr.q("popup.battery.dischargeRate")
     readonly property string batteryRateText: BatteryMetrics.formatRate(root.batteryChargeMode
         ? root.batteryChargeRate : root.batteryDischargeRate)
-    readonly property string batteryTimeLabel: root.batteryChargeMode ? "Time to full" : "Remaining"
+    readonly property string batteryTimeLabel: root.batteryChargeMode
+        ? Services.Tr.q("popup.battery.timeToFull") : Services.Tr.q("popup.battery.remaining")
     readonly property string batteryTimeText: root.batteryPluggedIn && !root.batteryCharging
-        ? "Full" : BatteryMetrics.formatDuration(root.batteryChargeMode
+        ? Services.Tr.q("widget.battery.full") : BatteryMetrics.formatDuration(root.batteryChargeMode
             ? root.batteryTimeToFull : root.batteryTimeToEmpty)
     readonly property string batteryStateText: {
         if (!root.batteryReady)
-            return "Unknown"
+            return Services.Tr.q("common.unknown")
         if (root.batteryCharging)
-            return "Charging"
+            return Services.Tr.q("widget.battery.charging")
         if (root.batteryPluggedIn)
-            return "Full"
+            return Services.Tr.q("widget.battery.full")
         if (root.batteryAttention)
-            return "Low"
-        return "Discharging"
+            return Services.Tr.q("widget.battery.low")
+        return Services.Tr.q("widget.battery.discharging")
     }
     // Bluetooth/network popups bind the live service through the payload so
     // power, scan, and list state stay fresh while the popup is open.
@@ -434,7 +437,7 @@ Item {
         if (root.networkService && typeof root.networkService.isCredentialFailure === "function") {
             try { return !!root.networkService.isCredentialFailure(root.wifiError) } catch (e) { return false }
         }
-        return root.wifiError === "Incorrect password"
+        return root.wifiError === "net.error.incorrectPassword"
     }
     readonly property bool wifiErrorNetworkSaved: {
         if (root.wifiErrorSsid === "" || !root.networkService)
@@ -764,21 +767,21 @@ Item {
     // Stable display name for a bluetooth device object.
     function btDeviceName(device) {
         if (!device)
-            return "Unknown device"
+            return Services.Tr.q("popup.bluetooth.unknownDevice")
         var name = device.name || device.deviceName || ""
         if (name !== "")
             return String(name)
-        return String(device.address || "Unknown device")
+        return String(device.address || Services.Tr.q("popup.bluetooth.unknownDevice"))
     }
 
     function btDeviceStatus(device) {
         if (!device)
             return ""
         if (device.connected)
-            return "Connected"
+            return Services.Tr.q("common.connected")
         if (device.paired || device.trusted)
-            return "Paired"
-        return "Available"
+            return Services.Tr.q("popup.bluetooth.paired")
+        return Services.Tr.q("common.available")
     }
 
     // Tap a device row: disconnect when connected, otherwise connect or pair.
@@ -860,11 +863,11 @@ Item {
             try { return String(root.networkService.getSignalLabel(Number(signal) || 0) || "") } catch (e) {}
         }
         var s = Number(signal) || 0
-        if (s >= 80) return "Excellent"
-        if (s >= 60) return "Good"
-        if (s >= 35) return "Fair"
-        if (s >= 15) return "Poor"
-        return "Weak"
+        if (s >= 80) return Services.Tr.q("popup.network.excellent")
+        if (s >= 60) return Services.Tr.q("popup.network.good")
+        if (s >= 35) return Services.Tr.q("popup.network.fair")
+        if (s >= 15) return Services.Tr.q("popup.network.poor")
+        return Services.Tr.q("popup.network.weak")
     }
 
     // A wireless row's right-hand readout: strength as a percentage plus the
@@ -897,12 +900,12 @@ Item {
         if (addresses.length > 0)
             return addresses.join(", ")
         if (profile.methodLabel !== undefined)
-            return String(profile.methodLabel || "")
+            return Services.Tr.q(String(profile.methodLabel || ""))
         var method = String(profile.method || "").toLowerCase()
         if (method === "" || method === "auto")
-            return "DHCP"
+            return Services.Tr.q("popup.network.dhcp")
         if (method === "manual")
-            return "Manual"
+            return Services.Tr.q("popup.network.manual")
         return method
     }
 
@@ -912,18 +915,29 @@ Item {
     // "nothing plugged in" from "plugged in, nothing activated".
     function wiredPortState(group) {
         if (root.networkService && typeof root.networkService.wiredPortState === "function") {
-            try { return root.networkService.wiredPortState(group) } catch (e) {}
+            try {
+                var state = root.networkService.wiredPortState(group)
+                // The service answers with an i18n key. Copy rather than mutate:
+                // the object it hands back is not necessarily writable, and a
+                // failed write inside this try left the raw key on screen.
+                if (state)
+                    return { text: Services.Tr.q(String(state.text || "")), tone: state.tone }
+            } catch (e) {}
         }
         if (!group)
             return { text: "", tone: "idle" }
+        // Same precedence the service uses, so the no-service fallback cannot
+        // name a state the service would not.
+        if (group.managed === false)
+            return { text: Services.Tr.q("net.port.notManaged"), tone: "idle" }
         if (String(group.carrier || "") === "off")
-            return { text: "No cable", tone: "idle" }
+            return { text: Services.Tr.q("popup.network.noCable"), tone: "idle" }
         if (group.connected)
-            return { text: "Connected", tone: "active" }
+            return { text: Services.Tr.q("common.connected"), tone: "active" }
         var reason = String(group.reason || "")
         if (reason.indexOf("Carrier") !== -1 || reason.indexOf("40 ") === 0)
-            return { text: "No cable", tone: "idle" }
-        return { text: "Disconnected", tone: "idle" }
+            return { text: Services.Tr.q("popup.network.noCable"), tone: "idle" }
+        return { text: Services.Tr.q("common.disconnected"), tone: "idle" }
     }
 
     function wiredPortStateColor(tone) {
@@ -1143,7 +1157,7 @@ Item {
                         width: parent.width
                         value: root.volumeValue
                         muted: root.volumeMuted
-                        label: "Volume"
+                        label: Services.Tr.q("widget.volume")
                         showMute: true
                         onValueCommitted: function(v) { root.handleVolumeValue(v) }
                         onToggleRequested: root.handleToggleMute()
@@ -1154,10 +1168,10 @@ Item {
                         id: outputDeviceList
                         objectName: "outputDeviceList"
                         width: parent.width
-                        sectionTitle: "Output"
+                        sectionTitle: Services.Tr.q("popup.audio.output")
                         devices: root.audioSinks
                         currentDevice: root.defaultAudioSinkNode
-                        emptyText: "No output devices"
+                        emptyText: Services.Tr.q("popup.audio.noOutputDevices")
                         onDeviceActivated: function (device) { root.handleAudioSink(device) }
                     }
 
@@ -1167,10 +1181,10 @@ Item {
                         id: inputDeviceList
                         objectName: "inputDeviceList"
                         width: parent.width
-                        sectionTitle: "Input"
+                        sectionTitle: Services.Tr.q("popup.audio.input")
                         devices: root.audioSources
                         currentDevice: root.defaultAudioSourceNode
-                        emptyText: "No input devices"
+                        emptyText: Services.Tr.q("popup.audio.noInputDevices")
                         onDeviceActivated: function (device) { root.handleAudioSource(device) }
                     }
 
@@ -1209,7 +1223,7 @@ Item {
                 width: parent.width
                 value: root.brightnessValue
                 muted: false
-                label: "Brightness"
+                label: Services.Tr.q("widget.brightness")
                 showMute: false
                 onValueCommitted: function(v) { root.handleBrightnessValue(v) }
             }
@@ -1320,7 +1334,7 @@ Item {
                             id: mediaTitleItem
                             objectName: "mediaTitleText"
                             width: parent.width
-                            text: root.mediaTitle !== "" ? root.mediaTitle : "Unknown title"
+                            text: root.mediaTitle !== "" ? root.mediaTitle : Services.Tr.q("popup.media.unknownTitle")
                             color: LazerTheme.textPrimary
                             font.pixelSize: 13
                             font.bold: true
@@ -1334,7 +1348,7 @@ Item {
                             anchors.top: mediaTitleItem.bottom
                             anchors.topMargin: 2
                             width: parent.width
-                            text: root.mediaArtist !== "" ? root.mediaArtist : "Unknown artist"
+                            text: root.mediaArtist !== "" ? root.mediaArtist : Services.Tr.q("popup.media.unknownArtist")
                             color: LazerTheme.textMuted
                             font.pixelSize: 11
                             elide: Text.ElideRight
@@ -1476,7 +1490,7 @@ Item {
                             width: 32
                             height: 32
                             source: Qt.resolvedUrl("../lazerbar/icons/previous.svg")
-                            accessibleName: "Previous track"
+                            accessibleName: Services.Tr.q("popup.media.previousTrack")
                             onClicked: root.handleMediaPrevious()
                         }
 
@@ -1490,7 +1504,7 @@ Item {
                             source: root.mediaPlaying
                                 ? Qt.resolvedUrl("../lazerbar/icons/pause.svg")
                                 : Qt.resolvedUrl("../lazerbar/icons/play.svg")
-                            accessibleName: root.mediaPlaying ? "Pause" : "Play"
+                            accessibleName: root.mediaPlaying ? Services.Tr.q("popup.media.pause") : Services.Tr.q("popup.media.play")
                             onClicked: root.handleMediaPlayPause()
                         }
 
@@ -1502,7 +1516,7 @@ Item {
                             width: 32
                             height: 32
                             source: Qt.resolvedUrl("../lazerbar/icons/next.svg")
-                            accessibleName: "Next track"
+                            accessibleName: Services.Tr.q("popup.media.nextTrack")
                             onClicked: root.handleMediaNext()
                         }
                     }
@@ -1554,7 +1568,7 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: root.notificationDnd ? "DND On" : "DND Off"
+                        text: root.notificationDnd ? Services.Tr.q("popup.notifications.dndOn") : Services.Tr.q("popup.notifications.dndOff")
                         color: LazerTheme.textPrimary
                         font.pixelSize: 11
                         font.bold: true
@@ -1580,7 +1594,7 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: "Clear"
+                        text: Services.Tr.q("common.clear")
                         color: LazerTheme.textPrimary
                         font.pixelSize: 11
                         font.bold: true
@@ -1750,7 +1764,7 @@ Item {
                     id: btPowerRow
                     objectName: "btPowerRow"
                     width: parent.width
-                    labelText: "Bluetooth"
+                    labelText: Services.Tr.q("widget.bluetooth")
                     currentValue: root.btEnabled
 
                     LazerSettingsToggle {
@@ -1765,7 +1779,7 @@ Item {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
                     visible: !root.btAvailable
-                    text: "No adapter"
+                    text: Services.Tr.q("cc.bluetooth.noAdapter")
                     color: LazerTheme.textMuted
                     font.pixelSize: 11
                 }
@@ -1781,7 +1795,7 @@ Item {
                     horizontalAlignment: Text.AlignHCenter
                     visible: root.btAvailable && root.btEnabled
                         && root.btDeviceList.length === 0
-                    text: root.btScanning ? "Scanning…" : "No devices found"
+                    text: root.btScanning ? Services.Tr.q("common.scanning") : Services.Tr.q("popup.bluetooth.noDevices")
                     color: LazerTheme.textMuted
                     font.pixelSize: 11
                 }
@@ -1861,7 +1875,7 @@ Item {
                         id: btRescanLabelItem
                         objectName: "btRescanLabel"
                         anchors.centerIn: parent
-                        text: root.btScanning ? "Scanning…" : "Rescan"
+                        text: root.btScanning ? Services.Tr.q("common.scanning") : Services.Tr.q("popup.rescan")
                         color: LazerTheme.textPrimary
                         font.pixelSize: 11
                         font.bold: true
@@ -1973,7 +1987,7 @@ Item {
                                 objectName: "linkIpLabelText"
                                 anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: "IP address"
+                                text: Services.Tr.q("popup.network.ipAddress")
                                 color: LazerTheme.textMuted
                                 font.pixelSize: 10
                             }
@@ -2005,7 +2019,7 @@ Item {
                                 objectName: "linkGatewayLabelText"
                                 anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: "Gateway"
+                                text: Services.Tr.q("popup.network.gateway")
                                 color: LazerTheme.textMuted
                                 font.pixelSize: 10
                             }
@@ -2037,7 +2051,7 @@ Item {
                                 objectName: "linkDnsLabelText"
                                 anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: "DNS"
+                                text: Services.Tr.q("popup.network.dns")
                                 color: LazerTheme.textMuted
                                 font.pixelSize: 10
                             }
@@ -2114,7 +2128,7 @@ Item {
                                     width: parent.width - 20 - 96
                                     text: String(wiredGroupCard.modelData.device || "") !== ""
                                         ? String(wiredGroupCard.modelData.device)
-                                        : "Other wired profiles"
+                                        : Services.Tr.q("popup.network.otherProfiles")
                                     color: LazerTheme.textPrimary
                                     font.pixelSize: 11
                                     font.bold: true
@@ -2232,11 +2246,11 @@ Item {
                                         text: {
                                             var uuid = String(wiredProfileRow.modelData.uuid || "")
                                             if (root.wiredActivating === uuid)
-                                                return "Connecting…"
+                                                return Services.Tr.q("common.connecting")
                                             if (root.wiredDeactivating === uuid)
-                                                return "Disconnecting…"
+                                                return Services.Tr.q("popup.network.disconnecting")
                                             return wiredProfileRow.modelData.active
-                                                ? "Disconnect" : "Connect"
+                                                ? Services.Tr.q("common.disconnect") : Services.Tr.q("common.connect")
                                         }
                                         color: wiredProfileStateText.busy
                                             ? LazerTheme.settingsAccent
@@ -2266,7 +2280,7 @@ Item {
                     id: wifiPowerRow
                     objectName: "wifiPowerRow"
                     width: parent.width
-                    labelText: "Wi-Fi"
+                    labelText: Services.Tr.q("popup.network.title")
                     currentValue: root.wifiEnabled
 
                     LazerSettingsToggle {
@@ -2285,7 +2299,7 @@ Item {
                     // Leave room for the recovery affordance when one shows.
                     height: root.wifiError === "" ? 0
                         : (root.wifiErrorIsSecret && root.wifiErrorNetworkSaved ? 30 : 24)
-                    text: root.wifiError
+                    text: Services.Tr.q(root.wifiError)
                     color: LazerTheme.osuPink
                     font.pixelSize: 10
                     wrapMode: Text.Wrap
@@ -2310,7 +2324,7 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: "Forget saved profile and retry"
+                        text: Services.Tr.q("popup.network.forgetAndRetry")
                         color: LazerTheme.textPrimary
                         font.pixelSize: 10
                         font.bold: true
@@ -2366,7 +2380,7 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            text: "Connect"
+                            text: Services.Tr.q("common.connect")
                             color: LazerTheme.textPrimary
                             font.pixelSize: 10
                         }
@@ -2386,7 +2400,7 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            text: "Cancel"
+                            text: Services.Tr.q("common.cancel")
                             color: LazerTheme.textMuted
                             font.pixelSize: 10
                         }
@@ -2469,7 +2483,7 @@ Item {
                                 if (!data) return ""
                                 if (root.wifiConnecting
                                         && root.wifiConnectingTo === String(data.ssid || ""))
-                                    return "Connecting…"
+                                    return Services.Tr.q("common.connecting")
                                 return root.wifiRowMeta(data)
                             }
                             color: wifiNetRow.modelData && wifiNetRow.modelData.connected
@@ -2526,9 +2540,9 @@ Item {
                         Text {
                             objectName: "wifiRescanLabel"
                             text: {
-                                if (root.wifiConnecting) return "Connecting…"
-                                if (root.wifiScanning) return "Scanning…"
-                                return "Rescan"
+                                if (root.wifiConnecting) return Services.Tr.q("common.connecting")
+                                if (root.wifiScanning) return Services.Tr.q("common.scanning")
+                                return Services.Tr.q("popup.rescan")
                             }
                             color: LazerTheme.textPrimary
                             font.pixelSize: 11
@@ -2628,7 +2642,7 @@ Item {
 
             Text {
                 anchors.centerIn: parent
-                text: root.actionKind === "" ? "No action" : root.actionKind
+                text: root.actionKind === "" ? Services.Tr.q("popup.noAction") : root.actionKind
                 color: LazerTheme.textMuted
                 font.pixelSize: 11
             }

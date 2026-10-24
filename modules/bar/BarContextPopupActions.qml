@@ -1,5 +1,6 @@
 import QtQuick
 import "../lazerbar"
+import "../../services" as Services
 
 // Compact context actions for the bar's second popup layer.
 Item {
@@ -76,7 +77,7 @@ Item {
                 anchors.leftMargin: 10
                 anchors.rightMargin: 44
                 verticalAlignment: Text.AlignVCenter
-                text: root.layoutMode ? "Exit layout mode" : "Enter layout mode"
+                text: root.layoutMode ? Services.Tr.q("context.exitLayoutMode") : Services.Tr.q("context.enterLayoutMode")
                 color: LazerTheme.textPrimary
                 font.pixelSize: 13
                 elide: Text.ElideRight
@@ -86,7 +87,7 @@ Item {
                 anchors.right: parent.right
                 anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
-                text: root.layoutMode ? "On" : "Off"
+                text: root.layoutMode ? Services.Tr.q("common.on") : Services.Tr.q("common.off")
                 color: LazerTheme.textMuted
                 font.pixelSize: 11
             }
@@ -114,7 +115,7 @@ Item {
                 anchors.fill: parent
                 anchors.leftMargin: 10
                 verticalAlignment: Text.AlignVCenter
-                text: "Shell settings"
+                text: Services.Tr.q("context.shellSettings")
                 color: LazerTheme.textPrimary
                 font.pixelSize: 13
                 elide: Text.ElideRight
@@ -129,11 +130,11 @@ Item {
 
         Repeater {
             model: root.hasWidgetTarget ? [
-                { action: "moveLeft", label: "Move left" },
-                { action: "moveRight", label: "Move right" },
-                { action: "moveToSection", label: "Move to section" },
-                { action: "openSettings", label: "Widget settings", available: root.hasSettings },
-                { action: "remove", label: "Remove widget" },
+                { action: "moveLeft", label: Services.Tr.q("context.moveLeft") },
+                { action: "moveRight", label: Services.Tr.q("context.moveRight") },
+                { action: "moveToSection", label: Services.Tr.q("context.moveToSection") },
+                { action: "openSettings", label: Services.Tr.q("context.widgetSettings"), available: root.hasSettings },
+                { action: "remove", label: Services.Tr.q("context.removeWidget") },
             ] : []
 
             delegate: Item {
@@ -183,7 +184,7 @@ Item {
                 anchors.leftMargin: 10
                 anchors.rightMargin: 28
                 verticalAlignment: Text.AlignVCenter
-                text: "Add widgets"
+                text: Services.Tr.q("context.addWidgets")
                 color: LazerTheme.textPrimary
                 font.pixelSize: 13
                 elide: Text.ElideRight
@@ -248,7 +249,11 @@ Item {
 
                             Text {
                                 width: parent.width
-                                text: String(modelData.label || modelData.id || "Widget")
+                                // The catalog hands over i18n keys, so a widget
+                                // names itself the same way here as it does in
+                                // its hover popup.
+                                text: Services.Tr.q(String(modelData.label || modelData.id
+                                                          || "widget.widget"))
                                 color: LazerTheme.textPrimary
                                 font.pixelSize: 13
                                 elide: Text.ElideRight
@@ -257,7 +262,8 @@ Item {
 
                             Text {
                                 width: parent.width
-                                text: String(modelData.description || modelData.section || "")
+                                text: modelData.description !== undefined
+                                      ? Services.Tr.q(String(modelData.description)) : ""
                                 color: LazerTheme.textMuted
                                 font.pixelSize: 10
                                 elide: Text.ElideRight

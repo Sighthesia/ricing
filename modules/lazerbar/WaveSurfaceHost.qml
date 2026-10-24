@@ -1,5 +1,6 @@
 import QtQuick
 import "WaveSurfaceLogic.js" as Logic
+import "../../services" as Services
 
 // Own the fixed wave viewport as a content-agnostic surface for launcher and future routes.
 //
@@ -424,7 +425,7 @@ Item {
                     anchors.fill: parent
                     visible: root.loading
                     color: LazerTheme.overlayContentSurface
-                    Text { anchors.centerIn: parent; text: "Loading..."; color: LazerTheme.textMuted }
+                    Text { anchors.centerIn: parent; text: Services.Tr.q("common.loading"); color: LazerTheme.textMuted }
                 }
             }
         }

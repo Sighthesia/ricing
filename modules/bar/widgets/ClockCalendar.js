@@ -34,6 +34,9 @@ function stepMonth(year, month, delta) {
     return { year: stepped.getFullYear(), month: stepped.getMonth() }
 }
 
+// Pure month naming, kept language-free: the shell renders the label itself
+// (see ClockPopupContent), because a date's word order is a language decision
+// and this module is shared by callers that never show text.
 function monthLabel(year, month) {
-    return year + " 年 " + (month + 1) + " 月"
+    return (month + 1) + "/" + year
 }

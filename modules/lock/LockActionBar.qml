@@ -2,6 +2,7 @@ import QtQuick
 import "../lazerbar" as Lazer
 import "LockActionBarLogic.js" as Logic
 import "LockSurfaceLogic.js" as SurfaceLogic
+import "../../services" as Services
 
 // Present suspend, shut down and log out as one permanent row of buttons in the
 // lower-right corner of the lock surface. There is no panel and no trigger: the
@@ -39,8 +40,19 @@ Item {
     readonly property color pinkColor: root.themeColor("pink", Lazer.LazerTheme.osuPink)
     readonly property color textColor: root.themeColor("sessionText",
         SurfaceLogic.readableThemeColor(Lazer.LazerTheme.accentColor, root.lightScheme))
-    readonly property string statusMessage: Logic.statusMessage(root.pendingAction,
-        root.errorText, root.statusText)
+    // Logic hands back either plain text (a failure or result already in words)
+    // or a { key, action } pair for the armed confirmation, which has to name an
+    // action and therefore needs translating here.
+    readonly property string statusMessage: {
+        var message = Logic.statusMessage(root.pendingAction, root.errorText, root.statusText)
+        if (typeof message === "string")
+            return message
+        if (!message)
+            return ""
+        return message.action !== undefined
+            ? Services.Tr.q(message.key, { action: Services.Tr.q(message.action) })
+            : Services.Tr.q(message.key)
+    }
 
     // The host restores keyboard ownership after a button hands it back.
     signal keyboardReleased()
@@ -127,7 +139,7 @@ Item {
             width: root.buttonWidth
             height: root.buttonHeight
             actionId: "suspend"
-            label: Logic.labelFor(actionId)
+            label: Services.Tr.q(Logic.labelFor(actionId))
             iconSource: Qt.resolvedUrl("../lazerbar/icons/suspend.svg")
             barHost: root
             available: root.actionAvailable(actionId)
@@ -143,7 +155,7 @@ Item {
             width: root.buttonWidth
             height: root.buttonHeight
             actionId: "shutdown"
-            label: Logic.labelFor(actionId)
+            label: Services.Tr.q(Logic.labelFor(actionId))
             iconSource: Qt.resolvedUrl("../lazerbar/icons/power.svg")
             barHost: root
             available: root.actionAvailable(actionId)
@@ -159,7 +171,7 @@ Item {
             width: root.buttonWidth
             height: root.buttonHeight
             actionId: "logout"
-            label: Logic.labelFor(actionId)
+            label: Services.Tr.q(Logic.labelFor(actionId))
             iconSource: Qt.resolvedUrl("../lazerbar/icons/logout.svg")
             barHost: root
             available: root.actionAvailable(actionId)
@@ -204,7 +216,7 @@ Item {
         target: null
         function onActionFinished(actionId, success, message) {
             root.pendingAction = ""
-            root.errorText = success ? "" : String(message || "Session action failed")
+            root.errorText = success ? "" : String(message || Services.Tr.q("lock.actionFailed"))
             root.statusText = String(message || "")
         }
         function onErrorTextChanged() { root.syncServiceMessage() }

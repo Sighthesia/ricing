@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Effects
 import "LazerSettingsLogic.js" as Logic
+import "../../services" as Services
 
 // Present one settings entry as osu's full-width card with a reserved reset zone,
 // then label above control with 5px spacing. Description text remains searchable
@@ -315,7 +316,7 @@ Item {
         enabled: root.canReset && root.matchesSearch
         activeFocusOnTab: root.canReset
         Accessible.role: Accessible.Button
-        Accessible.name: "恢复默认"
+        Accessible.name: Services.Tr.q("settings.resetDefault")
         scale: revertPress.pressed ? MotionTokens.pressScale : 1
         Behavior on scale {
             enabled: !MotionTokens.reducedMotion

@@ -145,7 +145,7 @@ Singleton {
             root._push({
                 kind: "volume", key: "volume", icon: "",
                 glyph: Services.VolumeService.sinkMuted ? "🔇" : "🔊",
-                title: Services.VolumeService.sinkMuted ? "静音" : Math.round(Services.VolumeService.sinkVolume * 100) + "%",
+                title: Services.VolumeService.sinkMuted ? Services.Tr.q("transient.muted") : Math.round(Services.VolumeService.sinkVolume * 100) + "%",
                 body: "", progress: Services.VolumeService.sinkMuted ? 0 : Services.VolumeService.sinkVolume
             })
         }

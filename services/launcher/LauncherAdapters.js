@@ -271,10 +271,15 @@ function appItem(entry, launchCounts, iconResolver, categoryResolver) {
 // managed-bind seam: actionArgv routes actionId "shell.<target>.<fn>" through
 // the afloat IPC helper.
 function builtinCommands() {
+    // `label`/`description` are i18n KEYS, not sentences: this module is pure
+    // data shared with non-QML callers, and a baked-in language would pin the
+    // builtin list to whatever locale it was written in. The launcher resolves
+    // them through Services.Tr when it renders a row. `keywords` stays raw text
+    // in every language on purpose - a user may search in either.
     return [{
         id: "cmd-lock",
-        label: "锁屏",
-        description: "Lock the session",
+        label: "launcher.cmd.lock",
+        description: "launcher.cmd.lock.description",
         keywords: "lock lockscreen 锁屏 锁定 锁定屏幕",
         icon: "lock",
         category: "system",

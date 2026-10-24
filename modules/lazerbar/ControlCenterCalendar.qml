@@ -3,6 +3,7 @@ import QtQuick
 // renders it; it never recomputes a date itself.
 // Reference: modules/bar/widgets/ClockPopupContent.qml + ClockCalendar.js
 import "../bar/widgets/ClockCalendar.js" as Calendar
+import "../../services" as Services
 
 // Local month view for the control center: a fixed six-row grid on the bar
 // module's own date math.
@@ -112,7 +113,7 @@ Item {
                 border.color: LazerTheme.focusRing
                 activeFocusOnTab: true
                 Accessible.role: Accessible.Button
-                Accessible.name: "上个月"
+                Accessible.name: Services.Tr.q("calendar.previousMonth")
                 readonly property Item glyphItem: previousGlyph
 
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
@@ -152,7 +153,7 @@ Item {
                 border.color: LazerTheme.focusRing
                 activeFocusOnTab: true
                 Accessible.role: Accessible.Button
-                Accessible.name: "下个月"
+                Accessible.name: Services.Tr.q("calendar.nextMonth")
                 readonly property Item glyphItem: nextGlyph
 
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }

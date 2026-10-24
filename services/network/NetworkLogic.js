@@ -346,16 +346,18 @@ function parseWiredProfiles(baseText, detailText) {
 // profile has no address until it is up, so its row must not look empty.
 function ipMethodLabel(method) {
     var m = String(method == null ? "" : method).trim().toLowerCase()
+    // Keys for the known methods; an unknown one falls through as nmcli's own
+    // word, which the renderer passes through untouched.
     if (m === "" || m === "auto")
-        return "DHCP"
+        return "net.method.dhcp"
     if (m === "manual")
-        return "Manual"
+        return "net.method.manual"
     if (m === "link-local")
-        return "Link-local"
+        return "net.method.linkLocal"
     if (m === "shared")
-        return "Shared"
+        return "net.method.shared"
     if (m === "disabled")
-        return "Disabled"
+        return "net.method.disabled"
     return m
 }
 
@@ -448,15 +450,15 @@ function linkStateLabel(entry) {
     if (!entry)
         return { text: "", tone: "idle" }
     if (entry.managed === false)
-        return { text: "Not managed", tone: "idle" }
+        return { text: "net.port.notManaged", tone: "idle" }
     if (entry.carrier === "off")
-        return { text: "No cable", tone: "idle" }
+        return { text: "popup.network.noCable", tone: "idle" }
     if (entry.connected)
-        return { text: "Connected", tone: "active" }
+        return { text: "common.connected", tone: "active" }
     if (String(entry.reason || "").indexOf("Carrier") !== -1
             || String(entry.reason || "").indexOf("40 ") === 0)
-        return { text: "No cable", tone: "idle" }
-    return { text: "Disconnected", tone: "idle" }
+        return { text: "popup.network.noCable", tone: "idle" }
+    return { text: "common.disconnected", tone: "idle" }
 }
 
 // Every managed wired port, each carrying the saved profiles that belong to it.
@@ -713,10 +715,13 @@ function firstErrorLine(text) {
 // Anything unmatched falls through to the raw first line, which beats a
 // blanket "Connection failed" — that string is what made every failure look
 // identical in the popup.
+// Returns an i18n KEY for every failure it recognises (plus nmcli's raw first
+// line when it recognises none), never a sentence: the wording is chosen by the
+// surface that shows it, and `isCredentialFailure` compares the same key.
 function classifyConnectError(rawText) {
     var text = String(rawText == null ? "" : rawText)
     if (!text.trim())
-        return "Connection failed"
+        return "net.error.connectionFailed"
     var lower = text.toLowerCase()
     if (lower.indexOf("secrets were required") !== -1
             || lower.indexOf("no secrets provided") !== -1
@@ -724,38 +729,41 @@ function classifyConnectError(rawText) {
             || lower.indexOf("no key") !== -1
             || lower.indexOf("pre-shared key") !== -1
             || lower.indexOf("authentication failed") !== -1)
-        return "Incorrect password"
+        return "net.error.incorrectPassword"
     if (lower.indexOf("802-1x") !== -1 || lower.indexOf("802.1x") !== -1
             || lower.indexOf("supplicant") !== -1)
-        return "Enterprise (EAP) network — not supported"
+        return "net.error.enterprise"
     if (lower.indexOf("no network with ssid") !== -1)
-        return "Network not found"
+        return "net.error.notFound"
     if (lower.indexOf("timed out") !== -1 || lower.indexOf("timeout") !== -1)
-        return "Connection timeout"
+        return "net.error.timeout"
     if (lower.indexOf("unknown connection") !== -1)
-        return "Saved profile is gone"
+        return "net.error.profileGone"
     if (lower.indexOf("carrier") !== -1
             || lower.indexOf("no link") !== -1
             || lower.indexOf("link down") !== -1)
-        return "No cable on this port"
+        return "net.error.noCable"
     if (lower.indexOf("no suitable device") !== -1
             || lower.indexOf("not compatible") !== -1
             || lower.indexOf("mismatching interface name") !== -1
             || lower.indexOf("incompatible") !== -1)
-        return "No adapter matches this saved profile"
+        return "net.error.noAdapterMatch"
     if (lower.indexOf("not available") !== -1
             || lower.indexOf("no wifi device") !== -1
             || lower.indexOf("wifi is disabled") !== -1
             || lower.indexOf("rf-kill") !== -1)
-        return "Wi-Fi adapter unavailable"
-    return firstErrorLine(text) || "Connection failed"
+        return "net.error.adapterUnavailable"
+    // The raw first line wins when the taxonomy has no name for it: nmcli's own
+    // words are still more useful than a generic sentence. It is not a key, and
+    // the renderer's lookup passes it through untouched.
+    return firstErrorLine(text) || "net.error.connectionFailed"
 }
 
 // A credential failure on a network we already hold a profile for is
 // recoverable: offer the password row again instead of a dead end.
 function isCredentialFailure(message) {
     var m = String(message == null ? "" : message)
-    return m === "Incorrect password"
+    return m === "net.error.incorrectPassword"
 }
 
 // Signal strength → Nerd Font glyph / short label, shared by the bar pill and
@@ -782,12 +790,12 @@ function signalIcon(signal, connected, connectivity) {
 function signalLabel(signal) {
     var s = Number(signal) || 0
     if (s >= 80)
-        return "Excellent"
+        return "popup.network.excellent"
     if (s >= 60)
-        return "Good"
+        return "popup.network.good"
     if (s >= 35)
-        return "Fair"
+        return "popup.network.fair"
     if (s >= 15)
-        return "Poor"
-    return "Weak"
+        return "popup.network.poor"
+    return "popup.network.weak"
 }

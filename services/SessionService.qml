@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "SessionServiceLogic.js" as Logic
+import "./" as Services
 
 // Route session-level commands through one process and one in-flight gate.
 Singleton {
@@ -36,6 +37,14 @@ Singleton {
         root._resultText = ""
     }
 
+    // Human name of a session action, so a result line reads "Suspend requested"
+    // rather than "suspend requested".
+    function actionLabel(actionId) {
+        var key = "lock.action." + String(actionId || "")
+        var label = Services.Tr.q(key)
+        return label === key ? String(actionId || "") : label
+    }
+
     function execute(actionId): bool {
         const id = String(actionId || "")
         if (!Logic.canStart(root.running, id, root.sessionId))
@@ -46,7 +55,7 @@ Singleton {
 
         if (id === "lock") {
             root.lockRequested()
-            root._resultText = "Lock requested"
+            root._resultText = Services.Tr.q("lock.lockRequested")
             root.actionFinished(id, true, root._resultText)
             return true
         }
@@ -69,10 +78,11 @@ Singleton {
         onExited: (exitCode, exitStatus) => {
             const id = root._runningAction
             const success = Number(exitCode) === 0
-            const message = success ? "" : "Session action failed"
+            const message = success ? "" : Services.Tr.q("lock.actionFailed")
             root._runningAction = ""
             if (success)
-                root._resultText = id + " requested"
+                root._resultText = Services.Tr.q("lock.action.requested",
+                    { action: root.actionLabel(id) })
             else
                 root._errorText = message
             root.actionFinished(id, success, success ? root._resultText : message)

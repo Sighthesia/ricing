@@ -1,4 +1,5 @@
 import QtQuick
+import "../../services" as Services
 
 // Reusable control-center card frame: one square major surface that presents a
 // service snapshot and reports a single activation.
@@ -54,10 +55,10 @@ Item {
     // ControlCenterLogic.summaryFor(), which the caller already passed in as
     // `summary`. A ready card carries no badge at all.
     readonly property var stateLabels: ({
-        "loading": "Loading",
-        "unavailable": "Unavailable",
-        "empty": "Empty",
-        "error": "Error"
+        "loading": Services.Tr.q("cc.card.loading"),
+        "unavailable": Services.Tr.q("cc.card.unavailable"),
+        "empty": Services.Tr.q("cc.card.empty"),
+        "error": Services.Tr.q("cc.card.error")
     })
     readonly property var badgeStates: ["loading", "unavailable", "empty", "error"]
     readonly property bool stateKnown: root.badgeStates.indexOf(root.status) >= 0

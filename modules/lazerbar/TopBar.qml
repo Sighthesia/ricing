@@ -201,7 +201,7 @@ Variants {
             mask: Region { item: musicOverlay.openState || musicOverlay.openProgress > 0 ? musicOverlay : null }
             OsuMusicOverlay {
                 id: musicOverlay; anchors.fill: parent
-                titleText: Services.MediaControlService.hasMedia ? Services.MediaControlService.title : "暂无播放内容"
+                titleText: Services.MediaControlService.hasMedia ? Services.MediaControlService.title : Services.Tr.q("media.nothingPlaying")
                 artistText: Services.MediaControlService.hasMedia ? Services.MediaControlService.artist : ""
                 playing: Services.MediaControlService.playbackState === "playing"
                 progress: Services.MediaControlService.progress

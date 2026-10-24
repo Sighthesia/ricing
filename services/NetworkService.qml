@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Networking
 import "./network/NetworkLogic.js" as Logic
+import "./" as Services
 
 // Network state: wired link plus Wi-Fi power toggle, scan,
 // connect/disconnect/forget via nmcli.
@@ -127,7 +128,7 @@ Singleton {
             if (!root.connecting || !root._job)
                 return
             console.warn("[Network] connect timed out for '" + root._job.ssid + "'")
-            root._finishConnect(false, "Connection timeout")
+            root._finishConnect(false, "net.error.timeout")
         }
     }
 
@@ -149,7 +150,7 @@ Singleton {
             console.warn("[Network] wired attempt on '" + label + "' timed out after "
                 + interval + "ms")
             root._finishWired(false, root.wiredActivating !== ""
-                ? root._wiredTimeoutMessage() : "Deactivation timeout")
+                ? root._wiredTimeoutMessage() : "net.error.deactivationTimeout")
         }
     }
 
@@ -391,7 +392,7 @@ Singleton {
 
         if (Logic.isEnterprise(requestedSecurity)
                 || (profile && Logic.isEnterpriseKeyMgmt(profile.keyMgmt))) {
-            root._setError("Enterprise (EAP) network — not supported", ssid)
+            root._setError("net.error.enterprise", ssid)
             console.warn("[Network] EAP rejected for '" + ssid + "'")
             return
         }
@@ -456,7 +457,7 @@ Singleton {
         if (uuid === "") {
             // Refusing outright beats running a command that would report
             // success while leaving the link up.
-            root._setError("No saved profile to disconnect", ssid)
+            root._setError("net.error.noSavedProfile", ssid)
             return
         }
         console.info("[Network] disconnect '" + ssid + "' via uuid " + uuid)
@@ -527,7 +528,7 @@ Singleton {
         if (profile && profile.stalePin) {
             // Activating it would be refused with a mismatching interface name
             // that names an adapter the user cannot see or change from here.
-            root._setError("Pinned to a port that no longer exists", "")
+            root._setError("net.error.stalePin", "")
             return
         }
         // A port with no carrier is attempted anyway. Refusing here used to make
@@ -570,9 +571,9 @@ Singleton {
     // direct-connect setup hits routinely.
     function _wiredTimeoutMessage() {
         if (root._wiredNoCable)
-            return "No cable on " + (root._wiredDevice || "this port")
-                + " — plug one in, then tap again"
-        return "Activation timeout"
+            return Services.Tr.q("net.error.noCableOn",
+                { port: root._wiredDevice || Services.Tr.q("net.error.thisPort") })
+        return "net.error.activationTimeout"
     }
 
     function _startWiredUp() {
@@ -644,7 +645,7 @@ Singleton {
     }
 
     function getSignalLabel(signal) {
-        return Logic.signalLabel(signal)
+        return Services.Tr.q(Logic.signalLabel(signal))
     }
 
     // A wired port's header state. The panel asks the service rather than
@@ -655,10 +656,17 @@ Singleton {
         return Logic.linkStateLabel(group)
     }
 
+    // A name where there is one (a connection profile, an SSID) and a
+    // translated phrase where there is not, so callers never receive half a
+    // sentence in one language glued to a name in another.
     function getStatusText() {
         if (root.ethernetConnected)
-            return root.activeEthernetConnection !== "" ? root.activeEthernetConnection : "Wired"
-        if (root.connecting) return root.connectingTo ? "Connecting " + root.connectingTo : "Connecting"
+            return root.activeEthernetConnection !== ""
+                ? root.activeEthernetConnection : Services.Tr.q("common.wired")
+        if (root.connecting)
+            return root.connectingTo
+                ? Services.Tr.q("widget.network.connecting", { ssid: root.connectingTo })
+                : Services.Tr.q("widget.network.connectingGeneric")
         if (!root.wifiEnabled) return ""
         if (root.wifiConnected) {
             var connectedNet = Object.values(root.networks).find(n => n.connected)

@@ -1,4 +1,5 @@
 import QtQuick
+import "../../services" as Services
 
 // Tail of the launcher list: the region that has not arrived yet. Shown only
 // while a refresh is still streaming batches, sitting where the next row
@@ -48,7 +49,7 @@ Item {
         anchors.right: parent.right
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
-        text: "Loading more"
+        text: Services.Tr.q("launcher.loadingMore")
         color: LazerTheme.textMuted
         font.pixelSize: 11
     }

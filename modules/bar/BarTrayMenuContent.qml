@@ -4,6 +4,7 @@ import QtQuick.Shapes
 import QtQuick.Window
 import "./BarTrayMenuLogic.js" as Logic
 import "../lazerbar" as Lazer
+import "../../services" as Services
 
 // Render the tray menu and its optional second-level surface.
 Item {
@@ -408,7 +409,7 @@ Item {
         objectName: "trayEmptyState"
         visible: emptyStateVisible
         z: 4
-        text: "No menu items"
+        text: Services.Tr.q("tray.noItems")
         color: Lazer.LazerTheme.textMuted
         font.pixelSize: 13
         anchors.left: parent.left

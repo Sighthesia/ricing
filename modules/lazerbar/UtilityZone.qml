@@ -1,5 +1,6 @@
 import QtQuick
 import "LazerBarLogic.js" as Logic
+import "../../services" as Services
 
 // Retain the highest-priority utilities as horizontal space contracts.
 Item {
@@ -12,13 +13,13 @@ Item {
     signal routeRequested(string route, Item opener)
     readonly property var visibleIds: Logic.visibleUtilityIds(availableWidth, LazerTheme.targetSize, LazerTheme.groupGap)
     readonly property var entries: [
-        { id: "news", name: "News", source: "icons/news.svg" },
-        { id: "changelog", name: "Changelog", source: "icons/code.svg" },
-        { id: "wiki", name: "Wiki", source: "icons/book.svg" },
-        { id: "ranking", name: "Ranking", source: "icons/podium.svg" },
-        { id: "library", name: "Beatmap library", source: "icons/library.svg" },
-        { id: "chat", name: "Chat", source: "icons/chat.svg" },
-        { id: "community", name: "Community", source: "icons/globe.svg" }
+        { id: "news", name: Services.Tr.q("sidebar.news"), source: "icons/news.svg" },
+        { id: "changelog", name: Services.Tr.q("sidebar.changelog"), source: "icons/code.svg" },
+        { id: "wiki", name: Services.Tr.q("sidebar.wiki"), source: "icons/book.svg" },
+        { id: "ranking", name: Services.Tr.q("sidebar.ranking"), source: "icons/podium.svg" },
+        { id: "library", name: Services.Tr.q("sidebar.beatmapLibrary"), source: "icons/library.svg" },
+        { id: "chat", name: Services.Tr.q("sidebar.chat"), source: "icons/chat.svg" },
+        { id: "community", name: Services.Tr.q("sidebar.community"), source: "icons/globe.svg" }
     ]
     implicitWidth: row.implicitWidth
     implicitHeight: LazerTheme.barHeight
@@ -46,8 +47,8 @@ Item {
             id: musicButton
             visible: root.visibleIds.indexOf("music") >= 0
             iconSource: "icons/music.svg"
-            titleText: "音乐播放器"
-            subtitleText: "播放控制"
+            titleText: Services.Tr.q("sidebar.music")
+            subtitleText: Services.Tr.q("sidebar.music.subtitle")
             isActive: root.musicActive
             onClicked: root.musicOverlayRequested(!root.musicActive)
             onTooltipRequestedChanged: root.musicTooltipRequested(tooltipRequested)

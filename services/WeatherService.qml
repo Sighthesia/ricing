@@ -159,7 +159,7 @@ Singleton {
             try {
                 answer = WeatherSeams.transport(url)
             } catch (err) {
-                root._fail("天气请求失败，稍后自动重试")
+                root._fail(Services.Tr.q("weather.requestFailed"))
                 return true
             }
             root._applyResponse(answer, Date.now())
@@ -171,7 +171,7 @@ Singleton {
         xhr.timeout = 10000
         xhr.ontimeout = function () {
             root._endRequest()
-            root._fail("天气请求超时，稍后自动重试")
+            root._fail(Services.Tr.q("weather.timeout"))
         }
         xhr.onreadystatechange = function () {
             if (xhr.readyState !== XMLHttpRequest.DONE)
@@ -184,7 +184,7 @@ Singleton {
             xhr.send()
         } catch (err) {
             root._endRequest()
-            root._fail("天气请求失败，稍后自动重试")
+            root._fail(Services.Tr.q("weather.requestFailed"))
         }
         return true
     }
@@ -203,17 +203,17 @@ Singleton {
     // test can pin updatedAt exactly. Leaving it out means "stamp it now".
     function _applyResponse(answer, now) {
         if (answer == null || typeof answer !== "object") {
-            root._fail("天气请求失败，稍后自动重试")
+            root._fail(Services.Tr.q("weather.requestFailed"))
             return
         }
         if (answer.status !== 200) {
-            root._fail("天气请求失败（网络 " + answer.status + "），稍后自动重试")
+            root._fail(Services.Tr.q("weather.httpFailed", { status: answer.status }))
             return
         }
         var stamp = answer.now === undefined ? now : answer.now
         var parsed = WeatherLogic.parseResponse(answer.body, stamp)
         if (!parsed.ok) {
-            root._fail(parsed.error)
+            root._fail(Services.Tr.q(parsed.error))
             return
         }
         root._adopt(parsed)

@@ -83,18 +83,22 @@ function conditionForCode(code) {
 // clock; tests pass it explicitly so `updatedAt` and the staleness check are
 // deterministic. A response is usable when it carries a numeric current
 // temperature, regardless of whether its code was recognized.
+// `error` carries an i18n KEY, not a sentence: this module is shared by the
+// service and its callers, and a baked-in language would pin the message to
+// whatever locale the parser was written in. The service resolves it through
+// Services.Tr before showing it.
 function parseResponse(jsonText, now) {
     var payload = parseObject(jsonText)
     if (!payload)
-        return { ok: false, error: "天气数据无法解析" }
+        return { ok: false, error: "weather.parseFailed" }
 
     var current = payload.current
     if (current == null || typeof current !== "object")
-        return { ok: false, error: "天气数据缺少当前实况" }
+        return { ok: false, error: "weather.noCurrent" }
 
     var temperature = toNumber(current.temperature_2m, Number.NaN)
     if (!isFinite(temperature))
-        return { ok: false, error: "天气数据缺少温度" }
+        return { ok: false, error: "weather.noTemperature" }
 
     return {
         ok: true,

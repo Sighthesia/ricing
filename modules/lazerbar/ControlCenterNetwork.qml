@@ -1,5 +1,6 @@
 import QtQuick
 import "ControlCenterLogic.js" as CcLogic
+import "../../services" as Services
 
 // Same-surface network detail page: a sub-page of the control-center route, not
 // a sibling Wave route.
@@ -53,8 +54,8 @@ Item {
     // Host chrome for this sub-page, in the same shape the overview publishes.
     // The header is the host's, so a sub-page changes what it says without the
     // host learning anything about sub-pages: it still reads one route page.
-    readonly property string title: "Network"
-    readonly property string description: "Wi-Fi and wired"
+    readonly property string title: Services.Tr.q("cc.network.title")
+    readonly property string description: Services.Tr.q("cc.network.description")
     readonly property var sectionEntries: []
     readonly property string activeSectionId: ""
 
@@ -235,18 +236,19 @@ Item {
                     : (root.wifiRowCount === 0 ? "empty" : "ready"))))
     readonly property string stateLabel: {
         if (root.state === "unavailable")
-            return "Network service unavailable"
+            return Services.Tr.q("cc.network.unavailable")
         if (root.state === "error")
-            return root.errorText
+            return Services.Tr.q(root.errorText)
         if (root.state === "loading")
             return root.connecting && root.connectingTo !== ""
-                ? "Connecting to " + root.connectingTo : "Scanning…"
+                ? Services.Tr.q("cc.network.connectingTo", { ssid: root.connectingTo })
+                : Services.Tr.q("common.scanning")
         if (root.state === "off")
-            return "Wi-Fi is off"
+            return Services.Tr.q("cc.network.wifiOff")
         if (root.state === "empty")
-            return "No networks found"
+            return Services.Tr.q("cc.network.noNetworks")
         return root.wifiConnected && root.connectedSsid !== ""
-            ? "Connected to " + root.connectedSsid : "Not connected"
+            ? Services.Tr.q("cc.network.connectedTo", { ssid: root.connectedSsid }) : Services.Tr.q("common.notConnected")
     }
     readonly property bool scanningActive: root.networkService
             && root.networkService.scanningActive === true
@@ -257,8 +259,8 @@ Item {
     // derived phrase: an ethernet profile really is called something.
     readonly property string wiredStatusText: root.ethernetConnected
         ? (root.activeEthernetConnection !== "" ? root.activeEthernetConnection
-            : (root.activeEthernetIf !== "" ? root.activeEthernetIf : "Wired"))
-        : (root.ethernetAvailable ? "Wired - not connected" : "")
+            : (root.activeEthernetIf !== "" ? root.activeEthernetIf : Services.Tr.q("common.wired")))
+        : (root.ethernetAvailable ? Services.Tr.q("cc.network.wiredNotConnected") : "")
 
     // --- Credentials ---
     //
@@ -530,7 +532,7 @@ Item {
                     anchors.right: rescanButton.left
                     anchors.rightMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Wi-Fi"
+                    text: Services.Tr.q("cc.network.wifi")
                     color: LazerTheme.textPrimary
                     font.pixelSize: 13
                     elide: Text.ElideRight
@@ -553,7 +555,7 @@ Item {
                     opacity: enabled ? 1 : LazerTheme.settingsDisabledAlpha
                     activeFocusOnTab: enabled
                     Accessible.role: enabled ? Accessible.Button : Accessible.StaticText
-                    Accessible.name: "Rescan networks"
+                    Accessible.name: Services.Tr.q("cc.network.rescan")
 
                     // The one activation path, so a key press, a click and a
                     // probe cannot diverge.
@@ -596,7 +598,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     checked: root.wifiEnabled
                     enabled: root.serviceAvailable
-                    accessibleName: "Wi-Fi"
+                    accessibleName: Services.Tr.q("cc.network.wifi")
                     onToggled: function (value) { root.setWifiEnabled(value) }
                 }
 
@@ -643,7 +645,7 @@ Item {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     height: root.errorHeight - 8
-                    text: root.errorText
+                    text: Services.Tr.q(root.errorText)
                     color: LazerTheme.settingsWarning
                     font.pixelSize: 12
                     elide: Text.ElideRight
@@ -697,7 +699,7 @@ Item {
                         id: wifiHeaderTitle
                         x: wifiHeaderBar.width + 6
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Available networks"
+                        text: Services.Tr.q("cc.network.available")
                         color: LazerTheme.textPrimary
                         font.pixelSize: 13
                         font.weight: Font.DemiBold
@@ -729,8 +731,8 @@ Item {
                         anchors.fill: parent
                         verticalAlignment: Text.AlignVCenter
                         text: root.serviceAvailable
-                            ? (root.wifiEnabled ? CcLogic.emptyLabels.network : "Wi-Fi is off")
-                            : "No network service"
+                            ? (root.wifiEnabled ? Services.Tr.q("cc.network.noNetworks") : Services.Tr.q("cc.network.wifiOff"))
+                            : Services.Tr.q("cc.network.noService")
                         color: LazerTheme.textMuted
                         font.pixelSize: 12
                         visible: root.wifiRowCount === 0
@@ -838,7 +840,8 @@ Item {
                                         anchors.rightMargin: 8
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: networkRow.busy
-                                            ? "Connecting to " + networkRow.rowLabel + "…"
+                                            ? Services.Tr.q("cc.network.connectingTo",
+                                                            { ssid: networkRow.rowLabel })
                                             : networkRow.rowLabel
                                         color: LazerTheme.textPrimary
                                         font.pixelSize: 13
@@ -960,7 +963,7 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            text: "Connect"
+                            text: Services.Tr.q("common.connect")
                             color: LazerTheme.textPrimary
                             font.pixelSize: 11
                             font.weight: Font.DemiBold
@@ -991,7 +994,7 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            text: "Cancel"
+                            text: Services.Tr.q("common.cancel")
                             color: LazerTheme.textMuted
                             font.pixelSize: 11
                         }

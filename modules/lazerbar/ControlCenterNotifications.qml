@@ -1,5 +1,6 @@
 import QtQuick
 import "ControlCenterLogic.js" as CcLogic
+import "../../services" as Services
 
 // Bounded notification summary for the control center's information column.
 //
@@ -130,10 +131,10 @@ Item {
     // nothing, so the row announces as text and says which of the two reasons
     // applies instead.
     readonly property string viewAllUnavailableReason: root.entryCount > 0
-            ? " - full notification history is not available"
-            : " - nothing to open"
-    readonly property string emptyLabel: "No notifications"
-    readonly property string viewAllLabel: "View all"
+            ? " - " + Services.Tr.q("cc.notifications.viewAllUnavailable")
+            : " - " + Services.Tr.q("cc.notifications.nothingToOpen")
+    readonly property string emptyLabel: Services.Tr.q("cc.notifications.empty")
+    readonly property string viewAllLabel: Services.Tr.q("cc.notifications.viewAll")
 
     implicitWidth: 320
     // Height is a function of the cap alone. Two entries and nine entries occupy
@@ -168,7 +169,7 @@ Item {
             id: headerTitle
             height: root.headerHeight
             verticalAlignment: Text.AlignVCenter
-            text: "Notifications"
+            text: Services.Tr.q("cc.notifications.title")
             color: LazerTheme.textPrimary
             font.pixelSize: 13
             font.weight: Font.DemiBold

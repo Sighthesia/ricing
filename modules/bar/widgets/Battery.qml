@@ -33,10 +33,10 @@ BarPill {
         : (root.low || root.critical ? LazerTheme.osuPink : LazerTheme.accentColor)
     readonly property string stateLabel: {
         if (!root.ready) return ""
-        if (root.charging) return "Charging"
-        if (root.pluggedIn) return "Full"
-        if (root.critical) return "Critical"
-        if (root.low) return "Low"
+        if (root.charging) return Services.Tr.q("widget.battery.charging")
+        if (root.pluggedIn) return Services.Tr.q("widget.battery.full")
+        if (root.critical) return Services.Tr.q("widget.battery.critical")
+        if (root.low) return Services.Tr.q("widget.battery.low")
         return ""
     }
 
@@ -58,18 +58,18 @@ BarPill {
             try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
         }
         if (!isFinite(centerX)) centerX = 0
-        var summaryText = "No battery"
+        var summaryText = Services.Tr.q("widget.battery.none")
         if (root.available && root.ready) {
             summaryText = root.percentage + "%"
             if (root.showStateLabel && root.stateLabel !== "") summaryText += " · " + root.stateLabel
         } else if (root.available) {
-            summaryText = "Unknown"
+            summaryText = Services.Tr.q("common.unknown")
         }
         return {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,
             screenName: root.screenName,
-            title: "Battery",
+            title: Services.Tr.q("widget.battery"),
             iconSource: Qt.resolvedUrl(root.iconFile),
             tintIcon: true,
             summary: summaryText,

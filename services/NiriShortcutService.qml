@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import "nirishortcuts/NiriShortcutParser.js" as ShortcutParser
+import "./" as Services
 
 // Reads niri binds.kdl into an editable model and writes sequence changes back.
 Singleton {
@@ -21,7 +22,7 @@ Singleton {
     property bool isLoaded: false
     property bool saveInProgress: false
     property string errorText: ""
-    property string statusText: "正在读取 niri 快捷键..."
+    property string statusText: Services.Tr.q("shortcuts.loading")
     property string _sourceText: ""
     property string _pendingWriteText: ""
     property var _entries: []
@@ -36,7 +37,7 @@ Singleton {
     function updateSequence(entryId, nextSequence) {
         const normalizedSequence = String(nextSequence || "").trim()
         if (normalizedSequence === "") {
-            root.errorText = "快捷键不能为空。"
+            root.errorText = Services.Tr.q("shortcuts.emptySequence")
             return false
         }
 
@@ -45,7 +46,7 @@ Singleton {
             return false
 
         root.errorText = ""
-        root.statusText = "正在校验并写回 niri 快捷键..."
+        root.statusText = Services.Tr.q("shortcuts.validating")
         root.saveInProgress = true
         root._pendingWriteText = nextText
         bindsWriter.running = false
@@ -62,7 +63,8 @@ Singleton {
             const entry = root._entries[index]
             shortcutsModel.append({
                 entryId: entry.id,
-                label: entry.title,
+                label: entry.title !== ""
+                    ? entry.title : Services.Tr.q("shortcuts.unnamed"),
                 sequence: entry.sequence,
                 detail: entry.detail,
                 actionId: entry.actionId,
@@ -73,8 +75,8 @@ Singleton {
 
         root.isLoaded = true
         root.statusText = root._entries.length > 0
-            ? "已读取 " + root._entries.length + " 条 niri 快捷键。"
-            : "未在 binds.kdl 中找到可编辑快捷键。"
+            ? Services.Tr.n("shortcuts.loaded", root._entries.length)
+            : Services.Tr.q("shortcuts.noneFound")
         root.shortcutsReloaded()
     }
 
@@ -93,7 +95,7 @@ Singleton {
             root._entries = []
             root._sourceText = ""
             root.isLoaded = true
-            root.errorText = "未找到 ~/.config/niri/binds.kdl，当前无法接管 niri 快捷键。"
+            root.errorText = Services.Tr.q("shortcuts.fileMissing")
             root.statusText = root.errorText
         }
     }
@@ -116,7 +118,7 @@ Singleton {
             root.saveInProgress = false
             if (exitCode === 0) {
                 root.errorText = ""
-                root.statusText = "niri 快捷键已更新。"
+                root.statusText = Services.Tr.q("shortcuts.saved")
                 root._applyLoadedText(root._pendingWriteText)
                 NiriService.reloadConfig()
                 root.shortcutsSaved()
@@ -124,9 +126,9 @@ Singleton {
             }
 
             if (exitCode === 2)
-                root.errorText = "niri 配置校验失败，已取消写回。"
+                root.errorText = Services.Tr.q("shortcuts.invalid")
             else
-                root.errorText = "niri 快捷键写回失败。"
+                root.errorText = Services.Tr.q("shortcuts.writeFailed")
 
             root.statusText = root.errorText
         }

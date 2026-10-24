@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import "../../services/launcher"
 import "LauncherSurfaceLogic.js" as Logic
+import "../../services" as Services
 
 // Self-contained launcher overlay stack: the wave surface, its launcher page,
 // and the session↔surface mirror that routes every open intent (bar entry,
@@ -289,7 +290,7 @@ Item {
         title: {
             var currentPage = root.activePage()
             return currentPage && currentPage.title !== undefined
-                    ? String(currentPage.title) : "Launcher"
+                    ? String(currentPage.title) : Services.Tr.q("launcher.title")
         }
         description: {
             var currentPage = root.activePage()

@@ -45,19 +45,19 @@ BarPill {
             try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
         }
         if (!isFinite(centerX)) centerX = 0
-        var summaryText = "No adapter"
+        var summaryText = Services.Tr.q("widget.bluetooth.noAdapter")
         if (root.available) {
-            if (!root.adapterEnabled) summaryText = "Off"
+            if (!root.adapterEnabled) summaryText = Services.Tr.q("common.off")
             else if (root.connectedCount > 0) {
                 summaryText = root.firstDeviceName
                 if (root.connectedCount > 1) summaryText += " +" + (root.connectedCount - 1)
-            } else summaryText = "On · No devices"
+            } else summaryText = Services.Tr.q("widget.bluetooth.noDevices")
         }
         return {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,
             screenName: root.screenName,
-            title: "Bluetooth",
+            title: Services.Tr.q("widget.bluetooth"),
             iconSource: Qt.resolvedUrl("../icons/bluetooth.svg"),
             tintIcon: true,
             summary: summaryText,

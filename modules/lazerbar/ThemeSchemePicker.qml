@@ -16,7 +16,7 @@ Item {
     property var defaults: ({})
     property var resetCallback: null
 
-    readonly property bool matchesSearch: Logic.matchesSearch("主题模板", "主题模板配色方案 theme scheme", searchQuery)
+    readonly property bool matchesSearch: Logic.matchesSearch(Services.Tr.q("settings.themeScheme"), "theme scheme 主题", searchQuery)
     readonly property bool searchVisible: matchesSearch
     readonly property bool searchHidden: Logic.normalizeSearchQuery(searchQuery).length > 0 && !matchesSearch
 
@@ -115,7 +115,7 @@ Item {
         anchors.leftMargin: 12
         anchors.top: parent.top
         anchors.topMargin: 10
-        text: "主题模板"
+        text: Services.Tr.q("settings.themeScheme")
         color: LazerTheme.textMuted
         font.pixelSize: 11
     }
@@ -271,17 +271,17 @@ Item {
     }
 
     function schemeLabel(scheme) {
-        const labels = {
-            "tonal-spot": "色调",
-            "content": "原色",
-            "fruit-salad": "果盘",
-            "rainbow": "彩虹",
-            "monochrome": "单色",
-            "vibrant": "鲜活",
-            "faithful": "忠实",
-            "muted": "柔和",
+        const keys = {
+            "tonal-spot": "settings.themeScheme.tonalSpot",
+            "content": "settings.themeScheme.content",
+            "fruit-salad": "settings.themeScheme.fruitSalad",
+            "rainbow": "settings.themeScheme.rainbow",
+            "monochrome": "settings.themeScheme.monochrome",
+            "vibrant": "settings.themeScheme.vibrant",
+            "faithful": "settings.themeScheme.faithful",
+            "muted": "settings.themeScheme.muted",
         }
-        return labels[scheme] || scheme
+        return keys[scheme] ? Services.Tr.q(keys[scheme]) : scheme
     }
 
     // Restore-to-default support consistent with sibling rows.

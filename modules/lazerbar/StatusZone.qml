@@ -1,4 +1,5 @@
 import QtQuick
+import "../../services" as Services
 
 // Keep identity, time, uptime, and notification state readable together.
 Item {
@@ -17,6 +18,6 @@ Item {
         UserProfile { username: root.username; avatarSource: root.avatarSource }
         Rectangle { width: 1; height: 24; anchors.verticalCenter: parent.verticalCenter; color: LazerTheme.divider }
         ClockWidget { anchors.verticalCenter: parent.verticalCenter }
-        IconButton { source: "icons/bell.svg"; accessibleName: "Notifications"; active: root.notificationsActive; activeColor: LazerTheme.osuPink; onClicked: root.activateNotification() }
+        IconButton { source: "icons/bell.svg"; accessibleName: Services.Tr.q("cc.notifications.title"); active: root.notificationsActive; activeColor: LazerTheme.osuPink; onClicked: root.activateNotification() }
     }
 }

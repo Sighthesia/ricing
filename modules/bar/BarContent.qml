@@ -275,15 +275,7 @@ Item {
             kind: "context",
             widgetId: widgetId,
             instanceKey: String(item.instanceKey || ""),
-            title: widgetId === "active-window" ? "Active Window"
-                    : widgetId === "notifications" ? "Notifications"
-                    : widgetId === "brightness" ? "Brightness"
-                    : widgetId === "battery" ? "Battery"
-                    : widgetId === "bluetooth" ? "Bluetooth"
-                    : widgetId === "network" ? "Network"
-                    : widgetId === "media" ? "Media"
-                    : widgetId === "volume" ? "Volume"
-                    : widgetId === "tray" ? "System Tray" : widgetId || "Widget",
+            title: root.widgetTitle(widgetId),
             iconSource: iconSource,
             tintIcon: iconSource !== "",
             summary: String(item.section || "center"),
@@ -296,6 +288,21 @@ Item {
         }
     }
 
+    // Localised display name for a widget id. One table, so a widget's title in
+    // the hover popup, the right-click menu and the settings catalog cannot
+    // drift into three different names for the same thing.
+    function widgetTitle(widgetId) {
+        var key = "widget." + String(widgetId || "")
+        if (String(widgetId) === "active-window")
+            key = "widget.activeWindow"
+        else if (String(widgetId) === "system-monitor")
+            key = "widget.systemMonitor"
+        var id = String(widgetId || "")
+        if (id === "")
+            return Services.Tr.q("widget.widget")
+        return Services.Tr.q(key)
+    }
+
     // Bar-level intent for empty gaps so right-click always opens the menu.
     function buildBarIntent(x) {
         var sectionName = root.sectionForX(x)
@@ -304,7 +311,7 @@ Item {
             kind: "context",
             widgetId: "",
             instanceKey: "",
-            title: "Bar",
+            title: Services.Tr.q("widget.bar"),
             iconSource: "",
             summary: sectionName,
             anchorX: Number(anchorPoint.x),

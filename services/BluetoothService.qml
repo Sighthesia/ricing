@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Bluetooth
 import Quickshell.Io
+import "./" as Services
 
 // Bluetooth state: adapter power, scan, device list, pair/connect/forget.
 Singleton {
@@ -48,7 +49,8 @@ Singleton {
         ignoreUnknownSignals: true
         function onEnabledChanged() {
             if (root.enabled) {
-                root._notify(root.enabled ? "Bluetooth on" : "Bluetooth off",
+                root._notify(root.enabled ? Services.Tr.q("bt.notify.on")
+                                          : Services.Tr.q("bt.notify.off"),
                              root.enabled ? "bluetooth" : "bluetooth-off")
             }
         }
@@ -84,7 +86,7 @@ Singleton {
             console.info("[Bluetooth] setBluetoothEnabled", state)
         } catch (e) {
             console.warn("[Bluetooth] enable/disable failed", e)
-            root._notify("Bluetooth state change failed", "bluetooth-off")
+            root._notify(Services.Tr.q("bt.notify.stateFailed"), "bluetooth-off")
         }
     }
 
@@ -226,10 +228,11 @@ Singleton {
         try {
             device.pair()
             console.info("[Bluetooth] pairDevice", device.name || device.deviceName)
-            root._notify("Pairing " + (device.name || device.deviceName || "device"), "bluetooth")
+            root._notify(Services.Tr.q("bt.notify.pairing",
+                { name: device.name || device.deviceName || Services.Tr.q("bt.notify.device") }), "bluetooth")
         } catch (e) {
             console.warn("[Bluetooth] pairDevice failed", e)
-            root._notify("Pair failed", "bluetooth-off")
+            root._notify(Services.Tr.q("bt.notify.pairFailed"), "bluetooth-off")
         }
     }
 
@@ -241,7 +244,7 @@ Singleton {
             console.info("[Bluetooth] connectDeviceWithTrust", device.name || device.deviceName)
         } catch (e) {
             console.warn("[Bluetooth] connectDeviceWithTrust failed", e)
-            root._notify("Connect failed", "bluetooth-off")
+            root._notify(Services.Tr.q("bt.notify.connectFailed"), "bluetooth-off")
         }
     }
 

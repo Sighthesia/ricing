@@ -59,20 +59,22 @@ BarPill {
             try { centerX = root.mapToItem(null, root.width / 2, 0).x } catch (e2) { centerX = 0 }
         }
         if (!isFinite(centerX)) centerX = 0
-        var summaryText = "Off"
+        var summaryText = Services.Tr.q("common.off")
         if (root.ethernetConnected) {
-            summaryText = root.ethernetName !== "" ? root.ethernetName : "Wired"
+            summaryText = root.ethernetName !== "" ? root.ethernetName : Services.Tr.q("common.wired")
         } else if (root.wifiEnabled) {
-            if (root.connecting) summaryText = root.connectingTo !== "" ? "Connecting " + root.connectingTo : "Connecting"
+            if (root.connecting) summaryText = root.connectingTo !== ""
+                ? Services.Tr.q("widget.network.connecting", { ssid: root.connectingTo })
+                : Services.Tr.q("widget.network.connectingGeneric")
             else if (root.statusText !== "") summaryText = root.statusText
-            else if (root.scanning) summaryText = "Scanning…"
-            else summaryText = "Not connected"
+            else if (root.scanning) summaryText = Services.Tr.q("common.scanning")
+            else summaryText = Services.Tr.q("common.notConnected")
         }
         return {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,
             screenName: root.screenName,
-            title: "Network",
+            title: Services.Tr.q("widget.network"),
             iconSource: Qt.resolvedUrl(root.iconFile),
             tintIcon: true,
             summary: summaryText,

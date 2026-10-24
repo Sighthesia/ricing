@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "./" as Services
 
 // Own the lock-screen clock placement: probe the runtime once, then compute and
 // cache one placement per screen size.
@@ -37,8 +38,8 @@ QtObject {
     readonly property bool ready: root.probed && root.available
     // What the settings row says when the row is greyed out.
     readonly property string hint: probed
-        ? "需要 python3 与 OpenCV (cv2)、numpy"
-        : "正在检测运行时…"
+        ? Services.Tr.q("settings.lockClockAutoPlacement.hint")
+        : Services.Tr.q("settings.lockClockAutoPlacement.probing")
 
     // The clock footprint on screen plus room to breathe, from the same scan
     // the design-time tool runs.

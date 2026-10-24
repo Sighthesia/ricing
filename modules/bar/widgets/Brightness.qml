@@ -35,7 +35,7 @@ BarPill {
             widgetId: root.widgetId,
             instanceKey: root.instanceKey,
             screenName: root.screenName,
-            title: "Brightness",
+            title: Services.Tr.q("widget.brightness"),
             iconSource: Qt.resolvedUrl("../icons/brightness.svg"),
             tintIcon: true,
             summary: summaryText,

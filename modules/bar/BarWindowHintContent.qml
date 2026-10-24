@@ -1,6 +1,7 @@
 import QtQuick
 import "../lazerbar"
 import "./WindowHintMenuLogic.js" as HintLogic
+import "../../services" as Services
 
 // Body of the mod-key window hint: a strip of the workspaces around the one you
 // are on. Rendered inside the bar's popup, so it reuses the popup's surface
@@ -2467,7 +2468,7 @@ Item {
         objectName: "windowHintEmpty"
         parent: root
         width: parent.width
-        text: "Waiting for the active workspace"
+        text: Services.Tr.q("hint.waitingWorkspace")
         color: LazerTheme.textMuted
         font.pixelSize: 11
         horizontalAlignment: Text.AlignHCenter

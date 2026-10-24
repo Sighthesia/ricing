@@ -65,13 +65,13 @@ function normalizeCategoryList(value) {
 var appBuckets = [
     {
         id: "games",
-        label: "Games",
+        label: "launcher.chip.games",
         exact: ["game", "shooter", "roleplaying", "amusement", "emulator"],
         prefixes: ["game"]
     },
     {
         id: "dev",
-        label: "Dev",
+        label: "launcher.chip.dev",
         exact: ["development", "ide", "debugger", "profiling", "revisioncontrol",
                 "guidemaker", "guidesigner", "building", "coding", "sdk",
                 "terminalemulator"],
@@ -79,7 +79,7 @@ var appBuckets = [
     },
     {
         id: "graphics",
-        label: "Graphics",
+        label: "launcher.chip.graphics",
         exact: ["graphics", "photography", "scanning", "screenshooter",
                 "imageprocessing", "2dgraphics", "3dgraphics", "rastegraphics",
                 "vectorgraphics", "cad", "chart", "datavisualization",
@@ -88,7 +88,7 @@ var appBuckets = [
     },
     {
         id: "media",
-        label: "Media",
+        label: "launcher.chip.media",
         exact: ["audiovideo", "audio", "video", "music", "player", "tv",
                 "discburning", "midi", "mixer", "sequencer", "recording",
                 "tuner", "television", "photocapture"],
@@ -96,7 +96,7 @@ var appBuckets = [
     },
     {
         id: "network",
-        label: "Network",
+        label: "launcher.chip.network",
         exact: ["network", "webbrowser", "telephony", "telephonytools", "chat",
                 "instantmessaging", "messaging", "email", "contactmanagement",
                 "p2p", "remoteaccess", "remotedesktop", "ftp", "videoconference",
@@ -105,7 +105,7 @@ var appBuckets = [
     },
     {
         id: "office",
-        label: "Office",
+        label: "launcher.chip.office",
         exact: ["office", "wordprocessor", "spreadsheet", "presentation",
                 "publisher", "flowoffice", "calendar", "finance", "dictionary",
                 "texttools", "ocr", "translation", "documentation",
@@ -115,7 +115,7 @@ var appBuckets = [
     },
     {
         id: "system",
-        label: "System",
+        label: "launcher.chip.system",
         exact: ["system", "filesystem", "filesystems", "security", "accessibility",
                 "desktopsettings", "display", "displaysettings", "keyboard",
                 "mouse", "printing", "packagemanager", "applet", "preferences",
@@ -124,7 +124,7 @@ var appBuckets = [
     },
     {
         id: "utility",
-        label: "Utilities",
+        label: "launcher.chip.utilities",
         exact: ["utility", "utilities", "calculator", "compression", "archive",
                 "benchmark", "education", "engineering", "medical", "physics",
                 "math", "numericalanalysis", "astronomy", "biology", "chemistry",
@@ -136,7 +136,7 @@ var appBuckets = [
     },
     {
         id: "other",
-        label: "Other",
+        label: "launcher.chip.other",
         exact: [],
         prefixes: []
     }
@@ -166,6 +166,9 @@ function bucketMatches(bucket, token, pass) {
     return false
 }
 
+// `label` on every taxonomy entry is an i18n KEY: this module is pure data with
+// no Qt import, so the launcher resolves each chip's wording at render time.
+// Ids stay stable English tokens - they are the filter contract, not text.
 // Category id of one desktop entry. Two passes: an exact freedesktop name
 // is unambiguous, so it wins anywhere in the taxonomy, and only then do the
 // family prefixes decide - which is what keeps "VideoConference" out of the
@@ -190,12 +193,12 @@ function appCategoryOf(entry) {
 // ---- Clipboard ----
 
 var clipboardTaxonomy = [
-    { id: "text", label: "Text" },
-    { id: "link", label: "Links" },
-    { id: "code", label: "Code" },
-    { id: "image", label: "Images" },
-    { id: "color", label: "Colors" },
-    { id: "number", label: "Numbers" }
+    { id: "text", label: "launcher.chip.text" },
+    { id: "link", label: "launcher.chip.links" },
+    { id: "code", label: "launcher.chip.code" },
+    { id: "image", label: "launcher.chip.images" },
+    { id: "color", label: "launcher.chip.colors" },
+    { id: "number", label: "launcher.chip.numbers" }
 ]
 
 var linkPattern = /^(?:https?|ftps?|file|ssh|git|mailto|irc|ircs|magnet|news|nntp):\S+$|^www\.[^\s/]+\.\S{2,}$/i
@@ -297,7 +300,7 @@ function taxonomyFor(mode) {
 }
 
 function allLabel(mode) {
-    return "All"
+    return "launcher.chip.all"
 }
 
 // Builds the chip bar model from a LauncherLogic.categorySummary() result:

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Effects
+import "../../services" as Services
 
 // Provide the active pink music entry with flash and tooltip timing state.
 Item {
@@ -10,8 +11,8 @@ Item {
     readonly property bool hovered: enabled && (hoverHandler.hovered || (testMode && forceHoverForTest))
     property bool isFlashing: false
     property url iconSource
-    property string titleText: "Music player"
-    property string subtitleText: "Playback controls"
+    property string titleText: Services.Tr.q("sidebar.music")
+    property string subtitleText: Services.Tr.q("sidebar.music.subtitle")
     property bool testMode: false
     property bool forceHoverForTest: false
     property bool keyboardPressed: false

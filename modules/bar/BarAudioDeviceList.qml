@@ -1,6 +1,7 @@
 import QtQuick
 import "../lazerbar"
 import "../../services/volume/VolumeLogic.js" as VolumeLogic
+import "../../services" as Services
 
 // One direction of the audio device picker: a section header over a bounded list
 // of device rows, the current one carrying a left accent band. Shared by the
@@ -27,7 +28,7 @@ Item {
     property var devices: []
     property var currentDevice: null
     property int maxVisibleRows: 3
-    property string emptyText: "No devices"
+    property string emptyText: Services.Tr.q("popup.audio.noDevices")
     property bool sectionVisible: true
     signal deviceActivated(var device)
 
@@ -292,7 +293,7 @@ Item {
     // its labels from its inputs alone.
     property var levelFormatter: function (device) {
         if (device.audio.muted === true)
-            return "Muted"
+            return Services.Tr.q("popup.audio.muted")
         var raw = Number(device.audio.volume)
         if (!isFinite(raw))
             return ""

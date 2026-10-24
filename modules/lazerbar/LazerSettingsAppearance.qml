@@ -1,6 +1,7 @@
 import QtQuick
 import "../../services/ColorSchemeLogic.js" as ColorLogic
 import "../../services/SolarCalc.js" as SolarCalc
+import "../../services" as Services
 
 // Present the supported appearance settings as one flat section block.
 LazerSettingsSection {
@@ -24,8 +25,10 @@ LazerSettingsSection {
     // same reason as the location wiring above: this page stays singleton-free.
     property bool clockPlacementAvailable: true
     property string clockPlacementHint: ""
-    title: "外观"
+    title: Services.Tr.q("settings.appearance")
 
+    property alias languageRow: languageRow
+    property alias languageChoice: languageChoiceControl
     property alias wallpaperField: wallpaperFieldControl
     property alias colorSchemeChoice: colorSchemeChoiceControl
     property alias autoModeChoice: autoModeChoiceControl
@@ -147,8 +150,8 @@ LazerSettingsSection {
         if (!root.isAutoLocationMode())
             return ""
         if (!root.coordsValid)
-            return "填写经纬度或解析城市后自动计算"
-        return "按位置算出 " + root.effectiveSunrise + "～" + root.effectiveSunset
+            return Services.Tr.q("settings.location.computing")
+        return Services.Tr.q("settings.location.computed", { sunrise: root.effectiveSunrise, sunset: root.effectiveSunset })
     }
 
     // City commit goes through the injected location service when present
@@ -194,18 +197,41 @@ LazerSettingsSection {
             cityFieldControl.lastCommittedText = ""
     }
 
+    // Interface language. "auto" follows the OS locale through Tr, so the row
+    // only stores the intent; the resolved language lives in services/Tr.qml.
+    LazerSettingsRow {
+        id: languageRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: Services.Tr.q("settings.language"); descriptionText: Services.Tr.q("settings.language.description")
+        defaultValue: root.defaultOf("language")
+        currentValue: languageChoiceControl.currentValue
+        resetCallback: function() { root.resetKey("language") }
+        LazerSettingsChoice {
+            id: languageChoiceControl
+            model: [{ value: "auto", label: Services.Tr.q("settings.language.auto") }, { value: "zh", label: Services.Tr.q("settings.language.zh") }, { value: "en", label: Services.Tr.q("settings.language.en") }]
+            currentValue: root.settingsObject && root.settingsObject.language ? root.settingsObject.language : "auto"
+            onValueSelected: function(value) {
+                if (root.settingsObject && ["auto", "zh", "en"].indexOf(value) >= 0) {
+                    root.settingsObject.language = value
+                    root.save()
+                }
+            }
+        }
+    }
+
     LazerSettingsRow {
         id: wallpaperRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "壁纸路径"; descriptionText: "留空恢复默认壁纸"
+        labelText: Services.Tr.q("settings.wallpaperPath"); descriptionText: Services.Tr.q("settings.wallpaperPath.description")
         defaultValue: root.defaultOf("wallpaperPath")
         currentValue: root.settingsObject ? root.settingsObject.wallpaperPath : ""
         resetCallback: function() { root.resetKey("wallpaperPath") }
         LazerSettingsTextField {
             id: wallpaperFieldControl
             text: root.settingsObject ? root.settingsObject.wallpaperPath : ""
-            placeholderText: "文件路径"
+            placeholderText: Services.Tr.q("settings.wallpaperPath.placeholder")
             onTextCommitted: function(path) {
                 if (!root.settingsObject)
                     return
@@ -231,13 +257,13 @@ LazerSettingsSection {
         id: wallpaperModeRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "壁纸显示"; descriptionText: "壁纸的缩放与填充方式"
+        labelText: Services.Tr.q("settings.wallpaperMode"); descriptionText: Services.Tr.q("settings.wallpaperMode.description")
         defaultValue: root.defaultOf("wallpaperMode")
         currentValue: wallpaperModeChoiceControl.currentValue
         resetCallback: function() { root.resetKey("wallpaperMode") }
         LazerSettingsChoice {
             id: wallpaperModeChoiceControl
-            model: [{ value: "crop", label: "裁剪填充" }, { value: "fit", label: "完整显示" }, { value: "stretch", label: "拉伸" }, { value: "tile", label: "平铺" }, { value: "center", label: "居中" }]
+            model: [{ value: "crop", label: Services.Tr.q("settings.wallpaperMode.crop") }, { value: "fit", label: Services.Tr.q("settings.wallpaperMode.fit") }, { value: "stretch", label: Services.Tr.q("settings.wallpaperMode.stretch") }, { value: "tile", label: Services.Tr.q("settings.wallpaperMode.tile") }, { value: "center", label: Services.Tr.q("settings.wallpaperMode.center") }]
             currentValue: root.settingsObject && root.settingsObject.wallpaperMode ? root.settingsObject.wallpaperMode : "crop"
             onValueSelected: function(value) {
                 if (root.settingsObject) {
@@ -254,9 +280,9 @@ LazerSettingsSection {
         id: lockClockRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "锁屏时钟自动定位"
+        labelText: Services.Tr.q("settings.lockClockAutoPlacement")
         descriptionText: root.clockPlacementAvailable
-                         ? "按壁纸的空白处摆放锁屏时钟"
+                         ? Services.Tr.q("settings.lockClockAutoPlacement.description")
                          : root.clockPlacementHint
         footerText: root.clockPlacementAvailable ? "" : root.clockPlacementHint
         enabled: root.clockPlacementAvailable
@@ -281,13 +307,13 @@ LazerSettingsSection {
         id: colorSchemeRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "配色方案"; descriptionText: "自动、深色或浅色"
+        labelText: Services.Tr.q("settings.colorScheme"); descriptionText: Services.Tr.q("settings.colorScheme.description")
         defaultValue: root.defaultOf("colorScheme")
         currentValue: colorSchemeChoiceControl.currentValue
         resetCallback: function() { root.resetKey("colorScheme") }
         LazerSettingsChoice {
             id: colorSchemeChoiceControl
-            model: [{ value: "auto", label: "自动" }, { value: "dark", label: "深色" }, { value: "light", label: "浅色" }]
+            model: [{ value: "auto", label: Services.Tr.q("settings.colorScheme.auto") }, { value: "dark", label: Services.Tr.q("settings.colorScheme.dark") }, { value: "light", label: Services.Tr.q("settings.colorScheme.light") }]
             currentValue: root.normalizeColorScheme(root.settingsObject ? root.settingsObject.colorScheme : "auto")
             onValueSelected: function(value) {
                 if (root.settingsObject && (value === "auto" || value === "dark" || value === "light")) {
@@ -304,13 +330,13 @@ LazerSettingsSection {
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
         enabled: root.isAutoMode()
-        labelText: "自动模式"; descriptionText: "跟随时间、位置或跟随系统"
+        labelText: Services.Tr.q("settings.autoMode"); descriptionText: Services.Tr.q("settings.autoMode.description")
         defaultValue: root.defaultOf("colorSchemeAutoMode")
         currentValue: autoModeChoiceControl.currentValue
         resetCallback: function() { root.resetKey("colorSchemeAutoMode") }
         LazerSettingsChoice {
             id: autoModeChoiceControl
-            model: [{ value: "time", label: "跟随时间" }, { value: "location", label: "跟随位置" }, { value: "system", label: "跟随系统" }]
+            model: [{ value: "time", label: Services.Tr.q("settings.autoMode.time") }, { value: "location", label: Services.Tr.q("settings.autoMode.location") }, { value: "system", label: Services.Tr.q("settings.autoMode.system") }]
             currentValue: root.normalizeAutoMode(root.settingsObject ? root.settingsObject.colorSchemeAutoMode : "time")
             onValueSelected: function(value) {
                 if (root.settingsObject && (value === "time" || value === "location" || value === "system")) {
@@ -326,7 +352,7 @@ LazerSettingsSection {
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
         enabled: root.isAutoTimeMode()
-        labelText: "日出时间"; descriptionText: root.isAutoLocationMode() ? root.locationTimetableHint() : "自动模式按此切到浅色（HH:MM）"
+        labelText: Services.Tr.q("settings.sunrise"); descriptionText: root.isAutoLocationMode() ? root.locationTimetableHint() : Services.Tr.q("settings.sunrise.description")
         defaultValue: root.defaultOf("autoSunrise")
         currentValue: root.settingsObject ? root.settingsObject.autoSunrise : ""
         resetCallback: function() { root.resetKey("autoSunrise") }
@@ -343,7 +369,7 @@ LazerSettingsSection {
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
         enabled: root.isAutoTimeMode()
-        labelText: "日落时间"; descriptionText: root.isAutoLocationMode() ? root.locationTimetableHint() : "自动模式按此切到深色（HH:MM）"
+        labelText: Services.Tr.q("settings.sunset"); descriptionText: root.isAutoLocationMode() ? root.locationTimetableHint() : Services.Tr.q("settings.sunset.description")
         defaultValue: root.defaultOf("autoSunset")
         currentValue: root.settingsObject ? root.settingsObject.autoSunset : ""
         resetCallback: function() { root.resetKey("autoSunset") }
@@ -360,7 +386,7 @@ LazerSettingsSection {
     LazerSettingsRow {
         id: cityRow
         width: parent.width - 16; x: 8
-        labelText: "城市"
+        labelText: Services.Tr.q("settings.city")
         searchQuery: root.searchQuery
         enabled: root.isAutoLocationMode()
         // A failed geocode surfaces inline under the field instead of a
@@ -372,7 +398,7 @@ LazerSettingsSection {
         LazerSettingsTextField {
             id: cityFieldControl
             text: root.settingsObject ? root.settingsObject.autoCity : ""
-            placeholderText: "上海"
+            placeholderText: Services.Tr.q("settings.city.placeholder")
             onTextCommitted: function(text) { root.commitCity(cityFieldControl, text) }
             onClearRequested: function() {
                 if (root.locationService)
@@ -391,7 +417,7 @@ LazerSettingsSection {
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
         enabled: root.isAutoLocationMode()
-        labelText: "纬度"; descriptionText: "范围 -90 到 90"
+        labelText: Services.Tr.q("settings.latitude"); descriptionText: Services.Tr.q("settings.latitude.description")
         defaultValue: root.defaultOf("autoLatitude")
         currentValue: root.settingsObject ? root.settingsObject.autoLatitude : ""
         resetCallback: function() { root.resetKey("autoLatitude") }
@@ -409,7 +435,7 @@ LazerSettingsSection {
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
         enabled: root.isAutoLocationMode()
-        labelText: "经度"; descriptionText: "范围 -180 到 180"
+        labelText: Services.Tr.q("settings.longitude"); descriptionText: Services.Tr.q("settings.longitude.description")
         defaultValue: root.defaultOf("autoLongitude")
         currentValue: root.settingsObject ? root.settingsObject.autoLongitude : ""
         resetCallback: function() { root.resetKey("autoLongitude") }
@@ -436,7 +462,7 @@ LazerSettingsSection {
         id: panelOpacityRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "面板不透明度"; descriptionText: "范围 0.35 到 1"
+        labelText: Services.Tr.q("settings.panelOpacity"); descriptionText: Services.Tr.q("settings.panelOpacity.description")
         defaultValue: root.defaultOf("panelOpacity")
         currentValue: root.settingsObject ? root.settingsObject.panelOpacity : null
         resetCallback: function() { root.resetKey("panelOpacity") }
@@ -452,7 +478,7 @@ LazerSettingsSection {
         id: enableBlurRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "启用模糊"
+        labelText: Services.Tr.q("settings.enableBlur")
         defaultValue: root.defaultOf("enableBlur")
         currentValue: root.settingsObject ? root.settingsObject.enableBlur : null
         resetCallback: function() { root.resetKey("enableBlur") }
@@ -467,7 +493,7 @@ LazerSettingsSection {
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
         enabled: root.settingsObject ? root.settingsObject.enableBlur : false
-        labelText: "模糊表面不透明度"; descriptionText: "范围 0 到 1"
+        labelText: Services.Tr.q("settings.blurSurfaceOpacity"); descriptionText: Services.Tr.q("settings.blurSurfaceOpacity.description")
         defaultValue: root.defaultOf("blurSurfaceOpacity")
         currentValue: root.settingsObject ? root.settingsObject.blurSurfaceOpacity : null
         resetCallback: function() { root.resetKey("blurSurfaceOpacity") }
@@ -484,7 +510,7 @@ LazerSettingsSection {
         id: overviewBackgroundRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "概览背景"; descriptionText: "在 niri 概览中显示壁纸背景"
+        labelText: Services.Tr.q("settings.overviewBackground"); descriptionText: Services.Tr.q("settings.overviewBackground.description")
         defaultValue: root.defaultOf("overviewBackground")
         currentValue: root.settingsObject ? root.settingsObject.overviewBackground : null
         resetCallback: function() { root.resetKey("overviewBackground") }
@@ -500,7 +526,7 @@ LazerSettingsSection {
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
         enabled: root.settingsObject ? root.settingsObject.overviewBackground : false
-        labelText: "概览纯色背景"; descriptionText: "使用纯色而非壁纸"
+        labelText: Services.Tr.q("settings.overviewBackgroundSolid"); descriptionText: Services.Tr.q("settings.overviewBackgroundSolid.description")
         defaultValue: root.defaultOf("overviewBackgroundSolid")
         currentValue: root.settingsObject ? root.settingsObject.overviewBackgroundSolid : null
         resetCallback: function() { root.resetKey("overviewBackgroundSolid") }
@@ -516,7 +542,7 @@ LazerSettingsSection {
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
         enabled: root.settingsObject ? (root.settingsObject.overviewBackground && !root.settingsObject.overviewBackgroundSolid) : false
-        labelText: "概览模糊"; descriptionText: "范围 0 到 1"
+        labelText: Services.Tr.q("settings.overviewBlur"); descriptionText: Services.Tr.q("settings.overviewBlur.description")
         defaultValue: root.defaultOf("overviewBackgroundBlur")
         currentValue: root.settingsObject ? root.settingsObject.overviewBackgroundBlur : null
         resetCallback: function() { root.resetKey("overviewBackgroundBlur") }
@@ -533,7 +559,7 @@ LazerSettingsSection {
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
         enabled: root.settingsObject ? root.settingsObject.overviewBackground : false
-        labelText: "概览着色"; descriptionText: "范围 0 到 1"
+        labelText: Services.Tr.q("settings.overviewTint"); descriptionText: Services.Tr.q("settings.overviewTint.description")
         defaultValue: root.defaultOf("overviewBackgroundTint")
         currentValue: root.settingsObject ? root.settingsObject.overviewBackgroundTint : null
         resetCallback: function() { root.resetKey("overviewBackgroundTint") }
@@ -550,7 +576,7 @@ LazerSettingsSection {
         id: screenCornersRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "屏幕伪圆角"; descriptionText: "用黑色边框遮罩模拟显示器圆角"
+        labelText: Services.Tr.q("settings.screenRoundedCorners"); descriptionText: Services.Tr.q("settings.screenRoundedCorners.description")
         defaultValue: root.defaultOf("screenRoundedCorners")
         currentValue: root.settingsObject ? root.settingsObject.screenRoundedCorners : null
         resetCallback: function() { root.resetKey("screenRoundedCorners") }
@@ -566,7 +592,7 @@ LazerSettingsSection {
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
         enabled: root.settingsObject ? root.settingsObject.screenRoundedCorners !== false : false
-        labelText: "屏幕圆角半径"; descriptionText: "范围 0 到 32 像素"
+        labelText: Services.Tr.q("settings.screenCornerRadius"); descriptionText: Services.Tr.q("settings.screenCornerRadius.description")
         defaultValue: root.defaultOf("screenCornerRadius")
         currentValue: root.settingsObject ? root.settingsObject.screenCornerRadius : null
         resetCallback: function() { root.resetKey("screenCornerRadius") }
@@ -582,7 +608,7 @@ LazerSettingsSection {
         id: glassHighlightRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "玻璃高光强度"; descriptionText: "范围 0 到 1"
+        labelText: Services.Tr.q("settings.glassHighlightIntensity"); descriptionText: Services.Tr.q("settings.glassHighlightIntensity.description")
         defaultValue: root.defaultOf("glassHighlightIntensity")
         currentValue: root.settingsObject ? root.settingsObject.glassHighlightIntensity : null
         resetCallback: function() { root.resetKey("glassHighlightIntensity") }
@@ -598,7 +624,7 @@ LazerSettingsSection {
         id: glassGlowRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "玻璃辉光强度"; descriptionText: "范围 0 到 1"
+        labelText: Services.Tr.q("settings.glassGlowIntensity"); descriptionText: Services.Tr.q("settings.glassGlowIntensity.description")
         defaultValue: root.defaultOf("glassGlowIntensity")
         currentValue: root.settingsObject ? root.settingsObject.glassGlowIntensity : null
         resetCallback: function() { root.resetKey("glassGlowIntensity") }
@@ -614,7 +640,7 @@ LazerSettingsSection {
         id: themeAdaptiveRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "主题自适应"
+        labelText: Services.Tr.q("settings.themeAdaptation")
         defaultValue: root.defaultOf("glassThemeAdaptive")
         currentValue: root.settingsObject ? root.settingsObject.glassThemeAdaptive : null
         resetCallback: function() { root.resetKey("glassThemeAdaptive") }
@@ -624,7 +650,7 @@ LazerSettingsSection {
         id: themeAdaptationRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "壁纸主题色"; descriptionText: "从壁纸提取主题色并应用到界面"
+        labelText: Services.Tr.q("settings.themeColor"); descriptionText: Services.Tr.q("settings.themeColor.description")
         defaultValue: root.defaultOf("themeAdaptation")
         currentValue: root.settingsObject ? root.settingsObject.themeAdaptation : null
         resetCallback: function() { root.resetKey("themeAdaptation") }
@@ -645,7 +671,7 @@ LazerSettingsSection {
         id: syncSystemThemeRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "同步系统亮暗"; descriptionText: "亮暗变化时推送系统色偏好，Electron/portal 应用跟随"
+        labelText: Services.Tr.q("settings.syncSystemTheme"); descriptionText: Services.Tr.q("settings.syncSystemTheme.description")
         defaultValue: root.defaultOf("syncSystemTheme")
         currentValue: root.settingsObject ? root.settingsObject.syncSystemTheme : null
         resetCallback: function() { root.resetKey("syncSystemTheme") }
@@ -655,7 +681,7 @@ LazerSettingsSection {
         id: syncAppThemesRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "同步应用主题"; descriptionText: "亮暗或配色变化时同步 GTK/Qt/kitty 与系统色"
+        labelText: Services.Tr.q("settings.syncAppThemes"); descriptionText: Services.Tr.q("settings.syncAppThemes.description")
         defaultValue: root.defaultOf("syncAppThemes")
         currentValue: root.settingsObject ? root.settingsObject.syncAppThemes : null
         resetCallback: function() { root.resetKey("syncAppThemes") }
@@ -665,7 +691,7 @@ LazerSettingsSection {
         id: terminalClearTextRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "透明终端清晰字"; descriptionText: "透明背景下终端文字全亮度绘制，用颜色区分层级"
+        labelText: Services.Tr.q("settings.terminalClearText"); descriptionText: Services.Tr.q("settings.terminalClearText.description")
         defaultValue: root.defaultOf("terminalClearText")
         currentValue: root.settingsObject ? root.settingsObject.terminalClearText : null
         resetCallback: function() { root.resetKey("terminalClearText") }
@@ -675,7 +701,7 @@ LazerSettingsSection {
         id: rippleRow
         width: parent.width - 16; x: 8
         searchQuery: root.searchQuery
-        labelText: "辉光脉冲"; descriptionText: "通知到达与音量、亮度等瞬态变化时，在通知卡片和顶栏上扫过光环"
+        labelText: Services.Tr.q("settings.ripplePulse"); descriptionText: Services.Tr.q("settings.ripplePulse.description")
         defaultValue: root.defaultOf("ripplePulseEnabled")
         currentValue: root.settingsObject ? root.settingsObject.ripplePulseEnabled : null
         resetCallback: function() { root.resetKey("ripplePulseEnabled") }
