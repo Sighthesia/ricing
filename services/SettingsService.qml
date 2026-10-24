@@ -19,6 +19,9 @@ QtObject {
     readonly property alias widgetInstanceSettings: adapter.widgetInstanceSettings
     // Keep the settings-panel defaults beside the persisted category schemas.
     readonly property var appearanceDefaults: ({
+        // Interface language: "auto" follows the OS locale, otherwise a forced
+        // "zh"/"en" (see services/Tr.qml).
+        language: "auto",
         wallpaperPath: "",
         wallpaperMode: "crop",
         colorScheme: "auto",
@@ -459,6 +462,9 @@ QtObject {
             }
 
             property JsonObject appearance: JsonObject {
+                // Interface language: "auto" follows the OS locale, otherwise a
+                // forced "zh"/"en" (see services/Tr.qml).
+                property string language: "auto"
                 property string wallpaperPath: ""
                 property string wallpaperMode: "crop"
                 property string colorScheme: "auto"
