@@ -223,6 +223,10 @@ Item {
     readonly property alias retryButton: retryButton
     // Current preview-pane item for probes/tests and shell wiring.
     readonly property alias previewSelectedResult: previewPane.selectedResult
+    // Whether the preview pane is still waiting on the decoded pixels of the
+    // entry it is showing. Exposed so a harness can read the exact condition the
+    // pane's loading plate is bound to instead of re-deriving it.
+    readonly property alias previewLoading: previewPane.awaitingThumbnail
     readonly property alias previewTextItem: paneText
     readonly property alias previewImageItem: paneImage
 
@@ -1253,14 +1257,28 @@ Item {
     }
     function _thumbDecoded(id, path) {
         var key = String(id == null ? "" : id)
-        if (!path)
+        if (!path) {
+            // A decode that produced nothing has still FINISHED, and saying so
+            // is what stops the preview pane's loading plate spinning over an
+            // image that will never arrive. Recorded in the same set the rows
+            // use for an unloadable path, so it settles for the rest of the
+            // open and is retried once (see rearmFailedThumbs) on the next one.
+            // The revision bump is what makes the pane re-read that set: an
+            // in-place marker alone reaches no binding.
+            if (key && !root._thumbFailedIds[key]) {
+                root._thumbFailedIds[key] = true
+                root._thumbRev++
+            }
             return
+        }
         root._thumbPaths[key] = path
         root._thumbRev++
     }
     // A materialized row could not load the thumbnail it was handed. Record it
     // and do nothing else: re-decoding immediately would spin, because the
     // cached path is already there and the file behind it has not changed.
+    // Sharing the set with an empty decode result is deliberate: both mean
+    // "settled, nothing to paint", and both want the same one-retry-per-open.
     function noteThumbLoadFailed(id) {
         var key = String(id == null ? "" : id)
         if (!key)
@@ -1353,6 +1371,11 @@ Item {
                 continue
             var id = String(row.result.id == null ? "" : row.result.id)
             if (!/^[0-9]+$/.test(id) || root._thumbPaths[id])
+                continue
+            // An entry that already failed to decode has settled for this open.
+            // Without this the queue would serve it on every tick: its path stays
+            // empty, so the candidate test would keep passing.
+            if (root._thumbFailedIds[id])
                 continue
             var previewed = id === previewId
             var height = row.height
@@ -1479,6 +1502,28 @@ Item {
             return s.selectedIndex >= 0 ? (s.results[s.selectedIndex] || null) : null
         }
         readonly property bool shown: !!selectedResult
+        // The pane's own blank window: true only while the pane has nothing to
+        // paint for the entry on screen. That is the condition a loading mark
+        // owns — blanking content that is already readable in order to spin at
+        // it would report a wait the user is not paying.
+        //
+        // Only an image can reach it. A text entry renders `previewText`,
+        // cliphist's single truncated line, from the moment the row exists; the
+        // full-content decode that follows replaces a sentence with the whole
+        // entry, which is not a blank surface and must not raise a plate.
+        readonly property bool awaitingThumbnail: {
+            var r = selectedResult
+            if (!r || r.isImage !== true)
+                return false
+            // Load-bearing revision read: the qs engine drops bare expressions,
+            // so a decode landing has to be referenced or this never re-runs.
+            var rev = root._thumbRev
+            if (rev < 0)
+                return false
+            var id = String(r.id == null ? "" : r.id)
+            // An entry already reported unloadable is settled, not waiting.
+            return !root._thumbFailedIds[id] && root.clipThumbPath(r) === ""
+        }
         // The decoded path lands asynchronously; mirror it onto the image
         // imperatively because a declarative source binding does not track
         // this property reliably under the qs engine.
@@ -1621,6 +1666,32 @@ Item {
                         // qs engine does not re-run this binding on property
                         // change notifications here.
                         source: ""
+                    }
+
+                    // The pane's wait, for the blank window before the decoded
+                    // image lands. Same `withBox` ring as the launcher's full
+                    // loading surface, because it is the same kind of wait: a
+                    // plate standing over content whose pixels are not there
+                    // yet. Declared inside the image frame, so it can only ever
+                    // appear over an image — a text entry paints its cliphist
+                    // preview immediately and must never be covered.
+                    //
+                    // Entrance and exit are the ring's own (scale 0.6 -> 1,
+                    // 500ms OutQuint); a second fade here would read as a
+                    // stutter.
+                    LazerLoadingRing {
+                        objectName: "clipboardPreviewLoadingRing"
+                        anchors.centerIn: parent
+                        width: 44
+                        height: 44
+                        withBox: true
+                        // Same reasoning as the loading surface: the plate is
+                        // the opposite side of the arc, so it follows the
+                        // scheme's polarity. The pane is a dark card in the dark
+                        // scheme and a lifted light card in the light one.
+                        inverted: !LazerTheme.lightScheme
+                        active: previewPane.shown && previewPane.awaitingThumbnail
+                        running: active
                     }
                 }
             }
@@ -2058,16 +2129,27 @@ Item {
         radius: 0
         color: "transparent"
 
-        // osu!lazer's loading ring, sized up from the popup's 16px because this
-        // is the one place afloat waits on something the user is watching for.
+        // osu!lazer's loading ring in its `withBox` form — the same shape
+        // `LoadingLayer` puts over every full-surface wait upstream, and the one
+        // afloat uses here because this is a plate over arbitrary result content
+        // rather than over a known backdrop. Sized at lazer's own clamp for a
+        // page-level wait (its `MainContents` tops out at 80; this page's
+        // viewport wants a little less), so the plate reads as a plate and the
+        // 0.6 inset arc inside it keeps the ring's weight.
         Column {
             anchors.centerIn: parent
             spacing: 10
 
             LazerLoadingRing {
                 objectName: "launcherLoadingRing"
-                width: 28
-                height: 28
+                width: 44
+                height: 44
+                withBox: true
+                // The plate is always the opposite side of the arc, so it takes
+                // the scheme's polarity rather than a token: on this page's dark
+                // card the default black plate would be invisible, which is
+                // exactly the case lazer answers with `inverted`.
+                inverted: !LazerTheme.lightScheme
                 active: root.sessionLoading
                 running: root.sessionLoading
             }
