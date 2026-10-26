@@ -53,6 +53,15 @@ var FIELD_SCALE = 0.8
 // a full raster. Callers gate on this rather than on opacity alone.
 var FIELD_MIN_VISIBLE_ALPHA = 0.05
 
+// Boxed spinner: lazer gives the plate's `TrianglesV2` the whole container
+// (`RelativeSizeAxes = Axes.Both`, no 0.8 inset) at 0.2 alpha and lets the
+// rounded-rectangle mask crop it, so the boxed field is generated across the
+// full plate and culled to that silhouette instead. It reads more strongly than
+// the bare 0.16 because it sits on the plate rather than over open background.
+var BOX_FIELD_ALPHA = 0.20
+var BOX_FIELD_MIN_SIZE = 22
+var BOX_FIELD_FULL_SIZE = 46
+
 // Deterministic generator. The field is rasterized once, so the same seed must
 // always produce the same triangles — a spinner that reshuffles itself on a
 // theme change reads as a glitch, not as motion.
@@ -84,6 +93,24 @@ function ringGeometry(size) {
     }
 }
 
+// --- Boxed spinner (lazer's `withBox` form) ---------------------------
+//
+// Reference: the same loading spinner file, `withBox` branch. The plate is a
+// `Container` with `CornerRadius = DrawWidth / 4` masked, filled with one flat
+// colour at 0.7 alpha, carrying the triangle field at 0.2 and the same
+// `circle-notch` arc at `Scale = 0.6`. This is the form lazer uses wherever the
+// spinner sits over arbitrary content (`LoadingLayer`), because the plate
+// guarantees contrast the bare arc cannot.
+
+// CornerRadius = DrawWidth / 4, read as a ratio of the plate's short edge.
+var BOX_RADIUS_RATIO = 0.25
+
+// The arc is sized at 0.6 of the plate (`Scale = new Vector2(0.6f)`).
+var BOX_ARC_SCALE = 0.6
+
+// Plate fill alpha, straight from the `Box` in the same branch.
+var BOX_PLATE_ALPHA = 0.7
+
 // Alpha the field is painted at for a given component size.
 function fieldOpacity(size) {
     var edge = Number(size)
@@ -107,6 +134,43 @@ function fieldVisible(size) {
     return fieldOpacity(size) >= FIELD_MIN_VISIBLE_ALPHA
 }
 
+// --- Boxed geometry ----------------------------------------------------
+
+// Corner radius of the plate, clamped so a tiny spinner cannot round itself
+// out of existence.
+function boxedRadius(size) {
+    var edge = Number(size)
+    if (!isFinite(edge) || edge <= 0)
+        return 0
+    return Math.min(edge / 2, edge * BOX_RADIUS_RATIO)
+}
+
+// Side of the arc inside the plate. The arc keeps the glyph's own proportions
+// at this smaller edge, so the plate reads as a frame around a ring rather
+// than as a ring with padding.
+function boxedArcSize(size) {
+    var edge = Number(size)
+    if (!isFinite(edge) || edge <= 0)
+        return 0
+    return edge * BOX_ARC_SCALE
+}
+
+// Alpha the boxed field is painted at. The plate's field covers the whole
+// plate (no 0.8 inset) and is cropped to the rounded rectangle, so it reaches
+// its full strength a little later than the bare one.
+function boxFieldOpacity(size) {
+    var edge = Number(size)
+    if (!isFinite(edge) || edge <= BOX_FIELD_MIN_SIZE)
+        return 0
+    if (edge >= BOX_FIELD_FULL_SIZE)
+        return BOX_FIELD_ALPHA
+    return BOX_FIELD_ALPHA * (edge - BOX_FIELD_MIN_SIZE) / (BOX_FIELD_FULL_SIZE - BOX_FIELD_MIN_SIZE)
+}
+
+function boxFieldVisible(size) {
+    return boxFieldOpacity(size) >= FIELD_MIN_VISIBLE_ALPHA
+}
+
 // Squared distance from a point to the centre of an edge-sized box.
 function _offsetFromCentre(edge, x, y) {
     var dx = x - edge / 2
@@ -114,11 +178,37 @@ function _offsetFromCentre(edge, x, y) {
     return dx * dx + dy * dy
 }
 
+// Whether a point falls inside the disc lazer's bare spinner crops its field
+// to.
+function _insideDisc(edge, x, y) {
+    var limit = (edge / 2) * (edge / 2)
+    return _offsetFromCentre(edge, x, y) <= limit
+}
+
+// Whether a point falls inside the plate of the boxed spinner: a square with
+// `radius` corners. Clamping the point into the corner-radius inset rectangle
+// and measuring from there is the standard signed-distance form — it reduces to
+// the square's own bounds away from the corners and to a quarter-circle test
+// inside them.
+function _insideRoundedRect(edge, radius, x, y) {
+    if (x < 0 || y < 0 || x > edge || y > edge)
+        return false
+    var innerLeft = radius
+    var innerRight = edge - radius
+    var nearestX = Math.min(Math.max(x, innerLeft), innerRight)
+    var nearestY = Math.min(Math.max(y, innerLeft), innerRight)
+    var dx = x - nearestX
+    var dy = y - nearestY
+    return dx * dx + dy * dy <= radius * radius
+}
+
 // One cell of the field: a square optionally split along a diagonal, with every
 // corner nudged so the field does not read as a wire grid. Triangles are pushed
 // flat — [x0, y0, x1, y1, x2, y2, alpha, …] — because the Canvas replays these
-// verbatim and object churn is not free on a repaint.
-function _emitCell(out, random, edge, cell, originX, originY, density, jitter, alpha) {
+// verbatim and object churn is not free on a repaint. `inside` is the silhouette
+// this field is cropped to: a disc for the bare spinner, the plate's rounded
+// rectangle for the boxed one.
+function _emitCell(out, random, edge, cell, originX, originY, density, jitter, alpha, inside) {
     // Lazer fades the field from transparent at the top to solid at the bottom.
     // Deliberately stops short of full strength: a static grid keeps the
     // bottom row's cells on screen together, which a moving one never does.
@@ -144,7 +234,6 @@ function _emitCell(out, random, edge, cell, originX, originY, density, jitter, a
         ? [[0, 1, 2], [0, 2, 3]]
         : [[0, 1, 3], [1, 2, 3]]
 
-    var limit = (edge / 2) * (edge / 2)
     for (var t = 0; t < tris.length; ++t) {
         // Each half decides for itself. Keeping them independent is what leaves
         // half-drawn cells in the field, and that is what makes it read as
@@ -161,13 +250,11 @@ function _emitCell(out, random, edge, cell, originX, originY, density, jitter, a
         var bx = corners[tri[1] * 2], by = corners[tri[1] * 2 + 1]
         var cx = corners[tri[2] * 2], cy = corners[tri[2] * 2 + 1]
 
-        // Lazer crops the field with a circular mask. Emitting only the
-        // triangles whose corners already fall inside that disc gives the same
-        // outline without a mask pass — and Shapes is not an option here anyway,
-        // its antialiased edge leaves a 1px opaque white ring.
-        if (_offsetFromCentre(edge, ax, ay) > limit
-            || _offsetFromCentre(edge, bx, by) > limit
-            || _offsetFromCentre(edge, cx, cy) > limit)
+        // Lazer crops the field with a mask. Emitting only the triangles whose
+        // corners already fall inside the silhouette gives the same outline
+        // without a mask pass — and Shapes is not an option here anyway, its
+        // antialiased edge leaves a 1px opaque white ring.
+        if (!inside(ax, ay) || !inside(bx, by) || !inside(cx, cy))
             continue
 
         out.push(ax, ay, bx, by, cx, cy, shade)
@@ -183,15 +270,43 @@ function triangleField(size, seed, density, cells) {
     if (!isFinite(edge) || edge <= 0)
         return []
 
+    return _gridField(edge, edge, fieldOpacity(size), seed, density, cells,
+                      function (x, y) { return _insideDisc(edge, x, y) })
+}
+
+// The boxed spinner's field: lazer gives the plate's triangle layer the whole
+// plate rather than an inset disc, and masks it with the plate's rounded
+// rectangle. Upstream can afford that because its field is counter-rotated only
+// in its direction of travel (a live particle layer under a masked container);
+// this one is a static texture pinned to the world, so the plate turns *under*
+// it and the two silhouettes disagree by up to a quarter turn.
+//
+// The crop is therefore the largest world-aligned shape guaranteed to stay
+// inside the plate at every rotation: the disc inscribed in the plate's square.
+// A rotating square (rounded or not) always contains its inscribed circle, so
+// this needs no mask pass and no scissor, and it cannot bleed past the plate at
+// any of the four quadrant angles or in between.
+function boxedTriangleField(size, seed, density, cells) {
+    var edge = Number(size)
+    if (!isFinite(edge) || edge <= 0)
+        return []
+
+    return _gridField(edge, edge, boxFieldOpacity(edge), seed, density, cells,
+                      function (x, y) { return _insideDisc(edge, x, y) })
+}
+
+// Shared grid walk behind both fields. Keeping it in one place is what makes
+// the boxed and bare spinners hold the same grain and the same vertical ramp;
+// only the silhouette and the alpha curve differ.
+function _gridField(edge, paintEdge, alpha, seed, density, cells, inside) {
     // Lazer spawns TrianglesV2 at roughly a third of the texture height per
     // cell. Coarser than that and the field reads as blocks rather than as the
     // faceted texture it is meant to be; the floor keeps it fine at popup sizes,
     // where scaling the cell down with the ring would leave a handful of
     // multi-pixel facets instead of a texture.
     var columns = Math.max(7, Math.min(18, Math.round(cells || edge / 4.5)))
-    var cell = edge / columns
+    var cell = paintEdge / columns
     var fill = density === undefined || density === null ? FIELD_DENSITY : density
-    var alpha = fieldOpacity(size)
     var random = makeRandom(seed === undefined || seed === null ? 1 : seed)
     // Just enough corner drift that the grid does not show through; enough to
     // read as scattered facets, not enough to turn cells into blobs.
@@ -200,8 +315,8 @@ function triangleField(size, seed, density, cells) {
     var out = []
     for (var row = 0; row < columns; ++row) {
         for (var col = 0; col < columns; ++col) {
-            _emitCell(out, random, edge, cell,
-                      col * cell, row * cell, fill, jitter, alpha)
+            _emitCell(out, random, paintEdge, cell,
+                      col * cell, row * cell, fill, jitter, alpha, inside)
         }
     }
     return out
