@@ -112,3 +112,16 @@ output_path = "~/.config/opencode/themes/Afloat.json"
 [templates.herdr]
 input_path = "./herdr-theme.toml"
 output_path = "~/.config/afloat/app-themes/herdr-theme.toml"
+
+# pi: 键覆盖参考 https://pi.dev/schemas/theme.schema.json
+# appearance 是固定字段，所以明暗分成两个文件；pi 只热加载
+# <agent-dir>/themes/<name>.json 中当前选中的那一个。
+# 启用：settings.json 里 "theme": "afloat-light/afloat-dark"
+# （斜杠前为浅色、后为深色；也可单独选其中一个名字）。
+[templates.pi-dark]
+input_path = "./pi-theme-dark.json"
+output_path = "~/.pi/agent/themes/afloat-dark.json"
+
+[templates.pi-light]
+input_path = "./pi-theme-light.json"
+output_path = "~/.pi/agent/themes/afloat-light.json"
