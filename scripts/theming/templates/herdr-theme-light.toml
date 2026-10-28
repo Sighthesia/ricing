@@ -24,8 +24,9 @@
 #
 # 本模式的关键约束（Noctalia 的浅色阶梯是反的：container 比 surface 更深）:
 #   · 活动 tab 的标签用 panel_bg 画在 accent 上 → accent 必须深、panel 必须浅；
-#   · 未选中 tab / 侧边栏标签用 overlay0(深) → 它们的底色必须保持浅，
-#     所以选中行只能取 surface_container 档，不能再深。
+#   · 未选中 tab / 侧边栏标签用 overlay0(深) → 它们的底色必须保持浅；
+#     未选中 tab 索性不画底色（surface0 = "reset"），选中行只能取
+#     surface_container 档，不能再深。
 # 括号里是本模式调色板的实测对比度。
 
 [theme.custom]
@@ -40,8 +41,9 @@ overlay1 = "{{colors.on_surface.light.hex}}"
 panel_bg = "{{colors.surface.light.hex}}"
 # 侧边栏比 panel 深一点（1.07）+ 右缘分隔线（1.7）定边界。
 sidebar_bg = "{{colors.surface_container_lowest.light.hex}}"
-# 未选中 tab 底色（标签 overlay0，5.4:1）。
-surface0 = "{{colors.surface_container_low.light.hex}}"
+# 未选中 tab：底色用 "reset"（不画底色，露出终端自己的背景 = kitty 的
+# surface，仍随调色板走）；标签 overlay0 压在那层上 6.4:1。
+surface0 = "reset"
 surface1 = "{{colors.surface_container_high.light.hex}}"
 surface_dim = "{{colors.outline_variant.light.hex}}"
 
