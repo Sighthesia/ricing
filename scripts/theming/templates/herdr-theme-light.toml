@@ -6,6 +6,11 @@
 # ~/.config/herdr/config.toml 的「Afloat managed」块（并在模式切换时重写 + reload）。
 # 不要手改 config.toml 里的 `[theme.custom]`：下一次渲染会覆盖。
 #
+# 注意（herdr 0.9.5 实测）：`herdr server reload-config` 只对之后 attach 的
+# 客户端生效，已经开着的 TUI 会继续用它 attach 时解析出的调色板（即使整屏
+# 重绘也不会变）。要立刻看到新配色，在那个 TUI 里按 prefix+shift+r
+# （keys.reload_config），或重连（prefix+q 后重开）。
+#
 # 为什么不用 herdr 的 [theme.custom.light]/[.dark] 子表：
 # 它们在 auto_switch = true 时才叠加，而 herdr 只在启动时查询一次宿主外观，
 # 所以 herdr-radar 插件固定 auto_switch = false、自己改写 [theme] name 来切主题。

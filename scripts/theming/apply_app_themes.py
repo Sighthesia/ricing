@@ -487,8 +487,16 @@ def main() -> int:
         run_hooks(args.mode)
         if not reload_niri():
             print("Warning: Niri config reload unavailable", file=sys.stderr)
-        if herdr_changed and not reload_herdr():
-            print("Warning: Herdr config reload unavailable", file=sys.stderr)
+        if herdr_changed:
+            if not reload_herdr():
+                print("Warning: Herdr config reload unavailable", file=sys.stderr)
+            else:
+                # Measured on herdr 0.9.5: the socket reload only reaches clients
+                # that attach afterwards. An already-attached TUI keeps the
+                # palette it resolved at attach time even across a full redraw;
+                # only its own reload keybinding re-resolves it.
+                print("Herdr: a running TUI applies the new palette on "
+                      "prefix+shift+r (keys.reload_config)")
 
     print(f"App themes applied: palette={args.palette} mode={args.mode}")
     return 0
