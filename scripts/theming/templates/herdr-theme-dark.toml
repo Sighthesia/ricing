@@ -15,16 +15,18 @@ subtext0 = "{{colors.on_surface_variant.dark.hex}}"
 overlay0 = "{{colors.on_surface_variant.dark.hex}}"
 overlay1 = "{{colors.on_surface.dark.hex}}"
 
-panel_bg = "{{colors.surface.dark.hex}}"
-sidebar_bg = "{{colors.surface_container_low.dark.hex}}"
+# 同 light：不画底色，露出终端自己的（半透明）背景。
+panel_bg = "reset"
+sidebar_bg = "reset"
 # 未选中 tab：不画底色（同一份理由，见 light 模板）。
 surface0 = "reset"
 surface1 = "{{colors.surface_container_high.dark.hex}}"
 surface_dim = "{{colors.outline_variant.dark.hex}}"
 
-# 深色下 accent 直接用 primary：深底上 6.2:1，标签反白可读。
-# 再压暗会掉到 3.5:1，反而糊。
-accent = "{{colors.primary.dark.hex}}"
+# panel_bg = "reset" 时活动 tab 的标签色回落到 surface_dim（outline_variant,
+# 深色档 #4a403d），所以 accent 必须比它亮：取 primary_fixed_dim，
+# 标签 5.0:1、accent 对透明底 8.4:1。
+accent = "{{colors.primary_fixed_dim.dark.hex}}"
 # 选中行/选区：primary_container 压一档（对侧边栏 2.0:1，overlay0 标签 5.6:1）。
 active_row_bg = "{{colors.primary_container.dark.hex | darken: 8.0}}"
 selection_bg = "{{colors.primary_container.dark.hex | darken: 8.0}}"

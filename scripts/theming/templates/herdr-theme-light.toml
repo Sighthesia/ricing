@@ -40,22 +40,23 @@ subtext0 = "{{colors.on_surface_variant.light.hex}}"
 overlay0 = "{{colors.on_surface_variant.light.hex}}"
 overlay1 = "{{colors.on_surface.light.hex}}"
 
-# 背景层：显式取调色板，不用 "reset"（"reset" 会落回基础主题 catppuccin-latte 的
-# #eff1f5/#ccd0da，一屏混两套浅色，accent 的标签色也随之漂移）。
-# panel_bg 只画 chrome，pane 内容仍用终端自己的透明底色。
-panel_bg = "{{colors.surface.light.hex}}"
-# 侧边栏比 panel 深一点（1.07）+ 右缘分隔线（1.7）定边界。
-sidebar_bg = "{{colors.surface_container_lowest.light.hex}}"
+# 背景层：一律 "reset"（不画底色），chrome 直接露出终端背景 = kitty 的
+# translucent surface，壁纸透光得以保留。之前这里取显式色，面板就被刷成
+# 不透明了（tab 栏与 agents 侧边栏都一样）。
+panel_bg = "reset"
+sidebar_bg = "reset"
 # 未选中 tab：底色用 "reset"（不画底色，露出终端自己的背景 = kitty 的
 # surface，仍随调色板走）；标签 overlay0 压在那层上 6.4:1。
 surface0 = "reset"
 surface1 = "{{colors.surface_container_high.light.hex}}"
 surface_dim = "{{colors.outline_variant.light.hex}}"
 
-# accent 是活动 tab 的底色（标签用 panel_bg 反白，7.1:1）+ 焦点边框，
-# 必须取前景级深色。原来的 surface_container_high(#f3c6b9) 当边框≈隐形、
-# 当 tab 底色与标签仅 1.2:1 —— 浅色下发灰的主因。
-accent = "{{colors.primary.light.hex | darken: 16.0}}"
+# accent 是活动 tab 的底色 + 焦点边框。
+# 实测：panel_bg = "reset" 时，活动 tab 的**标签色回落到 surface_dim**
+# （把 surface_dim 改成 #0000ff，标签立刻变蓝）。而 surface_dim 又是分隔线，
+# 只能留在 outline_variant 档，于是 accent 必须与它拉开：压暗 26% 后标签
+# 5.7:1、accent 对透明底 10.4:1。
+accent = "{{colors.primary.light.hex | darken: 26.0}}"
 # 选中行/选区：比侧边栏深一档（1.3）让选中可见，同时 overlay0 标签仍有 4.6:1。
 active_row_bg = "{{colors.surface_container.light.hex}}"
 selection_bg = "{{colors.surface_container.light.hex}}"
