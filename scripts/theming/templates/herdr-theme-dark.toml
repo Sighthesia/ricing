@@ -1,0 +1,38 @@
+# Afloat-generated Herdr theme overrides — **dark** appearance（深色专用）
+#
+# 由 apply_app_themes.py 渲染，产物写到
+# ~/.config/afloat/app-themes/herdr-dark.toml；同目录的 herdr-light.toml 是浅色版。
+# apply_app_themes.py 会把**与当前模式匹配**的那一份写进
+# ~/.config/herdr/config.toml 的「Afloat managed」块（并在模式切换时重写 + reload）。
+# 不要手改 config.toml 里的 `[theme.custom]`：下一次渲染会覆盖。
+#
+# 键语义见 herdr-theme-light.toml 顶部（同一份说明，按 herdr 0.9.5 实测）。
+# 括号里的对比度是对本模式调色板实测值。
+
+[theme.custom]
+text = "{{colors.on_surface.dark.hex}}"
+subtext0 = "{{colors.on_surface_variant.dark.hex}}"
+overlay0 = "{{colors.on_surface_variant.dark.hex}}"
+overlay1 = "{{colors.on_surface.dark.hex}}"
+
+panel_bg = "{{colors.surface.dark.hex}}"
+sidebar_bg = "{{colors.surface_container_low.dark.hex}}"
+surface0 = "{{colors.surface_container.dark.hex}}"
+surface1 = "{{colors.surface_container_high.dark.hex}}"
+surface_dim = "{{colors.outline_variant.dark.hex}}"
+
+# 深色下 accent 直接用 primary：深底上 6.2:1，标签反白可读。
+# 再压暗会掉到 3.5:1，反而糊。
+accent = "{{colors.primary.dark.hex}}"
+# 选中行/选区：primary_container 压一档（对侧边栏 2.0:1，overlay0 标签 5.6:1）。
+active_row_bg = "{{colors.primary_container.dark.hex | darken: 8.0}}"
+selection_bg = "{{colors.primary_container.dark.hex | darken: 8.0}}"
+
+# 深色语义色本身够亮，只有 error 在 4.1:1，提亮一档到 4.6。
+red = "{{colors.error.dark.hex | lighten: 4.0}}"
+green = "{{colors.tertiary.dark.hex}}"
+yellow = "{{colors.secondary.dark.hex}}"
+blue = "{{colors.primary.dark.hex}}"
+mauve = "{{colors.primary_fixed_dim.dark.hex}}"
+teal = "{{colors.tertiary_fixed_dim.dark.hex}}"
+peach = "{{colors.secondary_fixed_dim.dark.hex}}"

@@ -240,6 +240,101 @@ def sync_kde_theme(home: Path) -> bool:
         return False
 
 
+# Herdr keeps its theme in one static [theme.custom] table: herdr > 0.9 only reads
+# [theme.custom.light]/[.dark] under auto_switch, and auto_switch is deliberately
+# off (herdr-radar drives [theme] name instead, because herdr queries the host
+# appearance once at startup). So a single table cannot hold a value per mode —
+# we write the appearance-correct one on every apply and let reload-config pick
+# it up. The block is managed; a hand-written [theme.custom] is replaced so the
+# file never holds two tables with the same name (a TOML parse error).
+_HERDR_BEGIN = "# >>> Afloat managed: herdr palette. Do not edit or merge into it."
+_HERDR_END = "# <<< Afloat managed."
+# A hand-merged table from the generated snippet (the pre-managed workflow).
+# Removed together with the comment line that introduced it.
+_HERDR_LEGACY_COMMENT = "# Afloat palette (from ~/.config/afloat/app-themes/herdr-theme.toml)."
+
+
+def _herdr_table_body(text: str) -> list[str]:
+    """Return the [theme.custom] entries of one rendered herdr snippet."""
+    body: list[str] = []
+    inside = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("["):
+            inside = stripped == "[theme.custom]"
+            continue
+        if inside and stripped and not stripped.startswith("#"):
+            body.append(stripped)
+    return body
+
+
+def sync_herdr_theme(home: Path, mode: str) -> bool:
+    """Write the rendered mode's [theme.custom] into herdr's config.toml.
+
+    Two tables with the same name are a TOML parse error, so the managed block
+    owns `[theme.custom]` outright: any hand-written copy (and the old
+    `[theme.custom.light]`/`[.dark]` pair, which herdr never reads while
+    auto_switch stays off) is replaced. Only that table is touched — keys,
+    rows and markers owned by herdr-radar are left alone, and because a foreign
+    table no longer exists, radar keeps skipping the one it would otherwise
+    write.
+    """
+    source = home / f".config/afloat/app-themes/herdr-{mode}.toml"
+    target = home / ".config/herdr/config.toml"
+    if not source.exists() or not target.exists():
+        return False
+
+    body = _herdr_table_body(source.read_text())
+    if not body:
+        print(f"Warning: herdr snippet has no [theme.custom] table: {source}",
+              file=sys.stderr)
+        return False
+
+    kept: list[str] = []
+    in_block = False
+    in_foreign_table = False
+    for raw in target.read_text().splitlines():
+        stripped = raw.strip()
+        if stripped == _HERDR_BEGIN:
+            in_block = True
+            continue
+        if in_block:
+            if stripped == _HERDR_END:
+                in_block = False
+            continue
+        if stripped.startswith("["):
+            # A table we own: drop it and its entries until the next header.
+            in_foreign_table = (stripped == "[theme.custom]"
+                                or stripped.startswith("[theme.custom."))
+            if in_foreign_table:
+                continue
+        if in_foreign_table:
+            continue
+        if stripped == _HERDR_LEGACY_COMMENT:
+            continue
+        kept.append(raw)
+
+    block = [_HERDR_BEGIN, "[theme.custom]", *body, _HERDR_END]
+    head = "\n".join(kept).rstrip("\n")
+    rendered = (head + "\n\n" if head else "") + "\n".join(block) + "\n"
+    if rendered == target.read_text():
+        return False
+    target.write_text(rendered)
+    return True
+
+
+def reload_herdr() -> bool:
+    """Ask herdr to re-read config.toml; failure is non-fatal."""
+    if not _which("herdr"):
+        return False
+    try:
+        result = subprocess.run(["herdr", "server", "reload-config"],
+                                capture_output=True, timeout=10)
+        return result.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def _theme_exists(name: str) -> bool:
     """Check a GTK theme exists in the standard lookup locations."""
     import os
@@ -385,12 +480,15 @@ def main() -> int:
     sync_kitty_clear_text(home, args.terminal_clear_text)
     sync_kde_theme(home)
     sync_niri_config(home)
+    herdr_changed = sync_herdr_theme(home, args.mode)
 
     if args.home_prefix is None:
         notify_kde_theme()
         run_hooks(args.mode)
         if not reload_niri():
             print("Warning: Niri config reload unavailable", file=sys.stderr)
+        if herdr_changed and not reload_herdr():
+            print("Warning: Herdr config reload unavailable", file=sys.stderr)
 
     print(f"App themes applied: palette={args.palette} mode={args.mode}")
     return 0

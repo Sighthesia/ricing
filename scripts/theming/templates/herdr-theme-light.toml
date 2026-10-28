@@ -1,0 +1,63 @@
+# Afloat-generated Herdr theme overrides — **light** appearance（浅色专用）
+#
+# 由 apply_app_themes.py 渲染，产物写到
+# ~/.config/afloat/app-themes/herdr-light.toml；同目录的 herdr-dark.toml 是深色版。
+# apply_app_themes.py 会把**与当前模式匹配**的那一份写进
+# ~/.config/herdr/config.toml 的「Afloat managed」块（并在模式切换时重写 + reload）。
+# 不要手改 config.toml 里的 `[theme.custom]`：下一次渲染会覆盖。
+#
+# 为什么不用 herdr 的 [theme.custom.light]/[.dark] 子表：
+# 它们在 auto_switch = true 时才叠加，而 herdr 只在启动时查询一次宿主外观，
+# 所以 herdr-radar 插件固定 auto_switch = false、自己改写 [theme] name 来切主题。
+# 于是子表永远不会生效，只有一个静态 [theme.custom] 会被读 —— 这正是「浅色下
+# 拿到深色 accent」的根因。模式由 Afloat 这边决定，就直接写模式正确的那张表。
+#
+# 键语义（按 herdr 0.9.5 实测渲染结果，不是猜的）：
+#   accent        选中 tab 的**底色**，该 tab 的标签用 panel_bg 画
+#                 → 两者必须互相对比 ≥ 4.5，否则标签糊在底色里
+#   surface0      未选中 tab 的底色，其标签用 overlay0
+#   panel_bg      tab 栏/面板底色，同时是活动 tab 的标签色
+#   sidebar_bg    侧边栏底色（pane 内容不受影响，仍是终端自己的透明背景）
+#   active_row_bg 侧边栏选中行底色（标签同样用 overlay0）
+#   surface_dim   分隔线、树形连接线
+#   overlay0/1    次要文字 / 常规文字
+#
+# 本模式的关键约束（Noctalia 的浅色阶梯是反的：container 比 surface 更深）:
+#   · 活动 tab 的标签用 panel_bg 画在 accent 上 → accent 必须深、panel 必须浅；
+#   · 未选中 tab / 侧边栏标签用 overlay0(深) → 它们的底色必须保持浅，
+#     所以选中行只能取 surface_container 档，不能再深。
+# 括号里是本模式调色板的实测对比度。
+
+[theme.custom]
+text = "{{colors.on_surface.light.hex}}"
+subtext0 = "{{colors.on_surface_variant.light.hex}}"
+overlay0 = "{{colors.on_surface_variant.light.hex}}"
+overlay1 = "{{colors.on_surface.light.hex}}"
+
+# 背景层：显式取调色板，不用 "reset"（"reset" 会落回基础主题 catppuccin-latte 的
+# #eff1f5/#ccd0da，一屏混两套浅色，accent 的标签色也随之漂移）。
+# panel_bg 只画 chrome，pane 内容仍用终端自己的透明底色。
+panel_bg = "{{colors.surface.light.hex}}"
+# 侧边栏比 panel 深一点（1.07）+ 右缘分隔线（1.7）定边界。
+sidebar_bg = "{{colors.surface_container_lowest.light.hex}}"
+# 未选中 tab 底色（标签 overlay0，5.4:1）。
+surface0 = "{{colors.surface_container_low.light.hex}}"
+surface1 = "{{colors.surface_container_high.light.hex}}"
+surface_dim = "{{colors.outline_variant.light.hex}}"
+
+# accent 是活动 tab 的底色（标签用 panel_bg 反白，7.1:1）+ 焦点边框，
+# 必须取前景级深色。原来的 surface_container_high(#f3c6b9) 当边框≈隐形、
+# 当 tab 底色与标签仅 1.2:1 —— 浅色下发灰的主因。
+accent = "{{colors.primary.light.hex | darken: 16.0}}"
+# 选中行/选区：比侧边栏深一档（1.3）让选中可见，同时 overlay0 标签仍有 4.6:1。
+active_row_bg = "{{colors.surface_container.light.hex}}"
+selection_bg = "{{colors.surface_container.light.hex}}"
+
+# 语义色都画在浅底上，M3 原值只有 2.5–3.8:1，统一压暗到 ≥4.8。
+red = "{{colors.error.light.hex | darken: 16.0}}"
+green = "{{colors.tertiary.light.hex | darken: 16.0}}"
+yellow = "{{colors.secondary.light.hex | darken: 16.0}}"
+blue = "{{colors.primary.light.hex | darken: 16.0}}"
+mauve = "{{colors.primary_fixed_dim.light.hex}}"
+teal = "{{colors.tertiary_fixed_dim.light.hex | darken: 10.0}}"
+peach = "{{colors.secondary_fixed_dim.light.hex | darken: 10.0}}"

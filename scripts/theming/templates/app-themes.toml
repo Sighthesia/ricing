@@ -105,13 +105,17 @@ output_path = "~/.config/afloat/app-themes/firefox-colors.css"
 input_path = "./opencode-theme.json"
 output_path = "~/.config/opencode/themes/Afloat.json"
 
-# Herdr: generation only (config.toml 含用户按键绑定，不可整体覆写).
-# Merge the rendered snippet's [theme.custom] tables into
-# ~/.config/herdr/config.toml, keeping [theme] name = "terminal" so the base
-# follows the kitty ANSI palette; enable auto_switch for light/dark subtables.
-[templates.herdr]
-input_path = "./herdr-theme.toml"
-output_path = "~/.config/afloat/app-themes/herdr-theme.toml"
+# Herdr: 两张模式专用的 [theme.custom]，apply_app_themes.py 会把与当前
+# effectiveColorScheme 匹配的那张写进 ~/.config/herdr/config.toml 的 managed 块
+# 并 reload，所以 herdr 自己的 auto_switch 不必开（radar 也不会被顶掉）。
+# 键语义见模板头部：accent 是选中 tab 的底色、surface0 是未选中 tab 的底色。
+[templates.herdr-dark]
+input_path = "./herdr-theme-dark.toml"
+output_path = "~/.config/afloat/app-themes/herdr-dark.toml"
+
+[templates.herdr-light]
+input_path = "./herdr-theme-light.toml"
+output_path = "~/.config/afloat/app-themes/herdr-light.toml"
 
 # pi: 键覆盖参考 https://pi.dev/schemas/theme.schema.json
 # appearance 是固定字段，所以明暗分成两个文件；pi 只热加载
