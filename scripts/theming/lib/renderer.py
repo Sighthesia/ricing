@@ -117,6 +117,32 @@ def _atomic_write(path: Path, text: str) -> None:
         raise
 
 
+def _in_place_write(path: Path, text: str) -> None:
+    """Write `text` into the existing inode of `path`.
+
+    Some watchers only ever report the target's own name. `_atomic_write`
+    renames a temp file over the target, so `fs.watch` on the directory fires
+    `rename` for the temp name and `rename` for the target; a watcher that
+    subscribes to the *file* (rather than the directory) never sees either
+    event, because the inode it watches is the one that got unlinked. pi's
+    theme reload is exactly that case, so its output opts in here: truncating
+    and rewriting the same inode fires a single `change` for the target name,
+    which both directory- and file-based watchers report.
+
+    The trade-off is the torn-read window `_atomic_write` exists to avoid, so
+    only use this for a target that is rewritten as a whole by a consumer that
+    re-reads on every event (pi parses the JSON per reload and ignores a parse
+    error, keeping the last good theme).
+    """
+    with open(path, "w") as fh:
+        fh.write(text)
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
+WRITE_MODES = ("atomic", "in-place")
+
+
 class TemplateRenderer:
     """
     Renders templates using the generated theme colors.
@@ -1008,11 +1034,16 @@ class TemplateRenderer:
 
         return result
 
-    def render_file(self, input_path: Path, output_path: Path) -> Tuple[bool, bool]:
+    def render_file(
+        self, input_path: Path, output_path: Path, write_mode: str = "atomic"
+    ) -> Tuple[bool, bool]:
         """Render a template file to an output path.
 
         Returns (success, wrote) where wrote is False if the file was skipped because
         content was already identical (avoids mtime bumps and app reloads).
+
+        `write_mode` selects how the output reaches disk; see `_atomic_write`
+        and `_in_place_write`. Unknown values fall back to `atomic`.
         """
         self._current_file = str(input_path)
         success = False
@@ -1034,7 +1065,8 @@ class TemplateRenderer:
                     except OSError:
                         pass
                 if not skip_write:
-                    _atomic_write(out, rendered_text)
+                    writer = _in_place_write if write_mode == "in-place" else _atomic_write
+                    writer(out, rendered_text)
                     wrote = True
                 success = True
         except FileNotFoundError:
@@ -1213,7 +1245,17 @@ class TemplateRenderer:
                     rendered_compare_to = self.render(compare_to)
                     self.closest_color = find_closest_color(rendered_compare_to, colors_to_compare)
 
-                ok, wrote = self.render_file(Path(input_path).expanduser(), Path(output_path).expanduser())
+                write_mode = template.get("write_mode", "atomic")
+                if write_mode not in WRITE_MODES:
+                    print(f"Warning: Template '{name}' has unknown write_mode "
+                          f"'{write_mode}'; using 'atomic'", file=sys.stderr)
+                    write_mode = "atomic"
+
+                ok, wrote = self.render_file(
+                    Path(input_path).expanduser(),
+                    Path(output_path).expanduser(),
+                    write_mode=write_mode,
+                )
                 if not ok:
                     failed = True
                     continue

@@ -118,14 +118,15 @@ input_path = "./herdr-theme-light.toml"
 output_path = "~/.config/afloat/app-themes/herdr-light.toml"
 
 # pi: 键覆盖参考 https://pi.dev/schemas/theme.schema.json
-# appearance 是固定字段，所以明暗分成两个文件；pi 只热加载
-# <agent-dir>/themes/<name>.json 中当前选中的那一个。
-# 启用：settings.json 里 "theme": "afloat-light/afloat-dark"
-# （斜杠前为浅色、后为深色；也可单独选其中一个名字）。
-[templates.pi-dark]
-input_path = "./pi-theme-dark.json"
-output_path = "~/.pi/agent/themes/afloat-dark.json"
-
-[templates.pi-light]
-input_path = "./pi-theme-light.json"
-output_path = "~/.pi/agent/themes/afloat-light.json"
+# 单个文件 + write_mode = "in-place"，原因是 pi 的两条限制：
+#  1. 它把主题注册表缓存起来，只在「当前选中」的那个文件变化时重读；明暗两份
+#     文件里的另一份永远不会被重新读取，所以切换过去会显示上一次的配色。
+#  2. 它的热加载用 Bun 的 fs.watch 监听 themes 目录，只认目标文件名；默认的
+#     tmp+rename 原子写入对它不可见（重命名的是临时名），必须原地重写同一
+#     inode，才能触发它响应的 change 事件。
+# 因此 appearance 与配色都由 {{ mode }} 渲染进同一个 afloat.json，切换明暗时
+# pi 原地重读即可。启用：settings.json 里 "theme": "afloat"。
+[templates.pi]
+input_path = "./pi-theme.json"
+output_path = "~/.pi/agent/themes/afloat.json"
+write_mode = "in-place"
