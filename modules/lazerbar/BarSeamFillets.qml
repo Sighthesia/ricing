@@ -29,6 +29,11 @@ Item {
     // as alpha, so a fillet and the fill it continues blend with the desktop the
     // same way.
     property real fillOpacity: 1
+    // Which ends still have free desktop under them. A window that covers an end
+    // must occlude the seam there instead of letting it show through the window's
+    // own translucency, so that end is not painted at all. See SeamOcclusion.js.
+    property bool showLeft: true
+    property bool showRight: true
 
     readonly property real size: Math.max(0, Number(root.radius) || 0)
 
@@ -42,6 +47,7 @@ Item {
     Image {
         x: 0
         y: 0
+        visible: root.showLeft
         width: root.size
         height: root.size
         rotation: SeamLogic.rotationFor(root.atTop, true)
@@ -64,6 +70,7 @@ Item {
     Image {
         x: root.width - root.size
         y: 0
+        visible: root.showRight
         width: root.size
         height: root.size
         rotation: SeamLogic.rotationFor(root.atTop, false)

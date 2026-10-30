@@ -18,6 +18,15 @@ Singleton {
     // verdict derived from them. Both are plain vars recomputed imperatively,
     // never bindings over `get()` rows, so a consumer can bind to them safely.
     property var outputSizes: ({})
+    // Active workspace id per connector. Same plain-var contract as
+    // outputSizes: consumers bind to it, so it is reassigned rather than
+    // mutated, and it is never derived from `get()` inside a binding.
+    property var activeWorkspaces: ({})
+    // Plain-object copy of the windows that carry layout geometry, plus their
+    // workspace and floating position. Consumers that must decide something from
+    // window placement bind to THIS rather than to `windows`: a binding that
+    // reads `get()` rows is not reliably invalidated.
+    property var windowRects: []
     property var _fullscreenOutputs: ({})
 
     // Public read-only view of the verdicts, for consumers that need a QML
@@ -201,6 +210,10 @@ Singleton {
             const pos = (Array.isArray(rawPos) && rawPos.length >= 2) ? rawPos : null
             const rawTile = win.layout ? win.layout.tile_size : null
             const tile = (Array.isArray(rawTile) && rawTile.length >= 2) ? rawTile : null
+            // Only floating windows report a place on the output; a tiled
+            // window's position depends on the scrolling layout's offset.
+            const rawView = win.layout ? win.layout.tile_pos_in_workspace_view : null
+            const view = (Array.isArray(rawView) && rawView.length >= 2) ? rawView : null
             windows.append({
                 winId: String(win.id),
                 title: win.title || "",
@@ -212,7 +225,11 @@ Singleton {
                 // Tile geometry drives fullscreen detection: niri reports no
                 // is_fullscreen flag, but a fullscreen tile is the whole output.
                 tileWidth: tile ? Number(tile[0]) : 0,
-                tileHeight: tile ? Number(tile[1]) : 0
+                tileHeight: tile ? Number(tile[1]) : 0,
+                isFloating: win.is_floating === true,
+                // -1 means "not reported", which is every tiled window.
+                viewX: view ? Number(view[0]) : -1,
+                viewY: view ? Number(view[1]) : -1
             })
         }
         root._windowsRevision++
@@ -247,12 +264,20 @@ Singleton {
             const tile = (Array.isArray(rawTile) && rawTile.length >= 2) ? rawTile : null
             if (!tile)
                 continue
+            // A floating window being dragged reports its new place through the
+            // same event, so the seam's occlusion test has to follow it.
+            const rawView = layout.tile_pos_in_workspace_view
+            const view = (Array.isArray(rawView) && rawView.length >= 2) ? rawView : null
 
             for (let w = 0; w < windows.count; w++) {
                 if (windows.get(w).winId !== winId)
                     continue
                 windows.setProperty(w, "tileWidth", Number(tile[0]))
                 windows.setProperty(w, "tileHeight", Number(tile[1]))
+                if (view) {
+                    windows.setProperty(w, "viewX", Number(view[0]))
+                    windows.setProperty(w, "viewY", Number(view[1]))
+                }
                 break
             }
         }
@@ -314,6 +339,8 @@ Singleton {
                 focused[String(win.workspaceId)] = String(win.winId)
         }
 
+        root.activeWorkspaces = active
+
         const rows = []
         for (let k = 0; k < windows.count; k++) {
             const win = windows.get(k)
@@ -322,9 +349,13 @@ Singleton {
                 workspaceId: win.workspaceId,
                 isFocused: win.isFocused === true,
                 tileWidth: win.tileWidth,
-                tileHeight: win.tileHeight
+                tileHeight: win.tileHeight,
+                isFloating: win.isFloating === true,
+                viewX: win.viewX,
+                viewY: win.viewY
             })
         }
+        root.windowRects = rows
         root._fullscreenOutputs = FullscreenDetect
             .fullscreenOutputs(root.outputSizes, active, focused, rows)
     }

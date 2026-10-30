@@ -8,6 +8,7 @@ import "WallpaperReveal.js" as RevealLogic
 import "WallpaperBootLogic.js" as BootLogic
 import "WallpaperSlotLogic.js" as SlotLogic
 import "WallpaperMotionLogic.js" as MotionLogic
+import "SeamOcclusion.js" as SeamOcclusion
 
 // Paint each screen's desktop with the configured wallpaper behind every surface.
 // A switch reveals the incoming wallpaper through a circle that grows from the
@@ -746,8 +747,34 @@ Variants {
                 // The bar's free edge in this screen's coordinates, published by
                 // the bar itself. Off-screen while the bar is collapsed, so the
                 // seam leaves with it.
-                readonly property real edgeY: Services.BarSeamState.edgeFor(
-                    screenScope.modelData ? String(screenScope.modelData.name || "") : "")
+                readonly property string screenName: screenScope.modelData
+                    ? String(screenScope.modelData.name || "") : ""
+                readonly property real edgeY: Services.BarSeamState.edgeFor(seamFillets.screenName)
+                // The band the seam occupies. Its vertical extent is what decides
+                // whether a window would cover it.
+                readonly property real bandTop: seamFillets.barAtTop
+                    ? seamFillets.edgeY
+                    : seamFillets.edgeY - seamFillets.radiusSetting
+                readonly property real bandBottom: seamFillets.bandTop + seamFillets.radiusSetting
+                // Whether a window already covers each end of the band. The seam
+                // must be absent there rather than blended: it is part of the
+                // desktop, so a translucent window over it may not show it
+                // through. See SeamOcclusion.js for why niri's window geometry is
+                // enough to decide.
+                readonly property var occluded: SeamOcclusion.occludedSides(
+                    Services.NiriService.windowRects, ({
+                        workspaceId: (Services.NiriService.activeWorkspaces || {})[seamFillets.screenName] || "",
+                        workingTop: (Services.SettingsService.bar.floating || !seamFillets.barAtTop)
+                            ? 0 : seamFillets.stripHeight,
+                        workingHeight: wallpaperWindow.height
+                            - (Services.SettingsService.bar.floating ? 0 : seamFillets.stripHeight),
+                        bandTop: seamFillets.bandTop,
+                        bandBottom: seamFillets.bandBottom,
+                        leftX0: seamFillets.floatingMargin,
+                        leftX1: seamFillets.floatingMargin + seamFillets.radiusSetting,
+                        rightX0: wallpaperWindow.width - seamFillets.floatingMargin - seamFillets.radiusSetting,
+                        rightX1: wallpaperWindow.width - seamFillets.floatingMargin
+                    }))
 
                 // The bar's own corners, not the screen's: a floating bar is inset
                 // by its margin, and the seam has to stay on the bar.
@@ -759,6 +786,8 @@ Variants {
                     : seamFillets.edgeY - seamFillets.radiusSetting
                 radius: seamFillets.radiusSetting
                 atTop: seamFillets.barAtTop
+                showLeft: !seamFillets.occluded.left
+                showRight: !seamFillets.occluded.right
                 fillColor: Services.SettingsService.effectiveColorScheme === "light"
                         ? LazerTheme.bgLight : LazerTheme.bgDark
                 fillOpacity: Math.max(0.35, Math.min(1, Services.SettingsService.panelSurfaceOpacity))
