@@ -82,6 +82,31 @@ Variants {
                 ? Math.max(0, Math.min(24, Number(Services.SettingsService.bar.floatingMargin) || 0)) : 0
         readonly property int effectiveHeight:
             Math.max(40, Math.min(64, Number(Services.SettingsService.bar.height) || 48))
+        // Radius of the concave fillets on the bar's free edge. Same radius as
+        // the screen's own fake rounded corners, so the bar and the display read
+        // as one geometry; clamped to the bar's own height so a display-sized
+        // radius cannot grow taller than the surface it hangs from.
+        readonly property int seamRadius: Math.max(0, Math.min(screenScope.effectiveHeight,
+            Number(Services.SettingsService.appearance.screenCornerRadius) || 0))
+        // Distance the painted bar travels to leave the screen. The fillets hang
+        // past the bar's rectangle, so the slide has to carry that extra band
+        // out too — travelling only the strip would park the fillets on the
+        // screen edge with nothing above them.
+        readonly property real barTravel: screenScope.effectiveHeight + screenScope.seamRadius
+        // True while a fullscreen window covers this output, whether or not this
+        // bar auto-hides. The fillets join the bar to the tiled desktop below it,
+        // so they have nothing to join while one window owns the whole output.
+        //
+        // A maximized tile grows into the strip this bar releases during a lock
+        // photograph, which makes it measure as fullscreen; that release is this
+        // bar's own doing, not a fullscreen window, so it is masked back out.
+        readonly property bool outputFullscreen: {
+            const verdicts = Services.NiriService.fullscreenOutputs
+            const name = screenScope.modelData ? String(screenScope.modelData.name || "") : ""
+            if (!verdicts || !name || verdicts[name] !== true)
+                return false
+            return !screenScope.stripReleased
+        }
         readonly property bool atTop: String(Services.SettingsService.bar.position || "top") !== "bottom"
         // Output identity, for effects that must only answer on their own
         // screen (the bar's glow pulse, for one).
@@ -852,7 +877,11 @@ Variants {
             WlrLayershell.namespace: "afloat-bar"
             // Keep the physical bar above popup surfaces and normal windows.
             WlrLayershell.layer: WlrLayer.Overlay
-            implicitHeight: screenScope.effectiveHeight
+            // The bar strip plus the band its seam fillets paint into. The
+            // band is part of the surface but not of the bar: it stays out of
+            // the exclusive zone and out of the input region, so it only ever
+            // gives the fillets pixels to land on.
+            implicitHeight: screenScope.barTravel
             // Deliberately NOT released while the bar collapses. niri sizes a
             // fullscreen tile to the whole output, so the reserved strip is
             // invisible during fullscreen; dropping it would instead reflow every
@@ -871,7 +900,7 @@ Variants {
             // request ends pushes the tiles down while the bar is still arriving
             // above them, and the wallpaper shows in the gap between the two.
             exclusiveZone: (screenScope.floating
-                            || screenScope.stripReleased) ? 0 : implicitHeight
+                            || screenScope.stripReleased) ? 0 : screenScope.effectiveHeight
             anchors { top: screenScope.atTop; bottom: !screenScope.atTop; left: true; right: true }
             margins { top: screenScope.floatingMargin; bottom: screenScope.floatingMargin; left: screenScope.floatingMargin; right: screenScope.floatingMargin }
 
@@ -903,10 +932,16 @@ Variants {
             Item {
                 id: barSlide
                 x: 0
-                y: (1 - screenScope.slideProgress)
-                        * (screenScope.atTop ? -barSlide.height : barSlide.height)
+                // The bar strip only; the fillet band is not part of it. For a
+                // top bar the strip is the window's top edge and the band hangs
+                // below it; for a bottom bar the band sits above, so the strip
+                // is pushed down by it. `barTravel` is both the distance the
+                // strip travels and the extra band it has to carry off screen.
+                y: (screenScope.atTop ? 0 : screenScope.seamRadius)
+                        + (1 - screenScope.slideProgress)
+                            * (screenScope.atTop ? -screenScope.barTravel : screenScope.barTravel)
                 width: parent.width
-                height: parent.height
+                height: screenScope.effectiveHeight
 
                 // Paint the continuous sharp bar silhouette behind every widget.
                 Rectangle {
@@ -939,24 +974,24 @@ Variants {
                     glowEnabled: Services.SettingsService.appearance.ripplePulseEnabled !== false
                 }
 
-                // The screen bezel corners this bar physically covers. The bezel's
-                // own surface is a separate overlay-layer surface, and a client
-                // cannot order two of them against each other, so the corners the
-                // bar overlaps are painted here instead: above this window's own
-                // fill they are always the topmost thing, whatever the compositor
-                // does with the other surface. Painted after the fill so the wedge
-                // stays opaque black rather than being tinted by it.
-                ScreenCornerMask {
-                    anchors.fill: parent
-                    radius: Math.max(0, Number(Services.SettingsService.appearance.screenCornerRadius) || 0)
-                    corners: CornerMask.barCornerMask(
-                        String(Services.SettingsService.bar.position || "top"),
-                        Services.SettingsService.bar.floating === true)
-                    // Clamp against the screen, not against this one-strip-tall
-                    // window, so the radius matches the corners the bezel surface
-                    // paints on the opposite edge.
-                    screenWidth: screenScope.modelData.width
-                    screenHeight: screenScope.modelData.height
+                // The concave seam fillets on the bar's free edge, hanging in the
+                // band the window reserves below (or above) the strip. They are
+                // the bar's own decoration continuing its fill colour, and they
+                // slide out with the strip they belong to.
+                BarSeamFillets {
+                    width: parent.width
+                    height: screenScope.seamRadius
+                    // Anchored on the strip's free edge: below a top bar, above a
+                    // bottom one, so the fillet descends onto the desktop either
+                    // way.
+                    y: screenScope.atTop ? screenScope.effectiveHeight : -height
+                    radius: screenScope.seamRadius
+                    atTop: screenScope.atTop
+                    fillColor: Services.SettingsService.effectiveColorScheme === "light"
+                            ? LazerTheme.bgLight : LazerTheme.bgDark
+                    fillOpacity: Math.max(0.35, Math.min(1, Services.SettingsService.panelSurfaceOpacity))
+                    // No desktop to join while one window owns the whole output.
+                    visible: screenScope.seamRadius > 0 && !screenScope.outputFullscreen
                 }
 
                 BarContent {
@@ -1091,11 +1126,41 @@ Variants {
                 onPointChanged: {
                     screenScope._notePointerDistance(
                         RevealLogic.distanceFromEdge(
-                            point.position.y, barSlide.height, screenScope.atTop))
+                            // Measured against the strip, not the surface: a bottom
+                            // bar's surface also carries the fillet band above the
+                            // strip, so the pointer's surface y is shifted by it.
+                            point.position.y - (screenScope.atTop ? 0 : screenScope.seamRadius),
+                            barSlide.height, screenScope.atTop))
                     // Moving over the bar must not arm the collapse either.
                     if (!screenScope._revealState.hovered)
                         _hideTimer.restart()
                 }
+            }
+            // The screen bezel corners this bar physically covers. The bezel's
+            // own surface is a separate overlay-layer surface, and a client
+            // cannot order two of them against each other, so the corners the
+            // bar overlaps are painted here instead: above this window's own
+            // fill they are always the topmost thing, whatever the compositor
+            // does with the other surface. Painted after the fill so the wedge
+            // stays opaque black rather than being tinted by it.
+            //
+            // On the surface, not on the sliding strip: the strip leaves the
+            // screen when the bar auto-hides, and the bezel surface is told to
+            // skip these corners for as long as this bar owns them. Sliding them
+            // away with the strip took the screen's rounding with it — a
+            // fullscreen window then ran into square display corners until the
+            // bar came back.
+            ScreenCornerMask {
+                anchors.fill: parent
+                radius: Math.max(0, Number(Services.SettingsService.appearance.screenCornerRadius) || 0)
+                corners: CornerMask.barCornerMask(
+                    String(Services.SettingsService.bar.position || "top"),
+                    Services.SettingsService.bar.floating === true)
+                // Clamp against the screen, not against this one-strip-tall
+                // window, so the radius matches the corners the bezel surface
+                // paints on the opposite edge.
+                screenWidth: screenScope.modelData.width
+                screenHeight: screenScope.modelData.height
             }
         }
 
