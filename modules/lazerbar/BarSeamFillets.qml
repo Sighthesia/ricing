@@ -1,5 +1,4 @@
 import QtQuick
-import "../lazerbar"
 import "BarSeamArc.js" as SeamLogic
 
 // The two concave fillets on the bar's free edge: the bar's fill spills off its
@@ -8,14 +7,18 @@ import "BarSeamArc.js" as SeamLogic
 // angle. Painted in the bar's own colour and opacity, so it continues that
 // surface rather than becoming a second shape.
 //
-// The host places this item on the bar's free edge and owns the extra band of
-// window height it paints into: the fillets hang past the bar's rectangle, so a
-// host that clips to the bar strip has no room for them.
+// Painted by the desktop layer, not by the bar: the fillet hangs past the bar's
+// rectangle and must sit UNDER tiled windows, so a window that reaches the bar
+// covers it instead of the seam painting over the window. The wallpaper surface
+// is the shell's only background-layer owner, and two surfaces in the same layer
+// cannot be ordered against each other, so that surface has to be the painter
+// (see modules/lazerbar/WallpaperBackground.qml). The host places this item on
+// the bar's free edge, in its own surface coordinates.
 Item {
     id: root
 
-    // Fillet radius in pixels; 0 (or a bar with no free edge) draws nothing.
-    property real radius: 12
+    // Fillet radius in pixels; 0 draws nothing.
+    property real radius: 16
     // Where the bar sits on the output. Up-facing fillets drop below the bar,
     // down-facing ones rise above it.
     property bool atTop: true

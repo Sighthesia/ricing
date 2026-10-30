@@ -715,6 +715,54 @@ Variants {
                     wallpaperWindow.showWallpaper(Services.SettingsService.appearance.wallpaperPath)
                 }
             }
+
+            // The bar's free-edge seam, painted here rather than on the bar's own
+            // surface. It hangs past the bar's rectangle, and it must sit UNDER
+            // tiled windows: a window that reaches the bar should cover the seam,
+            // not have a strip of the bar's fill painted across its top. This is
+            // the shell's only background-layer surface, and two surfaces in one
+            // layer cannot be ordered against each other by the client, so the
+            // seam belongs to whichever surface already owns those pixels.
+            //
+            // Declared after the wallpaper layers so it sits above the backdrop,
+            // and it reads the edge the bar publishes because the painted bar
+            // travels on its own arrival curve — settings describe where the bar
+            // rests, not where its edge is this frame.
+            BarSeamFillets {
+                id: seamFillets
+
+                // Clamped to the bar's own height so a display-sized radius
+                // cannot grow taller than the surface it hangs from, and to 0
+                // when the display's fake corners are switched off.
+                readonly property int stripHeight: Math.max(40, Math.min(64,
+                    Number(Services.SettingsService.bar.height) || 48))
+                readonly property int radiusSetting: Services.SettingsService.appearance.screenRoundedCorners === false
+                    ? 0
+                    : Math.max(0, Math.min(stripHeight,
+                        Number(Services.SettingsService.appearance.screenCornerRadius) || 0))
+                readonly property int floatingMargin: Services.SettingsService.bar.floating
+                    ? Math.max(0, Math.min(24, Number(Services.SettingsService.bar.floatingMargin) || 0)) : 0
+                readonly property bool barAtTop: String(Services.SettingsService.bar.position || "top") !== "bottom"
+                // The bar's free edge in this screen's coordinates, published by
+                // the bar itself. Off-screen while the bar is collapsed, so the
+                // seam leaves with it.
+                readonly property real edgeY: Services.BarSeamState.edgeFor(
+                    screenScope.modelData ? String(screenScope.modelData.name || "") : "")
+
+                // The bar's own corners, not the screen's: a floating bar is inset
+                // by its margin, and the seam has to stay on the bar.
+                x: seamFillets.floatingMargin
+                width: Math.max(0, wallpaperWindow.width - seamFillets.floatingMargin * 2)
+                // Down from a top bar's free edge, up from a bottom one's.
+                y: seamFillets.barAtTop
+                    ? seamFillets.edgeY
+                    : seamFillets.edgeY - seamFillets.radiusSetting
+                radius: seamFillets.radiusSetting
+                atTop: seamFillets.barAtTop
+                fillColor: Services.SettingsService.effectiveColorScheme === "light"
+                        ? LazerTheme.bgLight : LazerTheme.bgDark
+                fillOpacity: Math.max(0.35, Math.min(1, Services.SettingsService.panelSurfaceOpacity))
+            }
         }
 
         // Publish this screen's window on the root, and drop it again when the

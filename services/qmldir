@@ -10,6 +10,7 @@ singleton ColorService 1.0 ColorService.qml
 singleton DesktopStandby 1.0 DesktopStandby.qml
 singleton NiriService 1.0 NiriService.qml
 singleton BarDebugState 1.0 BarDebugState.qml
+singleton BarSeamState 1.0 BarSeamState.qml
 singleton SessionService 1.0 SessionService.qml
 singleton NotificationService 1.0 NotificationService.qml
 singleton VolumeService 1.0 VolumeService.qml
