@@ -175,6 +175,12 @@ Singleton {
     readonly property alias visible: session.visible
     // Clipboard thumbnail decoding passthrough for result rows.
     function decodeThumbnail(id, mime, callback) { return session.decodeThumbnail(id, mime, callback) }
+    // Tiered decode for the preview pane ("pane") versus a result row ("row").
+    function decodeThumbnailTier(id, mime, tier, callback) {
+        return session.decodeThumbnailTier(id, mime, tier, callback)
+    }
+    // Cached path for a tier, without asking for a decode.
+    function thumbnailPath(id, tier) { return session.thumbnailPath(id, tier) }
     // Full-content clipboard preview decode passthrough for the preview pane.
     signal textPreviewDecoded(string id, string content)
     function requestTextPreview(id) { return session.requestTextPreview(id) }

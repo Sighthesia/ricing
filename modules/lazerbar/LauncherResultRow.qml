@@ -415,9 +415,16 @@ Item {
         // icon rail with no extra frame - the pixels speak for themselves.
         // A failed load hides the slot via thumbFailed; the thumbPath
         // binding itself is never touched (see its declaration).
-        // Synchronous like the app icon above: same wedged-async-pipeline
-        // immunity, and the decode is capped at 2x display size so a
-        // full-resolution paste never blocks the row on full pixels.
+        //
+        // Asynchronous, unlike the app icon above, and the difference is the
+        // cost of the source rather than a preference: the app icon is a 28px
+        // theme lookup from an in-process provider, while a clipboard entry is a
+        // file on disk that used to hold the FULL pasted image. A synchronous
+        // decode of one 2880x1800 screenshot measured 137-201ms - a dozen
+        // dropped frames inside the opening wave, which is exactly the hitch
+        // this row was reporting. The cache now stores the 2x-display-size tier
+        // (~11ms), and `sourceSize` caps whatever that file happens to be, so
+        // even an oversized entry cannot stall the frame it appears on.
         Image {
             id: thumbImage
             visible: root.isClipboardImage && root.thumbPath.length > 0 && !root.thumbFailed
@@ -430,7 +437,12 @@ Item {
             sourceSize.width: 72
             sourceSize.height: 104
             fillMode: Image.PreserveAspectFit
-            asynchronous: false
+            asynchronous: true
+            // No cache: the row window recycles 96 delegates through a handful
+            // of ids, and a QPixmapCache entry for every one of them is memory
+            // the shell does not get back. The tier file is small enough that a
+            // re-read is cheaper than holding it.
+            cache: false
             enabled: false
             onStatusChanged: {
                 if (status === Image.Error && root.thumbPath.length > 0) {

@@ -71,6 +71,23 @@ QtObject {
             callback("")
     }
 
+    // Tiered variant: "row" for a result row's rail, "pane" for the preview
+    // pane. A backend without tiers (tests, older doubles) falls back to the
+    // plain entry point, which is the row size.
+    function decodeThumbnailTier(id, mime, tier, callback) {
+        if (clipboardService && typeof clipboardService.decodeThumbnailTier === "function")
+            return clipboardService.decodeThumbnailTier(id, mime, tier, callback)
+        return root.decodeThumbnail(id, mime, callback)
+    }
+
+    // Cached path for a tier, so a surface can test "is this already decoded?"
+    // without asking for a decode. Empty for a backend with no tier support.
+    function thumbnailPath(id, tier) {
+        if (clipboardService && typeof clipboardService.thumbnailPath === "function")
+            return String(clipboardService.thumbnailPath(id, tier) || "")
+        return ""
+    }
+
     // Full-content preview decode for the clipboard preview pane: routes a
     // text decode request through the clipboard service and relays the
     // decoded content back as a session signal, so surfaces never need the

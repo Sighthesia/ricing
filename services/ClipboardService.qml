@@ -782,7 +782,47 @@ Singleton {
         return true
     }
 
+    // ---- Thumbnail cache tiers -------------------------------------------
+    // A decoded entry is kept at the size it will be PAINTED at, not at the
+    // size it was pasted at. The old cache stored the raw decode, so a 2880x1800
+    // screenshot was re-decoded at full resolution every time a 36x52 row
+    // wanted it - measured at 137-201ms of synchronous decode for a single row,
+    // which is a dozen frames. Two tiers, both written in the one process spawn
+    // that already produced the decode:
+    //
+    //   row  144x208  (2x the 72x104 the 36x52 rail paints)  ~11ms to decode
+    //   pane 1024x... (the preview pane's largest painted size) ~20ms
+    //
+    // The medium tier is a JPEG because at that size PNG is 10x the bytes for
+    // pixels the pane never shows at 1:1; the row tier keeps the source
+    // format, where a 30KB PNG decodes faster than the equivalent JPEG.
+    readonly property string _thumbDir: root._cacheDir + "/clipboard-thumbs"
+    readonly property int _thumbRowMaxEdge: 208
+    readonly property int _thumbPaneMaxEdge: 1280
+
+    // Path a caller asks for, by tier. Empty when the entry is not a decodable
+    // image id, which is the only case a caller has to handle itself.
+    function thumbnailPath(id: string, tier: string) {
+        var safeId = String(id == null ? "" : id)
+        if (!/^[0-9]+$/.test(safeId))
+            return ""
+        var suffix = String(tier) === "pane" ? "-pane.jpg" : "-row.png"
+        return root._thumbDir + "/" + safeId + suffix
+    }
+
     function decodeThumbnail(id: string, mime: string, callback: var) {
+        root.decodeThumbnailTier(id, mime, "row", callback)
+    }
+
+    // `tier` picks the cached size to produce: "row" for a result row's rail,
+    // "pane" for the preview pane. Both tiers are derived from one decode, so
+    // asking for the pane after a row costs no second cliphist spawn.
+    //
+    // `mime` is kept for signature compatibility with the old single-tier entry
+    // point. It no longer picks the cached file's extension: the raw decode is
+    // written to a neutral `raw-<id>.img` and both tiers are re-encoded from it,
+    // so a webp or gif entry needs no format branch and still caches as png/jpg.
+    function decodeThumbnailTier(id: string, mime: string, tier: string, callback: var) {
         var safeId = String(id == null ? "" : id)
         if (!root.available || !/^[0-9]+$/.test(safeId)) {
             if (callback) callback("")
@@ -791,15 +831,24 @@ Singleton {
         // A thumbnail is only ever decoded for a row the user can see, so it is
         // a foreground signal like a preview.
         root._noteForegroundTouch()
-        var ext = "png"
-        var m = String(mime == null ? "" : mime).toLowerCase()
-        if (m.indexOf("jpeg") >= 0 || m.indexOf("jpg") >= 0) ext = "jpg"
-        else if (m.indexOf("webp") >= 0) ext = "webp"
-        else if (m.indexOf("gif") >= 0) ext = "gif"
-        var dir = root._cacheDir + "/clipboard-thumbs"
-        var path = dir + "/" + safeId + "." + ext
-        root._thumbQueue.push({ path: path, clipId: safeId, cb: callback })
+        var path = root.thumbnailPath(safeId, tier)
+        root._thumbQueue.push({
+            path: path,
+            clipId: safeId,
+            tier: String(tier) === "pane" ? "pane" : "row",
+            cb: callback
+        })
         root._pumpThumbQueue()
+    }
+
+    // `999-row.png` -> `999-row.part.png`. The temp name has to keep the real
+    // extension at the END, because ImageMagick picks the encoder from it and
+    // silently falls back to the input's format otherwise.
+    function _thumbTempPath(path: string) {
+        var dot = String(path).lastIndexOf(".")
+        if (dot <= 0)
+            return String(path) + ".part"
+        return String(path).substring(0, dot) + ".part" + String(path).substring(dot)
     }
 
     function _pumpThumbQueue() {
@@ -811,14 +860,76 @@ Singleton {
         var target = root._clipboardItemById(job.clipId)
         var probeImage = !!target && target.isImage && !target.metadataReady
         thumbProc.probeImage = probeImage
-        var ensureThumbnail = "mkdir -p '" + root._cacheDir + "/clipboard-thumbs' && { test -f '" + job.path + "' || cliphist decode " + job.clipId + " > '" + job.path + "'; }"
-        if (probeImage) {
-            ensureThumbnail += " && dims=$(identify -format '%m|%w|%h' '" + job.path + "' 2>/dev/null);"
-                + " bytes=$(wc -c < '" + job.path + "' 2>/dev/null | tr -d ' ');"
-                + " [ -n \"$dims\" ] && [ -n \"$bytes\" ] && printf '%s|%s' \"$dims\" \"$bytes\""
-        }
-        thumbProc.command = ["sh", "-c", ensureThumbnail]
-        thumbProc.running = true
+        root._startThumbProcess(job, probeImage)
+    }
+
+    // One shell command per job: ensure the raw decode exists, then derive the
+    // requested tier from it. `magick` is ImageMagick 7's entry point; the
+    // `convert` name is the IM6 fallback, tried second so a machine without IM7
+    // still gets resized thumbs instead of full-size ones.
+    //
+    // The metadata probe uses `identify -ping`, which reads the PNG/JPEG header
+    // and skips the pixel decode: 35ms against 1026ms for a full identify on the
+    // same 2880x1800 screenshot. The full decode was the second half of the
+    // background CPU this queue used to spend.
+    //
+    // The tier files are written atomically because the row that asked for one
+    // starts painting it the moment the callback lands, and a half-written PNG
+    // decodes as an Image.Error - which the row would then latch as a permanent
+    // failure for the rest of the session. The temp name keeps the REAL
+    // extension (`999-pane.part.jpg`, not `999-pane.jpg.part`): ImageMagick
+    // infers the output format from the filename, so a `.part` suffix made it
+    // fall back to the INPUT format and write a 1.1MB PNG where a 146KB JPEG
+    // was intended - measured on this machine, silently, exit code 0.
+    function _startThumbProcess(job, probeImage) {
+        var raw = root._thumbDir + "/raw-" + job.clipId + ".img"
+        var edge = job.tier === "pane" ? root._thumbPaneMaxEdge : root._thumbRowMaxEdge
+        var encode = job.tier === "pane"
+                ? "-thumbnail '1024x1280>' -quality 82"
+                : "-thumbnail '" + edge + "x" + edge + ">' -define png:compression-level=6"
+        var args = [
+            "sh", "-c",
+            // argv from here on: $1 = cache dir, $2 = raw decode, $3 = cliphist
+            // id, $4 = final tier path, $5 = temp tier path.
+            //
+            // DOUBLE quotes, not single: these are parameters of the `sh -c`
+            // script and single quotes would make them literal text - the first
+            // version did exactly that and cliphist received `$3` as its
+            // argument. Nothing here is re-parsed by a second shell, so quoting
+            // the values is enough.
+            "mkdir -p \"$1\" || exit 1; "
+                + "[ -s \"$2\" ] || { cliphist decode \"$3\" > \"$2.part\" && mv \"$2.part\" \"$2\"; } || exit 1; "
+                + "[ -s \"$4\" ] || { "
+                + "if command -v magick >/dev/null 2>&1; then magick \"$2\" " + encode + " -strip \"$5\"; "
+                + "elif command -v convert >/dev/null 2>&1; then convert \"$2\" " + encode + " -strip \"$5\"; "
+                + "else exit 1; fi; } || exit 1; "
+                // Only move what was actually produced: a cache hit skips the
+                // derive above, and an unconditional `mv` would then fail on a
+                // temp file that was never written and report the hit as a
+                // failure.
+                + "[ -s \"$5\" ] && { mv \"$5\" \"$4\" || exit 1; }; "
+                + (probeImage ? "dims=$(identify -ping -format '%m|%w|%h' \"$2\" 2>/dev/null); "
+                    + "bytes=$(wc -c < \"$2\" 2>/dev/null | tr -d ' '); "
+                    + "[ -n \"$dims\" ] && [ -n \"$bytes\" ] && printf '%s|%s' \"$dims\" \"$bytes\""
+                    : "printf ''"),
+            "afloat-clip-thumb",
+            root._thumbDir,
+            raw,
+            job.clipId,
+            job.path,
+            root._thumbTempPath(job.path)
+        ]
+        thumbProc.command = args
+        // Never in the same turn as the command write: QML re-evaluates the
+        // command binding lazily, so starting here would launch the previous
+        // job's argv. The guard is `_thumbBusy` (set above, cleared only in
+        // `onExited`), never `running` - that property still reads true while a
+        // process is exiting, so gating the next start on it silently drops the
+        // job and stalls the queue. See
+        // .agents/skills/quickshell-process-stdio-hazards.
+        Qt.callLater(function() {
+            thumbProc.running = true
+        })
     }
 
     property Process thumbProc: Process {
@@ -828,14 +939,24 @@ Singleton {
         property var job: null
         property bool probeImage: false
         stdout: StdioCollector {}
-        onExited: {
+        onExited: exitCode => {
             var done = job
             var probeOutput = stdout.text.trim().split("|")
             job = null
             probeImage = false
             root._thumbBusy = false
-            if (done && done.cb)
-                done.cb(done.path)
+            if (done && done.cb) {
+                // An empty path is the row's "settled, nothing to paint" answer
+                // and costs it a retry on the next open, so a failed derive has
+                // to be reported as failure rather than as a missing entry.
+                var produced = done.path
+                if (exitCode !== 0) {
+                    console.warn("ClipboardService: thumbnail derive failed for entry",
+                                 done.clipId, "tier", done.tier, "exit", exitCode)
+                    produced = ""
+                }
+                done.cb(produced)
+            }
             if (done && probeOutput.length >= 4) {
                 var target = root._clipboardItemById(done.clipId)
                 if (root._storeImageMetadata(target, probeOutput[0], probeOutput[1], probeOutput[2], probeOutput[3])) {
@@ -910,6 +1031,13 @@ Singleton {
         root._signaturePendingById = ({})
         root._signatureGateTimer.running = false
         root._initialFirstSeenRecovery = false
+        // The thumbnail cache is keyed by entry id, and a wipe makes every id
+        // refer to nothing. Leaving the files behind meant a re-pasted entry
+        // that happened to reuse an id painted the old picture; the raw decodes
+        // in particular are full-size and would never be invalidated otherwise.
+        root._thumbQueue = []
+        Quickshell.execDetached(["sh", "-c",
+            "rm -rf '" + root._thumbDir + "'/*"])
         root._metadataDirty = true
         root._persistMetadataCache()
         root._firstSeenDirty = true

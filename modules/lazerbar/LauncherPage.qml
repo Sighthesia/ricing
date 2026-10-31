@@ -305,7 +305,7 @@ Item {
                 root._firstFillPending = false
                 // Pointer preview dies with the surface so a reopen starts
                 // from the focused row instead of a stale hover.
-                root._hoveredResult = null
+                root.clearHover(root._hoveredResult)
                 // Drop any query-driven window stretch: the next open starts
                 // from the base slice and stretches only if its own query
                 // needs deep matches, instead of rebuilding hundreds of
@@ -331,8 +331,11 @@ Item {
             resultsView.positionToSelection()
             resultsView.syncSelectionFrame()
             // The selected row is the preview pane's subject, so a move has to
-            // re-rank the decode queue even when nothing is outstanding yet.
+            // re-rank BOTH decode queues: the row queue because the selection is
+            // one of its priorities, and the pane queue because the entry the
+            // pane is showing has just changed.
             thumbQueue.wake()
+            paneThumbQueue.wake()
         }
         function onResultsChanged() {
             Qt.callLater(root._scheduleRowsCommit)
@@ -362,7 +365,10 @@ Item {
         }
     }
 
-    onThumbnailsActiveChanged: thumbQueue.wake()
+    onThumbnailsActiveChanged: {
+        thumbQueue.wake()
+        paneThumbQueue.wake()
+    }
 
     // Fallback key handling for focus held by the page itself or by rows;
     // the search field handles its own keys first and stops propagation.
@@ -502,7 +508,7 @@ Item {
             return false
         // Keyboard navigation reclaims the preview: a resting mouse would
         // otherwise keep the hovered row previewed while the highlight moves.
-        root._hoveredResult = null
+        root.clearHover(root._hoveredResult)
         if (direction < 0 && typeof root.session.selectPrevious === "function") {
             root.session.selectPrevious()
             // Arrow navigation changes the selected row but must not move the
@@ -1198,6 +1204,7 @@ Item {
         resultsView.normalizeViewport()
         root._syncWindowToMatches()
         thumbQueue.wake()
+        paneThumbQueue.wake()
     }
     // A chip switch folds rows exactly like a search edit, so the viewport
     // needs the same clamp and deep-match stretch.
@@ -1205,6 +1212,7 @@ Item {
         resultsView.normalizeViewport()
         root._syncWindowToMatches()
         thumbQueue.wake()
+        paneThumbQueue.wake()
     }
     // Window growth materializes rows below the fold and the query/category
     // re-ranks fold the ones in it, so both re-derive the decode queue's
@@ -1232,6 +1240,14 @@ Item {
     // Handle for probes and tests: the decode queue's counters are the only
     // way to prove a burst never happened.
     readonly property alias thumbScheduler: thumbQueue
+    // Handle for the pane's own queue, so a probe can prove the two tiers are
+    // throttled independently and that a row decode never waits behind a pane.
+    readonly property alias paneThumbScheduler: paneThumbQueue
+    // Decoded pane-tier paths and entries that settled with nothing to paint.
+    // Kept apart from `_thumbPaths` for the reason given in _paneThumbDecoded.
+    property var _paneThumbPaths: ({})
+    property var _paneThumbFailedIds: ({})
+    property int _paneThumbRev: 0
     // Prefetch slack around the visible band, in rows. Rows just outside it
     // are still served - a flick reveals them before their decode could
     // possibly land - but never ahead of a row the user can actually see.
@@ -1305,6 +1321,19 @@ Item {
             }
         }
         root._thumbFailedIds = ({})
+        // The pane tier has its own paths and its own failure set, and it is
+        // re-armed by the same contract: one fresh attempt per open, for both
+        // the entries that failed to derive and the entries whose derive
+        // produced nothing.
+        for (var paneId in root._paneThumbFailedIds) {
+            if (root._paneThumbPaths[paneId] !== undefined) {
+                delete root._paneThumbPaths[paneId]
+                dropped++
+            }
+        }
+        root._paneThumbFailedIds = ({})
+        if (dropped > 0)
+            root._paneThumbRev++
         if (dropped > 0)
             root._thumbRev++
         return dropped
@@ -1325,6 +1354,33 @@ Item {
             return
         }
         service.decodeThumbnail(String(id), String(mime == null ? "" : mime), done)
+    }
+    // The preview pane paints the entry at up to half the panel's width and the
+    // whole viewport height, so a row-sized thumb there is a visibly soft
+    // image. It decodes the pane tier instead, through the same one-in-flight
+    // seam the rows use, and the row tier is unaffected: the two files are
+    // derived independently from one cached raw decode.
+    function _issuePaneThumbDecode(id, mime, done) {
+        var service = root.session
+        if (!service || typeof service.decodeThumbnailTier !== "function") {
+            done("")
+            return
+        }
+        service.decodeThumbnailTier(String(id), String(mime == null ? "" : mime),
+                                    "pane", done)
+    }
+    function _paneThumbDecoded(id, path) {
+        var key = String(id == null ? "" : id)
+        if (!key)
+            return
+        // The pane's own cache, deliberately separate from the row cache: the
+        // same id legitimately holds two paths, and sharing one map made the
+        // row's thumbPath jump to the pane image whenever a preview landed.
+        if (path)
+            root._paneThumbPaths[key] = path
+        else if (!root._paneThumbFailedIds[key])
+            root._paneThumbFailedIds[key] = true
+        root._paneThumbRev++
     }
     function _selectedResultId() {
         var service = root.session
@@ -1432,6 +1488,65 @@ Item {
         onTriggered: thumbQueue.pump()
     }
 
+    // The pane's own single-flight queue. A pane decode is a 300ms+ derive on a
+    // screenshot, so it must never sit in the row queue where it would hold
+    // back every row behind it - and the row queue must never hold back the one
+    // image the user is actually looking at.
+    LauncherThumbScheduler {
+        id: paneThumbQueue
+        active: root.thumbnailsActive && !!root.session
+                && root.session.visible === true && root.enabled
+        candidates: root._paneThumbCandidates
+        decode: root._issuePaneThumbDecode
+        decoded: root._paneThumbDecoded
+    }
+
+    Timer {
+        id: paneThumbPacer
+        interval: paneThumbQueue.interval
+        repeat: true
+        running: paneThumbQueue.running
+        onTriggered: paneThumbQueue.pump()
+    }
+
+    // The previewed entry, when its pane tier is not on disk yet. Deliberately
+    // one candidate: the pane shows exactly one entry at a time, and asking for
+    // any more would spend a 300ms derive on an image nobody is looking at.
+    function _paneThumbCandidates() {
+        var r = root._previewedResult()
+        if (!r || r.isImage !== true)
+            return []
+        var id = String(r.id == null ? "" : r.id)
+        if (!/^[0-9]+$/.test(id))
+            return []
+        if (root._paneThumbPaths[id] || root._paneThumbFailedIds[id])
+            return []
+        return [{ id: id, mime: r.mime == null ? "" : String(r.mime) }]
+    }
+
+    // The entry the pane is rendering, or null. Shared by the candidate list
+    // and the pane's own source binding so the two can never disagree about
+    // which image is on screen.
+    function _previewedResult() {
+        var s = root.session
+        if (!s || s.mode !== "clipboard" || !s.results)
+            return null
+        if (root._hoveredResult)
+            return root._hoveredResult
+        return s.selectedIndex >= 0 ? (s.results[s.selectedIndex] || null) : null
+    }
+
+    // Cached pane path for an entry, "" while it is still being derived.
+    function clipPaneThumbPath(item) {
+        if (!item || !item.isImage)
+            return ""
+        var id = String(item.id == null ? "" : item.id)
+        if (!/^[0-9]+$/.test(id))
+            return ""
+        return root._paneThumbPaths[id] || ""
+    }
+
+
     // Full decoded text per entry id: `cliphist list` previews are a single
     // truncated line, so the preview pane pulls the real content through the
     // service decode seam and swaps it in when it lands. Until then the
@@ -1473,17 +1588,33 @@ Item {
 
     // Hover tracking for the preview pane; leaving a row hands preview
     // back to the keyboard selection, destruction never leaves a stale ref.
+    //
+    // The change is announced by hand rather than through an `on...Changed`
+    // handler: QML only synthesises one for an ordinary property name, and an
+    // underscore-prefixed name is private - the engine accepts the handler in
+    // source and then refuses the whole page with "Cannot assign to
+    // non-existent property". `previewedResultChanged` is what the pane's
+    // decode queue listens to.
     property var _hoveredResult: null
+    signal previewedResultChanged()
     function trackHover(item, entered) {
+        var before = _hoveredResult
         if (entered)
             _hoveredResult = item
         else if (_hoveredResult === item)
             _hoveredResult = null
+        if (_hoveredResult !== before)
+            previewedResultChanged()
     }
     function clearHover(item) {
-        if (_hoveredResult === item)
-            _hoveredResult = null
+        if (_hoveredResult !== item)
+            return
+        _hoveredResult = null
+        previewedResultChanged()
     }
+    // A hover change is not a selection change, and the pane's subject follows
+    // both, so the decode queue has to be re-ranked from here as well.
+    onPreviewedResultChanged: paneThumbQueue.wake()
 
     // Clipboard preview pane: the selected entry rendered large — decoded
     // image or full multi-line text — beside a narrowed results list.
@@ -1493,14 +1624,7 @@ Item {
     // text so long excerpts remain mouse-selectable.
     Rectangle {
         id: previewPane
-        readonly property var selectedResult: {
-            var s = root.session
-            if (!s || s.mode !== "clipboard" || !s.results)
-                return null
-            if (root._hoveredResult)
-                return root._hoveredResult
-            return s.selectedIndex >= 0 ? (s.results[s.selectedIndex] || null) : null
-        }
+        readonly property var selectedResult: root._previewedResult()
         readonly property bool shown: !!selectedResult
         // The pane's own blank window: true only while the pane has nothing to
         // paint for the entry on screen. That is the condition a loading mark
@@ -1522,7 +1646,7 @@ Item {
                 return false
             var id = String(r.id == null ? "" : r.id)
             // An entry already reported unloadable is settled, not waiting.
-            return !root._thumbFailedIds[id] && root.clipThumbPath(r) === ""
+            return !root._paneThumbFailedIds[id] && root.clipPaneThumbPath(r) === ""
         }
         // The decoded path lands asynchronously; mirror it onto the image
         // imperatively because a declarative source binding does not track
@@ -1541,8 +1665,8 @@ Item {
             // Load-bearing read: the engine eliminates bare expressions,
             // so the revision must be used or this binding never re-runs
             // when the async decode lands.
-            var rev = root._thumbRev
-            return rev >= 0 ? root.clipThumbPath(r) : ""
+            var rev = root._paneThumbRev
+            return rev >= 0 ? root.clipPaneThumbPath(r) : ""
         }
         // Anchored to the query card's bottom edge, which already folds the
         // lens away when a mode has no categories — so everything below
@@ -1662,6 +1786,14 @@ Item {
                         asynchronous: true
                         cache: false
                         mipmap: true
+                        // The pane is the largest painted surface a clipboard
+                        // entry ever reaches, so it decodes the pane tier (a
+                        // 1024x1280 JPEG) instead of the row's 208px PNG. The
+                        // cap is stated here as well, because the tier file is
+                        // whatever an older cache left behind and the pane must
+                        // never decode a full-resolution paste on its own.
+                        sourceSize.width: 1024
+                        sourceSize.height: 1280
                         // Assigned imperatively from paneThumbSource below: the
                         // qs engine does not re-run this binding on property
                         // change notifications here.
