@@ -11,7 +11,11 @@ Rectangle {
     property var entries: []
     property string selected: ""
     property bool expanded: true
-    readonly property real expansionProgress: expanded ? 1 : 0
+    // Collapse progress, 0 = contracted, 1 = expanded. The host animates this
+    // (WaveSurfaceHost drives it off the settings panel's own curve) so the rail
+    // and its insets move on ONE curve. A host that writes only `expanded`
+    // still gets a correct rail, just without the transition.
+    property real expansionProgress: expanded ? 1 : 0
     signal selectedChangedByUser(string value)
     signal collapseToggled()
 
@@ -44,6 +48,9 @@ Rectangle {
     TrailIndicator {
         id: selectionIndicator
         z: 2
+        // No Behavior across the rail: `expansionProgress` is already the
+        // animated value, and easing it a second time parked the pill while the
+        // column moved and then slid it home after everything else had landed.
         crossAxis: 10 + 4 + 5 * root.expansionProgress
         markLength: 24
         markThickness: 4
@@ -61,11 +68,6 @@ Rectangle {
         targetKey: String(root.selected)
         targetValid: root.selectedIndex() >= 0
         visible: root.selectedIndex() >= 0
-
-        Behavior on crossAxis {
-            enabled: !MotionTokens.reducedMotion
-            NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
-        }
     }
 
     Column {

@@ -75,9 +75,25 @@ Item {
     // Rail collapse state and width. Only the rail layout reads them; the page
     // bar has no such affordance, which is one of the two layouts' differences
     // rather than a missing feature in either.
+    //
+    // The collapse is driven the same way the settings panel drives its own
+    // rail: ONE animated 0..1 progress owns the width AND every inset inside
+    // the rail. Animating the width alone left `expansionProgress` jumping
+    // instantly, so the nav padding snapped to its contracted values on the
+    // first frame while the column was still wide - and the content column's
+    // left margin jumped with it.
     property bool railExpanded: true
-    readonly property int railWidth: root.railExpanded
-            ? LazerTheme.settingsSidebarExpandedWidth : LazerTheme.settingsSidebarContractedWidth
+    property real railCollapseProgress: root.railExpanded ? 1 : 0
+    readonly property real railWidth: LazerTheme.settingsSidebarContractedWidth
+        + (LazerTheme.settingsSidebarExpandedWidth - LazerTheme.settingsSidebarContractedWidth)
+            * root.railCollapseProgress
+    // The one animation behind the collapse. `settingsSidebarCollapse` and
+    // OutQuint are the settings panel's curve, shared so both rails read as the
+    // same component rather than as two surfaces that happen to be similar.
+    Behavior on railCollapseProgress {
+        enabled: !MotionTokens.reducedMotion
+        NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
+    }
     // No hairline between the rail and the content column: the rail tone
     // already separates them, and a 1px rule through the query strip read
     // as a stray tick (visible in light mode even after insetting it below
@@ -374,11 +390,11 @@ Item {
                         entries: root.sectionEntries
                         selected: root.activeSectionId
                         expanded: root.railExpanded
+                        expansionProgress: root.railCollapseProgress
+                        // Width comes off the animated progress, so there is no
+                        // second Behavior here: one curve moves the column and
+                        // everything inside it.
                         width: root.railWidth
-                        Behavior on width {
-                            enabled: !MotionTokens.reducedMotion
-                            NumberAnimation { duration: MotionTokens.settingsSidebarCollapse; easing.type: Easing.OutQuint }
-                        }
                         onSelectedChangedByUser: id => root.sectionSelected(id)
                         onCollapseToggled: root.railExpanded = !root.railExpanded
                     }

@@ -81,6 +81,11 @@ Item {
     TrailIndicator {
         id: selectionIndicator
         z: 2
+        // Padding across the rail comes straight off `expansionProgress`, like
+        // every other rail offset (nav icons, the selection pill). A Behavior
+        // here would be a SECOND easing on top of the 300ms collapse already
+        // animating that progress: the pill then sat still through the whole
+        // collapse and only closed its inset after everything else had landed.
         crossAxis: 10 + 4 + 5 * root.expansionProgress
         markLength: 24
         markThickness: 4
@@ -91,10 +96,6 @@ Item {
         targetValid: root.selectedAvailable
         opacity: root.sessionActive && root.selectedAvailable ? 1 : 0
 
-        Behavior on crossAxis {
-            enabled: !MotionTokens.reducedMotion
-            NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
-        }
         Behavior on opacity {
             enabled: !MotionTokens.reducedMotion
             NumberAnimation { duration: MotionTokens.settingsSidebarFade; easing.type: Easing.OutQuint }
