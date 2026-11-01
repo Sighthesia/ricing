@@ -33,7 +33,11 @@ Item {
     property bool sidePanel: false
 
     // Session state: sidebar expansion, search, and the shared open progress.
+    // `sidebarExpanded` is NOT session-local: the rail remembers whether the
+    // user put it away, through SettingsService.ui, so closing the panel or
+    // restarting the shell never silently re-expands it.
     property bool sidebarExpanded: true
+    property var uiSettings: null
     property string searchQuery: ""
     property real progress: 0
     property bool contentReady: false
@@ -117,9 +121,11 @@ Item {
         return ["appearance", "bar", "notifications"][Math.max(0, Math.min(2, index))]
     }
 
-    // Reset session-local state on every fresh open.
+    // Reset session-local state on every fresh open. The rail state is adopted
+    // from storage rather than reset, which is the one piece of this that is
+    // not session-local.
     function beginSession() {
-        sidebarExpanded = true
+        root.adoptSidebarState()
         searchQuery = ""
         sidebarLayer.beginSession()
         sectionsItem.resetScrollState()
@@ -132,9 +138,28 @@ Item {
         sectionsItem.cancelEntranceWave()
     }
 
+    // Adopt the stored rail state. Runs on construction and whenever the
+    // settings source appears or reloads, because the panel is built on first
+    // open while settings.json may still be in flight.
+    function adoptSidebarState() {
+        if (!root.uiSettings)
+            return
+        root.sidebarExpanded = root.uiSettings.settingsSidebarExpanded !== false
+    }
+
+    Component.onCompleted: root.adoptSidebarState()
+    onUiSettingsChanged: root.adoptSidebarState()
+
+    // Toggle the rail and persist it through the shared save seam, so the next
+    // open of the panel (or the next boot) reads back the state the user left.
     function toggleExpanded() {
-        if (root.interactive)
-            root.sidebarExpanded = !root.sidebarExpanded
+        if (!root.interactive)
+            return
+        root.sidebarExpanded = !root.sidebarExpanded
+        if (root.uiSettings)
+            root.uiSettings.settingsSidebarExpanded = root.sidebarExpanded
+        if (root.saveCallback)
+            root.saveCallback()
     }
 
     // Navigate by scrolling the target section into view.

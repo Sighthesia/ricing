@@ -32,6 +32,10 @@ Item {
     property var barDefaults: Services.SettingsService.barDefaults
     property var notificationDefaults: Services.SettingsService.notificationDefaults
     property var settingsReset: Services.SettingsService.resetCategorySetting
+    // Persisted panel chrome (rail collapse state). Passed as an object rather
+    // than a boolean so the panel can write back through the same seam the
+    // other categories use.
+    property var uiSettings: Services.SettingsService.ui
     property var wallpaperService: Services.WallpaperService
     property var locationService: Services.LocationService
     property string effectiveSunrise: Services.SettingsService.effectiveSunrise
@@ -277,6 +281,7 @@ Item {
                     barDefaults: root.barDefaults
                     notificationDefaults: root.notificationDefaults
                     settingsReset: root.settingsReset
+                    uiSettings: root.uiSettings
                     wallpaperService: root.wallpaperService
                     locationService: root.locationService
                     effectiveSunrise: root.effectiveSunrise

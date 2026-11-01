@@ -195,10 +195,15 @@ Item {
     Connections {
         target: root.session
         function onVisibleChanged() { root.syncVisibility() }
+        // The persisted value arrives asynchronously: launcher.json is read off
+        // the first frame, so Component.onCompleted below runs while the service
+        // still holds its default. Without this, a collapsed rail came back
+        // expanded on every boot and the file was never consulted.
+        function onRailExpandedChanged() { root.syncRailFromSession() }
     }
 
     // Rail collapse round-trip with the session: the persisted value seeds
-    // the host once, and user toggles write back through the same seam.
+    // the host, and user toggles write back through the same seam.
     // Seeding is one-shot, not a binding — assigning the toggle would
     // silently drop a binding and strand later updates.
     function syncRailFromSession() {

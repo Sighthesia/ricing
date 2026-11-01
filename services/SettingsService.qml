@@ -15,6 +15,10 @@ QtObject {
     readonly property alias appearance: adapter.appearance
     readonly property alias notifications: adapter.notifications
     readonly property alias controls: adapter.controls
+    // Panel chrome that outlives a session: the settings rail remembers whether
+    // the user left it collapsed, so reopening (or restarting) does not silently
+    // re-expand a rail they put away.
+    readonly property alias ui: adapter.ui
     readonly property alias widgetSettings: adapter.widgetSettings
     readonly property alias widgetInstanceSettings: adapter.widgetInstanceSettings
     // Keep the settings-panel defaults beside the persisted category schemas.
@@ -554,6 +558,12 @@ QtObject {
             property JsonObject controls: JsonObject {
                 property real volumeStep: 0.05
                 property real brightnessStep: 0.05
+            }
+
+            // Persisted panel chrome. Defaults match the shipped look, and a
+            // missing key falls back to them rather than to a stale file.
+            property JsonObject ui: JsonObject {
+                property bool settingsSidebarExpanded: true
             }
 
             property JsonObject widgetSettings: JsonObject {
