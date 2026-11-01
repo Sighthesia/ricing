@@ -25,6 +25,13 @@ Item {
     property bool interactive: true
     // Corner radius of the painted surface and of the flash that fills it.
     property int surfaceRadius: 12
+    // Side inset of the painted surface. The slot itself stays full width, so
+    // the pointer target is unchanged; only the painted highlight moves in.
+    // The default lines the surface up with the rail's own nav column, which
+    // sits at x=10 with a further 2px inside each entry - without it the
+    // collapse and close highlights ran to both edges of the rail while every
+    // category highlight floated 12px in, reading as two different alignments.
+    property int surfaceInset: 12
 
     signal activated
 
@@ -49,6 +56,8 @@ Item {
     Rectangle {
         id: actionSurface
         anchors.fill: parent
+        anchors.leftMargin: root.surfaceInset
+        anchors.rightMargin: root.surfaceInset
         radius: root.surfaceRadius
         color: actionHover.hovered ? LazerTheme.settingsRowHover : "transparent"
         border.width: 0
