@@ -56,8 +56,8 @@ LazerSettingsSection {
     property alias cityField: cityFieldControl
     property alias latitudeField: latitudeFieldControl
     property alias longitudeField: longitudeFieldControl
-    property alias themeSchemePicker: themeSchemePicker
-    property alias presetSchemePicker: presetSchemePicker
+    readonly property Item themeSchemePicker: themeSchemePickerLoader.item
+    readonly property Item presetSchemePicker: presetSchemePickerLoader.item
     property alias panelOpacityRow: panelOpacityRow
     property alias enableBlurRow: enableBlurRow
     property alias blurSurfaceRow: blurSurfaceRow
@@ -448,14 +448,22 @@ LazerSettingsSection {
     }
 
     // Theme template cards previewing the wallpaper palette per scheme.
-    ThemeSchemePicker {
-        id: themeSchemePicker
+    // Loaded by path rather than by type name: naming the type here pulls the
+    // whole picker (and its preview pipeline) into every boot's compilation
+    // pass, for a panel most sessions never open.
+    Loader {
+        id: themeSchemePickerLoader
         width: parent.width - 16; x: 8
-        searchQuery: root.searchQuery
-        settingsObject: root.settingsObject
-        saveCallback: root.saveCallback
-        defaults: root.defaults
-        resetCallback: function(key, value) { root.resetKey(key) }
+        source: "ThemeSchemePicker.qml"
+        onLoaded: {
+            if (!item)
+                return
+            item.searchQuery = Qt.binding(() => root.searchQuery)
+            item.settingsObject = Qt.binding(() => root.settingsObject)
+            item.saveCallback = Qt.binding(() => root.saveCallback)
+            item.defaults = Qt.binding(() => root.defaults)
+            item.resetCallback = function(key, value) { root.resetKey(key) }
+        }
     }
 
     LazerSettingsRow {
@@ -658,12 +666,17 @@ LazerSettingsSection {
     }
 
     // Preset color scheme cards (active while wallpaper adaptation is off).
-    PresetSchemePicker {
-        id: presetSchemePicker
+    Loader {
+        id: presetSchemePickerLoader
         width: parent.width - 16; x: 8
-        searchQuery: root.searchQuery
-        settingsObject: root.settingsObject
-        saveCallback: root.saveCallback
+        source: "PresetSchemePicker.qml"
+        onLoaded: {
+            if (!item)
+                return
+            item.searchQuery = Qt.binding(() => root.searchQuery)
+            item.settingsObject = Qt.binding(() => root.settingsObject)
+            item.saveCallback = Qt.binding(() => root.saveCallback)
+        }
     }
 
     // Push system light/dark preference independently of template sync.

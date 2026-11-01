@@ -36,8 +36,6 @@ LazerSettingsChoice 1.0 LazerSettingsChoice.qml
 LazerSettingsTextField 1.0 LazerSettingsTextField.qml
 SettingsDropdownMenu 1.0 SettingsDropdownMenu.qml
 LazerSettingsAppearance 1.0 LazerSettingsAppearance.qml
-ThemeSchemePicker 1.0 ThemeSchemePicker.qml
-PresetSchemePicker 1.0 PresetSchemePicker.qml
 LazerSettingsBar 1.0 LazerSettingsBar.qml
 LazerSettingsNotifications 1.0 LazerSettingsNotifications.qml
 LazerSettingsSection 1.0 LazerSettingsSection.qml
@@ -60,12 +58,6 @@ OverlayPageBand 1.0 OverlayPageBand.qml
 OverlaySectionTab 1.0 OverlaySectionTab.qml
 FullscreenSidebar 1.0 FullscreenSidebar.qml
 LauncherPage 1.0 LauncherPage.qml
-ControlCenter 1.0 ControlCenter.qml
-ControlCenterNetwork 1.0 ControlCenterNetwork.qml
-ControlCenterBluetooth 1.0 ControlCenterBluetooth.qml
-ControlCenterCard 1.0 ControlCenterCard.qml
-ControlCenterCalendar 1.0 ControlCenterCalendar.qml
-ControlCenterNotifications 1.0 ControlCenterNotifications.qml
 LauncherCategoryBar 1.0 LauncherCategoryBar.qml
 LauncherCategoryChip 1.0 LauncherCategoryChip.qml
 LauncherListFooter 1.0 LauncherListFooter.qml

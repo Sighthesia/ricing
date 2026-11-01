@@ -2416,20 +2416,27 @@ Item {
         }
     }
 
+    // Loaded BY PATH, not by type name. `ControlCenter` is a type from this
+    // module, so naming it here forces the whole control-center subtree into
+    // every launch's compilation pass even though nobody has opened it. A
+    // string source is resolved on the frame the Loader actually activates, so
+    // the five view files are compiled the first time the rail entry is used
+    // instead of on every boot.
     Component {
         id: controlCenterComponent
-        ControlCenter {
-            // The injected services are forwarded UNCHANGED, so the view and its
-            // same-surface sub-pages can never describe two different instances of
-            // one service. A null service is a defined state: the overview renders
-            // its explicit unavailable/optional state rather than throwing.
-            networkService: root.networkService
-            bluetoothService: root.bluetoothService
-            volumeService: root.volumeService
-            mediaService: root.mediaService
-            batteryService: root.batteryService
-            notificationService: root.notificationService
-            weatherService: root.weatherService
+        Loader {
+            source: "ControlCenter.qml"
+            onLoaded: {
+                if (!item)
+                    return
+                item.networkService = root.networkService
+                item.bluetoothService = root.bluetoothService
+                item.volumeService = root.volumeService
+                item.mediaService = root.mediaService
+                item.batteryService = root.batteryService
+                item.notificationService = root.notificationService
+                item.weatherService = root.weatherService
+            }
         }
     }
 
