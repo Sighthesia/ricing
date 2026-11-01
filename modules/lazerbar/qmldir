@@ -42,6 +42,7 @@ LazerSettingsSection 1.0 LazerSettingsSection.qml
 LazerSettingsSections 1.0 LazerSettingsSections.qml
 LazerSettingsNavItem 1.0 LazerSettingsNavItem.qml
 LazerSettingsSidebar 1.0 LazerSettingsSidebar.qml
+RailActionButton 1.0 RailActionButton.qml
 LazerSettingsContent 1.0 LazerSettingsContent.qml
 LazerSettingsPanel 1.0 LazerSettingsPanel.qml
 LazerSettingsOverlay 1.0 LazerSettingsOverlay.qml

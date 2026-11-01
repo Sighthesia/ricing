@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import "../../services" as Services
 
 // Own the launcher navigation rail using the settings-sidebar contract:
@@ -95,73 +94,19 @@ Rectangle {
         }
     }
 
-    // Bottom collapse toggle carrying the settings sidebar's flash contract.
-    // Sized like a category chip (26px tall, 4px radius) and inset like the
-    // nav column above it, so it reads as one more rail element rather than
-    // a separate bar.
-    Item {
+    // Bottom collapse toggle: the settings rail's own action control, at the
+    // same 40px height, full-width slot, 12px surface radius and 20px icon. It
+    // used to be a hand copy sized like a category chip (26px, inset 10px,
+    // radius 4, 16px icon), which read as a different control on the same
+    // desktop. Sharing the component is what keeps them equal.
+    RailActionButton {
         id: collapseButton
-        x: 10
-        y: root.height - height - 8
-        width: Math.max(0, root.width - 20)
-        height: 26
-        Accessible.role: Accessible.Button
-        Accessible.name: root.expanded ? Services.Tr.q("settings.collapseSidebar") : Services.Tr.q("settings.expandSidebar")
-
-        scale: collapsePress.pressed ? MotionTokens.pressScale : 1
-        Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
-
-        Rectangle {
-            anchors.fill: parent
-            radius: 4
-            color: collapseHover.hovered ? LazerTheme.settingsRowHover : "transparent"
-            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-        }
-
-        Rectangle {
-            id: collapseFlashOverlay
-            z: 1
-            anchors.fill: parent
-            radius: 4
-            color: LazerTheme.textPrimary
-            opacity: 0
-            enabled: false
-        }
-
-        Image {
-            id: collapseIcon
-            anchors.centerIn: parent
-            width: 16
-            height: 16
-            source: root.expanded ? "icons/chevron-left.svg" : "icons/chevron-right.svg"
-            fillMode: Image.PreserveAspectFit
-        }
-        MultiEffect {
-            anchors.fill: collapseIcon
-            source: collapseIcon
-            colorization: 1
-            colorizationColor: collapseHover.hovered ? LazerTheme.textPrimary : LazerTheme.textMuted
-            Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
-        }
-
-        HoverHandler { id: collapseHover }
-        TapHandler { id: collapsePress; onTapped: collapseButton.activate() }
-
-        function activate() {
-            collapseButton.forceActiveFocus()
-            if (!MotionTokens.reducedMotion)
-                collapseFlashAnimation.restart()
-            root.collapseToggled()
-        }
-
-        NumberAnimation {
-            id: collapseFlashAnimation
-            target: collapseFlashOverlay
-            property: "opacity"
-            from: MotionTokens.clickFlashOpacity
-            to: 0
-            duration: MotionTokens.clickFlashDuration
-            easing.type: MotionTokens.clickFlashEasing
-        }
+        x: 0
+        y: root.height - height - 12
+        width: root.width
+        height: 40
+        accessibleName: root.expanded ? Services.Tr.q("settings.collapseSidebar") : Services.Tr.q("settings.expandSidebar")
+        iconSource: root.expanded ? "icons/chevron-left.svg" : "icons/chevron-right.svg"
+        onActivated: root.collapseToggled()
     }
 }

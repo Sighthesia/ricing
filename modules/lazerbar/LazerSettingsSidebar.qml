@@ -26,10 +26,10 @@ Item {
     }
     property alias collapseButton: collapseButton
     property alias backButton: backButton
-    property alias collapseSurfaceItem: collapseSurface
-    property alias collapseIconItem: collapseIcon
-    property alias backSurfaceItem: backSurface
-    property alias backIconItem: backIcon
+    property alias collapseSurfaceItem: collapseButton.surfaceItem
+    property alias collapseIconItem: collapseButton.iconItem
+    property alias backSurfaceItem: backButton.surfaceItem
+    property alias backIconItem: backButton.iconItem
     property alias appearanceNav: appearanceNav
     property alias barNav: barNav
     property alias notificationNav: notificationNav
@@ -102,110 +102,19 @@ Item {
         }
     }
 
-    // Provide the manual collapse toggle in the bottom action slot.
-    Item {
+    // Provide the manual collapse toggle in the bottom action slot. The whole
+    // button - geometry, surface, flash, keyboard - is the shared rail control,
+    // so the settings and launcher rails cannot drift apart again.
+    RailActionButton {
         id: collapseButton
         x: 0
         y: root.height - height - 12
         width: root.width
         height: 40
-        enabled: root.interactive
-        activeFocusOnTab: root.interactive
-        Accessible.role: Accessible.Button
-        Accessible.name: root.expanded ? Services.Tr.q("settings.collapseSidebar") : Services.Tr.q("settings.expandSidebar")
-        readonly property bool flashActive: collapseFlashAnimation.running || collapseFlashOverlay.opacity > 0
-        readonly property Item flashOverlayItem: collapseFlashOverlay
-        readonly property Animation flashAnimationItem: collapseFlashAnimation
-
-        scale: collapsePress.pressed ? MotionTokens.pressScale : 1
-        Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
-
-        Rectangle {
-            id: collapseSurface
-            anchors.fill: parent
-            radius: 12
-            color: collapseHover.hovered ? LazerTheme.settingsRowHover : "transparent"
-            border.width: 0
-            border.color: "transparent"
-            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-        }
-
-        // Confirm the sidebar toggle without changing its input boundary.
-        Rectangle {
-            id: collapseFlashOverlay
-            z: 1
-            anchors.fill: collapseSurface
-            radius: collapseSurface.radius
-            color: LazerTheme.textPrimary
-            opacity: 0
-            enabled: false
-        }
-
-        Image {
-            id: collapseIcon
-            anchors.centerIn: collapseSurface
-            width: 20
-            height: 20
-            source: root.expanded ? "icons/chevron-left.svg" : "icons/chevron-right.svg"
-            fillMode: Image.PreserveAspectFit
-        }
-        MultiEffect {
-            anchors.fill: collapseIcon
-            source: collapseIcon
-            visible: collapseIcon.visible
-            colorization: 1
-            colorizationColor: collapseHover.hovered ? LazerTheme.textPrimary : LazerTheme.textMuted
-            Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
-        }
-
-        HoverHandler { id: collapseHover; enabled: collapseButton.enabled }
-        TapHandler {
-            id: collapsePress
-            enabled: collapseButton.enabled
-            onTapped: collapseButton.activate()
-        }
-        Keys.onPressed: event => {
-            if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) && collapseButton.enabled) {
-                collapseButton.activate()
-                event.accepted = true
-            }
-        }
-
-        function restartFlash() {
-            if (!collapseButton.enabled || MotionTokens.reducedMotion) {
-                collapseFlashAnimation.stop()
-                collapseFlashOverlay.opacity = 0
-                return
-            }
-            collapseFlashAnimation.restart()
-        }
-
-        function activate() {
-            if (!collapseButton.enabled)
-                return
-            collapseButton.forceActiveFocus()
-            collapseButton.restartFlash()
-            root.collapseToggleRequested()
-        }
-
-        NumberAnimation {
-            id: collapseFlashAnimation
-            target: collapseFlashOverlay
-            property: "opacity"
-            from: MotionTokens.clickFlashOpacity
-            to: 0
-            duration: MotionTokens.clickFlashDuration
-            easing.type: MotionTokens.clickFlashEasing
-            running: false
-        }
-
-        Connections {
-            target: MotionTokens
-            function onReducedMotionChanged() {
-                if (MotionTokens.reducedMotion)
-                    collapseButton.restartFlash()
-            }
-        }
+        interactive: root.interactive
+        accessibleName: root.expanded ? Services.Tr.q("settings.collapseSidebar") : Services.Tr.q("settings.expandSidebar")
+        iconSource: root.expanded ? "icons/chevron-left.svg" : "icons/chevron-right.svg"
+        onActivated: root.collapseToggleRequested()
     }
 
     // List the three persistent category entries with osu's 40ms stagger.
@@ -260,110 +169,18 @@ Item {
         }
     }
 
-    // Provide the back affordance in the top action slot.
-    Item {
+    // Provide the back affordance in the top action slot - the same shared
+    // rail control as the collapse toggle, so both ends of the rail agree.
+    RailActionButton {
         id: backButton
         x: 0
         y: 10
         width: root.width
         height: 40
-        enabled: root.interactive
-        activeFocusOnTab: root.interactive
-        Accessible.role: Accessible.Button
-        Accessible.name: Services.Tr.q("settings.back")
-        readonly property bool flashActive: backFlashAnimation.running || backFlashOverlay.opacity > 0
-        readonly property Item flashOverlayItem: backFlashOverlay
-        readonly property Animation flashAnimationItem: backFlashAnimation
-
-        scale: backPress.pressed ? MotionTokens.pressScale : 1
-        Behavior on scale { enabled: !MotionTokens.reducedMotion; NumberAnimation { duration: MotionTokens.fast } }
-
-        Rectangle {
-            id: backSurface
-            anchors.fill: parent
-            anchors.margins: 2
-            radius: 12
-            color: backHover.hovered ? LazerTheme.settingsRowHover : "transparent"
-            border.width: 0
-            border.color: "transparent"
-            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-        }
-
-        // Confirm leaving the settings surface without changing its bounds.
-        Rectangle {
-            id: backFlashOverlay
-            z: 1
-            anchors.fill: backSurface
-            radius: backSurface.radius
-            color: LazerTheme.textPrimary
-            opacity: 0
-            enabled: false
-        }
-
-        Image {
-            id: backIcon
-            anchors.centerIn: backSurface
-            width: 20
-            height: 20
-            source: "icons/close.svg"
-            fillMode: Image.PreserveAspectFit
-        }
-        MultiEffect {
-            anchors.fill: backIcon
-            source: backIcon
-            visible: backIcon.visible
-            colorization: 1
-            colorizationColor: backHover.hovered ? LazerTheme.textPrimary : LazerTheme.textMuted
-            Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
-        }
-        HoverHandler { id: backHover; enabled: backButton.enabled }
-        TapHandler {
-            id: backPress
-            enabled: backButton.enabled
-            onTapped: backButton.activate()
-        }
-        Keys.onPressed: event => {
-            if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) && backButton.enabled) {
-                backButton.activate()
-                event.accepted = true
-            }
-        }
-
-        function restartFlash() {
-            if (!backButton.enabled || MotionTokens.reducedMotion) {
-                backFlashAnimation.stop()
-                backFlashOverlay.opacity = 0
-                return
-            }
-            backFlashAnimation.restart()
-        }
-
-        function activate() {
-            if (!backButton.enabled)
-                return
-            backButton.forceActiveFocus()
-            backButton.restartFlash()
-            root.closeRequested()
-        }
-
-        NumberAnimation {
-            id: backFlashAnimation
-            target: backFlashOverlay
-            property: "opacity"
-            from: MotionTokens.clickFlashOpacity
-            to: 0
-            duration: MotionTokens.clickFlashDuration
-            easing.type: MotionTokens.clickFlashEasing
-            running: false
-        }
-
-        Connections {
-            target: MotionTokens
-            function onReducedMotionChanged() {
-                if (MotionTokens.reducedMotion)
-                    backButton.restartFlash()
-            }
-        }
+        interactive: root.interactive
+        accessibleName: Services.Tr.q("settings.back")
+        iconSource: "icons/close.svg"
+        onActivated: root.closeRequested()
     }
 
     // Reveal each nav entry with osu's per-item 40ms delay and 500ms fade.
