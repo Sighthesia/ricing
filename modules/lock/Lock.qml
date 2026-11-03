@@ -541,7 +541,7 @@ Scope {
     // the wave cannot start until its desktop replacement is ready.
     property Timer _exitFailsafe: Timer {
         interval: Lazer.MotionTokens.medium + Lazer.MotionTokens.instant
-                  + Lazer.MotionTokens.lockContentSpan
+                  + Lazer.MotionTokens.lockContentExitSpan
                   + Lazer.MotionTokens.lockExitDesktopWait
                   + Lazer.MotionTokens.waveExit
                   + Lazer.MotionTokens.slow

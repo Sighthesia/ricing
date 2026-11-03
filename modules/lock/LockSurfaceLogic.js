@@ -97,21 +97,41 @@ var contentBlocks = {
     count: 3
 }
 
-// Entry and exit sample one shared curve — the notification fling's free fall
-// (t²) for travel and fade — but each block reads its own delayed position on
-// it, so the blocks start one after another instead of moving as one group.
+// Entry and exit sample one shared span — a block's own travel time plus the
+// delay of the last block to start — but each block reads its own delayed
+// position inside it, so the blocks start one after another instead of moving as
+// one group.
 //
-// The delays are asymmetric on purpose. Entry counts up (clock first, power row
-// last, lifting into place); exit counts down (power row first, clock last,
-// dropping away), so the two directions are two different waves rather than the
-// same wave played backwards. A block's delay is measured on the animation
-// clock, not in progress units: `progress` runs over the whole staggered span
-// (the curve plus every delay), so each block still gets the full curve length
-// and every block lands exactly when the driver stops.
+// The two directions are opposite waves. Entry counts up from the bottom block
+// (power row first, clock last), which is the only order that agrees with the
+// travel: the clock starts furthest from its place, so letting it start first
+// would have it land last anyway while the bottom row overtook it. Exit counts
+// down from the top (clock first, power row last), so the surface empties as a
+// wave travelling down. A block's delay is measured on the animation clock, not
+// in progress units: `progress` runs over the whole staggered span, so each block
+// still gets the full curve length and every block lands exactly when the driver
+// stops.
 //
-// The output is one 0..1 slot per block; callers own the travel and the fade
-// shape so reduced motion and the entry lift stay call-site decisions.
-function contentSlots(progress, entering, curveMs, staggerMs, blockCount) {
+// `shape` is the curve a block's own slice is read through, so the two
+// directions can accelerate differently: the exit falls (t², gravity), while the
+// entrance rises and settles (OutCubic, decelerating into place). The output is
+// one 0..1 slot per block; callers own the travel distance and the fade, so
+// reduced motion and the per-block entry distance stay call-site decisions.
+var contentShapes = {
+    fall: "fall",
+    rise: "rise"
+}
+
+function _contentCurve(local, shape) {
+    var t = local < 0 ? 0 : (local > 1 ? 1 : local)
+    if (shape === contentShapes.rise) {
+        var inverse = 1 - t
+        return 1 - inverse * inverse * inverse
+    }
+    return t * t
+}
+
+function contentSlots(progress, entering, curveMs, staggerMs, blockCount, shape) {
     var curve = Number(curveMs) > 0 ? Number(curveMs) : 0
     var step = Number(staggerMs) > 0 ? Number(staggerMs) : 0
     var count = Number(blockCount) > 0 ? Number(blockCount) : 1
@@ -125,18 +145,25 @@ function contentSlots(progress, entering, curveMs, staggerMs, blockCount) {
         t = 1
     var slots = []
     for (var i = 0; i < count; ++i) {
-        // Entry: block 0 starts at 0, block n at n * step. Exit: the last block
-        // starts first, so the delay is read backwards off the same step.
-        var delay = (entering === true ? i : count - 1 - i) * step
+        // Entry waves up from the bottom block, exit waves down from the top one:
+        // the delay is read off the index in the direction each wave travels.
+        var delay = (entering === true ? count - 1 - i : i) * step
         var local = curve > 0 ? (t * span - delay) / curve : 1
-        if (local < 0)
-            local = 0
-        if (local > 1)
-            local = 1
-        var eased = local * local
-        slots.push({ drop: eased, fade: eased })
+        var eased = _contentCurve(local, shape)
+        slots.push({ travel: eased, fade: eased })
     }
     return slots
+}
+
+// How far a block has to climb to start at the screen's bottom edge: its own
+// bottom sits `blockBottom` from the surface's top, so the distance is whatever
+// is left below it. Every block therefore starts on the same line and rises by a
+// different amount, which is what makes the entrance read as a lift off the
+// bottom edge instead of three unrelated slides.
+function riseDistance(surfaceHeight, blockBottom) {
+    var height = Number(surfaceHeight) > 0 ? Number(surfaceHeight) : 0
+    var bottom = Number(blockBottom) > 0 ? Number(blockBottom) : 0
+    return Math.max(0, height - bottom)
 }
 
 // Read one block out of a slot list. A missing list or index answers the state
@@ -145,7 +172,7 @@ function contentSlots(progress, entering, curveMs, staggerMs, blockCount) {
 // keeps it fully present.
 function contentSlot(slots, block) {
     if (!slots || block < 0 || block >= slots.length)
-        return { drop: 0, fade: 0 }
+        return { travel: 0, fade: 0 }
     return slots[block]
 }
 

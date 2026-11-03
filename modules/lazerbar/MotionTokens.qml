@@ -26,27 +26,36 @@ QtObject {
     // Lock-screen content: the clock, the lock control and the power row enter
     // and leave on a stagger rather than as one block, so the surface reads as
     // a wave crossing three layers instead of everything moving together. Each
-    // block travels on the osu notification fling's shape (gravity drop + fade,
-    // symmetric in and out) with its own delayed start, so the delays are
-    // strictly ascending on entry and strictly descending on exit — a wave each
-    // way, never a mirrored group. The travel stays inside the frame: the bottom
-    // row already sits one control height above the screen edge.
+    // block reads its own delayed start of one shared span, so the delays are
+    // strictly ordered and the two directions are different waves, never one
+    // mirrored group.
     //
-    // `lockContentFall` is one block's own travel time; `lockContentSpan` is the
-    // whole staggered choreography (curve plus every delay) and is what the
-    // drivers and the unlock failsafe budget actually run for.
+    // The two directions are also two different journeys. Entry is a rise from
+    // the screen's bottom edge to the block's place: every block starts on that
+    // line, so each travels its own distance, and nothing fades on the way in.
+    // Exit is the notification fling — an accelerating fall with a fade — because
+    // content on its way out may dissolve, while content arriving may not.
+    //
+    // `lockContentRise` is longer than `lockContentFall` on purpose: the rise
+    // covers the height of the output (up to a full screen for the clock) while
+    // the fall only has to clear the bottom row, so equal durations would make
+    // the entrance whip.
+    readonly property int lockContentRise: 520
     readonly property int lockContentFall: 360
     readonly property real lockContentFallDistance: 56
-    // Entry lifts the same three blocks into place from below instead of
-    // dropping them, and by half the exit travel: an entrance never competes
-    // with the curtain that is unveiling it.
-    readonly property real lockContentRiseDistance: 28
+    // Entry travel has no token on purpose: every block has to start at the
+    // surface's bottom edge, so its distance is whatever is left below it, and
+    // that depends on the output. LockSurface derives it per block.
     // Delay step between neighbouring blocks (index order on entry, reverse
     // order on exit).
     readonly property int lockContentStagger: 100
     // Tail added by the two blocks that start last.
     readonly property int lockContentStaggerSpan: 2 * lockContentStagger
-    readonly property int lockContentSpan: lockContentFall + lockContentStaggerSpan
+    // Whole staggered choreographies. The exit span is what the unlock failsafe
+    // budgets for, because the closing wave waits for it; the entry span only has
+    // to fit inside the curtain's own travel.
+    readonly property int lockContentEnterSpan: lockContentRise + lockContentStaggerSpan
+    readonly property int lockContentExitSpan: lockContentFall + lockContentStaggerSpan
 
     // Wallpaper swaps are large-surface reveals; keep them calm but not slow.
     readonly property int wallpaperSwap: 480
