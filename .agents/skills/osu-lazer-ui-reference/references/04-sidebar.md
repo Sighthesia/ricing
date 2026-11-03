@@ -173,7 +173,7 @@
 
 7. **入场 stagger 序列**：导航按钮逐个 500ms FadeInFromZero、间隔 40ms，配合面板整体滑入——低成本高质感，适合 Afloat 面板首次展开时复刻。
 
-8. **恢复默认按钮的弹入/快出不对称**：出现 200ms OutElasticQuarter（有存在感）、消失 120ms OutExpo 后淡出（利落收尾）——与 lazer-settings-surface-details skill 中已验证的伪月牙按钮契约一致，可保留。
+8. **恢复默认按钮的弹入/快出不对称**：出现 200ms OutElasticQuarter（有存在感）、消失 120ms OutExpo 后淡出（利落收尾）——与 `lazer-ui-style` 的 `references/settings-panel.md` 中已验证的伪月牙按钮契约一致，可保留。
 
 9. **子面板打开时收缩侧栏并降灰**：`Expanded=false` 收至 70 + `FadeColour(DarkGray, 300ms)` 表达"此栏暂时不可用"，比隐藏更保留空间感和上下文。
 

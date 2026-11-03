@@ -24,8 +24,8 @@ import QtQuick
 // restarts its easing before it leaves the start of its curve — measured at ~5%
 // of the gap on the first tick of a 480ms flight, a frozen tail. The crossing
 // case in `modules/bar/BarWindowHintContent.qml` genuinely needs the follower
-// and is deliberately NOT folded in here; `pinned-head-trail-motion` is the
-// record of why the two are different mechanisms.
+// and is deliberately NOT folded in here; `lazer-motion-perf` records why the
+// two are different mechanisms.
 //
 // THE WAKE IS UNBOUNDED, as it is in the widget: a long jump draws a strip
 // longer than the surface it sits in. A cap is not the fix — capping converts a

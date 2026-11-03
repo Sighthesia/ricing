@@ -613,8 +613,8 @@ Item {
     // and both rails carry one wake rather than three implementations of it.
     // Its tracker used to live here verbatim (`_edgeX` / `_edgeShadowX` /
     // `_edgeSpan` / `retargetEdges`); see `modules/lazerbar/TrailIndicator.qml`
-    // for the recipe and `pinned-head-trail-motion` for the record of what
-    // went wrong on the way there.
+    // for the recipe and `lazer-motion-perf` for the record of what went wrong
+    // on the way there.
     TrailIndicator {
         id: activeIndicator
 

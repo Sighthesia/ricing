@@ -91,7 +91,7 @@ loads.
 - **Two surfaces in the same layer-shell layer cannot be ordered against each other by the client** — the compositor decides, and re-commits can change its mind. Mounting a surface "last" is not a z-order guarantee (`shell.qml` claimed exactly that for the screen bezel, and it was wrong: the bar won, and its translucent fill washed the bezel out to a light tint). Any decoration overlapping a sibling surface must be painted **by the surface that owns that region**; never let two surfaces both paint the same pixels. The bezel splits its four corners this way (`ScreenCornerMask.corners` plus `barCornerMask`/`barFreeCornerMask`): the bar paints the corners it physically covers, the bezel surface paints the remaining two. When a radius is shared across two hosts, clamp it against the *screen* extent rather than the host window's, or a short host (the bar is a 48px strip) silently caps it at half its own height.
 - Qt 6.11 effect stack, verified on this machine (Qt 6.11.2 / Mesa / radeonsi): inline GLSL in `ShaderEffect` **no longer compiles** (its `vertexShader`/`fragmentShader` are now `.qsb` URLs, so every inline shader reports `status === Error`), and `MultiEffect`'s mask/blur passes drop the source or render nothing. `Qt5Compat.GraphicalEffects.OpacityMask` (rounded-rect mask source) is the one that works — see `modules/lazerbar/WallpaperReveal.qml`. Its edge is 1px hard; a nested blur inside a `maskSource` renders nothing.
 - Full-screen images (wallpapers) exceed `QPixmapCache`'s 10 MB default, so `Image.cache: true` never produces a cache hit for them: a second request for the same source re-decodes from disk. Hand a full-screen wallpaper over with `asynchronous: false` (the assignment returns with pixels ready) or keep both layers alive and swap roles — an `asynchronous: true` reload shows whatever is underneath until the decode lands.
-- Lock screen (`modules/lock/`, `LockService`): `WlSessionLockSurface` constraints — no `Repeater`, backdrop z-order, re-arm choreography. Load `session-lock-surface-constraints` skill before touching it.
+- Lock screen (`modules/lock/`, `LockService`): `WlSessionLockSurface` constraints — no `Repeater`, backdrop z-order, re-arm choreography. Load `quickshell-platform-traps` before touching it.
 
 ## Style
 
@@ -100,9 +100,12 @@ loads.
 
 ## Skills (`.agents/skills/`)
 
-- Before any visible UI change: `osu-sharp-design-language` + `settings-panel-style-authority`.
-- Load others on symptom: `lazer-settings-surface-details` (settings panel edits), `submenu-surface-motion` (tray/submenu motion), `overlay-pointer-event-starvation` (lost hover), `multi-instance-focus-ownership` (input lost on reopen), `effective-visibility-cycle-debugging` (mapped but paints nothing), `reactive-measurement-layout-debugging` (clipped/drifted sizes), `quickshell-process-stdio-hazards` (a `Process` ran the wrong argv, or a handler overwrote a good result — affects every service that shells out), `per-frame-surface-resize-jank` / `reveal-before-clip` / `async-layer-sync-lag-debugging` (animation jank), `browser-media-metadata-fallback` (web-player metadata), `active-window-live-sync`, `marquee-exit-ghosts`, `first-batch-cold-path-prewarm`, `surface-owner-split-debugging`, `visual-transition-rules`, `comment-before-declarations`, `osu-lazer-ui-reference` (exact lazer colors/sizes/durations).
-- Load `layer-shell-overflow-hit-testing` when a visible layer-shell popup overflows a primary column but the submenu has no hover/click response, especially when the compositor region is wide but a Qt Quick ancestor remains narrow.
-- Load `startup-reveal-scheduling` before touching boot ordering, the wallpaper reveal, `MotionTokens.wallpaperBootReveal` / `wallpaperSwap`, startup gates, the launcher's `startupPrewarmAllowed`, or any boot watchdog interval.
-- Load `quickshell-variants-delegate-hijack` when a surface is missing from the compositor (desktop shows the compositor's own background colour) with no error beyond one `qs:`-category `modelData` warning, and before adding any child object inside a `Variants`-rooted component or at one of its instantiation sites.
-- Load `regression-proof` before claiming any bug is fixed, and after a fix "did not work". A checker that cannot fail passes vacuously, one clean log read on a flaky surface is noise, and after two wrong root causes the answer is an instrumented reproduction rather than more source reading.
+七个域 skill，各带 `references/` 按症状拆分。先读 SKILL.md 的路由表，只再读命中的那一个文件。
+
+- `lazer-ui-style` — 任何可见 UI 改动之前必读：形态层级/圆角规则、过渡要求、设置面板作为风格权威、MotionTokens 数值、点击闪烁与滚动契约、注释约定。设置面板与托盘子菜单细节在 references 里。
+- `osu-lazer-ui-reference` — 需要 lazer 原版精确配色/字号/时长基准时。
+- `lazer-surface-debugging` — 表面"看起来正常但行为不对"：mapped 但不绘制、hover 不触发、第二次打开收不到输入、溢出区无响应、内容被裁切、可见 owner 迁移后行为回归。
+- `lazer-motion-perf` — 动效与性能：动画掉帧、模糊层收缩溢出、内容被硬切、首次搜索卡顿、开机分几段卡、指示条拖尾被截断、标题残影。
+- `quickshell-platform-traps` — Quickshell 平台静默失败：`Process` 跑的是上一次的 argv / stderr handler 覆盖了好结果、`Variants` 劫持 delegate 导致 surface 完全没上屏、锁屏 surface 约束。
+- `lazer-data-sync` — 外部数据源到派生 UI 状态：Niri 窗口快照不跟随焦点、浏览器 MPRIS 封面/歌词闪烁或缺失。
+- `regression-proof` — 声明"修好了"之前，或一个 fix "没生效"之后：什么才算证明了修复。

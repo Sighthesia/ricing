@@ -222,6 +222,6 @@ new OsuContextMenuContainer { RelativeSizeAxes = Axes.Both, Child = myWidgets }
 ## 8. 对 Afloat/QML 移植的可借鉴要点
 
 1. 双层文字（Normal/Bold 叠放 + AlwaysPresent）实现 hover 变粗且不抖宽度 —— QML 可用两个叠放 `Text` + opacity 切换实现同样效果。
-2. 关闭动画 = 50ms 延迟 + 280ms OutQuint 淡出，尺寸收起延迟到淡出结束 —— 对应 Afloat 的 reveal-before-clip 场景。
+2. 关闭动画 = 50ms 延迟 + 280ms OutQuint 淡出，尺寸收起延迟到淡出结束 —— 对应 Afloat 的 `lazer-motion-perf` 里的 `references/reveal-before-clip.md` 场景。
 3. hover 背景 `#172023` vs 菜单底 `#223034` 的低对比深灰系配色 + 5px 圆角 + Radius 4 黑 10% 投影，是最小可用的 osu!lazer 菜单视觉包。
 4. "Highlighted=金黄主操作置顶、Destructive=红+spacer 置底" 是稳定的菜单信息层级惯例。

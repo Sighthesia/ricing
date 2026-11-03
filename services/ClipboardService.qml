@@ -926,7 +926,7 @@ Singleton {
         // `onExited`), never `running` - that property still reads true while a
         // process is exiting, so gating the next start on it silently drops the
         // job and stalls the queue. See
-        // .agents/skills/quickshell-process-stdio-hazards.
+        // .agents/skills/quickshell-platform-traps (references/process-stdio.md).
         Qt.callLater(function() {
             thumbProc.running = true
         })
