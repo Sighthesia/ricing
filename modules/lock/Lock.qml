@@ -536,12 +536,12 @@ Scope {
     // Bounded fallback so a stalled exit can never hold the lock after a
     // successful authentication; it stays armed only in the exiting state. The
     // budget covers the whole unlock choreography — unlock feedback, the
-    // control collapse, the content fall, the exit-image decode wait, then the
-    // wave sweep — plus a margin. The image wait is separate because the wave
-    // cannot start until its desktop replacement is ready.
+    // control collapse, the staggered content fall, the exit-image decode wait,
+    // then the wave sweep — plus a margin. The image wait is separate because
+    // the wave cannot start until its desktop replacement is ready.
     property Timer _exitFailsafe: Timer {
         interval: Lazer.MotionTokens.medium + Lazer.MotionTokens.instant
-                  + Lazer.MotionTokens.lockContentFall
+                  + Lazer.MotionTokens.lockContentSpan
                   + Lazer.MotionTokens.lockExitDesktopWait
                   + Lazer.MotionTokens.waveExit
                   + Lazer.MotionTokens.slow

@@ -23,12 +23,30 @@ QtObject {
     // and swallows the lower (darker) layers mid-transition.
     readonly property int waveBackdropEnter: 600
 
-    // Lock-screen unlock: every content block drops away together on the osu
-    // notification fling (gravity drop + InQuad fade) before the wave closes
-    // over the empty surface. The drop stays inside the frame: the bottom row
-    // already sits one control height above the screen edge.
+    // Lock-screen content: the clock, the lock control and the power row enter
+    // and leave on a stagger rather than as one block, so the surface reads as
+    // a wave crossing three layers instead of everything moving together. Each
+    // block travels on the osu notification fling's shape (gravity drop + fade,
+    // symmetric in and out) with its own delayed start, so the delays are
+    // strictly ascending on entry and strictly descending on exit — a wave each
+    // way, never a mirrored group. The travel stays inside the frame: the bottom
+    // row already sits one control height above the screen edge.
+    //
+    // `lockContentFall` is one block's own travel time; `lockContentSpan` is the
+    // whole staggered choreography (curve plus every delay) and is what the
+    // drivers and the unlock failsafe budget actually run for.
     readonly property int lockContentFall: 360
     readonly property real lockContentFallDistance: 56
+    // Entry lifts the same three blocks into place from below instead of
+    // dropping them, and by half the exit travel: an entrance never competes
+    // with the curtain that is unveiling it.
+    readonly property real lockContentRiseDistance: 28
+    // Delay step between neighbouring blocks (index order on entry, reverse
+    // order on exit).
+    readonly property int lockContentStagger: 100
+    // Tail added by the two blocks that start last.
+    readonly property int lockContentStaggerSpan: 2 * lockContentStagger
+    readonly property int lockContentSpan: lockContentFall + lockContentStaggerSpan
 
     // Wallpaper swaps are large-surface reveals; keep them calm but not slow.
     readonly property int wallpaperSwap: 480

@@ -37,6 +37,9 @@ WlSessionLockSurface {
     // Unlock fall driver: 0 keeps every content block in place, 1 has dropped
     // and faded all of them away. The wave sweep waits for it.
     property real contentFallProgress: 0
+    // Entry lift driver: the mirror of the fall, sampled by each block at its
+    // own delayed position. It runs under the curtain, not after it.
+    property real entryContentProgress: 0
     property bool reducedMotion: Lazer.MotionTokens.reducedMotion
     property bool exitStarted: false
     property bool exitWaveActive: false
@@ -152,6 +155,7 @@ WlSessionLockSurface {
         exitWavePending = false
         exitBodyProgress = 1
         entryBodyProgress = reducedMotion ? 1 : 0
+        entryContentProgress = reducedMotion ? 1 : 0
         releaseSent = false
         exitReleaseSettleTimer.stop()
         startupWaveStarted = false
@@ -258,16 +262,53 @@ WlSessionLockSurface {
     }
 
     function allAnimations(): var {
-        return [enterAnimation, entryBodyAnimation, exitAnimation, exitBodyAnimation,
-            contentFallAnimation]
+        return [enterAnimation, entryBodyAnimation, entryContentAnimation,
+            exitAnimation, exitBodyAnimation, contentFallAnimation]
     }
 
-    // One curve, one clock: the clock, the lock entry and the power row all
-    // fall together on this single sample. The progress read stays in the
-    // binding itself — a bare read from inside the JS helper is not part of the
-    // capture set.
-    readonly property var contentFall: SurfaceLogic.contentFallCurve(root.contentFallProgress)
+    // Every block samples one curve, but at its own delayed position, so the
+    // clock, the lock control and the power row arrive and leave as a wave
+    // instead of as a single block. Entry counts up (clock first), exit counts
+    // down (power row first): the two directions are deliberately different
+    // waves, and the curve length and the step both live in MotionTokens.
+    readonly property var contentSlots: SurfaceLogic.contentSlots(
+        root.contentFallProgress, false,
+        Lazer.MotionTokens.lockContentFall,
+        Lazer.MotionTokens.lockContentStagger,
+        SurfaceLogic.contentBlocks.count)
+    readonly property var entrySlots: SurfaceLogic.contentSlots(
+        root.entryContentProgress, true,
+        Lazer.MotionTokens.lockContentFall,
+        Lazer.MotionTokens.lockContentStagger,
+        SurfaceLogic.contentBlocks.count)
     readonly property real fallDistance: Lazer.MotionTokens.lockContentFallDistance
+    readonly property real riseDistance: Lazer.MotionTokens.lockContentRiseDistance
+
+    // The slot lists and the travel distances are passed in rather than read from
+    // `root` inside these helpers: a property read inside a JS function is not
+    // part of the binding's capture set, so the caller has to keep every dynamic
+    // read in the expression itself.
+    //
+    // Entry displacement: blocks that have not started yet sit one lift below
+    // their resting place and fully transparent, and each block closes that gap
+    // on its own delayed slice of the shared curve.
+    function entryOffset(slots, block, distance): real {
+        return (1 - SurfaceLogic.contentSlot(slots, block).drop) * distance
+    }
+
+    function entryFade(slots, block): real {
+        return SurfaceLogic.contentSlot(slots, block).fade
+    }
+
+    // Exit displacement, on the same delayed curve but counting down: the power
+    // row leads, the clock trails.
+    function exitOffset(slots, block, distance): real {
+        return SurfaceLogic.contentSlot(slots, block).drop * distance
+    }
+
+    function exitFade(slots, block): real {
+        return 1 - SurfaceLogic.contentSlot(slots, block).fade
+    }
 
     // Enter the inline authentication mode without changing PAM state.
     function enterInputMode(): void {
@@ -405,9 +446,13 @@ WlSessionLockSurface {
                 restart()
                 return
             }
-            // Retarget from the live value so a re-reveal never jumps.
+            // Retarget from the live value so a re-reveal never jumps. The
+            // content lift is a separate, shorter clock than the body: the three
+            // blocks stagger up while the curtain is still travelling, so the
+            // wave and the content are two asynchronous motions rather than one.
             enterAnimation.from = root.waveProgress
             entryBodyAnimation.restart()
+            entryContentAnimation.restart()
             enterAnimation.start()
         }
     }
@@ -443,9 +488,19 @@ WlSessionLockSurface {
         lightScheme: root.lightScheme
         lockTheme: root.themeSnapshotReady ? root.lockThemeSnapshot : null
         entranceRevealed: backdrop.revealContentInteractive
-        // The power row falls on the same curve as the rest of the content.
-        opacity: 1 - root.contentFall.fade
-        transform: Translate { y: root.contentFall.drop * root.fallDistance }
+        // The power row leads the exit and trails the entry: it reads the last
+        // slot of one stagger on the way in and the first on the way out.
+        opacity: root.exitFade(root.contentSlots, SurfaceLogic.contentBlocks.actions)
+                 * root.entryFade(root.entrySlots, SurfaceLogic.contentBlocks.actions)
+        // Entry and exit never overlap (the fall starts only after the lift has
+        // landed), so the two displacements simply add: both are measured
+        // downward, and one of them is always zero.
+        transform: Translate {
+            y: root.entryOffset(root.entrySlots, SurfaceLogic.contentBlocks.actions,
+                                root.riseDistance)
+               + root.exitOffset(root.contentSlots, SurfaceLogic.contentBlocks.actions,
+                                 root.fallDistance)
+        }
         z: 3.5
 
         onKeyboardReleased: keyboardOwner.forceActiveFocus()
@@ -493,11 +548,17 @@ WlSessionLockSurface {
             spacing: root.clockLineGap
                 - (clockTime.height - clockTime.digitInkBottom)
                 - (dateFont.ascent + dateInk.tightBoundingRect.top)
-            // The clock and its date fall with everything else. The drop
-            // rides a transform so the centered layout binding above stays
-            // authoritative.
-            opacity: 1 - root.contentFall.fade
-            transform: Translate { y: root.contentFall.drop * root.fallDistance }
+            // The clock leads both directions: first to lift in, last to fall.
+            // The offsets ride a transform so the centered layout bindings
+            // above stay authoritative.
+            opacity: root.exitFade(root.contentSlots, SurfaceLogic.contentBlocks.clock)
+                     * root.entryFade(root.entrySlots, SurfaceLogic.contentBlocks.clock)
+            transform: Translate {
+                y: root.entryOffset(root.entrySlots, SurfaceLogic.contentBlocks.clock,
+                                    root.riseDistance)
+                   + root.exitOffset(root.contentSlots, SurfaceLogic.contentBlocks.clock,
+                                     root.fallDistance)
+            }
 
             Behavior on x {
                 enabled: !root.reducedMotion
@@ -604,13 +665,20 @@ WlSessionLockSurface {
                 enabled: !root.reducedMotion
                 ColorAnimation { duration: Lazer.MotionTokens.fast }
             }
-            // The failure shake and the unlock fall are separate offsets, so a
-            // stale shake can never ride the drop away.
+            // The failure shake and the staggered fall are separate offsets, so
+            // a stale shake can never ride the drop away. The lock control sits
+            // between the clock and the power row in both waves.
             transform: [
                 Translate { x: authControl.failureOffset },
-                Translate { y: root.contentFall.drop * root.fallDistance }
+                Translate {
+                    y: root.entryOffset(root.entrySlots, SurfaceLogic.contentBlocks.control,
+                                        root.riseDistance)
+                       + root.exitOffset(root.contentSlots, SurfaceLogic.contentBlocks.control,
+                                         root.fallDistance)
+                }
             ]
-            opacity: 1 - root.contentFall.fade
+            opacity: root.exitFade(root.contentSlots, SurfaceLogic.contentBlocks.control)
+                     * root.entryFade(root.entrySlots, SurfaceLogic.contentBlocks.control)
 
             // Keep the glyph visible while the same rectangle opens for input.
             Item {
@@ -818,16 +886,34 @@ WlSessionLockSurface {
         easing.type: Easing.InQuad
     }
 
+    // Content entry owner: the same linear driver as the fall, running forward.
+    // It spans the whole stagger — the last block's own curve ends exactly when
+    // this does — so the lift is one clock, not a clock plus a queue of timers.
+    // The wave does not wait on it: the curtain and the content are two
+    // asynchronous motions, and the wave's own landing is what the surface
+    // reports.
+    NumberAnimation {
+        id: entryContentAnimation
+        target: root
+        property: "entryContentProgress"
+        from: 0
+        to: 1
+        duration: Lazer.MotionTokens.lockContentSpan
+        easing.type: Easing.Linear
+    }
+
     // Content fall owner: a plain linear driver whose gravity and fade shapes
     // live in SurfaceLogic, so every block samples one curve. Linear here is
-    // deliberate — easing twice would bend the free-fall acceleration.
+    // deliberate — easing twice would bend the free-fall acceleration. The span
+    // covers every block's delayed start, so the wave closes only after the
+    // trailing block has landed.
     NumberAnimation {
         id: contentFallAnimation
         target: root
         property: "contentFallProgress"
         from: 0
         to: 1
-        duration: Lazer.MotionTokens.lockContentFall
+        duration: Lazer.MotionTokens.lockContentSpan
         easing.type: Easing.Linear
         onFinished: root.startWaveExit()
     }

@@ -87,15 +87,66 @@ function inputEscapeAction(inputMode, unlockInProgress) {
     return inputMode === true || unlockInProgress === true ? "cancel-input" : "none"
 }
 
-// The unlock fall reuses the notification card's fling: a free-fall drop that
-// accelerates with t² and the same InQuad fade. Only those two carry over — the
-// card's leftward impulse and rotation come from the user's throw, and lock
-// content is not thrown. One curve drives every block at once, so the lock
-// content leaves as a single motion rather than a cascade.
-function contentFallCurve(progress) {
-    var t = progress < 0 ? 0 : (progress > 1 ? 1 : progress)
-    var eased = t * t
-    return { drop: eased, fade: eased }
+// The lock surface's three content blocks. Their index order is also their
+// vertical order on screen (clock, lock control, power row), which is what makes
+// a delay taken from it read as a wave crossing the surface.
+var contentBlocks = {
+    clock: 0,
+    control: 1,
+    actions: 2,
+    count: 3
+}
+
+// Entry and exit sample one shared curve — the notification fling's free fall
+// (t²) for travel and fade — but each block reads its own delayed position on
+// it, so the blocks start one after another instead of moving as one group.
+//
+// The delays are asymmetric on purpose. Entry counts up (clock first, power row
+// last, lifting into place); exit counts down (power row first, clock last,
+// dropping away), so the two directions are two different waves rather than the
+// same wave played backwards. A block's delay is measured on the animation
+// clock, not in progress units: `progress` runs over the whole staggered span
+// (the curve plus every delay), so each block still gets the full curve length
+// and every block lands exactly when the driver stops.
+//
+// The output is one 0..1 slot per block; callers own the travel and the fade
+// shape so reduced motion and the entry lift stay call-site decisions.
+function contentSlots(progress, entering, curveMs, staggerMs, blockCount) {
+    var curve = Number(curveMs) > 0 ? Number(curveMs) : 0
+    var step = Number(staggerMs) > 0 ? Number(staggerMs) : 0
+    var count = Number(blockCount) > 0 ? Number(blockCount) : 1
+    // The driver covers the curve plus the delay of the last block to start, so
+    // no block is left frozen mid-travel when the animation ends.
+    var span = curve + (count - 1) * step
+    var t = Number(progress)
+    if (!(t > 0))
+        t = 0
+    if (t > 1)
+        t = 1
+    var slots = []
+    for (var i = 0; i < count; ++i) {
+        // Entry: block 0 starts at 0, block n at n * step. Exit: the last block
+        // starts first, so the delay is read backwards off the same step.
+        var delay = (entering === true ? i : count - 1 - i) * step
+        var local = curve > 0 ? (t * span - delay) / curve : 1
+        if (local < 0)
+            local = 0
+        if (local > 1)
+            local = 1
+        var eased = local * local
+        slots.push({ drop: eased, fade: eased })
+    }
+    return slots
+}
+
+// Read one block out of a slot list. A missing list or index answers the state
+// before any motion started (no travel, no fade), which is the safe resting
+// point for both directions: entry keeps the block hidden below its place, exit
+// keeps it fully present.
+function contentSlot(slots, block) {
+    if (!slots || block < 0 || block >= slots.length)
+        return { drop: 0, fade: 0 }
+    return slots[block]
 }
 
 // Keep keyboard editing on one focused owner instead of handing events off to
@@ -454,9 +505,15 @@ function screenSlot(screens, screen) {
 function applyRevealImmediately(surface, animations) {
     stopAll(animations)
     surface.waveProgress = 1
+    // Reduced motion lands every block on its settled entry state: no lift, no
+    // fade, and no stagger waiting behind the curtain.
+    surface.entryContentProgress = 1
 }
 
 function applyExitImmediately(surface, animations) {
     stopAll(animations)
     surface.waveProgress = 0
+    // Reduced motion leaves the blocks where the fall left them: dropped and
+    // faded, with the closing wave passing over an already empty surface.
+    surface.contentFallProgress = 1
 }
