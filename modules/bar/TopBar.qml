@@ -298,16 +298,38 @@ Variants {
         // tiles then settle down behind a bar that already covers their edge.
         property bool _reclaimHold: false
 
+        // Whether this output's active workspace has any window at all, read at
+        // the moment a stand-down edge arrives. An empty desktop gives the strip
+        // release nothing to re-tile: no window means no animated move, so the
+        // reflow wait below can be skipped outright. Unknown workspace (the map
+        // has not answered for this output yet) fails safe into waiting.
+        readonly property bool _desktopHasWindows: {
+            const active = Services.NiriService.activeWorkspaces
+            const wsId = active ? active[screenName] : null
+            if (wsId == null)
+                return true
+            const windows = Services.NiriService.windows
+            for (let i = 0; i < windows.count; i++) {
+                if (String(windows.get(i).workspaceId) === String(wsId))
+                    return true
+            }
+            return false
+        }
+
         // The wait for the desktop to actually stand in that strip. niri
         // re-tiles this screen's windows when the strip is released, and it
-        // animates that with its own window-movement spring: this machine's
-        // config is 0.75-damped, 323-stiff under a 1.5x global slowdown, a
-        // little over a second to settle. The compositor announces the new
-        // layout but never the end of the animation around it, so this is a
-        // budget rather than a signal — the one guessed wait in the stand-down,
-        // and the reason a capture taken inside it bakes a half-moved desktop
-        // into the lock's background.
-        readonly property int reflowBudgetMs: 1000
+        // animates that with its own window-movement spring. The compositor
+        // never announces the end of that animation: WindowLayoutsChanged
+        // arrives once, at the animation START, already carrying the final
+        // geometry (verified against this machine's event stream — only
+        // interactive drags stream per frame), so no signal can end this wait
+        // and it stays a budget. It is no longer a guessed one: this machine's
+        // spring (damping 0.75, stiffness 323, slowdown 1.5) settles a
+        // bar-height move to sub-pixel in about 300ms, so 400ms covers the
+        // visible settle with margin. The old 1000ms was the spring's full
+        // epsilon completion — three times longer than the eye can see, and it
+        // sat between the wave panel landing and the lock appearing.
+        readonly property int reflowBudgetMs: 400
         property Timer reflowTimer: Timer {
             interval: screenScope.reflowBudgetMs
             repeat: false
@@ -358,8 +380,15 @@ Variants {
                 screenScope._stripMovedTiles = !screenScope.reportedFullscreen
                 if (screenScope._stripMovedTiles) {
                     screenScope._reclaimHold = true
-                    screenScope._reflowPending = true
-                    screenScope.reflowTimer.restart()
+                    // An empty desktop gives the release nothing to move, so
+                    // the reflow wait is skipped outright instead of sitting a
+                    // budget between the wave panel landing and the capture.
+                    if (screenScope._desktopHasWindows) {
+                        screenScope._reflowPending = true
+                        screenScope.reflowTimer.restart()
+                    } else {
+                        screenScope._reflowPending = false
+                    }
                 }
             } else {
                 // A request that photographs nothing has nothing to reclaim, and
