@@ -102,21 +102,23 @@ var contentBlocks = {
 // position inside it, so the blocks start one after another instead of moving as
 // one group.
 //
-// The two directions are opposite waves. Entry counts up from the bottom block
-// (power row first, clock last), which is the only order that agrees with the
-// travel: the clock starts furthest from its place, so letting it start first
-// would have it land last anyway while the bottom row overtook it. Exit counts
-// down from the top (clock first, power row last), so the surface empties as a
-// wave travelling down. A block's delay is measured on the animation clock, not
-// in progress units: `progress` runs over the whole staggered span, so each block
-// still gets the full curve length and every block lands exactly when the driver
-// stops.
+// Both directions carry the same meaning: a slot is how far a block has climbed
+// from *below the surface's bottom edge* to its place. Entry counts up from that
+// hidden line, exit counts back down to it, so a block is only fully out of sight
+// when it has cleared the edge rather than the small distance of the notification
+// fling. Nothing fades in either direction.
 //
-// `shape` is the curve a block's own slice is read through, so the two
-// directions can accelerate differently: the exit falls (t², gravity), while the
-// entrance rises and settles (OutCubic, decelerating into place). The output is
-// one 0..1 slot per block; callers own the travel distance and the fade, so
-// reduced motion and the per-block entry distance stay call-site decisions.
+// Because every block leaves through the same edge, the order has to follow the
+// distance: the bottom row travels barely its own height while the clock has to
+// cross most of the output, so both waves start at the bottom (power row first,
+// clock last). Starting the clock first would drop it straight through the two
+// blocks still standing under it. A block's delay is measured on the animation
+// clock, not in progress units: `progress` runs over the whole staggered span, so
+// each block still gets the full curve length and every block lands exactly when
+// the driver stops.
+//
+// The output is one 0..1 slot per block; callers own the travel distance so
+// reduced motion and the per-block geometry stay call-site decisions.
 var contentShapes = {
     fall: "fall",
     rise: "rise"
@@ -131,7 +133,7 @@ function _contentCurve(local, shape) {
     return t * t
 }
 
-function contentSlots(progress, entering, curveMs, staggerMs, blockCount, shape) {
+function contentSlots(progress, curveMs, staggerMs, blockCount, shape) {
     var curve = Number(curveMs) > 0 ? Number(curveMs) : 0
     var step = Number(staggerMs) > 0 ? Number(staggerMs) : 0
     var count = Number(blockCount) > 0 ? Number(blockCount) : 1
@@ -145,34 +147,34 @@ function contentSlots(progress, entering, curveMs, staggerMs, blockCount, shape)
         t = 1
     var slots = []
     for (var i = 0; i < count; ++i) {
-        // Entry waves up from the bottom block, exit waves down from the top one:
-        // the delay is read off the index in the direction each wave travels.
-        var delay = (entering === true ? count - 1 - i : i) * step
+        // Both waves start at the bottom block and end at the top one, which is
+        // the only order that agrees with how far each of them actually travels.
+        var delay = (count - 1 - i) * step
         var local = curve > 0 ? (t * span - delay) / curve : 1
-        var eased = _contentCurve(local, shape)
-        slots.push({ travel: eased, fade: eased })
+        slots.push(_contentCurve(local, shape))
     }
     return slots
 }
 
-// How far a block has to climb to start at the screen's bottom edge: its own
-// bottom sits `blockBottom` from the surface's top, so the distance is whatever
-// is left below it. Every block therefore starts on the same line and rises by a
-// different amount, which is what makes the entrance read as a lift off the
-// bottom edge instead of three unrelated slides.
-function riseDistance(surfaceHeight, blockBottom) {
+// How far a block has to travel to be completely below the surface's bottom
+// edge: its own bottom sits `blockBottom` from the surface's top, so it has to
+// clear whatever is left below it plus its own height. Every block therefore
+// starts and ends on the same hidden line while travelling a different distance,
+// which is what makes the motion read as the surface's contents moving through
+// its edge instead of three unrelated slides.
+function travelBelow(surfaceHeight, blockBottom, blockHeight) {
     var height = Number(surfaceHeight) > 0 ? Number(surfaceHeight) : 0
     var bottom = Number(blockBottom) > 0 ? Number(blockBottom) : 0
-    return Math.max(0, height - bottom)
+    var size = Number(blockHeight) > 0 ? Number(blockHeight) : 0
+    return Math.max(0, height - bottom) + size
 }
 
 // Read one block out of a slot list. A missing list or index answers the state
-// before any motion started (no travel, no fade), which is the safe resting
-// point for both directions: entry keeps the block hidden below its place, exit
-// keeps it fully present.
+// before any motion started — a block still sitting below the edge — which is the
+// safe resting point for both directions.
 function contentSlot(slots, block) {
     if (!slots || block < 0 || block >= slots.length)
-        return { travel: 0, fade: 0 }
+        return 0
     return slots[block]
 }
 
@@ -532,15 +534,15 @@ function screenSlot(screens, screen) {
 function applyRevealImmediately(surface, animations) {
     stopAll(animations)
     surface.waveProgress = 1
-    // Reduced motion lands every block on its settled entry state: no lift, no
-    // fade, and no stagger waiting behind the curtain.
+    // Reduced motion lands every block on its settled entry state: in place, with
+    // no stagger waiting behind the curtain.
     surface.entryContentProgress = 1
 }
 
 function applyExitImmediately(surface, animations) {
     stopAll(animations)
     surface.waveProgress = 0
-    // Reduced motion leaves the blocks where the fall left them: dropped and
-    // faded, with the closing wave passing over an already empty surface.
+    // Reduced motion leaves the blocks where the drop left them: below the bottom
+    // edge, with the closing wave passing over an already empty surface.
     surface.contentFallProgress = 1
 }
