@@ -1906,6 +1906,12 @@ PanelWindow {
                                 iconSource: root.currentIntent ? (root.currentIntent.iconSource || "") : ""
                                 tintIcon: root.currentIntent ? root.currentIntent.tintIcon === true : false
                                 summary: root.currentIntent ? (root.currentIntent.summary || "") : ""
+                                // Opt-in, and only the mod-key hint opts in: its two
+                                // lines are rewritten while the panel sits still, so a
+                                // cut reads as a glitch. Every other rail is set once
+                                // per open and keeps the plain swap.
+                                animatedText: root.currentIntent ? root.currentIntent.animatedText === true : false
+                                changeFlash: root.currentIntent ? root.currentIntent.changeFlash === true : false
                                 hostWidth: root.popupSlotWidth
                                 showClose: root.currentIntent ? String(root.currentIntent.kind || "") === "context" : false
                                 onCloseRequested: root.requestAnimatedClose()

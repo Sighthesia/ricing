@@ -22,6 +22,19 @@ Rectangle {
     // Foreground fade for replacement slides: icon, texts and close fade
     // while the rail background stays opaque.
     property real foregroundOpacity: 1
+    // Announce an IN-PLACE change of the two lines. Off by default, because most
+    // rails are set once per open and a flash on every repositioned summary would
+    // be noise; the mod-key window hint turns both on, because its lines change
+    // while the panel sits still - a held modifier plus a tapped key rewrites the
+    // title under the user's eyes, and a cut there reads as a glitch.
+    //
+    // `animatedText` runs the shell's own text transition (`MarqueeLabel`'s scan:
+    // the outgoing line falls character by character, the incoming one is revealed
+    // left to right) rather than a second transition invented here.
+    property bool animatedText: false
+    // `changeFlash` washes the rail with the shared click-flash recipe so the
+    // change is noticed from the corner of an eye that is not reading the text.
+    property bool changeFlash: false
     signal closeRequested()
 
     implicitWidth: hostWidth
@@ -31,6 +44,34 @@ Rectangle {
     color: LazerTheme.settingsRail
     clip: true
     radius: 0
+
+    // The change wash. Declared before the row so it tints the rail UNDER the
+    // icon and the two lines: the flash says "something changed here", and a
+    // wash over the glyphs would instead read as the text itself flickering.
+    //
+    // Same recipe as every click flash in the shell - `textPrimary` at
+    // `clickFlashOpacity`, falling to zero on `clickFlashDuration` with
+    // `clickFlashEasing` - so the rail flashing when a shortcut changes and a
+    // settings row flashing when it is clicked are visibly the same event.
+    Rectangle {
+        id: changeFlashSurface
+        objectName: "identityChangeFlash"
+        anchors.fill: parent
+        color: LazerTheme.textPrimary
+        opacity: 0
+        enabled: false
+        visible: opacity > 0.001
+    }
+
+    NumberAnimation {
+        id: changeFlashRun
+        target: changeFlashSurface
+        property: "opacity"
+        from: MotionTokens.clickFlashOpacity
+        to: 0
+        duration: MotionTokens.clickFlashDuration
+        easing.type: MotionTokens.clickFlashEasing
+    }
 
     // Left-aligned row: optional 16px icon plus title/summary column.
     Row {
@@ -81,33 +122,72 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 1
 
-            Text {
+            // `MarqueeLabel` rather than `Text` because it is the shell's single
+            // line-of-text contract: it grows with its content up to the cap,
+            // scrolls past it instead of eliding, and - the reason it is here -
+            // carries `transitionFrom`, the one text transition the shell has.
+            // Under reduced motion it degrades to a statically elided line, which
+            // is what a `Text` gave before.
+            MarqueeLabel {
                 id: titleText
                 objectName: "identityTitle"
-                width: parent.width
+                maxWidth: Math.max(0, Math.round(parent.width))
                 text: root.title
-                color: LazerTheme.textPrimary
-                font.pixelSize: 13
-                font.bold: true
-                elide: Text.ElideRight
-                verticalAlignment: Text.AlignVCenter
-                maximumLineCount: 1
+                textColor: LazerTheme.textPrimary
+                pixelSize: 13
+                bold: true
             }
 
-            Text {
+            MarqueeLabel {
                 id: summaryText
                 objectName: "identitySummary"
-                width: parent.width
+                maxWidth: Math.max(0, Math.round(parent.width))
                 text: root.summary
-                color: LazerTheme.textMuted
-                font.pixelSize: 10
-                elide: Text.ElideRight
+                textColor: LazerTheme.textMuted
+                pixelSize: 10
                 visible: root.summary !== ""
-                verticalAlignment: Text.AlignVCenter
-                maximumLineCount: 1
                 opacity: visible ? 0.92 : 0
             }
         }
+    }
+
+    // The two lines as they were LAST SHOWN, so a change can be told from the
+    // initial fill. `""` means "nothing has been shown yet": the first real text
+    // arriving is the rail being populated on open, not a change the user made,
+    // and it must not flash.
+    property string _shownTitle: ""
+    property string _shownSummary: ""
+
+    function _flash() {
+        if (!root.changeFlash || MotionTokens.reducedMotion)
+            return
+        changeFlashRun.stop()
+        changeFlashSurface.opacity = MotionTokens.clickFlashOpacity
+        changeFlashRun.restart()
+    }
+
+    onTitleChanged: {
+        if (root._shownTitle === root.title)
+            return
+        const previous = root._shownTitle
+        root._shownTitle = root.title
+        if (previous === "")
+            return
+        if (root.animatedText)
+            titleText.transitionFrom(previous, root.title)
+        root._flash()
+    }
+
+    onSummaryChanged: {
+        if (root._shownSummary === root.summary)
+            return
+        const previous = root._shownSummary
+        root._shownSummary = root.summary
+        if (previous === "")
+            return
+        if (root.animatedText)
+            summaryText.transitionFrom(previous, root.summary)
+        root._flash()
     }
 
     // Persistent-menu close affordance pinned to the header's right edge.

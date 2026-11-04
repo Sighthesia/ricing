@@ -554,6 +554,13 @@ Variants {
                 // only for bound actions left the overview with a blank line
                 // where the answer to "what am I holding" belongs.
                 summary: String(hint.bindSequence || ""),
+                // The rail's lines are rewritten IN PLACE while the panel stays
+                // put - a held mod key plus a tapped bound key - so they run the
+                // shell's text transition and wash the rail with the shared flash
+                // recipe. Told as a sentence with two halves: the title swaps, and
+                // the rail says so.
+                animatedText: true,
+                changeFlash: true,
                 // A keyboard glyph in both states, tinted like every other
                 // monochrome module glyph: the panel is an answer about KEYS
                 // whether it is naming a bound action or showing the overview.
