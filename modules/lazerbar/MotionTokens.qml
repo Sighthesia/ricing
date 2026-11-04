@@ -134,6 +134,18 @@ QtObject {
     readonly property int windowRowStagger: 24
     readonly property real windowRowExitInset: 12
 
+    // A window REORDERED inside its workspace - moved a column or a row in niri - keeps
+    // its row and travels to the new one, so the list reads as the thing that moved
+    // rather than as two rows trading titles.
+    //
+    // One duration for the whole swap and `OutCubic` for it, because this is a
+    // DISPLACEMENT between two rows that are both on screen: the row leaving a place and
+    // the row taking it are the same gesture, so pacing them apart would read as two
+    // events. It is longer than an arrival's slot (`windowRowEnter`) on purpose - a
+    // reorder is a row crossing several row pitches, not opening in place, and a short
+    // curve over that distance is a flick.
+    readonly property int windowRowMove: 240
+
     readonly property int controlCommit: 120
     readonly property int tooltipIn: 120
     readonly property int tooltipOut: 160

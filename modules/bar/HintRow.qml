@@ -63,7 +63,11 @@ Item {
     // shrinking towards its centre as it dissolves - which is the tray icon's fall
     // turned ninety degrees, and the same statement: it goes the way it is laid out.
     property real insetAmount: 0
-
+    // 0 where a reorder found this row, 1 where it belongs. A window moved inside its
+    // workspace keeps its row and travels to the new one, so this is the travel - and it is
+    // the row's own clock, not the layout's: the slot above it may be collapsing on a
+    // different curve at the same time, and the two displacements are added where the row
+    // is placed rather than fought over here.
     readonly property string rowKey: root.record && root.record.key !== undefined
         ? String(root.record.key) : ""
     readonly property string phase: root.record && root.record.phase !== undefined
@@ -104,6 +108,7 @@ Item {
         root.rowMoved()
     }
     onInkChanged: if (root.record) root.record.ink = root.ink
+    onSlotIndexChanged: root.rowMoved()
 
     // The row's content, in the slot's own space: full height while open, nothing while
     // closed. Sized from `presence` rather than from the slot's height so the content's
@@ -250,6 +255,42 @@ Item {
         easing.type: Easing.OutQuad
     }
 
+    // A reorder: one ease over the whole swap, and `OutCubic` because it is a displacement
+    // between two places that are both on screen. The row that left a place and the row
+    // that took it are the same gesture, so they share a clock - see
+    // `MotionTokens.windowRowMove`.
+    // Drives the RECORD, not a property of this item, for the reason at `moveOffset`: the
+    // item is rebuilt on the next publish and would lose whatever it was holding.
+    // The travel itself, on a property of THIS item.
+    //
+    // It cannot animate `record.moveProgress`, and that was the whole reason the rows did
+    // not move: a record is a plain JS object, so assigning one of its fields notifies
+    // nothing - no binding that read it is invalidated, and the layout kept the offset it
+    // computed on the first frame. A property of the item is a real QML property, so it
+    // notifies, and the `rowMoved()` in its handler is what tells the strip that the sum
+    // it places rows by has changed.
+    //
+    // The record still carries the START of the travel (`moveFrom`, `moveEpoch`), because
+    // that has to survive the delegate being rebuilt; the PROGRESS lives here, because it
+    // only means anything while this item is drawing.
+    property real _moveProgress: 1
+    on_MoveProgressChanged: root.rowMoved()
+
+    NumberAnimation {
+        id: moveAnim
+        target: root
+        property: "_moveProgress"
+        to: 1
+        duration: MotionTokens.windowRowMove
+        easing.type: Easing.OutCubic
+        // The travel is SPENT once it has arrived, and the record says so. `moveFrom` is
+        // what the next delegate reads to know where to start, so leaving it set makes every
+        // later rebuild of this row replay the same journey - measured, a reorder followed
+        // by a departing slot being retired slid the moved row into place and then slid it
+        // again from the same place, because the record still named it.
+        onFinished: if (root.record) root.record.moveFrom = -1
+    }
+
     // The resting state, written without an animation: the values a finished entry
     // would have left behind. It is the reduced-motion answer and the one a row created
     // into a settled list takes.
@@ -353,6 +394,11 @@ Item {
         if (!root.record)
             return
         const phase = root.phase
+        // A REORDER is its own event and it is orthogonal to the phase: the row stays
+        // `"live"` through it, because nothing about it is arriving or leaving. Handled
+        // first and outside the phase gate below, or the very case this exists for - a
+        // settled row that moved - would be answered "nothing changed".
+        root.syncMove()
         // The same phase this item is already in: the publish said nothing about this
         // row, so nothing restarts. Only a settled row adopts a value it somehow missed.
         if (phase === root._animPhase) {
@@ -374,6 +420,59 @@ Item {
         root.record.started = true
     }
 
-    onRecordChanged: root.syncFromRecord()
-    Component.onCompleted: root.syncFromRecord()
+    // A REORDER, and why its state lives on the record and not here.
+    //
+    // `Repeater` is given the row COUNT, and it rebuilds its delegates on every publish -
+    // measured, three items for a list of three replaced by three new ones for the same
+    // three rows. So an item cannot remember where it was: it does not survive the frame
+    // the list changes on. What survives is the record, exactly as it does for `presence`
+    // and `ink`, and the reconcile is what knows both positions - where the window was and
+    // where it went. This item's job is only to DRIVE the progress the record carries.
+    //
+    // The travel is in ROW PITCHES, and it is signed: a row that moved up starts below its
+    // new place and has to come up to it.
+    readonly property real moveOffset: {
+        if (!root.record || root.record.moveFrom === undefined || root.record.moveFrom < 0)
+            return 0
+        var progress = Math.max(0, Math.min(1, root._moveProgress))
+        return (root.record.moveFrom - root.slotIndex) * (1 - progress)
+    }
+    // This slot's own index in the column. Handed in rather than `index`, because the
+    // `Repeater`'s injected `index` is the slot's place and the travel is measured against
+    // the ROW's place - see the note above.
+    property int slotIndex: -1
+
+    // Start the travel the record is carrying, if it is carrying one this item has not
+    // already begun. `moveEpoch` is the tell: the record outlives the item, so "there is a
+    // move in flight" is not enough - a second move landing before the first finished has
+    // the same shape, and only a counter says "this is a new journey".
+    property int _drivenEpoch: -1
+    function syncMove() {
+        if (!root.record)
+            return
+        const epoch = root.record.moveEpoch === undefined ? 0 : root.record.moveEpoch
+        if (epoch === root._drivenEpoch)
+            return
+        root._drivenEpoch = epoch
+        if (root.record.moveFrom === undefined || root.record.moveFrom < 0)
+            return
+        // From the old place. Written before the restart so the animation's `from` is the
+        // start of this travel rather than wherever the record happened to be.
+        root._moveProgress = 0
+        if (MotionTokens.reducedMotion) {
+            root._moveProgress = 1
+            root.record.moveFrom = -1
+            return
+        }
+        moveAnim.restart()
+    }
+
+    onRecordChanged: {
+        root.syncMove()
+        root.syncFromRecord()
+    }
+    Component.onCompleted: {
+        root.syncMove()
+        root.syncFromRecord()
+    }
 }

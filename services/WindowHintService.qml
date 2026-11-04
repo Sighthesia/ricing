@@ -215,12 +215,20 @@ Singleton {
             return left.windowId.localeCompare(right.windowId)
         })
 
+        // `colIdx` / `rowIdx` are carried through, and they are the whole reason a
+        // REORDER can be told apart from a row that was replaced. The list is already
+        // sorted by them, so their order in the array says the same thing - but a
+        // reorder is the same array of identities in a different order, and telling that
+        // apart from "one left and another arrived in its place" needs the position each
+        // window HOLDS, not just where it sits in the projection.
         return items.map(item => ({
             windowId: item.windowId,
             title: item.title,
             appId: item.appId,
             icon: item.icon,
-            isFocused: item.isFocused
+            isFocused: item.isFocused,
+            colIdx: item.colIdx,
+            rowIdx: item.rowIdx
         }))
     }
 

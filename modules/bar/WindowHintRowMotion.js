@@ -51,13 +51,26 @@ function _fields(row) {
         title: row && row.title !== undefined ? row.title : "",
         appId: row && row.appId !== undefined ? row.appId : "",
         icon: row && row.icon !== undefined ? row.icon : "",
-        isFocused: !!(row && row.isFocused)
+        isFocused: !!(row && row.isFocused),
+        // The window's own place in niri's tiling. Carried because a REORDER is the same
+        // set of identities in a different order, and telling that apart from "one left and
+        // another arrived in its place" needs the position each window HOLDS rather than
+        // where it happens to sit in the projection.
+        colIdx: row && row.colIdx !== undefined ? row.colIdx : 0,
+        rowIdx: row && row.rowIdx !== undefined ? row.rowIdx : 0
     }
+}
+
+// Where this record sits, as one comparable number. Columns first, then rows - the same
+// order the service sorts by, so "moved up" and "moved left" are both a decrease.
+function _tilingOrder(record) {
+    return Number(record.colIdx || 0) * 1000 + Number(record.rowIdx || 0)
 }
 
 function _copy(record) {
     var out = _fields(record)
     out.key = record.key
+    out.moveFrom = record.moveFrom === undefined ? -1 : record.moveFrom
     out.phase = record.phase
     out.delayMs = record.delayMs || 0
     out.presence = record.presence === undefined ? 1 : record.presence
@@ -73,12 +86,15 @@ function _resting(fields, key) {
         appId: fields.appId,
         icon: fields.icon,
         isFocused: fields.isFocused,
+        colIdx: fields.colIdx,
+        rowIdx: fields.rowIdx,
         key: key,
         phase: "live",
         delayMs: 0,
         presence: 1,
         ink: 1,
-        started: true
+        started: true,
+        moveFrom: -1
     }
 }
 
@@ -109,13 +125,54 @@ function _arriving(fields, key, index, count, stepMs) {
         appId: fields.appId,
         icon: fields.icon,
         isFocused: fields.isFocused,
+        colIdx: fields.colIdx,
+        rowIdx: fields.rowIdx,
         key: key,
         phase: "enter",
         delayMs: SlotLogic.cascadeDelayMs(index, count, stepMs, false),
         presence: 0,
         ink: 0,
-        started: false
+        started: false,
+        moveFrom: -1
     }
+}
+
+// The index a key occupied in a list, or -1. Used to tell a row that MOVED from a row
+// that was merely re-described: both arrive with the same key, and only the position it
+// used to hold says which one happened.
+function _indexOfKey(list, key) {
+    for (var i = 0; i < list.length; ++i) {
+        var item = list[i]
+        if (!item)
+            continue
+        // `keyFor` rather than `item.key`, because the two lists this is asked about are
+        // not the same shape: the previous one holds reconcile RECORDS (which carry a
+        // `key`), and the incoming one holds raw snapshot rows (which do not, and whose
+        // identity is derived from the window id exactly as the reconcile derives it).
+        if (keyFor(item, i) === String(key))
+            return i
+    }
+    return -1
+}
+
+// The index a key holds among the rows that are present in BOTH lists, which is the only
+// frame of reference a reorder can be measured in: a row that is leaving occupies a place
+// on one side and no place on the other, so counting through it makes every row below it
+// look displaced - and dropping it later displaces them again by the same amount.
+function _indexAmongSurviving(list, key, otherByKey) {
+    var seen = 0
+    for (var i = 0; i < list.length; ++i) {
+        var item = list[i]
+        if (!item)
+            continue
+        var itemKey = keyFor(item, i)
+        if (!otherByKey[itemKey])
+            continue
+        if (itemKey === String(key))
+            return seen
+        ++seen
+    }
+    return -1
 }
 
 // The union of `previous` and `incoming`, in display order.
@@ -190,6 +247,37 @@ function reconcileRows(previous, incoming, stepMs) {
             // would be a number on a record whose phase says nothing is moving.
             if (merged.phase === "live")
                 merged.delayMs = 0
+            // MOVED, or just re-described? A window that changed its place in niri is the
+            // one thing this projection cannot show by itself: the array is sorted by that
+            // place, so a move is the same identities in a different order - which reads
+            // exactly like a row being replaced unless the position is compared.
+            //
+            // The travel is remembered as the ORDER INDEX it came from, not as a pixel
+            // offset and not as the tiling number: the row is drawn by its index in this
+            // list (`slotTopAt`), so the index is the unit its position is already
+            // expressed in. A tiling delta would have to be converted through a pitch that
+            // a collapsing slot is changing at the same time.
+            if (merged.phase === "live") {
+                // The two positions, and neither is `i`: this loop walks the PREVIOUS
+                // list, so `i` is where the row was - the new place is where the incoming
+                // list puts it. Comparing `i` against itself is why the first cut of this
+                // found no movement at all: every row was at its own index in both lists.
+                //
+                // Both indices are counted over the rows that are STILL HERE, on both
+                // sides. A departing row holds a place in `prev` that the arriving list does
+                // not have, so counting through it made every row below it look like it had
+                // moved by one - and the moment that row was dropped, the same rows were
+                // "moved" again by the same one. Measured: a reorder and a close in one
+                // publish slid the moved row into place, then slid it a second time when the
+                // closing slot was retired.
+                var previousIndex = _indexAmongSurviving(prev, key, incomingByKey)
+                var incomingIndex = _indexAmongSurviving(next, key, previousByKey)
+                if (previousIndex >= 0 && incomingIndex >= 0
+                        && previousIndex !== incomingIndex) {
+                    merged.moveFrom = previousIndex
+                    merged.moveEpoch = (merged.moveEpoch || 0) + 1
+                }
+            }
             out.push(merged)
             continue
         }
@@ -205,7 +293,25 @@ function reconcileRows(previous, incoming, stepMs) {
         out.splice(c, 0, _arriving(_fields(next[c]), arrivalKey,
             arriving.indexOf(arrivalKey), arriving.length, step))
     }
-    return out
+    // ORDERED BY THE INCOMING LIST, not by the previous one.
+    //
+    // The loop above walks `prev` so that a row on its way out keeps the place the user
+    // last saw it in - but everything that STAYS belongs in the order the snapshot now
+    // says, or a reorder would be invisible: the rows would keep their slots and only the
+    // titles under them would change. Departures are appended at the end, where a row that
+    // no longer has a place belongs.
+    var ordered = []
+    for (var d = 0; d < next.length; ++d) {
+        var wantKey = keyFor(next[d], d)
+        for (var e = 0; e < out.length; ++e) {
+            if (out[e] && String(out[e].key) === String(wantKey)) {
+                ordered.push(out[e])
+                out.splice(e, 1)
+                break
+            }
+        }
+    }
+    return ordered.concat(out)
 }
 
 // Is a row arriving or leaving anywhere in this list? The one question the panel
@@ -214,7 +320,13 @@ function reconcileRows(previous, incoming, stepMs) {
 function anyMoving(rows) {
     var list = _list(rows)
     for (var i = 0; i < list.length; ++i) {
-        if (list[i] && (list[i].phase === "enter" || list[i].phase === "exit"))
+        if (!list[i])
+            continue
+        // A REORDER counts, and it has to: `liftAt` is read while this is true, and a row
+        // that is half way between two places is not where its index says it is any more
+        // than a collapsing slot is.
+        if (list[i].phase === "enter" || list[i].phase === "exit"
+                || list[i].moveFrom >= 0)
             return true
     }
     return false
@@ -235,7 +347,9 @@ function liftAt(rows, index, rowHeight, listSpacing) {
         // pixels above where it is: measured on the first frame of a twelve-row workspace,
         // eleven slots at presence 0 summed to a lift of 199.96 and the reveal scrolled to
         // 4 instead of 238, which is the report - the focused card below the panel's edge.
-        if (!record || record.phase !== "exit")
+        if (!record)
+            continue
+        if (record.phase !== "exit")
             continue
         var presence = record.presence !== undefined ? Number(record.presence) : 1
         if (!isFinite(presence))

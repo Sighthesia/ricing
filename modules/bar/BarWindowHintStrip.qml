@@ -441,6 +441,9 @@ Item {
     // records' live `presence`, so it is exact at every frame of a transition rather than
     // only at its ends.
     function rowLiftFor(index) {
+        // The revision for the same DEPENDENCY reason `slotTopAt` reads it: a move's
+        // progress lives on a plain record, so nothing would invalidate this otherwise.
+        root.rowRevision
         return RowMotion.liftAt(root.activeRows, index, root.rowHeight, root.listSpacing)
     }
     // The same number for the focused row, which is what the body's markers subtract.
@@ -476,7 +479,20 @@ Item {
     // place the layout offset caused by mid-flight rows is added up, so the body does not
     // re-derive it and cannot disagree with where the row is drawn.
     function liveRowTop(index) {
-        return index * root.rowPitch - root.rowLiftFor(index) - root.scrollOffset
+        // The row's own travel is part of where it is, not an adjustment to the index it
+        // currently holds: a reordering row is drawn between two places, and the marker has
+        // to sit on it rather than on the place it is heading for.
+        root.rowRevision
+        // The travel is asked of the ACTIVE column, which is the one the markers follow.
+        // Guarded on the FUNCTION rather than only on the item: a column delegate is a
+        // plain `Item` until its own definition has been applied, so a marker placed in the
+        // same turn the strip is built can reach an item that does not answer yet - and a
+        // missing answer here is "no travel", not an error.
+        var column = root.activeColumnItem
+        var travel = column && typeof column.moveOffsetAt === "function"
+            ? column.moveOffsetAt(index) * root.rowPitch : 0
+        return index * root.rowPitch - root.rowLiftFor(index) + travel
+            - root.scrollOffset
     }
 
     // Nothing needs an exit animation while the surface is off screen, and the state this
@@ -625,6 +641,30 @@ Item {
             readonly property string positionKey: String(stripColumn.modelData.position)
             property alias columnBody: contentColumn
 
+            // The slot at `index`'s own travel, in pitches, read off the ITEM that is
+            // drawing it. Not from the record: the record says where a window went, and the
+            // item is what knows how much of that journey is left - and only one of those
+            // two is what the user sees.
+            function moveOffsetAt(index) {
+                var slot = stripColumn.slotAt(index)
+                return slot ? slot.moveOffset : 0
+            }
+
+            // The slot at a column position, found by the ITEM'S OWN place rather than by
+            // its `slotIndex` property: the children are in `Repeater` order, which is the
+            // order the column draws in, so the child at `index` is the slot at `index`.
+            //
+            // This walks `columnBody`'s children rather than the `Repeater` because the
+            // repeater's id is scoped to the column's content, and this has to be callable
+            // from the strip root as well - the markers ask it where a row is.
+            function slotAt(index) {
+                if (!stripColumn.columnBody)
+                    return null
+                var children = stripColumn.columnBody.children
+                var slot = children[index]
+                return slot && slot.moveOffset !== undefined ? slot : null
+            }
+
             // Where the slot at `index` starts, in the column's own space. THE running sum,
             // and the only one: a row's place is what every slot above it measures. Rows are
             // then placed by their own `y` rather than by a positioner, so a height that
@@ -633,21 +673,35 @@ Item {
             // `presence` is the slot's own 0-to-1, and `presence * pitch` is its height, so
             // the sum is over exactly the numbers the animations drive.
             function slotTopAt(index) {
-                // The revision is read for its DEPENDENCY: a record's `presence` is a field
-                // of a plain object, so a slot closing notifies nothing, and a binding that
-                // only summed the array would be evaluated once and then hold every row at
-                // the position it had on the frame it was created.
+                // The revision is read for its DEPENDENCY: a slot's travel lives on the item,
+                // so nothing in the model would invalidate this otherwise.
                 root.rowRevision
                 var top = 0
                 var list = stripColumn.rowList
+                var pitch = root.rowHeight + root.listSpacing
                 for (var i = 0; i < index && i < list.length; ++i) {
                     var presence = list[i] && list[i].presence !== undefined
                         ? Number(list[i].presence) : 1
                     if (!isFinite(presence))
                         presence = 1
-                    top += (root.rowHeight + root.listSpacing) * presence
+                    // The slot's own height, plus wherever a REORDER has that row right now.
+                    // A row crossing its neighbours occupies the space it is passing
+                    // through, so the rows it is crossing have to make room for it on the
+                    // same frame - which is the same arithmetic `liftAt` does for the
+                    // markers, so the two cannot disagree about where a row is.
+                    top += pitch * (presence + stripColumn.moveOffsetAt(i))
                 }
                 return top
+            }
+
+            // A row's own drawn top: its place in the layout, plus the travel it has left.
+            // The one expression, so the row and the marker that follows it are placed from
+            // the same numbers.
+            function rowTopAt(index) {
+                root.rowRevision
+                var pitch = root.rowHeight + root.listSpacing
+                return stripColumn.slotTopAt(index)
+                    + pitch * stripColumn.moveOffsetAt(index)
             }
 
             // The full list. Only this moves on scroll; the viewport above stays
@@ -693,11 +747,15 @@ Item {
             // when a slot collapsed to nothing, which is a dead gap exactly where a row
             // is leaving.
             Repeater {
+                id: columnRowRepeater
                 model: stripColumn.rowList.length
 
                 HintRow {
                     id: rowSlot
                     required property int index
+                    // The slot's own place, as opposed to the place of the row it is
+                    // drawing. The `Repeater`'s injected `index` is this one.
+                    slotIndex: rowSlot.index
                     // The record is taken BY INDEX rather than handed over as
                     // `modelData`, and that is load-bearing rather than stylistic: a
                     // `Repeater` given a JS array hands each delegate a COPY of its
@@ -712,7 +770,9 @@ Item {
                     // note on `contentColumn`. The sum is a function of the same presence
                     // values the slot animates, so the row below a closing card is where
                     // the closing card says it is, on every frame.
-                    y: stripColumn.slotTopAt(rowSlot.index)
+                    // The row's own drawn top, which is its place in the layout plus the
+                    // travel a reorder has left - see `rowTopAt`.
+                    y: stripColumn.rowTopAt(rowSlot.index)
                     x: root.cellPaddingX
                     width: stripColumn.cardWidth
                     cardWidth: stripColumn.cardWidth
