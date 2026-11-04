@@ -548,11 +548,15 @@ Variants {
                 // replacing the panel.
                 title: hint.bindLabel !== "" ? String(hint.bindLabel)
                     : Services.Tr.q("hint.overview"),
-                summary: hint.bindLabel !== ""
-                    ? String(hint.bindSequence) : "",
-                // A keyboard glyph while naming a shortcut, and the launcher's own
-                // when the panel is just the overview - the same monochrome module
-                // glyphs the calendar and notification panels use.
+                // The second line is the KEYS in BOTH states: the bound
+                // combination once one has been pressed, and the mod key's own
+                // name while the panel is just the overview. Showing the keys
+                // only for bound actions left the overview with a blank line
+                // where the answer to "what am I holding" belongs.
+                summary: String(hint.bindSequence || ""),
+                // A keyboard glyph in both states, tinted like every other
+                // monochrome module glyph: the panel is an answer about KEYS
+                // whether it is naming a bound action or showing the overview.
                 iconSource: Qt.resolvedUrl("../lazerbar/icons/keyboard.svg"),
                 tintIcon: true,
                 anchorX: barContent.hintAnchorX(),

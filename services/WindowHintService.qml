@@ -329,7 +329,10 @@ Singleton {
             previousWindow: root._windowAt(windows, currentIndex - 1),
             nextWindow: root._windowAt(windows, currentIndex + 1),
             bindLabel: root._liveBindLabel(),
-            bindSequence: Services.NiriKeybindService.liveSequence
+            // `holdSequence`, not `liveSequence`: it falls back to the mod key's
+            // own name while no bound key has been pressed, so the overview reads
+            // "Overview / Super" instead of leaving the second line blank.
+            bindSequence: Services.NiriKeybindService.holdSequence
         }
     }
 

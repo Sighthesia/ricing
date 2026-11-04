@@ -54,6 +54,23 @@ Singleton {
         ? "" : Services.Tr.q(String(root.liveLabel.key || ""), root.liveLabel.args || {})
     readonly property string bindSequence: root.liveSequence
 
+    // The sequence line while the rail is naming the PANEL rather than an action:
+    // the mod key that is holding it open, so the overview says "Super" where a
+    // bound key says "Super+Space". Empty when no modifier is held at all.
+    //
+    // Read off the live modifier mask rather than remembered from the press that
+    // opened the panel, because that is the same source the bound-key labels use -
+    // a rail that named one from a mask and the other from a latch could print two
+    // different notions of what is currently down.
+    readonly property string holdSequence: {
+        if (root.liveSequence !== "")
+            return root.liveSequence
+        const modifiers = Services.WindowHintTriggerService.liveModifiers
+        if (!modifiers || modifiers.super !== true)
+            return ""
+        return KeyMatch.sequenceLabel(KeyMatch.SUPER, "")
+    }
+
     // Emitted when the ANSWER changes, not when a key moves: the rail only cares
     // about which action it is naming. Named `bindResolved` rather than
     // `liveBindChanged` because that one already exists as the property's own

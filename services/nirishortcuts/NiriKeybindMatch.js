@@ -319,9 +319,15 @@ function keysymLabel(keysym) {
 // from the config file, so a bind written `Mod+E` reads as the keys the user
 // actually pressed (`Super+E`). That is the whole point of showing it: the
 // sequence confirms which key was understood.
+//
+// An EMPTY keysym means "just the modifiers", which is what the hint's rail
+// shows while the mod key is held on its own: the panel is the overview, and the
+// key standing it up is Super. Without this the label would end in a bare "+".
 function sequenceLabel(modifiers, keysym) {
     var parts = modifierLabel(modifiers)
-    parts.push(keysymLabel(keysym))
+    var key = keysymLabel(keysym)
+    if (key !== "")
+        parts.push(key)
     return parts.join("+")
 }
 
