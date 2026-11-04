@@ -35,6 +35,9 @@ Rectangle {
     // `changeFlash` washes the rail with the shared click-flash recipe so the
     // change is noticed from the corner of an eye that is not reading the text.
     property bool changeFlash: false
+    // What the announcement is keyed on: a counter the host bumps once per fired
+    // shortcut. Only meaningful together with `animatedText` / `changeFlash`.
+    property int announceToken: 0
     signal closeRequested()
 
     implicitWidth: hostWidth
@@ -151,11 +154,29 @@ Rectangle {
         }
     }
 
-    // The two lines as they were LAST SHOWN, so a change can be told from an
-    // empty edge. `""` on either side is never announced: see `_announce`.
+    // The two lines as they were last shown, so a change can be told from an
+    // empty edge. `""` on either side is never animated: the rail being filled or
+    // emptied is the panel opening or closing, and its own reveal already says so.
     property string _shownTitle: ""
     property string _shownSummary: ""
 
+    // THE TWO EFFECTS ANSWER DIFFERENT QUESTIONS, so they are driven by different
+    // things. Trying to run both off one signal is what broke each of them:
+    //
+    //   * The TRANSITION belongs to the text. It runs when the line's words
+    //     change, which is `MarqueeLabel`'s own contract, and it is what makes a
+    //     new answer read as replacing an old one rather than as a cut.
+    //   * The FLASH belongs to the EVENT. It runs when a shortcut fires, which is
+    //     the token. A repeat press of one bind leaves the text identical -
+    //     "Workspace 1" twice is still "Workspace 1" - and a rail that stayed
+    //     silent would be telling the user the key had stopped working.
+    //     `MarqueeLabel` early-returns on identical text, so the flash is the only
+    //     thing that can carry that press.
+    //
+    // The reverse also matters: the overview's title gains its workspace number a
+    // frame after the panel opens, when the workspace snapshot lands. That is a
+    // text change and NOT an event, so it may transition (it happens under the
+    // opening reveal) but it must not flash.
     function _flash() {
         if (!root.changeFlash || MotionTokens.reducedMotion)
             return
@@ -164,16 +185,9 @@ Rectangle {
         changeFlashRun.restart()
     }
 
-    // A change is announced only between two REAL answers. An empty side is the
-    // rail being filled (the panel is opening) or emptied (the panel is closing),
-    // and in both cases the panel's own reveal is already saying so: running the
-    // text transition there made "Overview" fall away as you released mod, and
-    // again on the way back in - the panel appeared to say the same word twice.
-    function _announce(kind, previous, next, label) {
-        if (previous === "" || next === "")
+    onAnnounceTokenChanged: {
+        if (root.announceToken <= 0)
             return
-        if (root.animatedText)
-            label.transitionFrom(previous, next)
         root._flash()
     }
 
@@ -182,7 +196,10 @@ Rectangle {
             return
         const previous = root._shownTitle
         root._shownTitle = root.title
-        root._announce("title", previous, root.title, titleText)
+        if (previous === "" || root.title === "")
+            return
+        if (root.animatedText)
+            titleText.transitionFrom(previous, root.title)
     }
 
     onSummaryChanged: {
@@ -190,7 +207,10 @@ Rectangle {
             return
         const previous = root._shownSummary
         root._shownSummary = root.summary
-        root._announce("summary", previous, root.summary, summaryText)
+        if (previous === "" || root.summary === "")
+            return
+        if (root.animatedText)
+            summaryText.transitionFrom(previous, root.summary)
     }
 
     // Persistent-menu close affordance pinned to the header's right edge.

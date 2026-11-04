@@ -347,6 +347,10 @@ var strings = {
     // held on its own - a view of the workspaces around the one you are on - and
     // it becomes the bound action's own name the moment a bound key arrives.
     "hint.overview": { zh: "概览", en: "Overview" },
+    // The overview's title while the workspace is known: "概览 3". The index is
+    // niri's own, the same number the bar's workspace squares show, so the panel
+    // and the bar cannot name the same workspace two different ways.
+    "hint.overviewIndexed": { zh: "概览 {index}", en: "Overview {index}" },
     // Names for the actions the hint's title rail reports. A bind with a
     // `hotkey-overlay-title` is shown as the user wrote it; these name the rest,
     // from the action id or the spawn target (`NiriActionLabel.js`). `named`

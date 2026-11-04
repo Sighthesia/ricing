@@ -1912,6 +1912,7 @@ PanelWindow {
                                 // per open and keeps the plain swap.
                                 animatedText: root.currentIntent ? root.currentIntent.animatedText === true : false
                                 changeFlash: root.currentIntent ? root.currentIntent.changeFlash === true : false
+                                announceToken: root.currentIntent ? Number(root.currentIntent.announceToken || 0) : 0
                                 hostWidth: root.popupSlotWidth
                                 showClose: root.currentIntent ? String(root.currentIntent.kind || "") === "context" : false
                                 onCloseRequested: root.requestAnimatedClose()

@@ -152,7 +152,8 @@ Singleton {
             // a second reader there would be a second answer to the same
             // question.
             bindLabel: "",
-            bindSequence: ""
+            bindSequence: "",
+            bindToken: 0
         }
     }
 
@@ -329,6 +330,11 @@ Singleton {
             previousWindow: root._windowAt(windows, currentIndex - 1),
             nextWindow: root._windowAt(windows, currentIndex + 1),
             bindLabel: root._liveBindLabel(),
+            // How many shortcuts have been fired since the shell started. The rail
+            // announces on THIS changing, so a repeat press of one bind still gets
+            // an answer while the overview's title gaining its workspace number
+            // does not - see `NiriKeybindService.triggerToken`.
+            bindToken: Services.NiriKeybindService.triggerToken,
             // `holdSequence`, not `liveSequence`: it falls back to the mod key's
             // own name while no bound key has been pressed, so the overview reads
             // "Overview / Super" instead of leaving the second line blank.

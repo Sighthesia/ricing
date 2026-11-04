@@ -546,8 +546,20 @@ Variants {
                 // hold lasts, and the host treats a same-identity intent as a live
                 // update - so a key press changes the rail in place instead of
                 // replacing the panel.
-                title: hint.bindLabel !== "" ? String(hint.bindLabel)
-                    : Services.Tr.q("hint.overview"),
+                // The overview names the WORKSPACE it is showing, because the
+                // panel is a view of the three workspaces around one of them and
+                // nothing else in it says which one that is. The index is niri's
+                // own - the same number the bar's workspace squares carry - so the
+                // two cannot name one workspace two ways.
+                //
+                // Only the overview is numbered. A bound action's name is the
+                // answer to a different question, and a number after it would read
+                // as part of the action.
+                title: hint.bindLabel !== ""
+                    ? String(hint.bindLabel)
+                    : (Number(hint.workspaceIndex) > 0
+                        ? Services.Tr.q("hint.overviewIndexed", { index: Number(hint.workspaceIndex) })
+                        : Services.Tr.q("hint.overview")),
                 // The second line is the KEYS in BOTH states: the bound
                 // combination once one has been pressed, and the mod key's own
                 // name while the panel is just the overview. Showing the keys
@@ -561,6 +573,11 @@ Variants {
                 // the rail says so.
                 animatedText: true,
                 changeFlash: true,
+                // What the announcement is keyed on: the number of shortcuts fired.
+                // Text changes alone do not announce - the overview's title gains
+                // its workspace number a frame after the panel opens, and that is
+                // the panel settling, not the user pressing something.
+                announceToken: Number(hint.bindToken || 0),
                 // A keyboard glyph in both states, tinted like every other
                 // monochrome module glyph: the panel is an answer about KEYS
                 // whether it is naming a bound action or showing the overview.

@@ -77,6 +77,17 @@ Singleton {
     // change signal, and QML forbids overriding it.
     signal bindResolved()
 
+    // Bumped on every TRIGGER, including two presses of the same bind - the rail
+    // announces on this rather than on its text changing, because the two are not
+    // the same question. Pressing Super+1 three times fires the shortcut three
+    // times while the text stays "Workspace 1", and the panel owes an answer to
+    // each one; meanwhile the overview's own title gaining its workspace number a
+    // frame after the panel opens is NOT a trigger, and must not flash.
+    //
+    // It also survives the latch: a repeat is filtered here (see `_latch`), so the
+    // rail never announces an auto-repeating key.
+    property int triggerToken: 0
+
     // ---- config reading ---------------------------------------------------
 
     // The files niri actually reads, in include order, and the keyboard layout
@@ -262,7 +273,7 @@ Singleton {
         if (!entry)
             return
 
-        root._latch(entry, keysym, modifiers)
+        root._latch(entry, keysym, modifiers, Number(frame.value))
     }
 
     function _modifierBits(modifiers) {
@@ -290,18 +301,27 @@ Singleton {
             || name === "caps_lock" || name === "num_lock"
     }
 
-    function _latch(entry, keysym, modifiers) {
+    function _latch(entry, keysym, modifiers, frame_value) {
         const label = ActionLabel.labelForEntry(entry)
         const sequence = KeyMatch.sequenceLabel(modifiers, keysym)
-        // Same bind, same sequence: nothing to announce. A held key repeating
-        // must not re-trigger the rail's text transition.
-        if (root.liveBind && String(root.liveBind.id) === String(entry.id)
-                && root.liveSequence === sequence)
-            return
 
         root.liveBind = entry
         root.liveSequence = sequence
         root.liveLabel = label
+
+        // A REPEAT is not a new press, and it must not re-announce: holding a key
+        // down would then flash the rail for as long as the key repeats, which is
+        // the one case where the effect would read as a malfunction. Everything
+        // else announces, INCLUDING the same bind twice - pressing Super+1 three
+        // times is three shortcuts fired, and a panel that answers only the first
+        // of them is telling the user the key stopped working.
+        //
+        // That is why the previous "same bind, same sequence" guard is gone: it
+        // existed to stop the repeat, and it made consecutive presses of one key
+        // indistinguishable from the key auto-repeating.
+        if (Number(frame_value) === 2)
+            return
+        root.triggerToken += 1
         root.bindResolved()
     }
 
