@@ -53,11 +53,24 @@ Singleton {
     readonly property string bindLabel: root.liveLabel === null
         ? "" : Services.Tr.q(String(root.liveLabel.key || ""), root.liveLabel.args || {})
     readonly property string bindSequence: root.liveSequence
-    // Whether the latched bind is a WORKSPACE action, from the parser's own
-    // category - not from a list of action names kept here, which would drift from
-    // the parser the moment one was added.
-    readonly property bool liveBindIsWorkspaceAction:
-        root.liveBind !== null && String(root.liveBind.category || "") === "workspaces"
+    // Whether the latched bind is one whose ANSWER is a place - a workspace, or
+    // the focus inside it. The rail numbers those and leaves the rest alone.
+    //
+    // Asked of the action body rather than of the parser's category, because the
+    // category groups by what the key acts ON (a column, a window, a workspace)
+    // and the question here is different: `focus-column-left` and
+    // `focus-window-down` are `windows` to the parser and still move where you
+    // are, which is exactly what the number is for. A FOCUS action is the whole
+    // set - anything that changes what is current - plus every workspace action,
+    // which also covers moving things between workspaces.
+    readonly property bool liveBindIsNavigational: {
+        if (root.liveBind === null)
+            return false
+        const category = String(root.liveBind.category || "")
+        if (category === "workspaces")
+            return true
+        return String(root.liveBind.detail || "").indexOf("focus-") === 0
+    }
 
     // The sequence line while the rail is naming the PANEL rather than an action:
     // the mod key that is holding it open, so the overview says "Super" where a

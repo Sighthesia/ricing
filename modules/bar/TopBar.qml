@@ -555,7 +555,7 @@ Variants {
                 // wrong), and everything else is just its own name.
                 title: HintTitle.title(
                     hint.bindLabel,
-                    hint.bindIsWorkspaceAction === true,
+                    hint.bindIsNavigational === true,
                     hint.workspaceIndex,
                     function(key, args) { return Services.Tr.q(key, args) },
                     {

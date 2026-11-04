@@ -154,7 +154,7 @@ Singleton {
             bindLabel: "",
             bindSequence: "",
             bindToken: 0,
-            bindIsWorkspaceAction: false
+            bindIsNavigational: false
         }
     }
 
@@ -338,7 +338,7 @@ Singleton {
             bindToken: Services.NiriKeybindService.triggerToken,
             // Whether the answer names a WORKSPACE action, which is what decides
             // if the title carries the workspace number too.
-            bindIsWorkspaceAction: Services.NiriKeybindService.liveBindIsWorkspaceAction,
+            bindIsNavigational: Services.NiriKeybindService.liveBindIsNavigational,
             // `holdSequence`, not `liveSequence`: it falls back to the mod key's
             // own name while no bound key has been pressed, so the overview reads
             // "Overview / Super" instead of leaving the second line blank.
