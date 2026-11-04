@@ -145,7 +145,14 @@ Singleton {
             nextWindows: [],
             workspaces: [],
             previousWindow: root._emptyWindow(),
-            nextWindow: root._emptyWindow()
+            nextWindow: root._emptyWindow(),
+            // The title rail's second half: which niri bind the key being held
+            // resolves to. On the snapshot rather than read by the popup body,
+            // because the body that paints them is the body the host measures -
+            // a second reader there would be a second answer to the same
+            // question.
+            bindLabel: "",
+            bindSequence: ""
         }
     }
 
@@ -320,8 +327,19 @@ Singleton {
                 ? root._workspaceWindows(nextSummary.workspaceId) : [],
             workspaces: root._workspaceSummaries(),
             previousWindow: root._windowAt(windows, currentIndex - 1),
-            nextWindow: root._windowAt(windows, currentIndex + 1)
+            nextWindow: root._windowAt(windows, currentIndex + 1),
+            bindLabel: root._liveBindLabel(),
+            bindSequence: Services.NiriKeybindService.liveSequence
         }
+    }
+
+    // The action the held shortcut runs, as one line. Empty while no bound key
+    // has been pressed - the rail then says what the panel is instead.
+    function _liveBindLabel() {
+        const service = Services.NiriKeybindService
+        if (!service || service.liveBind === null)
+            return ""
+        return String(service.bindLabel || "")
     }
 
     Connections {
@@ -348,6 +366,19 @@ Singleton {
 
         function onHoldChanged(active) {
             root.setHintHeld(active)
+        }
+    }
+
+    // A key pressed WHILE the hint is held is a change to what the rail says, not
+    // a reason to reopen the panel: the snapshot is republished in place, so the
+    // host treats it as the same popup and the title transitions instead of the
+    // whole surface being replaced.
+    Connections {
+        target: Services.NiriKeybindService
+
+        function onBindResolved() {
+            if (root.hintHeld)
+                root._scheduleHintRefresh(true)
         }
     }
 }

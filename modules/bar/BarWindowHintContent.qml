@@ -37,6 +37,11 @@ import "../../services" as Services
 // marks cross together AND change width together, at every instant of the
 // crossing rather than only at its ends.
 //
+// The panel's TITLE RAIL is the popup's shared one (`BarPopupIdentity`), the same
+// layer every other hover panel opens with - not a header of this body's own. It
+// carries the shortcut's name and its sequence, and it is the host that measures
+// it, exactly as it does for the calendar or the volume panel.
+//
 // THE ACTIVE COLUMN IS TWICE AS WIDE AS EITHER NEIGHBOUR, and that is what the
 // crossing is drawn with. The workspace you are ON is the one whose windows you
 // opened the panel to choose from, so it gets the room; the neighbours are context
@@ -504,6 +509,9 @@ Item {
     //
     // Everything below is in STRIP coordinates, so the strip's own `y` - the padding
     // between the panel's top edge and the card block - is already applied.
+    // The strip's own top edge in this body's coordinates. Named because the two
+    // off-panel positions below are measured against it, and a rail above the cards
+    // moves all three together.
     readonly property real _stripY: bandInset - surfaceInset + cellPaddingY
     // The panel's top edge in those coordinates, and a whole card above it: where the
     // marker starts. Wholly outside, so it slides IN rather than already being on screen
@@ -1917,6 +1925,10 @@ Item {
     // A twelve-window workspace now scrolls within five rows instead of collapsing the
     // rest into a summary line, and the panel is the same size either way - so the
     // layer-shell input region still does not grow once per added window.
+    //
+    // The rail is added on top and taken back out of the strip's own height (see the
+    // strip's `height`), so the card block's margins are the same numbers they were
+    // before there was a rail at all.
     implicitHeight: ready
         ? Math.min(root.viewportHeight,
             Math.max(root._outgoingHeight, strip.contentHeight))

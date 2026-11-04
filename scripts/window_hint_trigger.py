@@ -10,8 +10,21 @@ import time
 
 
 EV_KEY = 0x01
+EV_SYN = 0x00
+SYN_REPORT = 0
 KEY_LEFTMETA = 125
 KEY_RIGHTMETA = 126
+# One entry per modifier the shell cares about, as the set of evdev key codes
+# that can carry it. The output mask is a bit per entry, in this order, which is
+# the order niri writes modifiers in: shift, ctrl, alt, super, iso5. (Right Alt
+# and ISO_Level3_Shift share key code 100, so level 3 travels with `alt`.)
+MODIFIER_GROUPS = (
+    frozenset((42, 54)),
+    frozenset((29, 97)),
+    frozenset((56, 100)),
+    frozenset((125, 126)),
+    frozenset((203,)),
+)
 KEY_NAME_MAP = {
     "leftmeta": KEY_LEFTMETA,
     "rightmeta": KEY_RIGHTMETA,
@@ -84,8 +97,8 @@ def _emit(event_name: str) -> None:
     sys.stdout.flush()
 
 
-def _read_events(fd: int) -> list[tuple[int, int]]:
-    events: list[tuple[int, int]] = []
+def _read_events(fd: int) -> list[tuple[int, int, int]]:
+    events: list[tuple[int, int, int]] = []
     while True:
         try:
             chunk = os.read(fd, EVENT_SIZE * 32)
@@ -105,8 +118,8 @@ def _read_events(fd: int) -> list[tuple[int, int]]:
                 EVENT_FORMAT, chunk, offset
             )
             offset += EVENT_SIZE
-            if event_type == EV_KEY:
-                events.append((event_code, event_value))
+            if event_type == EV_KEY or (event_type == EV_SYN and event_code == SYN_REPORT):
+                events.append((event_type, event_code, event_value))
 
 
 def main() -> int:
@@ -116,6 +129,12 @@ def main() -> int:
     open_devices: dict[str, int] = {}
     hold_active = False
     warned_unavailable = False
+    # Held keys per device, so the modifier mask describes the moment the key
+    # arrived rather than the moment a frame was flushed. A key event that
+    # carries a modifier is sent AFTER that modifier was added to this set, which
+    # is what makes a press of the modifier itself report itself held - the same
+    # ordering niri resolves binds with.
+    held_keys: dict[str, set[int]] = {}
 
     def sync_hold_state() -> None:
         nonlocal hold_active
@@ -124,6 +143,18 @@ def main() -> int:
             return
         hold_active = next_active
         _emit("mod-down" if hold_active else "mod-up")
+
+    # One line per key event, carrying the evdev KEY_* code and the modifiers
+    # that were held while it happened. The shell turns these into a keysym and
+    # a modifier mask through the same libxkbcommon keymap the compositor uses,
+    # so the two never disagree about what a keycode means. Modifier order is
+    # fixed and follows niri's: shift, ctrl, alt, super, iso3, iso5.
+    def emit_key(event_code: int, event_value: int, modifiers: set[int]) -> None:
+        mask = 0
+        for index, group in enumerate(MODIFIER_GROUPS):
+            if modifiers & group:
+                mask |= 1 << index
+        _emit(f"key {event_code} {event_value} {mask}")
 
     def remove_device(path: str) -> None:
         fd = open_devices.pop(path, None)
@@ -144,6 +175,8 @@ def main() -> int:
         if stale:
             pressed_keys.difference_update(stale)
             sync_hold_state()
+
+        held_keys.pop(path, None)
 
     while True:
         candidates = _candidate_devices()
@@ -190,20 +223,37 @@ def main() -> int:
                 remove_device(path)
                 continue
 
-            for event_code, event_value in events:
-                if event_code not in meta_keys:
-                    continue
-
-                marker = (path, event_code)
-                if event_value == 0:
-                    if marker in pressed_keys:
-                        pressed_keys.remove(marker)
-                        sync_hold_state()
-                    continue
-
-                if event_value == 1 and marker not in pressed_keys:
-                    pressed_keys.add(marker)
+            for event_type, event_code, event_value in events:
+                # Frame boundary: the key set is now consistent, so this is where
+                # a held modifier is allowed to change the hint's state.
+                if event_type == EV_SYN:
                     sync_hold_state()
+                    # Frame boundary for the shell: every key event of this frame
+                    # has been emitted, so a reader that buffers them can now
+                    # decide what the modifier set means. Emitted after the hold
+                    # sync, so `mod-down` always precedes the frame that caused it.
+                    _emit("syn")
+                    continue
+
+                held = held_keys.setdefault(path, set())
+                if event_value == 0:
+                    held.discard(event_code)
+                elif event_value == 1:
+                    held.add(event_code)
+
+                emit_key(event_code, event_value, held)
+
+                if event_code in meta_keys:
+                    marker = (path, event_code)
+                    if event_value == 0:
+                        if marker in pressed_keys:
+                            pressed_keys.remove(marker)
+                            sync_hold_state()
+                        continue
+
+                    if event_value == 1 and marker not in pressed_keys:
+                        pressed_keys.add(marker)
+                        sync_hold_state()
 
 
 if __name__ == "__main__":

@@ -30,7 +30,88 @@ Singleton {
     property bool active: false
     property string lastEvent: ""
 
+    // ---- live key state ---------------------------------------------------
+    //
+    // The helper reports every key event with the modifiers that were held while
+    // it happened ("key <evdev code> <value> <mask>"), and a bare `syn` when the
+    // kernel frame is complete. That is the only place in the shell that knows
+    // which keys are physically down, because a Wayland client cannot see a
+    // keybinding the compositor has intercepted - which is exactly what the
+    // shortcut the user is pressing is.
+    //
+    // Keys are buffered until `syn` and published as one frame, so a consumer
+    // never sees half a key press: the modifier that arrived with it and the key
+    // itself belong to the same moment.
+    property var liveModifiers: ({ "mask": 0, "shift": false, "ctrl": false, "alt": false, "super": false, "iso5": false })
+    property var liveKeyCodes: []
+    // Emitted once per key frame. `pressed` / `released` are the code of the key
+    // that changed in THIS frame, or -1: a frame can carry several keys (a
+    // modifier and a letter arriving together), so the consumer is told the
+    // whole held set and which single key moved.
+    signal keyFrame(var frame)
+
     signal holdChanged(bool active)
+
+    // One entry per modifier bit the helper's mask uses, in its order (see
+    // `MODIFIER_GROUPS` in `scripts/window_hint_trigger.py`).
+    function _decodeMask(mask) {
+        const value = Number(mask) | 0
+        return {
+            "mask": value,
+            "shift": (value & 1) !== 0,
+            "ctrl": (value & 2) !== 0,
+            "alt": (value & 4) !== 0,
+            "super": (value & 8) !== 0,
+            "iso5": (value & 16) !== 0
+        }
+    }
+
+    property var _frameKeyCodes: ({})
+    property int _framePressed: -1
+    property int _frameReleased: -1
+    property int _frameValue: -1
+
+    function _handleKeyEvent(code, value, mask) {
+        const keyCode = Number(code)
+        if (!isFinite(keyCode))
+            return
+
+        const pressed = Number(value)
+        if (pressed === 1 || pressed === 2)
+            root._frameKeyCodes[keyCode] = true
+        else
+            delete root._frameKeyCodes[keyCode]
+
+        root._framePressed = pressed === 1 ? keyCode : -1
+        root._frameReleased = pressed === 0 ? keyCode : -1
+        root._frameValue = pressed
+        root.liveModifiers = root._decodeMask(mask)
+
+        // A press has to reach the consumer even if the kernel frame is never
+        // closed (a device that stops mid-frame). Reported here as an immediate
+        // frame as well; the `syn` below then reports the settled set, and a
+        // consumer that only cares about presses sees one press per key.
+        if (pressed === 1)
+            root._emitKeyFrame()
+    }
+
+    function _emitKeyFrame() {
+        const codes = []
+        for (const code in root._frameKeyCodes)
+            codes.push(Number(code))
+        codes.sort((left, right) => left - right)
+
+        root.liveKeyCodes = codes
+        root.keyFrame({
+            "codes": codes,
+            "modifiers": root.liveModifiers,
+            "pressed": root._framePressed,
+            "released": root._frameReleased,
+            "value": root._frameValue
+        })
+        root._framePressed = -1
+        root._frameReleased = -1
+    }
 
     function _applyHold(nextActive, eventName) {
         const normalizedActive = !!nextActive
@@ -48,9 +129,24 @@ Singleton {
     }
 
     function _handleLine(line) {
-        const normalized = (line || "").trim().toLowerCase()
+        const raw = (line || "").trim()
+        const normalized = raw.toLowerCase()
         if (normalized === "")
             return
+
+        // Key events and frame boundaries, before the hold vocabulary below:
+        // these carry arguments, so they are not single words.
+        if (normalized.indexOf("key ") === 0) {
+            const parts = raw.split(/\s+/)
+            if (parts.length >= 4)
+                root._handleKeyEvent(parts[1], parts[2], parts[3])
+            return
+        }
+
+        if (normalized === "syn") {
+            root._emitKeyFrame()
+            return
+        }
 
         switch (normalized) {
         case "mod-down":
@@ -94,6 +190,11 @@ Singleton {
         }
 
         onExited: () => {
+            // The keyboard is gone: whatever was held was released with it.
+            root._frameKeyCodes = ({})
+            root.liveKeyCodes = []
+            root.liveModifiers = root._decodeMask(0)
+
             if (root.active)
                 root._applyHold(false, "process-exit")
 

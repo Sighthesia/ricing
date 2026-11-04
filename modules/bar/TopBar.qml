@@ -530,11 +530,31 @@ Variants {
                 instanceKey: "hint:" + (screenScope.modelData ? String(screenScope.modelData.name || "") : ""),
                 kind: "hover",
                 actionKind: "window-hint",
-                // Body-only: the panel is just the window list, so the host
-                // collapses its identity rail to nothing. The bar already
-                // reports the active workspace and the rows are countable, so a
-                // header here would only restate the screen.
-                noIdentity: true,
+                // THE SAME RAIL EVERY OTHER HOVER PANEL OPENS WITH.
+                //
+                // The hint used to be body-only, on the grounds that the bar already
+                // reports the active workspace. That was right about the workspace and
+                // wrong about the SHORTCUT: holding mod is how you ask what mod does,
+                // and the panel answered with a window list and no word for the key
+                // you were pressing. So the shared identity layer carries it, exactly
+                // as it carries "Calendar" and "Volume" - icon, title, second line.
+                //
+                // The title is the live bind's action and the second line is its
+                // sequence, because the answer to "what does this key do" is the
+                // action; the sequence underneath confirms which key was understood.
+                // Both come from the hint snapshot, which is republished while the
+                // hold lasts, and the host treats a same-identity intent as a live
+                // update - so a key press changes the rail in place instead of
+                // replacing the panel.
+                title: hint.bindLabel !== "" ? String(hint.bindLabel)
+                    : Services.Tr.q("hint.overview"),
+                summary: hint.bindLabel !== ""
+                    ? String(hint.bindSequence) : "",
+                // A keyboard glyph while naming a shortcut, and the launcher's own
+                // when the panel is just the overview - the same monochrome module
+                // glyphs the calendar and notification panels use.
+                iconSource: Qt.resolvedUrl("../../lazerbar/icons/keyboard.svg"),
+                tintIcon: true,
                 anchorX: barContent.hintAnchorX(),
                 screenWidth: screenScope.modelData ? Number(screenScope.modelData.width) : 1920,
                 screenHeight: screenScope.modelData ? Number(screenScope.modelData.height) : 1080,

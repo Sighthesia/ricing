@@ -78,23 +78,35 @@ function _findMatchingBrace(text, braceIndex, limit) {
     return -1
 }
 
-function _findBindsBlock(text) {
-    const bindsMatch = /(^|\n)\s*binds\s*\{/m.exec(text)
-    if (!bindsMatch)
-        return null
+// Every `binds { }` block in the text, in order.
+//
+// A file may hold more than one - niri merges includes, and the shell writes a
+// second block of its own into `afloat-hotkeys.kdl` - so "the binds block" is
+// not a thing a parser can look for once. Reading only the first silently
+// dropped every bind after it, which is invisible until something asks which
+// action a key is bound to.
+function _findBindsBlocks(text) {
+    const blocks = []
+    const pattern = /(^|\n)\s*binds\s*\{/g
+    let match = pattern.exec(text)
+    while (match) {
+        const braceIndex = text.indexOf("{", match.index)
+        if (braceIndex < 0)
+            break
 
-    const braceIndex = text.indexOf("{", bindsMatch.index)
-    if (braceIndex < 0)
-        return null
+        const closeIndex = _findMatchingBrace(text, braceIndex, text.length)
+        if (closeIndex < 0)
+            break
 
-    const closeIndex = _findMatchingBrace(text, braceIndex, text.length)
-    if (closeIndex < 0)
-        return null
-
-    return {
-        bodyStart: braceIndex + 1,
-        bodyEnd: closeIndex
+        blocks.push({
+            bodyStart: braceIndex + 1,
+            bodyEnd: closeIndex
+        })
+        pattern.lastIndex = closeIndex + 1
+        match = pattern.exec(text)
     }
+
+    return blocks
 }
 
 function _extractOverlayTitle(prefixText) {
@@ -108,8 +120,49 @@ function _extractOverlayTitle(prefixText) {
     return titleMatch[1].slice(1, -1)
 }
 
+// Collapses whitespace BETWEEN tokens, never inside a quoted string: a spawn
+// argument is a path, and a path with its spaces collapsed is a different path.
 function _normalizeActionBody(actionBody) {
-    return String(actionBody || "").replace(/\s+/g, " ").trim()
+    const text = String(actionBody || "")
+    let result = ""
+    let pendingSpace = false
+    let inString = false
+    let escapeNext = false
+
+    for (let index = 0; index < text.length; index++) {
+        const char = text[index]
+        if (inString) {
+            result += char
+            if (escapeNext)
+                escapeNext = false
+            else if (char === "\\")
+                escapeNext = true
+            else if (char === "\"")
+                inString = false
+            continue
+        }
+
+        if (char === "\"") {
+            if (pendingSpace && result !== "")
+                result += " "
+            pendingSpace = false
+            inString = true
+            result += char
+            continue
+        }
+
+        if (char === " " || char === "\t" || char === "\n" || char === "\r") {
+            pendingSpace = true
+            continue
+        }
+
+        if (pendingSpace && result !== "")
+            result += " "
+        pendingSpace = false
+        result += char
+    }
+
+    return result.trim()
 }
 
 function _extractActionSummary(actionBody) {
@@ -117,21 +170,81 @@ function _extractActionSummary(actionBody) {
     if (normalized === "")
         return ""
 
-    const firstStatement = normalized.split(";")[0].trim()
-    if (firstStatement === "")
-        return normalized
+    // Split on a `;` that is not inside a quoted string, and with no regex.
+    //
+    // `split(";")` here, then `replace(/\s+/g, " ")` above, together ate the
+    // escape characters of every quoted argument: a spawn whose path held
+    // `_` came out as a path with spaces (`.../Quickshell/afloat` ->
+    // `.../Quickshell afloat`). Both are now character walks.
+    let inString = false
+    let escapeNext = false
+    let firstStatement = ""
+    for (let index = 0; index < normalized.length; index++) {
+        const char = normalized[index]
+        if (inString) {
+            if (escapeNext)
+                escapeNext = false
+            else if (char === "\\")
+                escapeNext = true
+            else if (char === "\"")
+                inString = false
+            firstStatement += char
+            continue
+        }
 
-    return firstStatement
+        if (char === "\"") {
+            inString = true
+            firstStatement += char
+            continue
+        }
+
+        if (char === ";")
+            break
+
+        firstStatement += char
+    }
+
+    firstStatement = firstStatement.trim()
+    return firstStatement === "" ? normalized : firstStatement
 }
 
 // No wording here: the parser stays language-free so its output is stable
 // data, and the shell names an unnamed action at render time (see
 // NiriShortcutService).
+//
+// The dashes become spaces for READING (`focus-column-left`), and only outside
+// quoted arguments: an argument is a path, an app id or a shell command, and
+// `Quickshell/afloat` spelled with a space is not the path that was written.
 function _prettyActionLabel(actionSummary) {
     if (!actionSummary)
         return ""
 
-    return actionSummary.replace(/[-_]/g, " ")
+    let result = ""
+    let inString = false
+    let escapeNext = false
+    for (let index = 0; index < actionSummary.length; index++) {
+        const char = actionSummary[index]
+        if (inString) {
+            result += char
+            if (escapeNext)
+                escapeNext = false
+            else if (char === "\\")
+                escapeNext = true
+            else if (char === "\"")
+                inString = false
+            continue
+        }
+
+        if (char === "\"") {
+            inString = true
+            result += char
+            continue
+        }
+
+        result += (char === "-" || char === "_") ? " " : char
+    }
+
+    return result
 }
 
 function _extractShellIpcActionId(normalized) {
@@ -214,11 +327,22 @@ function _categoryForAction(actionSummary, actionId) {
 
 function parseShortcutEntries(text) {
     const sourceText = String(text || "")
-    const bindsBlock = _findBindsBlock(sourceText)
-    if (!bindsBlock)
+    const blocks = _findBindsBlocks(sourceText)
+    if (!blocks.length)
         return []
 
     const entries = []
+    for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++)
+        _parseBindsBlock(sourceText, blocks[blockIndex], entries)
+
+    return entries
+}
+
+// Parses the binds in ONE block, appending to `entries`. Split out so a text
+// with several blocks is read by the same loop rather than by a second copy of
+// it, and so the entry ids stay unique across blocks (`hotkeyStart` is an
+// absolute offset, so they already are).
+function _parseBindsBlock(sourceText, bindsBlock, entries) {
     let cursor = bindsBlock.bodyStart
 
     while (cursor < bindsBlock.bodyEnd) {
@@ -273,6 +397,12 @@ function parseShortcutEntries(text) {
             nodeEnd: nodeEnd,
             sequence: sequence,
             title: overlayTitle !== "" ? overlayTitle : _prettyActionLabel(actionSummary),
+            // The NAME the user wrote for this key, when they wrote one. Kept
+            // beside `title` because the two mean different things: a title from
+            // the file is the user's own wording and must be shown as-is, while
+            // `title`'s fallback is the action body prettified, which the shell
+            // names at render time (see `NiriActionLabel.js`).
+            overlayTitle: overlayTitle,
             detail: actionSummary,
             actionId: actionId,
             category: _categoryForAction(actionSummary, actionId),
@@ -281,8 +411,6 @@ function parseShortcutEntries(text) {
 
         cursor = nodeEnd
     }
-
-    return entries
 }
 
 function applySequence(text, entries, entryId, nextSequence) {
@@ -302,4 +430,33 @@ function applySequence(text, entries, entryId, nextSequence) {
     }
 
     return sourceText
+}
+
+// Same parse, but over several files, in the order niri merges them.
+//
+// `sources` is `[{ path, text }]`. Entry ids stay unique because each source's
+// absolute offsets are prefixed with its index. This is what a live key lookup
+// needs: the binds the user presses live in `binds.kdl` AND in the shell's own
+// `afloat-hotkeys.kdl`, and an include list read out of `config.kdl` is the only
+// thing that says which of them are live.
+function parseShortcutEntriesFromSources(sources) {
+    const list = Array.isArray(sources) ? sources : []
+    const entries = []
+    for (let sourceIndex = 0; sourceIndex < list.length; sourceIndex++) {
+        const source = list[sourceIndex] || {}
+        const text = String(source.text || "")
+        const blocks = _findBindsBlocks(text)
+        const blockEntries = []
+        for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++)
+            _parseBindsBlock(text, blocks[blockIndex], blockEntries)
+
+        for (let index = 0; index < blockEntries.length; index++) {
+            const entry = blockEntries[index]
+            entry.id = "s" + sourceIndex + "-" + entry.id
+            entry.sourcePath = String(source.path || "")
+            entries.push(entry)
+        }
+    }
+
+    return entries
 }

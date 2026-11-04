@@ -29,6 +29,7 @@ singleton MediaService 1.0 MediaService.qml
 singleton MediaControlService 1.0 MediaControlService.qml
 singleton NeteaseWebLyricsService 1.0 NeteaseWebLyricsService.qml
 singleton NiriShortcutService 1.0 NiriShortcutService.qml
+singleton NiriKeybindService 1.0 NiriKeybindService.qml
 singleton WindowHintTriggerService 1.0 WindowHintTriggerService.qml
 singleton TextSize 1.0 TextSize.qml
 singleton WindowHintService 1.0 WindowHintService.qml
