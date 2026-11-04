@@ -85,6 +85,11 @@ function _resting(fields, key) {
 function _leaving(previous, key, index, count, stepMs) {
     var out = _copy(previous)
     out.key = key
+    // A row on its way out is not the current window, whatever it was while it was open.
+    // The focus markers are placed from the list's own `isFocused`, so a closing row that
+    // kept the flag would hold the frame and the bar on a card that is dissolving - and
+    // the window niri focused in its place would never be marked at all.
+    out.isFocused = false
     if (previous.phase !== "exit") {
         // The phase CHANGED on this pass, so this is the frame the exit begins: the
         // delay is its own and the animation starts from wherever the row was.

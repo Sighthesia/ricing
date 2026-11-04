@@ -254,12 +254,17 @@ Item {
     // pre-change value to a test function that does not run the event loop.
     readonly property alias focusFrameMotion: focusFrameGlide
     readonly property int rowHeight: 28
-    // The one row the focus indicator belongs to, or -1. Read from the ARRIVING
-    // active column, which is the content the user is being taken to.
+    // The arriving frame's active column, as the SNAPSHOT describes it. Kept for the
+    // plan's own bookkeeping - which slot is the wide one, which workspace the crossing
+    // is arriving at - and deliberately not for anything the markers are placed from:
+    // those read the strip's rendered list, because that is the one on screen.
     readonly property var activeColumn: root.plan
         ? root.columns[root.plan.activeSlot] : null
-    readonly property int focusedRowIndex: HintLogic.focusedIndexIn(
-        root.activeColumn ? root.activeColumn.rows : null)
+    // Read off the strip's RENDERED list rather than off the snapshot's: the two differ
+    // for the length of a transition, because a row that closed is still in the list
+    // (leaving) and the snapshot has already forgotten it. The index has to name the row
+    // the markers are drawn against, and that is the one on screen.
+    readonly property int focusedRowIndex: strip.focusedRowIndex
     // The indicator, outside the card. `Workspaces.qml` puts its indicator outside the
     // marked square - below it, in the bar's own gap - and this panel had it the other
     // way round: 4px in from the card's left edge, between the card's edge and its
@@ -327,7 +332,7 @@ Item {
     // rather than a blink.
     readonly property real noRowTop: _offTop
     readonly property real focusedRowTop: focusedRowIndex < 0 ? noRowTop
-        : focusedRowIndex * rowPitch - strip.scrollOffset
+        : strip.liveRowTop(focusedRowIndex)
     // The frame's glide target in UNSCROLLED list coordinates: the row's own top
     // edge, before the viewport offset is applied. The drawn `y` below subtracts
     // the scroll on the way out, so one glide covers both a focus step and the
@@ -341,6 +346,10 @@ Item {
     // on time. The anchor here carries no scroll term while a row is focused, so a
     // scroll in flight cannot retarget the glide; the drawn `y` simply follows the
     // offset underneath it, the way `_barTop` already does for the indicator.
+    // The lift a transition puts under the rows above the focused one is NOT in this
+    // anchor, and that is the same arrangement the scroll already has: the anchor is a pure
+    // function of the index, so a slot collapsing somewhere above cannot retarget the
+    // glide, and the drawn position below subtracts the layout's own offset on the way out.
     property real _frameAnchorY: focusedRowIndex < 0
         ? noRowTop + strip.scrollOffset : focusedRowIndex * rowPitch
     Behavior on _frameAnchorY {
@@ -456,10 +465,9 @@ Item {
     // derived property has inside its own notification cannot reach it. Every
     // position still comes from `_targetYFor`, one turn later, from the index.
     readonly property string focusedWindowKey: hasTarget
-            && activeColumn
-            && focusedRowIndex < activeColumn.rows.length
-            && String(activeColumn.rows[focusedRowIndex].windowId) !== ""
-        ? "w" + String(activeColumn.rows[focusedRowIndex].windowId)
+            && focusedRowIndex < strip.activeRows.length
+            && String(strip.activeRows[focusedRowIndex].windowId) !== ""
+        ? "w" + String(strip.activeRows[focusedRowIndex].windowId)
         : "s" + (root.plan ? root.plan.activePosition : 0)
 
     // --- the crossing displacement ---------------------------------------
@@ -1296,12 +1304,18 @@ Item {
     // head leads and the wake trails below. `Math.min` agrees with both at a wake of zero,
     // so the direction cannot introduce a step of its own.
     readonly property real _wake: Math.abs(_headY - _tailY)
-    readonly property real _barTop: Math.min(_headY, _tailY) - strip.scrollOffset
+    // Two offsets between the tracker's coordinates and the drawn bar, and both are
+    // subtracted here for the same reason: the tracker works in the list's own unscrolled,
+    // un-shortened space, and the bar is drawn where the rows actually are. `scrollOffset`
+    // is the viewport's, and `rowLift` is a slot above being shorter than its pitch while
+    // it opens or closes - which is the same kind of statement, so it is the same
+    // subtraction rather than a second mechanism.
+    readonly property real _barTop: Math.min(_headY, _tailY)
+        - strip.scrollOffset - strip.rowLift
     readonly property real _barLength: indicatorLength + _wake
 
     readonly property bool hasTarget: focusedRowIndex >= 0
-            && activeColumn
-            && focusedRowIndex < activeColumn.rows.length
+            && focusedRowIndex < strip.activeRows.length
 
     // The two ends AT REST, and they are `Workspaces.qml`'s two ends verbatim: the head on
     // `medium`/OutQuad, the tail on `slow * 2`/OutSine - three times the head's flight, which
@@ -2068,7 +2082,8 @@ Item {
         // position: anchor minus scroll, with no `Behavior` of its own. A `Behavior`
         // here would chase a target the reveal scroll rewrites every tick and pin
         // the frame until the scroll lands - see `_frameAnchorY`.
-        y: root._markerCrossing ? root.crossingTop : root._frameAnchorY - strip.scrollOffset
+        y: root._markerCrossing ? root.crossingTop
+            : root._frameAnchorY - strip.scrollOffset - strip.rowLift
         width: root._markerCrossing ? root.markerWidth : strip.activeCardWidth
         height: root.rowHeight
         opacity: root.markerHasTarget ? 1 : 0
@@ -2226,7 +2241,12 @@ Item {
         // 300ms. niri's second publish about 40ms into a switch is what makes that likely
         // rather than merely possible, since that is when the new workspace's windows
         // arrive and the reveal they call for has to happen.
-        strip.revealRow(root.focusedRowIndex, !root.swapping && !root._markerCrossing)
+        // ...and not animated while a ROW is arriving or leaving either, for the same
+        // reason: the reveal's target is a row's live top edge, and a slot closing above
+        // that row is moving it. An eased offset would arrive after the row it was
+        // scrolling to.
+        strip.revealRow(root.focusedRowIndex,
+            !root.swapping && !root._markerCrossing && !strip.rowsTransitioning)
     }
 
     // Where the bar rests when there is no row to mark: the same off-panel position the
@@ -2455,6 +2475,29 @@ Item {
     // second is a no-op when the first already ran.
     onFocusedWindowKeyChanged: Qt.callLater(_syncIndicator)
     onHasTargetChanged: _syncIndicator()
+
+    // A row arriving or leaving moves every row below it, and the bar is drawn against
+    // where the focused row actually is - so the tracker has to be told the layout moved
+    // even though the focused row is the same row. `strip.rowRevision` is what carries
+    // that: the records are plain objects, so a slot's `presence` changing notifies
+    // nothing that a binding could depend on, and the strip bumps a counter instead.
+    //
+    // No deferral here, and that is the opposite of the hook above for the same reason it
+    // has one: this is a LAYOUT change rather than a frame change, so the values
+    // `_targetYFor` reads are already final when this runs.
+    Connections {
+        target: strip
+        function onRowRevisionChanged() {
+            if (!root.hasTarget || root._markerCrossing)
+                return
+            // The same-target DRIFT path, not the retarget one: the row this marks is the
+            // same row, so what moved is the layout under it. `_retargetIndicator` would
+            // blink, and a blink on every frame of a transition is a strobing bar - while
+            // `_snapIndicator` is what the widget itself does when its target has not
+            // changed and its content has.
+            root._snapIndicator(root._restingY())
+        }
+    }
 
     Component.onCompleted: {
         if (root.hasTarget)

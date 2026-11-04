@@ -341,9 +341,13 @@ Item {
             root.contentHeight = tallest
     }
 
+    // Synchronously, not deferred: the body's `focusedRowIndex` is read off `activeRows`,
+    // and a turn's worth of staleness there would place the markers against the list the
+    // previous publish left behind - which is the same one-frame lag that made the
+    // tracker read the previous row's target.
     onColumnsChanged: {
+        root.reconcileAllRows()
         Qt.callLater(remeasureHeight)
-        Qt.callLater(root.reconcileAllRows)
     }
 
     // --- rows entering and leaving ------------------------------------------
@@ -372,6 +376,21 @@ Item {
     readonly property bool rowsTransitioning: {
         root.rowRevision
         return RowMotion.anyMoving(root.activeRows)
+    }
+
+    // The strip's own columns, as objects: what is actually on the strip right now, rather
+    // than what the model says should be. Readable from outside this file because a
+    // column's rows live inside a `Repeater`, where an id is file-scoped and nothing can
+    // reach them - and "what is this column painting" is the one question a diagnostic
+    // cannot answer from the snapshot.
+    readonly property var columnItems: {
+        var items = []
+        for (var i = 0; i < columnRepeater.count; ++i) {
+            var item = columnRepeater.itemAt(i)
+            if (item)
+                items.push(item)
+        }
+        return items
     }
 
     function reconcileAllRows() {
@@ -554,6 +573,12 @@ Item {
             // the active column. The neighbours are capped by the logic and drawn
             // whole, which is why they need no clip.
             clip: stripColumn.isActiveSlot
+            // The column's height is what its slots MEASURE, which is now a continuous
+            // number rather than a row count: a slot opening or closing changes it a frame
+            // at a time, so the panel and the rows below a transition travel on the same
+            // value and there is nothing left for a second animation to catch up on. It
+            // also means the drop of a spent row does not change the height at all - a slot
+            // is already zero by the time it is removed.
             height: stripColumn.isActiveSlot
                 ? Math.min(contentColumn.implicitHeight, root.viewportHeight)
                 : contentColumn.implicitHeight
@@ -579,15 +604,68 @@ Item {
             // workspace's rows.
             readonly property var rowList: root.rowsByPosition[stripColumn.modelData.position]
                 || []
+            // The workspace this column is for, as the string the reconcile map is keyed
+            // on - and the object that holds its slots. Published for the same reason
+            // `columnItems` is: a diagnostic has to be able to ask a column what it is
+            // drawing.
+            readonly property string positionKey: String(stripColumn.modelData.position)
+            property alias columnBody: contentColumn
+
+            // Where the slot at `index` starts, in the column's own space. THE running sum,
+            // and the only one: a row's place is what every slot above it measures. Rows are
+            // then placed by their own `y` rather than by a positioner, so a height that
+            // changes on a frame moves everything below it on that same frame.
+            //
+            // `presence` is the slot's own 0-to-1, and `presence * pitch` is its height, so
+            // the sum is over exactly the numbers the animations drive.
+            function slotTopAt(index) {
+                // The revision is read for its DEPENDENCY: a record's `presence` is a field
+                // of a plain object, so a slot closing notifies nothing, and a binding that
+                // only summed the array would be evaluated once and then hold every row at
+                // the position it had on the frame it was created.
+                root.rowRevision
+                var top = 0
+                var list = stripColumn.rowList
+                for (var i = 0; i < index && i < list.length; ++i) {
+                    var presence = list[i] && list[i].presence !== undefined
+                        ? Number(list[i].presence) : 1
+                    if (!isFinite(presence))
+                        presence = 1
+                    top += (root.rowHeight + root.listSpacing) * presence
+                }
+                return top
+            }
 
             // The full list. Only this moves on scroll; the viewport above stays
             // put, which is what keeps the clip rect over the panel while the rows
             // travel under it.
-            Column {
+            //
+            // NO POSITIONER, and that is the whole of how a transition lays out. A row's
+            // height is a CONTINUOUS number here - that is what makes a slot open and close
+            // - and a `Column` is not the right tool for a continuous layout: it places its
+            // children from their measured heights, and a height that changes every frame
+            // asks it to re-place every sibling on every frame, which is the arrangement
+            // that left this list with every `y` at zero and `implicitHeight` at zero while
+            // its children were each 34px tall. A plain `Item` whose children place
+            // THEMSELVES from the same running sum is both correct and cheaper: the sum is
+            // one subtraction (see `HintRow.slotTopFor`), and it cannot fall a frame behind
+            // the heights it is summing because it is not a second pass over them.
+            Item {
                 id: contentColumn
                 width: stripColumn.width
-                spacing: 0
                 y: stripColumn.isActiveSlot ? -root.scrollOffset : 0
+                // The block's own height: the running sum of its slots, which is what the
+                // viewport clips to and what the panel is sized from. Computed rather than
+                // measured, because the items are placed by the same expression.
+                readonly property real contentTop: {
+                    root.rowRevision
+                    return stripColumn.rowList.length === 0
+                        ? 0 : stripColumn.slotTopAt(stripColumn.rowList.length)
+                }
+                implicitHeight: stripColumn.rowList.length === 0
+                    ? root.rowHeight
+                    : contentTop - root.listSpacing
+                height: implicitHeight
                 onImplicitHeightChanged: root.remeasureHeight()
 
             // The rows this column is painting, in order: the union of what the
@@ -616,6 +694,11 @@ Item {
                     // Indexing the live array gives the same object the map holds, which
                     // is what makes the record the durable half of the pair.
                     record: stripColumn.rowList[rowSlot.index]
+                    // Placed from the slots above it rather than by a positioner: see the
+                    // note on `contentColumn`. The sum is a function of the same presence
+                    // values the slot animates, so the row below a closing card is where
+                    // the closing card says it is, on every frame.
+                    y: stripColumn.slotTopAt(rowSlot.index)
                     x: root.cellPaddingX
                     width: stripColumn.cardWidth
                     cardWidth: stripColumn.cardWidth
@@ -651,14 +734,14 @@ Item {
             BarWindowHintEmpty {
                 objectName: "windowHintColumnEmpty"
                 x: root.cellPaddingX
-                y: stripColumn.rowList.length > 0
-                    ? stripColumn.rowList[0].presence * (root.rowHeight + root.listSpacing)
-                    : 0
+                y: 0
                 width: stripColumn.cardWidth
                 height: root.rowHeight * emptyPresence
                 opacity: emptyPresence
                 rowHeight: root.rowHeight
-                visible: height > 0.01
+                // Not `visible` either, for the reason at `HintRow`: a positioner skips an
+                // invisible child, so the placeholder would leave the layout the moment it
+                // started to shrink instead of shrinking inside it.
                 property real emptyPresence: stripColumn.rowList.length === 0 ? 1 : 0
                 Behavior on emptyPresence {
                     enabled: !MotionTokens.reducedMotion

@@ -89,7 +89,12 @@ Item {
     // Off while it has no size or no ink: a slot mid-flight takes no hover and no tap,
     // and a half-dissolved card must not be clickable through its own fade.
     enabled: root.interactive && presence > 0.99 && ink > 0.99
-    visible: height > 0.01
+    // NEVER `visible`, and that is a layout fact rather than an omission: a positioner
+    // SKIPS an invisible child entirely, so a slot whose height was the thing being
+    // animated would be dropped out of the column for the whole of its opening - the rows
+    // below it would not move and a closing row would not close at all. A zero height is
+    // what takes it out of the layout, and a zero-height slot paints nothing because its
+    // content is given `rowHeight * presence` and the card fills that content.
 
     // Keep the record current, so a delegate rebuilt by the next publish resumes from
     // where this one had got to instead of starting the animation again.
@@ -200,22 +205,22 @@ Item {
     ParallelAnimation {
         id: exitAnim
         animations: [exitInkAnim, closeSlotAnim, insetAnim]
-        // No handler: a departure ends by the slot being DROPPED (`retireTimer`), not by
-        // anything being settled. A phase written back here would revive the row it just
-        // finished closing.
+        // A departure ends by the slot being DROPPED, and this is the moment it is empty:
+        // the group's own last frame, rather than a timer set from its nominal length.
+        // The timer was tuned against `windowRowExit` while the animation itself is
+        // shortened to the part of the leg that is left, so the gap it guessed at was the
+        // one thing on screen that did not match the row above it - measured, a slot
+        // dropped with eight pixels still in it and the rows below snapping that far.
+        //
+        // Guarded on the phase, because a publish can hand this delegate a different row
+        // while it is still playing - and the row it is carrying now is not the row this
+        // animation was for.
+        onFinished: if (root._animPhase === "exit") root.retireRequested(root.rowKey)
     }
 
     Timer {
         id: exitDelay
         onTriggered: exitAnim.restart()
-    }
-
-    // The row is dropped on its own clock rather than from the animation's
-    // `onFinished`: a slot left behind by a group that never reports completion holds
-    // its gap open forever, which is the fault `Tray`'s retire timer exists to avoid.
-    Timer {
-        id: retireTimer
-        onTriggered: root.retireRequested(root.rowKey)
     }
 
     NumberAnimation {
@@ -251,7 +256,6 @@ Item {
     function snap() {
         enterDelay.stop()
         exitDelay.stop()
-        retireTimer.stop()
         enterAnim.stop()
         exitAnim.stop()
         root.insetAmount = 0
@@ -326,11 +330,6 @@ Item {
         closeSlotAnim.duration = MotionTokens.windowRowExit * Math.max(0.05, root.presence)
         insetAnim.duration = MotionTokens.windowRowExitInk
             * Math.max(0.05, 1 - root.insetAmount)
-        // The retire clock starts with the delay rather than with the animation, so a
-        // staggered departure is not retired early by its own share of the cascade.
-        retireTimer.interval = exitDelay.interval
-            + MotionTokens.windowRowExit * Math.max(0.05, root.presence)
-        retireTimer.restart()
         if (exitDelay.interval > 0)
             exitDelay.restart()
         else
