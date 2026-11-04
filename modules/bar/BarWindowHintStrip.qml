@@ -396,16 +396,13 @@ Item {
     function reconcileAllRows() {
         var previous = root.rowsByPosition || ({})
         var next = ({})
-        var positions = []
         for (var i = 0; i < root.columns.length; ++i) {
             var column = root.columns[i]
             if (!column || column.position === undefined)
                 continue
             var key = String(column.position)
-            positions.push(key)
             next[key] = RowMotion.reconcileRows(previous[key], column.rows || [],
                 MotionTokens.windowRowStagger)
-
         }
         // Positions the strip no longer carries keep nothing: a workspace that left the
         // run is not on screen, and holding its rows would be state waiting to be wrong
