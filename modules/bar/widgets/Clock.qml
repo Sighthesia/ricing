@@ -47,7 +47,17 @@ Item {
     // exotic formats, otherwise show the seconds pair when configured.
     readonly property bool useRollingDigits: root.timeFormat === "HH:mm" || root.timeFormat === "hh:mm"
         || root.timeFormat === "HH:mm:ss" || root.timeFormat === "hh:mm:ss"
-    readonly property bool showSeconds: root.timeFormat.indexOf("s") >= 0
+    // The configured format asks for seconds outright, or the clock is sitting
+    // in the top-of-hour window and lends the seconds pair to that one minute.
+    readonly property bool showSeconds: root.timeFormat.indexOf("s") >= 0 || root.topOfHour
+    // Top-of-hour window: the whole minute an hour turns in, so the second the
+    // hour changes is visible without the seconds pair being resident all day.
+    // Derived from the ticked `now` rather than a timer of its own, so it opens
+    // and closes on the same frame the minute flips. A format without seconds
+    // cannot lend them, and a format that never rolls digits has no strips to
+    // widen, so the window only applies to the rolling HH:mm forms.
+    readonly property bool topOfHour: root.useRollingDigits && root.timeFormat.indexOf("s") < 0
+        && root.now.getMinutes() === 0
 
     function buildHoverIntent() {
         var centerX = 0
@@ -89,6 +99,10 @@ Item {
 
         // Time line: rolling digit strips with the flip transition, paced by
         // the ported clock flip tokens (old 300ms x 8/4/1, OutCubic).
+        // `showSeconds` gains and loses two digit strips once an hour; the
+        // strips' own implicit width is what animates that reflow (see
+        // RollingClockTime.secondsReveal), so the bar eases wider instead of
+        // snapping.
         RollingClockTime {
             id: rollingTime
 

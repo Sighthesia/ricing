@@ -47,10 +47,21 @@ Item {
     readonly property int secondTens: Number(root.secondText.charAt(0) || "0")
     readonly property int secondOnes: Number(root.secondText.charAt(1) || "0")
 
+    // The seconds pair is measured rather than gated on `showSeconds`: its width
+    // is animated (see `secondsReveal`), so the implicit width has to keep
+    // tracking the row while the pair is still on its way out.
     implicitWidth: hourGroup.implicitWidth + separator.implicitWidth + minuteGroup.implicitWidth
-        + (root.showSeconds ? secondSeparator.implicitWidth + secondDigits.implicitWidth : 0)
-        + root.digitSpacing * (root.showSeconds ? 3 : 2)
+        + secondsReveal.implicitWidth + root.digitSpacing * 2
     implicitHeight: Math.max(hourGroup.implicitHeight, minuteGroup.implicitHeight, secondDigits.implicitHeight)
+
+    // The pair sits as the last child of the time row and slides open and shut
+    // over `showSeconds` instead of appearing and vanishing. Callers (the bar
+    // clock's top-of-hour window) toggle the pair once an hour, so a hard cut
+    // would read as the clock snapping wider. The Row places it by its animated
+    // width, so it trails the minute pair while the box opens; the ink inside is
+    // laid out at full width and wiped in by `clip`, never repositioned. The
+    // box is as tall as the row, so `clip` only ever bites on the horizontal
+    // axis it is there for.
 
     // Ink box of the digits actually drawn, in this item's coordinates. The
     // strip a digit rolls inside is taller than the glyphs it shows (the roll
@@ -151,11 +162,36 @@ Item {
                 transitionEasing: root.transitionEasing
             }
         }
+    }
+
+    // Seconds reveal box: sibling of the row, not a child of it. Positioners
+    // exclude zero-width children from layout and never re-layout them when
+    // the width comes back, so a closed reveal placed inside the Row stayed
+    // parked at x=0 with its ink painted over the hour digits (seen in the
+    // calendar popup). Anchored by hand to the minute pair's trailing edge
+    // instead; the Row sits at 0,0, so its children's coordinates are this
+    // item's coordinates. Its ink is always laid out at full width inside, so
+    // opening reads as a wipe, never a slide of the digits themselves.
+    Item {
+        id: secondsReveal
+
+        x: minuteGroup.x + minuteGroup.width + root.digitSpacing
+        implicitWidth: root.showSeconds
+            ? secondSeparator.implicitWidth + secondDigits.implicitWidth + root.digitSpacing
+            : 0
+        width: implicitWidth
+        height: root.implicitHeight
+        clip: true
+
+        Behavior on implicitWidth {
+            enabled: !Lazer.MotionTokens.reducedMotion
+            NumberAnimation { duration: Lazer.MotionTokens.medium; easing.type: Easing.OutQuad }
+        }
 
         Row {
             id: secondGroup
             spacing: 0
-            visible: root.showSeconds
+            anchors.verticalCenter: parent.verticalCenter
 
             Text {
                 id: secondSeparator
