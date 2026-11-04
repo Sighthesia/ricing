@@ -21,7 +21,17 @@ Item {
     property real revealProgress: 1
     property real sidebarOffset: 0
     property real contentOffset: 0
-    property int contentDelay: MotionTokens.settingsContentDelay
+    // THE STAGGER IS OFF, and `BarPopupHost` is why. These two layers are not the
+    // settings panel's two COLUMNS: the rail sits on top of the body, so a delay
+    // between them opens a gap of unpainted surface under the header instead of
+    // sliding one column in beside another. The bar's host sets this to 0 for
+    // exactly that reason, and the default here follows it rather than the
+    // settings panel's 200.
+    //
+    // The number still participates in `revealDuration` and in
+    // `contentRevealProgress`, so a horizontal host that wants the settings
+    // stagger can pass `MotionTokens.settingsContentDelay` and get it.
+    property int contentDelay: 0
     // Host sets this from its lifecycle so exit motion is not delayed twice.
     property bool opening: true
     property real horizontalSidebarX: 0
@@ -56,7 +66,20 @@ Item {
     onRevealProgressChanged: syncStableHeights()
     Component.onCompleted: syncStableHeights()
 
-    readonly property int revealDuration: MotionTokens.settingsSidebarFade + MotionTokens.settingsContentDelay
+    // HOW LONG THE HOST'S REVEAL TAKES, and it is not a recipe of its own: it is
+    // the settings overlay's `settingsSlide`, because that is the rhythm this
+    // container is measured against. `BarPopupHost.startReveal` runs exactly this
+    // number with the overlay's own easings (OutQuint in, InQuad out), and the
+    // exit cleanup timer waits it out.
+    //
+    // It used to be `settingsSidebarFade + settingsContentDelay` - the two-layer
+    // stagger added up - which made every bar popup 100ms slower than the settings
+    // panel on both legs. The stagger it was summing is off by design here: see
+    // `contentDelay` below.
+    //
+    // `contentDelay` stays in the sum for a host that turns it back on, so this
+    // number can never claim less time than the layers actually need.
+    readonly property int revealDuration: MotionTokens.settingsSlide + root.contentDelay
     readonly property bool interactable: root.revealProgress > 0.99
     readonly property real sidebarRevealProgress: root.revealProgress
     readonly property real contentRevealProgress: MotionTokens.reducedMotion || !root.opening

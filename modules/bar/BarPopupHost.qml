@@ -208,18 +208,25 @@ PanelWindow {
             popup.revealProgress = target
             return
         }
-        // Scale duration by travelled distance so an interrupted reveal
-        // resumes at proportional speed instead of jumping or lingering.
-        // Tray has no content delay (contentDelay 0), so its enter only needs
-        // the sidebar span instead of the full two-layer total.
-        var base = MotionTokens.reducedMotion ? MotionTokens.fast : popup.revealDuration
-        if (target >= 1 && root.currentIntent && root.currentIntent.actionKind === "tray")
-            base = MotionTokens.settingsSidebarFade
+        // THE SETTINGS OVERLAY'S RECIPE, on both legs. One rhythm for the whole
+        // shell: the bar's popups and the settings panel are opened from the same
+        // bar by the same hand, and two surfaces that arrive at different speeds
+        // read as two shells.
+        //
+        // That means `settingsSlide` as the base, `OutQuint` opening and `InQuad`
+        // closing - the exact pair `LazerSettingsOverlay` runs (`panelEnterDuration`
+        // / `panelExitDuration`, `beginOpen` / `close`). It used to be
+        // `settingsSidebarFade + settingsContentDelay` (700ms) with OutCubic /
+        // InOutQuad, i.e. 100ms slower than the settings panel on both legs with a
+        // softer start and a two-phase exit.
+        //
+        // The one popup-specific term is the DISTANCE scaling below, which the
+        // settings overlay does not need: its panel always travels the same road,
+        // while a popup reveal can be interrupted half-open and has to resume at
+        // proportional speed rather than jumping or lingering.
+        var base = MotionTokens.reducedMotion ? MotionTokens.fast : MotionTokens.settingsSlide
         revealMotion.duration = Math.max(MotionTokens.fast, Math.round(base * dist))
-        // OutQuint front-loads most travel into the first frames (looks like
-        // an instant pop); OutCubic stays smooth. Exit uses InOutQuad so it
-        // slides out visibly instead of lingering then vanishing (InQuad).
-        revealMotion.easing.type = target >= 1 ? Easing.OutCubic : Easing.InOutQuad
+        revealMotion.easing.type = target >= 1 ? Easing.OutQuint : Easing.InQuad
         revealMotion.to = target
         revealMotion.restart()
     }
@@ -1517,7 +1524,10 @@ PanelWindow {
         id: revealMotion
         target: popup
         property: "revealProgress"
-        duration: MotionTokens.reducedMotion ? MotionTokens.fast : MotionTokens.settingsSidebarFade
+        // The settled default; `startReveal` always assigns the real recipe
+        // before restarting, so this is only what a reveal looks like if that
+        // ever stops happening.
+        duration: MotionTokens.reducedMotion ? MotionTokens.fast : MotionTokens.settingsSlide
         onFinished: {
             // Pick up any geometry deferred mid-slide so the final size
             // settles with one gentle motion after the reveal, not a bounce.
@@ -1833,9 +1843,12 @@ PanelWindow {
                 width: popupContainer.width
                 height: popupContainer.height
                 revealProgress: 0
-                // Content and identity slide together from frame one. The old
-                // 200ms contentDelay held the content layer behind the bar for
-                // the first ~1/3 of travel, so it popped in around 3/4.
+                // Content and identity slide together from frame one, which is
+                // also `TwoLayerPopup`'s own default now. The old 200ms
+                // contentDelay held the content layer behind the bar for the
+                // first ~1/3 of travel, so it popped in around 3/4 - and these
+                // two layers are stacked, not side by side, so the delay could
+                // only ever show as a gap under the header.
                 contentDelay: 0
                 // Lets the layer know the rail is optional, so it reads the
                 // rail's live height instead of latching the previous one.
