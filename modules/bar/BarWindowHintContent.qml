@@ -1936,9 +1936,11 @@ Item {
         repeat: true
         running: root._markerLeaving
         onTriggered: {
-            // Focus came back while the exit was still travelling: the normal path owns the
-            // bar again and clears the flag itself.
-            if (root.hasTarget)
+            // A crossing or a restored target means this exit is no longer the mechanism in
+            // charge - the crossing branch has already cleared the flag, and the normal path
+            // clears it before it writes anything. Either way there is nothing to finish
+            // here, and finishing anyway would clear `_placed` under a mark that is on a row.
+            if (root._markerCrossing || root.hasTarget)
                 return
             if (Math.abs(root._headY - root._anchorY) >= 0.5
                     || Math.abs(root._tailY - root._anchorY) >= 0.5)
@@ -2411,6 +2413,15 @@ Item {
         var target = root._restingY()
         if (root._markerCrossing) {
             root._pendingTop = -1
+            // A crossing owns the position outright, so an exit is over the moment one
+            // starts: the marker is not leaving the panel any more, it is travelling
+            // through it. Cleared here rather than left to the exit's own clock, because
+            // the exit's completion test - "both ends are on the anchor and nothing is
+            // animating" - is TRUE at the end of a journey too (the pin writes both ends
+            // onto the landing row with the `Behavior`s disabled), and it would then clear
+            // `_placed` the instant a crossing landed, so the next focus change would snap
+            // instead of travelling.
+            root._markerLeaving = false
             if (root._placed && root.focusedWindowKey !== root._targetKey) {
                 _targetKey = root.focusedWindowKey
                 _flashIndicator.restart()
