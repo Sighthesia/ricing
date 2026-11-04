@@ -677,6 +677,21 @@ Item {
     // is already out of sight. That is what lets this be the simple OR it used to be:
     // nothing has to consult the leg, and nothing can flicker on the way through.
     readonly property bool markerHasTarget: hasTarget || _departingRowIndex >= 0
+    // Is the marker on its way OUT: focus has gone, and what was drawn is travelling off
+    // the top of the panel.
+    //
+    // A no-target publish used to park the bar where it stood and hide it, and that was
+    // the one cut left in this panel: the frame beside it glides out on its own clock -
+    // `_frameAnchorY` re-aims at the off-panel coordinate and its `Behavior` carries it
+    // there over `settingsSidebarCollapse` - so the bar vanishing underneath a frame that
+    // is still moving up read as the bar being switched off rather than as the mark
+    // leaving. The two are one mark, so they leave together.
+    property bool _markerLeaving: false
+    // Is either marker DRAWN right now: a row to mark, a crossing's departure, or the
+    // exit's own travel. One term for the outline and for the bar, because they are one
+    // mark - two gates is how they drift apart, and a pair that fades out at two different
+    // moments is exactly what the report was about.
+    readonly property bool markerDrawn: markerHasTarget || _markerLeaving
     // The bar is the same gesture one `markerOffset` lower at every point of it: at rest
     // it is a bar centred on its card, so the offset that puts it there is the offset it
     // travels with, on both legs. One formula, one offset, two elements that cannot
@@ -1845,7 +1860,7 @@ Item {
     // A write to the committed target here would hand both ends to the landing row on the
     // switch's own first frame and leave the bar sitting still under a frame that is already
     // leaving the panel.
-    function _retargetIndicator(top, key) {
+    function _retargetIndicator(top, key, blink) {
         if (!isFinite(top))
             return
         if (key !== _targetKey && _placed) {
@@ -1864,7 +1879,12 @@ Item {
             // the wake sat at 204.0px, the travel itself, for the whole flight and closed in
             // about 670ms, a bar drawn five and a half times its resting length.
             _tailY = top
-            _flashIndicator.restart()
+            // The blink is the widget's response to a switch between two things that are
+            // BOTH marked. An exit is a switch to nothing: there is no new identity to
+            // announce, and a flash on the way out reads as the mark being struck rather
+            // than as it leaving - which is the opposite of what the travel is for.
+            if (blink !== false)
+                _flashIndicator.restart()
             return
         }
         if (Math.abs(top - _anchorY) < 0.5)
@@ -1894,6 +1914,40 @@ Item {
             var pending = root._pendingTop
             root._pendingTop = -1
             root._snapIndicator(pending)
+        }
+    }
+
+    // The exit's own ending: the travel is over, so the marker may go.
+    //
+    // The predicate is "both ends are ON the anchor and neither is animating" rather than a
+    // duration, for the reason the `_pendingTop` timer above waits on the tail rather than
+    // on a length: a wake closes in a logarithm of its own size, so any duration would be a
+    // guess that either hides the bar mid-flight or holds it on a panel that has stopped
+    // moving. It cannot fire early either - the exit's write has just re-aimed both ends
+    // AWAY from the anchor, so on the first tick they are a row away from it.
+    //
+    // What the ending does is the two things the parked branch used to do at once: the
+    // marker stops being drawn (both elements, on `markerDrawn`), and `_placed` goes false,
+    // which is the statement that the bar is no longer on a row - so the next target to
+    // arrive is handed to the first-placement branch and lands rather than flying in from a
+    // coordinate that named nothing.
+    Timer {
+        interval: 16
+        repeat: true
+        running: root._markerLeaving
+        onTriggered: {
+            // Focus came back while the exit was still travelling: the normal path owns the
+            // bar again and clears the flag itself.
+            if (root.hasTarget)
+                return
+            if (Math.abs(root._headY - root._anchorY) >= 0.5
+                    || Math.abs(root._tailY - root._anchorY) >= 0.5)
+                return
+            if (root.indicatorHeadMotion.running || root.indicatorTailMotion.running)
+                return
+            root._markerLeaving = false
+            root._anchorY = root._restingY()
+            root._placed = false
         }
     }
 
@@ -2074,7 +2128,12 @@ Item {
         // Nothing filled, so this element cannot cover the row's content. The tint
         // is `windowRow`'s own background instead, in the same token - see above.
         color: "transparent"
-        border.width: root.hasTarget ? 1.5 : 0
+        // The border follows the DRAWN term, like the opacity beside it: an outline whose
+        // stroke had already gone would be a rectangle that cannot leave, and the departure
+        // leg of a crossing into an empty workspace is drawn on the same term for the same
+        // reason - the outline is on the card it leaves from, which is the whole point of
+        // marking it.
+        border.width: root.markerDrawn ? 1.5 : 0
         border.color: LazerTheme.settingsAccent
         // Inert to input, so it can never intercept a tap meant for the row.
         enabled: false
@@ -2098,7 +2157,9 @@ Item {
             : root._frameAnchorY - strip.scrollOffset - strip.rowLift
         width: root._markerCrossing ? root.markerWidth : strip.activeCardWidth
         height: root.rowHeight
-        opacity: root.markerHasTarget ? 1 : 0
+        // Drawn for the whole of an exit, so the outline is the thing the bar is seen to
+        // follow out - and only hidden once the travel has arrived.
+        opacity: root.markerDrawn ? 1 : 0
 
         Behavior on opacity {
             enabled: !MotionTokens.reducedMotion
@@ -2178,8 +2239,10 @@ Item {
         // trail. See the indicator section at the top.
         y: root._barTop
         height: root._barLength
-        visible: root.markerHasTarget
-        opacity: root.markerHasTarget ? 1 : 0
+        // Drawn while the exit travels, for the reason at `markerDrawn`: the bar and the
+        // outline are one mark, so they are drawn on one term and hidden on one tick.
+        visible: root.markerDrawn
+        opacity: root.markerDrawn ? 1 : 0
 
         // Switch blink: the same tinted-glow blink the workspace indicator plays
         // per genuine target switch.
@@ -2395,65 +2458,48 @@ Item {
             // branch above has already returned. So the state this gate guards is a state
             // one publish creates and a later publish has to take away again.
             //
-            // So: nothing is written. The bar keeps whatever position the mechanism
-            // already in charge has given it, keeps its committed target, keeps its
-            // identity and keeps its PLACEMENT - and the target that arrives next is
-            // re-aimed from wherever the trail had got to, which is `retargetEdges`'
-            // answer and the only one of the widget's four responses that a journey in
-            // flight can use. `_pendingTop` goes, because a same-anchor drift belongs to
-            // the target that has just gone and applying it later would be a second
-            // discontinuity.
+            // So the bar is not PARKED here, and the last line of that reasoning is what
+            // governs the branch: what a journey in flight needs is a re-aim, and what a
+            // journey that has ended needs is to be seen ending. Both are the same write -
+            // both ends handed one target - and the target is the off-panel coordinate the
+            // outline is already gliding to. The bar is DRAWN for the whole of it
+            // (`markerDrawn`), so the exit is the mark leaving rather than the mark being
+            // switched off; the wake closes on the tail's own clock as it always does.
             //
-            // The bar is not drawn for the whole of this interval - `focusUnderline` is
-            // gated on `markerHasTarget`, which is `hasTarget || _departingRowIndex >= 0`
-            // - so nothing here is visible while it lasts. That is the answer to whether a
-            // wake should persist through a no-target interval: it cannot be seen, and
-            // what it buys is the frame after, where the bar re-appears already travelling
-            // instead of already arrived.
-            if (root._barInFlight()) {
+            // A marker that was never placed has nothing to leave with: there is no row it
+            // was drawn on, so the honest thing is to park it and say so. That is the
+            // whole of the old branch, kept for exactly this state.
+            if (!root._placed) {
+                root._markerLeaving = false
+                root._pendingTop = -1
+                root._snapIndicator(root._restingY())
+                return
+            }
+            // A PLACED marker leaves by travelling, and it is the same write a focus change
+            // makes - both ends re-aimed at one shared target - because it is the same
+            // event: the mark has moved to a place where there is nothing to mark. The
+            // target is the off-panel coordinate the outline is gliding to, so the bar and
+            // the outline are handed the same destination on the same tick and no reader
+            // has to decide which of them leads.
+            //
+            // No blink (`false`), because an exit is a switch to nothing.
+            //
+            // Already leaving: nothing to say. `_retargetIndicator` would take its
+            // same-target branch and dedupe anyway; the flag is what keeps this branch from
+            // restarting the travel on every `_syncIndicator` of a no-target interval.
+            if (root._markerLeaving) {
                 root._pendingTop = -1
                 return
             }
-            // No target and nothing travelling: the bar is hidden with no journey under
-            // it, so it must not be left mid-trail either - there is nothing left to be
-            // mid, and a bar resting at a coordinate that named a row would fly from that
-            // row when the next target arrives.
-            //
-            // Snap to the resting position for NO row rather than to
-            // `_targetYFor(-1)`. That expression is `index * rowPitch + ...`, so an
-            // index of -1 hands back a negative offset roughly one row above the
-            // panel's top: a real coordinate, which the next target's `Behavior`
-            // then animates FROM. The bar is invisible, so the flight was not
-            // visible when it happened - but it was a flight, and the tail it left
-            // behind had to walk the rest of the way before the bar looked settled.
-            // That is the flash on arriving at a workspace whose focused row is not
-            // where the previous one was.
-            //
-            // Zero is the honest "resting, nowhere" value: it is where
-            // `_snapIndicator` puts the marker before its first placement, and a
-            // bar that has no row to sit on has no business anywhere else. Retarget
-            // from here and the first real target still travels, which is the
-            // head-and-wake stretch doing its job, rather than arriving pre-stretched
-            // from a coordinate that never named a row.
+            root._markerLeaving = true
             root._pendingTop = -1
-            root._snapIndicator(root._restingY())
-            // ...and it is no longer a PLACEMENT. Zero is a coordinate that names no row,
-            // and the next real target has to arrive by snapping rather than by flying
-            // from it: `_retargetIndicator`'s genuine-switch branch animates the head and
-            // the tail from wherever they are, which from here means the bar entering on
-            // the FIRST card and sliding down to the focused one - a journey invented by
-            // the tracker's resting value, out of a state where there was nothing to
-            // travel from. Clearing `_placed` hands the next target to the first-placement
-            // branch below, which snaps.
-            //
-            // So this branch is not only "no row, park it" - it is also the statement
-            // that the marker is not currently on a row, which is what the stretch needs
-            // to know and had no way to ask. The gate above is what keeps that statement
-            // TRUE: it declines to make it while the bar is still travelling, because a
-            // target that has not resolved yet is not a target that has gone.
-            root._placed = false
+            root._retargetIndicator(root._restingY(), "leaving:" + root.focusedWindowKey, false)
             return
         }
+        // A target is back, so nothing is leaving any more. Cleared BEFORE the branches
+        // below run, because the completion clock keys on the flag and would otherwise
+        // outlive the exit it was started for.
+        root._markerLeaving = false
         // First placement snaps: there is nothing on screen to travel from.
         if (!root._placed) {
             root._placed = true
