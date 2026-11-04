@@ -12,6 +12,8 @@ BarWindowHintContent 1.0 BarWindowHintContent.qml
 BarWindowHintStrip 1.0 BarWindowHintStrip.qml
 BarWindowHintLabel 1.0 BarWindowHintLabel.qml
 BarWindowHintEmpty 1.0 BarWindowHintEmpty.qml
+HintRow 1.0 HintRow.qml
+HintWindowCard 1.0 HintWindowCard.qml
 BarPopupSlider 1.0 BarPopupSlider.qml
 BarAudioDeviceList 1.0 BarAudioDeviceList.qml
 BarAudioMixer 1.0 BarAudioMixer.qml
