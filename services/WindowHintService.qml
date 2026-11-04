@@ -153,7 +153,8 @@ Singleton {
             // question.
             bindLabel: "",
             bindSequence: "",
-            bindToken: 0
+            bindToken: 0,
+            bindIsWorkspaceAction: false
         }
     }
 
@@ -335,6 +336,9 @@ Singleton {
             // an answer while the overview's title gaining its workspace number
             // does not - see `NiriKeybindService.triggerToken`.
             bindToken: Services.NiriKeybindService.triggerToken,
+            // Whether the answer names a WORKSPACE action, which is what decides
+            // if the title carries the workspace number too.
+            bindIsWorkspaceAction: Services.NiriKeybindService.liveBindIsWorkspaceAction,
             // `holdSequence`, not `liveSequence`: it falls back to the mod key's
             // own name while no bound key has been pressed, so the overview reads
             // "Overview / Super" instead of leaving the second line blank.

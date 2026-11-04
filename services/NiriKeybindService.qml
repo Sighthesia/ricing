@@ -53,6 +53,11 @@ Singleton {
     readonly property string bindLabel: root.liveLabel === null
         ? "" : Services.Tr.q(String(root.liveLabel.key || ""), root.liveLabel.args || {})
     readonly property string bindSequence: root.liveSequence
+    // Whether the latched bind is a WORKSPACE action, from the parser's own
+    // category - not from a list of action names kept here, which would drift from
+    // the parser the moment one was added.
+    readonly property bool liveBindIsWorkspaceAction:
+        root.liveBind !== null && String(root.liveBind.category || "") === "workspaces"
 
     // The sequence line while the rail is naming the PANEL rather than an action:
     // the mod key that is holding it open, so the overview says "Super" where a

@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../lazerbar"
+import "./HintTitle.js" as HintTitle
 import "../lazerbar/ScreenCornerMask.js" as CornerMask
 import "../lazerbar/OverlayCoordinatorLogic.js" as CoordLogic
 import "../lazerbar/WallpaperBootLogic.js" as BootLogic
@@ -546,20 +547,23 @@ Variants {
                 // hold lasts, and the host treats a same-identity intent as a live
                 // update - so a key press changes the rail in place instead of
                 // replacing the panel.
-                // The overview names the WORKSPACE it is showing, because the
-                // panel is a view of the three workspaces around one of them and
-                // nothing else in it says which one that is. The index is niri's
-                // own - the same number the bar's workspace squares carry - so the
-                // two cannot name one workspace two ways.
-                //
-                // Only the overview is numbered. A bound action's name is the
-                // answer to a different question, and a number after it would read
-                // as part of the action.
-                title: hint.bindLabel !== ""
-                    ? String(hint.bindLabel)
-                    : (Number(hint.workspaceIndex) > 0
-                        ? Services.Tr.q("hint.overviewIndexed", { index: Number(hint.workspaceIndex) })
-                        : Services.Tr.q("hint.overview")),
+                // What the rail says is one rule with three outcomes, so it lives
+                // in `HintTitle.js` where it can be read and checked without a
+                // shell: the overview is numbered ("Overview | Workspace 3"), a
+                // workspace action is numbered too ("Next workspace | Workspace 4",
+                // because a direction is the one thing a workspace key can get
+                // wrong), and everything else is just its own name.
+                title: HintTitle.title(
+                    hint.bindLabel,
+                    hint.bindIsWorkspaceAction === true,
+                    hint.workspaceIndex,
+                    function(key, args) { return Services.Tr.q(key, args) },
+                    {
+                        overview: "hint.overview",
+                        overviewIndexed: "hint.overviewIndexed",
+                        actionIndexed: "hint.actionIndexed",
+                        workspaceLabel: "hint.workspaceLabel"
+                    }),
                 // The second line is the KEYS in BOTH states: the bound
                 // combination once one has been pressed, and the mod key's own
                 // name while the panel is just the overview. Showing the keys

@@ -347,10 +347,21 @@ var strings = {
     // held on its own - a view of the workspaces around the one you are on - and
     // it becomes the bound action's own name the moment a bound key arrives.
     "hint.overview": { zh: "概览", en: "Overview" },
-    // The overview's title while the workspace is known: "概览 3". The index is
-    // niri's own, the same number the bar's workspace squares show, so the panel
-    // and the bar cannot name the same workspace two different ways.
-    "hint.overviewIndexed": { zh: "概览 {index}", en: "Overview {index}" },
+    // The overview's title while the workspace is known: "概览 | 工作区 3". The
+    // index is niri's own, the same number the bar's workspace squares show, so the
+    // panel and the bar cannot name the same workspace two different ways.
+    //
+    // Two facts, two words: what the panel is, then where you are. The separator is
+    // a plain `|` rather than a dot because the rail is a single line of text and a
+    // middot at 10px reads as a speck of dust; the pipe is a hard edge, which is
+    // this shell's language.
+    "hint.overviewIndexed": { zh: "概览 | 工作区 {index}", en: "Overview | Workspace {index}" },
+    "hint.workspaceLabel": { zh: "工作区 {index}", en: "Workspace {index}" },
+    // A workspace ACTION, titled with where you ended up: "Next workspace |
+    // Workspace 4". The action name says what the key did; the index says whether
+    // it landed where you expected, which is the one thing a workspace key can get
+    // wrong. Same `|` as the overview, so the two read as one title format.
+    "hint.actionIndexed": { zh: "{action} | 工作区 {index}", en: "{action} | Workspace {index}" },
     // Names for the actions the hint's title rail reports. A bind with a
     // `hotkey-overlay-title` is shown as the user wrote it; these name the rest,
     // from the action id or the spawn target (`NiriActionLabel.js`). `named`
