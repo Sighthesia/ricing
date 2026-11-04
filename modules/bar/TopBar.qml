@@ -553,7 +553,7 @@ Variants {
                 // A keyboard glyph while naming a shortcut, and the launcher's own
                 // when the panel is just the overview - the same monochrome module
                 // glyphs the calendar and notification panels use.
-                iconSource: Qt.resolvedUrl("../../lazerbar/icons/keyboard.svg"),
+                iconSource: Qt.resolvedUrl("../lazerbar/icons/keyboard.svg"),
                 tintIcon: true,
                 anchorX: barContent.hintAnchorX(),
                 screenWidth: screenScope.modelData ? Number(screenScope.modelData.width) : 1920,

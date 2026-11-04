@@ -14,16 +14,24 @@ EV_SYN = 0x00
 SYN_REPORT = 0
 KEY_LEFTMETA = 125
 KEY_RIGHTMETA = 126
-# One entry per modifier the shell cares about, as the set of evdev key codes
-# that can carry it. The output mask is a bit per entry, in this order, which is
-# the order niri writes modifiers in: shift, ctrl, alt, super, iso5. (Right Alt
-# and ISO_Level3_Shift share key code 100, so level 3 travels with `alt`.)
+# One entry per modifier the shell cares about, as the set of EVDEV key codes
+# that can carry it. The output mask is one bit per entry, in this order: shift,
+# ctrl, alt, super, level5.
+#
+# EVDEV codes throughout - see `XkbKeycodes.js` for why that matters. These are
+# the numbers from `linux/input-event-codes.h`, which is also what the key events
+# below carry; an XKB key code would be these plus 8.
+#
+# Level 3 is folded into `alt` rather than given a bit of its own: it is what the
+# right Alt key produces on this layout, so the two are the same physical key and
+# a caller asking "is Alt held" means it. `ISO_Level3_Shift` gets its own code
+# (84) because a layout can put it on a key of its own.
 MODIFIER_GROUPS = (
-    frozenset((42, 54)),
-    frozenset((29, 97)),
-    frozenset((56, 100)),
-    frozenset((125, 126)),
-    frozenset((203,)),
+    frozenset((42, 54)),            # KEY_LEFTSHIFT, KEY_RIGHTSHIFT
+    frozenset((29, 97)),            # KEY_LEFTCTRL, KEY_RIGHTCTRL
+    frozenset((56, 100, 84)),       # KEY_LEFTALT, KEY_RIGHTALT, ISO_Level3_Shift
+    frozenset((125, 126)),          # KEY_LEFTMETA, KEY_RIGHTMETA
+    frozenset((195,)),              # ISO_Level5_Shift
 )
 KEY_NAME_MAP = {
     "leftmeta": KEY_LEFTMETA,

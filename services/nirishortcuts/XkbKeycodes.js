@@ -2,85 +2,74 @@
 
 // evdev key code -> keysym NAME, for the unmodified level of each key.
 //
-// This is what lets a key event read off /dev/input (an evdev code, e.g. 65)
-// be compared with a niri bind written as a keysym name ("Super+Space"). The
-// names are the ones libxkbcommon reports, which is exactly what
+// This is what lets a key event read off /dev/input (an evdev code, e.g. 57 for
+// space) be compared with a niri bind written as a keysym name ("Super+Space").
+// The names are the ones libxkbcommon reports, which is exactly what
 // `xkb_keysym_from_name` - and therefore niri's own bind parser - accepts.
+//
+// INDEXED BY EVDEV CODE, which is the one detail that matters. libxkbcommon's
+// keymap API speaks XKB key codes, and an XKB key code is an evdev code PLUS 8.
+// Building this table from the keymap without subtracting 8 produced a file that
+// was self-consistent and uniformly wrong: `grave` (evdev 41) read as `f`, and a
+// real `f` (evdev 33) read as `p`, so the panel named the wrong action and missed
+// the right one. Generating it from the same skewed numbers hid the fault from
+// the first round of checks.
 //
 // Level 0 only: a bind names the key, not the character it produces with a
 // modifier. `Mod+Shift+Slash` is written with the *unshifted* name even though
-// what the user types is "?", and `xkb_state_key_get_one_sym` on the unmodified
-// state reports the same name, so the two agree without any shift handling.
+// what the user types is "?", and the unmodified state reports the same name, so
+// the two agree without any shift handling.
 //
-// Generated, not hand-written: on this machine (xkb layout `us`), by walking
-// key codes 8..255 of the default keymap and keeping the first key code that
-// produces each keysym. 218 entries, one per physical key.
+// Generated, not hand-written: on this machine (xkb layout `us`), by walking XKB
+// key codes 8..255 of the default keymap, subtracting 8, and keeping the first
+// key code that produces each keysym. 218 entries, one per physical key.
 //
-//   python3 - <<'EOF' > /tmp/keycodes.txt
-//   import ctypes
-//   lib = ctypes.CDLL("libxkbcommon.so.0")
-//   ...
-//   EOF
-//
-// A layout with non-Latin letters changes the letter names this produces
-// (that is the point: it describes the keyboard in front of the user), so the
-// file is worth regenerating when the layout changes. Anything missing here
-// simply never matches a bind, which is the safe direction to fail in.
+// A layout with non-Latin letters changes the letter names this produces (that
+// is the point: it describes the keyboard in front of the user), so the file is
+// worth regenerating when the layout changes. Anything missing here simply never
+// matches a bind, which is the safe direction to fail in.
 var KEYCODES = {
-    9: "Escape", 10: "1", 11: "2", 12: "3", 13: "4", 14: "5",
-    15: "6", 16: "7", 17: "8", 18: "9", 19: "0", 20: "minus",
-    21: "equal", 22: "BackSpace", 23: "Tab", 24: "q", 25: "w", 26: "e",
-    27: "r", 28: "t", 29: "y", 30: "u", 31: "i", 32: "o",
-    33: "p", 34: "bracketleft", 35: "bracketright", 36: "Return", 37: "Control_L", 38: "a",
-    39: "s", 40: "d", 41: "f", 42: "g", 43: "h", 44: "j",
-    45: "k", 46: "l", 47: "semicolon", 48: "apostrophe", 49: "grave", 50: "Shift_L",
-    51: "backslash", 52: "z", 53: "x", 54: "c", 55: "v", 56: "b",
-    57: "n", 58: "m", 59: "comma", 60: "period", 61: "slash", 62: "Shift_R",
-    63: "KP_Multiply", 64: "Alt_L", 65: "space", 66: "Caps_Lock", 67: "F1", 68: "F2",
-    69: "F3", 70: "F4", 71: "F5", 72: "F6", 73: "F7", 74: "F8",
-    75: "F9", 76: "F10", 77: "Num_Lock", 78: "Scroll_Lock", 79: "KP_Home", 80: "KP_Up",
-    81: "KP_Prior", 82: "KP_Subtract", 83: "KP_Left", 84: "KP_Begin", 85: "KP_Right", 86: "KP_Add",
-    87: "KP_End", 88: "KP_Down", 89: "KP_Next", 90: "KP_Insert", 91: "KP_Delete", 92: "ISO_Level3_Shift",
-    93: "F24", 94: "less", 95: "F11", 96: "F12", 98: "Katakana", 99: "Hiragana",
-    100: "Henkan_Mode", 101: "Hiragana_Katakana", 102: "Muhenkan", 104: "KP_Enter", 105: "Control_R", 106: "KP_Divide",
-    107: "Print", 108: "Alt_R", 109: "Linefeed", 110: "Home", 111: "Up", 112: "Prior",
-    113: "Left", 114: "Right", 115: "End", 116: "Down", 117: "Next", 118: "Insert",
-    119: "Delete", 121: "XF86AudioMute", 122: "XF86AudioLowerVolume", 123: "XF86AudioRaiseVolume", 124: "XF86PowerOff", 125: "KP_Equal",
-    126: "plusminus", 127: "Pause", 128: "XF86LaunchA", 129: "KP_Decimal", 130: "Hangul", 131: "Hangul_Hanja",
-    133: "Super_L", 134: "Super_R", 135: "Menu", 136: "Cancel", 137: "Redo", 138: "SunProps",
-    139: "Undo", 140: "SunFront", 141: "XF86Copy", 142: "XF86Open", 143: "XF86Paste", 144: "Find",
-    145: "XF86Cut", 146: "Help", 147: "XF86MenuKB", 148: "XF86Calculator", 150: "XF86Sleep", 151: "XF86WakeUp",
-    152: "XF86Explorer", 153: "XF86Send", 155: "XF86Xfer", 156: "XF86Launch1", 157: "XF86Launch2", 158: "XF86WWW",
-    159: "XF86DOS", 160: "XF86ScreenSaver", 161: "XF86RotateWindows", 162: "XF86TaskPane", 163: "XF86Mail", 164: "XF86Favorites",
-    165: "XF86MyComputer", 166: "XF86Back", 167: "XF86Forward", 169: "XF86Eject", 171: "XF86AudioNext", 172: "XF86AudioPlay",
-    173: "XF86AudioPrev", 174: "XF86AudioStop", 175: "XF86AudioRecord", 176: "XF86AudioRewind", 177: "XF86Phone", 179: "XF86Tools",
-    180: "XF86HomePage", 181: "XF86Reload", 182: "XF86Close", 185: "XF86ScrollUp", 186: "XF86ScrollDown", 187: "parenleft",
-    188: "parenright", 189: "XF86New", 192: "XF86Launch5", 193: "XF86Launch6", 194: "XF86Launch7", 195: "XF86Launch8",
-    196: "XF86Launch9", 197: "F19", 198: "XF86AudioMicMute", 199: "XF86TouchpadToggle", 200: "XF86TouchpadOn", 201: "XF86TouchpadOff",
-    203: "ISO_Level5_Shift", 209: "XF86AudioPause", 210: "XF86Launch3", 211: "XF86Launch4", 212: "XF86LaunchB", 213: "XF86Suspend",
-    216: "XF86AudioForward", 217: "XF86AudioBassBoost", 220: "XF86WebCam", 221: "XF86AudioPreset", 224: "XF86Messenger", 225: "XF86Search",
-    226: "XF86Go", 227: "XF86Finance", 228: "XF86Game", 229: "XF86Shop", 232: "XF86MonBrightnessDown", 233: "XF86MonBrightnessUp",
-    234: "XF86AudioMedia", 235: "XF86Display", 236: "XF86KbdLightOnOff", 237: "XF86KbdBrightnessDown", 238: "XF86KbdBrightnessUp", 240: "XF86Reply",
-    241: "XF86MailForward", 242: "XF86Save", 243: "XF86Documents", 244: "XF86Battery", 245: "XF86Bluetooth", 246: "XF86WLAN",
-    247: "XF86UWB", 249: "XF86Next_VMode", 250: "XF86Prev_VMode", 251: "XF86MonBrightnessCycle", 252: "XF86BrightnessAuto", 253: "XF86DisplayOff",
-    254: "XF86WWAN", 255: "XF86RFKill",
+    1: "Escape", 2: "1", 3: "2", 4: "3", 5: "4", 6: "5",
+    7: "6", 8: "7", 9: "8", 10: "9", 11: "0", 12: "minus",
+    13: "equal", 14: "BackSpace", 15: "Tab", 16: "q", 17: "w", 18: "e",
+    19: "r", 20: "t", 21: "y", 22: "u", 23: "i", 24: "o",
+    25: "p", 26: "bracketleft", 27: "bracketright", 28: "Return", 29: "Control_L", 30: "a",
+    31: "s", 32: "d", 33: "f", 34: "g", 35: "h", 36: "j",
+    37: "k", 38: "l", 39: "semicolon", 40: "apostrophe", 41: "grave", 42: "Shift_L",
+    43: "backslash", 44: "z", 45: "x", 46: "c", 47: "v", 48: "b",
+    49: "n", 50: "m", 51: "comma", 52: "period", 53: "slash", 54: "Shift_R",
+    55: "KP_Multiply", 56: "Alt_L", 57: "space", 58: "Caps_Lock", 59: "F1", 60: "F2",
+    61: "F3", 62: "F4", 63: "F5", 64: "F6", 65: "F7", 66: "F8",
+    67: "F9", 68: "F10", 69: "Num_Lock", 70: "Scroll_Lock", 71: "KP_Home", 72: "KP_Up",
+    73: "KP_Prior", 74: "KP_Subtract", 75: "KP_Left", 76: "KP_Begin", 77: "KP_Right", 78: "KP_Add",
+    79: "KP_End", 80: "KP_Down", 81: "KP_Next", 82: "KP_Insert", 83: "KP_Delete", 84: "ISO_Level3_Shift",
+    85: "F24", 86: "less", 87: "F11", 88: "F12", 90: "Katakana", 91: "Hiragana",
+    92: "Henkan_Mode", 93: "Hiragana_Katakana", 94: "Muhenkan", 96: "KP_Enter", 97: "Control_R", 98: "KP_Divide",
+    99: "Print", 100: "Alt_R", 101: "Linefeed", 102: "Home", 103: "Up", 104: "Prior",
+    105: "Left", 106: "Right", 107: "End", 108: "Down", 109: "Next", 110: "Insert",
+    111: "Delete", 113: "XF86AudioMute", 114: "XF86AudioLowerVolume", 115: "XF86AudioRaiseVolume", 116: "XF86PowerOff", 117: "KP_Equal",
+    118: "plusminus", 119: "Pause", 120: "XF86LaunchA", 121: "KP_Decimal", 122: "Hangul", 123: "Hangul_Hanja",
+    125: "Super_L", 126: "Super_R", 127: "Menu", 128: "Cancel", 129: "Redo", 130: "SunProps",
+    131: "Undo", 132: "SunFront", 133: "XF86Copy", 134: "XF86Open", 135: "XF86Paste", 136: "Find",
+    137: "XF86Cut", 138: "Help", 139: "XF86MenuKB", 140: "XF86Calculator", 142: "XF86Sleep", 143: "XF86WakeUp",
+    144: "XF86Explorer", 145: "XF86Send", 147: "XF86Xfer", 148: "XF86Launch1", 149: "XF86Launch2", 150: "XF86WWW",
+    151: "XF86DOS", 152: "XF86ScreenSaver", 153: "XF86RotateWindows", 154: "XF86TaskPane", 155: "XF86Mail", 156: "XF86Favorites",
+    157: "XF86MyComputer", 158: "XF86Back", 159: "XF86Forward", 161: "XF86Eject", 163: "XF86AudioNext", 164: "XF86AudioPlay",
+    165: "XF86AudioPrev", 166: "XF86AudioStop", 167: "XF86AudioRecord", 168: "XF86AudioRewind", 169: "XF86Phone", 171: "XF86Tools",
+    172: "XF86HomePage", 173: "XF86Reload", 174: "XF86Close", 177: "XF86ScrollUp", 178: "XF86ScrollDown", 179: "parenleft",
+    180: "parenright", 181: "XF86New", 184: "XF86Launch5", 185: "XF86Launch6", 186: "XF86Launch7", 187: "XF86Launch8",
+    188: "XF86Launch9", 189: "F19", 190: "XF86AudioMicMute", 191: "XF86TouchpadToggle", 192: "XF86TouchpadOn", 193: "XF86TouchpadOff",
+    195: "ISO_Level5_Shift", 201: "XF86AudioPause", 202: "XF86Launch3", 203: "XF86Launch4", 204: "XF86LaunchB", 205: "XF86Suspend",
+    208: "XF86AudioForward", 209: "XF86AudioBassBoost", 212: "XF86WebCam", 213: "XF86AudioPreset", 216: "XF86Messenger", 217: "XF86Search",
+    218: "XF86Go", 219: "XF86Finance", 220: "XF86Game", 221: "XF86Shop", 224: "XF86MonBrightnessDown", 225: "XF86MonBrightnessUp",
+    226: "XF86AudioMedia", 227: "XF86Display", 228: "XF86KbdLightOnOff", 229: "XF86KbdBrightnessDown", 230: "XF86KbdBrightnessUp", 232: "XF86Reply",
+    233: "XF86MailForward", 234: "XF86Save", 235: "XF86Documents", 236: "XF86Battery", 237: "XF86Bluetooth", 238: "XF86WLAN",
+    239: "XF86UWB", 241: "XF86Next_VMode", 242: "XF86Prev_VMode", 243: "XF86MonBrightnessCycle", 244: "XF86BrightnessAuto", 245: "XF86DisplayOff",
+    246: "XF86WWAN", 247: "XF86RFKill",
 }
 
 // Keysym name for one evdev key code, or "" when this table has no name for it.
 function keysymFor(code) {
     var name = KEYCODES[code]
     return name === undefined ? "" : name
-}
-
-// Every key code that produces this keysym name.
-function codesForKeysym(name) {
-    var wanted = String(name || "").toLowerCase()
-    var codes = []
-    if (wanted === "")
-        return codes
-    for (var code in KEYCODES) {
-        if (KEYCODES[code].toLowerCase() === wanted)
-            codes.push(Number(code))
-    }
-    return codes
 }
