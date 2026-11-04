@@ -305,12 +305,17 @@ Singleton {
         root.bindResolved()
     }
 
+    // Silent on purpose: this runs when the hold ENDS, and the rail is already
+    // being torn down. Announcing the clear there rewrote the panel's lines on the
+    // way out - the last action's name dropping back to the overview while the
+    // panel was leaving - which reads as the same answer arriving twice. The next
+    // hold republishes from scratch (`setHintHeld(true)` refreshes), so nothing is
+    // lost by not announcing it.
     function _clearLatch() {
         if (root.liveBind === null && root.liveSequence === "")
             return
         root.liveBind = null
         root.liveSequence = ""
         root.liveLabel = null
-        root.bindResolved()
     }
 }

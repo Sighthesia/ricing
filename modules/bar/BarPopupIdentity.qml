@@ -151,10 +151,8 @@ Rectangle {
         }
     }
 
-    // The two lines as they were LAST SHOWN, so a change can be told from the
-    // initial fill. `""` means "nothing has been shown yet": the first real text
-    // arriving is the rail being populated on open, not a change the user made,
-    // and it must not flash.
+    // The two lines as they were LAST SHOWN, so a change can be told from an
+    // empty edge. `""` on either side is never announced: see `_announce`.
     property string _shownTitle: ""
     property string _shownSummary: ""
 
@@ -166,16 +164,25 @@ Rectangle {
         changeFlashRun.restart()
     }
 
+    // A change is announced only between two REAL answers. An empty side is the
+    // rail being filled (the panel is opening) or emptied (the panel is closing),
+    // and in both cases the panel's own reveal is already saying so: running the
+    // text transition there made "Overview" fall away as you released mod, and
+    // again on the way back in - the panel appeared to say the same word twice.
+    function _announce(kind, previous, next, label) {
+        if (previous === "" || next === "")
+            return
+        if (root.animatedText)
+            label.transitionFrom(previous, next)
+        root._flash()
+    }
+
     onTitleChanged: {
         if (root._shownTitle === root.title)
             return
         const previous = root._shownTitle
         root._shownTitle = root.title
-        if (previous === "")
-            return
-        if (root.animatedText)
-            titleText.transitionFrom(previous, root.title)
-        root._flash()
+        root._announce("title", previous, root.title, titleText)
     }
 
     onSummaryChanged: {
@@ -183,11 +190,7 @@ Rectangle {
             return
         const previous = root._shownSummary
         root._shownSummary = root.summary
-        if (previous === "")
-            return
-        if (root.animatedText)
-            summaryText.transitionFrom(previous, root.summary)
-        root._flash()
+        root._announce("summary", previous, root.summary, summaryText)
     }
 
     // Persistent-menu close affordance pinned to the header's right edge.
