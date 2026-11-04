@@ -2476,28 +2476,6 @@ Item {
     onFocusedWindowKeyChanged: Qt.callLater(_syncIndicator)
     onHasTargetChanged: _syncIndicator()
 
-    // A row arriving or leaving moves every row below it, and the bar is drawn against
-    // where the focused row actually is - so the tracker has to be told the layout moved
-    // even though the focused row is the same row. `strip.rowRevision` is what carries
-    // that: the records are plain objects, so a slot's `presence` changing notifies
-    // nothing that a binding could depend on, and the strip bumps a counter instead.
-    //
-    // No deferral here, and that is the opposite of the hook above for the same reason it
-    // has one: this is a LAYOUT change rather than a frame change, so the values
-    // `_targetYFor` reads are already final when this runs.
-    Connections {
-        target: strip
-        function onRowRevisionChanged() {
-            if (!root.hasTarget || root._markerCrossing)
-                return
-            // The same-target DRIFT path, not the retarget one: the row this marks is the
-            // same row, so what moved is the layout under it. `_retargetIndicator` would
-            // blink, and a blink on every frame of a transition is a strobing bar - while
-            // `_snapIndicator` is what the widget itself does when its target has not
-            // changed and its content has.
-            root._snapIndicator(root._restingY())
-        }
-    }
 
     Component.onCompleted: {
         if (root.hasTarget)

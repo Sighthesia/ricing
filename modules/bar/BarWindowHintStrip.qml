@@ -450,6 +450,14 @@ Item {
     // that only read the array would compute the lift once and hold it while the slots
     // moved. Every row bumps this when it moves, which is what makes `rowLift` a live
     // function of the layout rather than of the last publish.
+    //
+    // NOTHING ELSE LISTENS TO IT, deliberately. The body's markers subtract `rowLift` where
+    // they are DRAWN, exactly as they already subtract the viewport's scroll - so a slot
+    // closing under them moves the mark on the same frame, and the tracker is never told
+    // the layout moved. It was told, for one round: a handler on this counter re-snapped
+    // both ends of the indicator, which on a workspace switch's row transition ran every
+    // frame and closed the wake before it could open. That is the report - "the indicator
+    // teleports instead of moving, no trail" - and it was the handler, not the animation.
     property int rowRevision: 0
     readonly property real rowLift: {
         root.rowRevision
