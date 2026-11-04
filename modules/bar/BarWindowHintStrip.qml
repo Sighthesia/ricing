@@ -516,7 +516,16 @@ Item {
     // only listened for the height would leave the list scrolled 238px past its own
     // end. It showed as two unrelated faults - a stale offset in one test, and a click
     // that landed on a row the previous test had scrolled out of the panel in another.
-    onMaxScrollOffsetChanged: clampScroll()
+    onMaxScrollOffsetChanged: {
+        // The outstanding reveal first: a range that has just grown is a new answer to the
+        // question it asked, and clamping an offset it is about to set would be work done
+        // in the wrong order.
+        if (root._revealIndex >= 0) {
+            root._applyReveal()
+            return
+        }
+        root.clampScroll()
+    }
 
     // The active column's own full height, unclamped. This is what the scroll range is
     // measured against, so it has to be the content and not the viewport.
@@ -817,13 +826,42 @@ Item {
 
     // Keep the offset inside the scrollable range without animating, and without
     // dragging the reveal into it: this is a correction, not a scroll.
+    //
+    // A RUNNING REVEAL IS NOT CANCELLED HERE, and that is the whole of why a long list
+    // could not be scrolled to its focused row. This is called from `onContentHeightChanged`
+    // and `onMaxScrollOffsetChanged`, and the range it is clamping to MOVES on every frame
+    // of a row transition - so the reveal it used to stop was being stopped by its own
+    // target changing underneath it: measured, a reveal to the twelfth row of a twelve-row
+    // workspace started at 40 toward 238 and was cancelled on the next frame by a clamp
+    // raised from a slot's `presence`. The offset stayed at 40, the focused card stayed 200
+    // pixels below the panel's bottom edge, and the panel looked as though it could not
+    // scroll at all.
+    //
+    // What a correction owes the reveal is a target inside the new range, not a halt. The
+    // animation is re-aimed when it is running and stopped when it is not, and the scroll
+    // range it is aimed at is the one measured NOW rather than the one measured when the
+    // row it is going to was published.
     function clampScroll() {
         settleAnim.stop()
         driveAnim.stop()
         edgeSettleTimer.stop()
-        revealAnim.stop()
         edgeDriving = false
-        root.scrollOffset = Math.max(0, Math.min(root.maxScrollOffset, root.scrollOffset))
+        const limit = root.maxScrollOffset
+        const clamped = Math.max(0, Math.min(limit, root.scrollOffset))
+        if (revealAnim.running) {
+            // Re-aim rather than restart: `to` is the only thing a running
+            // `NumberAnimation` reads, so the remaining curve covers the remaining
+            // distance and the reveal keeps the pace it set out with.
+            //
+            // The offset is NOT written here, and that is not tidiness either - an
+            // animation is writing it on every frame, and a correction that writes it
+            // between two of those frames is a second author for one number: measured, a
+            // reveal running 0 toward 238 was held at 4.0 by the clamp raised from the
+            // same column's resize, for the whole of its 300ms and after it.
+            revealAnim.to = Math.max(0, Math.min(limit, revealAnim.to))
+            return
+        }
+        root.scrollOffset = clamped
     }
 
     Timer {
@@ -953,23 +991,63 @@ Item {
     // Snapped rather than animated while a crossing is in flight or under reduced
     // motion - a moving target cannot be eased to, and the offset would arrive after
     // the column it belongs to.
+    //
+    // A REQUEST, not a one-shot, and that is the whole of why a long list could not be
+    // scrolled to its focused row. The range the row has to fit into is still being
+    // MEASURED on the frame this is asked for - a column's height is the running sum of its
+    // slots, so it grows while they open - and the first answer is a number computed
+    // against a list that has not finished existing. Measured on a twelve-window workspace
+    // focused on the twelfth row: the reveal was requested at a range of 0 (and dropped,
+    // because it had nowhere to go), then at a range of 4, and it ran to 4 while the
+    // focused card sat 200 pixels below the panel's bottom edge. The panel looked as though
+    // it could not scroll at all, and the wheel was the only thing that moved it.
+    //
+    // So the index is remembered and `_applyReveal` is what runs it, from here and from
+    // `onMaxScrollOffsetChanged` - which fires on every frame the range grows. Nothing
+    // polls, and the request is spent the moment the offset reaches a target computed
+    // against the range as it finally stands.
     function revealRow(index, animated) {
-        if (index < 0 || root.maxScrollOffset <= 0)
+        if (index < 0)
+            return
+        root._revealIndex = index
+        root._revealAnimated = animated
+        root._revealTarget = -1
+        root._applyReveal()
+    }
+
+    // The row the list owes a scroll to, and whether that scroll may be eased. Kept as a
+    // REQUEST for as long as the range it has to fit into is still being measured - see
+    // `revealRow`.
+    property int _revealIndex: -1
+    property bool _revealAnimated: false
+    // The target last written, so a range that keeps growing does not re-run the same
+    // reveal on every frame of a transition: only a target that has actually moved is a
+    // scroll worth making.
+    property real _revealTarget: -1
+
+    // Run the outstanding reveal against the range as it stands NOW. Idempotent, so the
+    // range hook can call it on every frame of a transition.
+    function _applyReveal() {
+        if (root._revealIndex < 0 || root.maxScrollOffset <= 0)
             return
         const target = HintLogic.revealScrollY(root.scrollOffset,
-            // The LIVE top, not the pitch: a row mid-transition is not where its index
-            // says it is, and revealing to the pitch would scroll to a position the row
-            // is on its way to rather than the one it is at.
-            index * root.rowPitch - root.rowLiftFor(index),
-            root.rowHeight, root.viewportHeight,
-            root.maxScrollOffset)
-        if (Math.abs(target - root.scrollOffset) < 0.5)
+            root._revealIndex * root.rowPitch - root.rowLiftFor(root._revealIndex),
+            root.rowHeight, root.viewportHeight, root.maxScrollOffset)
+        if (Math.abs(target - root._revealTarget) < 0.5
+                && Math.abs(target - root.scrollOffset) < 0.5) {
+            // Already where this reveal wanted to be: the request is spent.
+            root._revealIndex = -1
             return
-        root._cancelEdge()
-        if (!animated || MotionTokens.reducedMotion || !root.interactive) {
+        }
+        root._revealTarget = target
+        if (!root._revealAnimated || MotionTokens.reducedMotion || !root.interactive) {
+            revealAnim.stop()
             root.scrollOffset = target
             return
         }
+        if (revealAnim.running && Math.abs(revealAnim.to - target) < 0.5)
+            return
+        root._cancelEdge()
         revealAnim.from = root.scrollOffset
         revealAnim.to = target
         revealAnim.duration = 300 * root.debugTimeScale
@@ -981,5 +1059,7 @@ Item {
         target: root
         property: "scrollOffset"
         easing.type: Easing.OutQuint
+        onFinished: root._revealIndex = -1
     }
+
 }

@@ -228,8 +228,16 @@ function liftAt(rows, index, rowHeight, listSpacing) {
     var pitch = Number(rowHeight) + Number(listSpacing)
     var lift = 0
     for (var i = 0; i < list.length && i < index; ++i) {
-        var presence = list[i] && list[i].presence !== undefined
-            ? Number(list[i].presence) : 1
+        var record = list[i]
+        // Only a LEAVING slot lifts the rows below it. An arriving one is opening into a
+        // space the list does not have yet, so the rows under it are still where they were
+        // - and counting its shortfall as a lift is what put the focused row's target 200
+        // pixels above where it is: measured on the first frame of a twelve-row workspace,
+        // eleven slots at presence 0 summed to a lift of 199.96 and the reveal scrolled to
+        // 4 instead of 238, which is the report - the focused card below the panel's edge.
+        if (!record || record.phase !== "exit")
+            continue
+        var presence = record.presence !== undefined ? Number(record.presence) : 1
         if (!isFinite(presence))
             presence = 1
         lift += pitch * (1 - Math.max(0, Math.min(1, presence)))
