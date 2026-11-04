@@ -1926,11 +1926,18 @@ Item {
     // moving. It cannot fire early either - the exit's write has just re-aimed both ends
     // AWAY from the anchor, so on the first tick they are a row away from it.
     //
-    // What the ending does is the two things the parked branch used to do at once: the
-    // marker stops being drawn (both elements, on `markerDrawn`), and `_placed` goes false,
-    // which is the statement that the bar is no longer on a row - so the next target to
-    // arrive is handed to the first-placement branch and lands rather than flying in from a
-    // coordinate that named nothing.
+    // What the ending does is stop DRAWING the marker, and nothing else. `_placed` stays
+    // true, and that is the whole of why focus coming back travels instead of snapping.
+    //
+    // Clearing it was the parked branch's answer, and it was right there: that branch ran
+    // with the bar already off the panel and nothing on screen to travel from, so a
+    // first-placement snap was the honest landing. An exit is not that state - the marker
+    // has travelled somewhere real, and both ends are sitting on it. Declaring the bar
+    // unplaced threw that away, so the next target was handed to the first-placement branch
+    // and appeared on the row with no motion at all: measured, focus returning after a
+    // completed exit put the bar on the row in one frame while the outline beside it
+    // glided in. The mark is drawn again by `markerDrawn` on the same frame the target
+    // arrives, so it does not need to have been forgotten to appear.
     Timer {
         interval: 16
         repeat: true
@@ -1947,9 +1954,10 @@ Item {
                 return
             if (root.indicatorHeadMotion.running || root.indicatorTailMotion.running)
                 return
+            // Only the flag: the travel is over, so nothing is leaving any more - but where
+            // it arrived is a real position, and it is kept. See the note above.
             root._markerLeaving = false
             root._anchorY = root._restingY()
-            root._placed = false
         }
     }
 
@@ -2510,6 +2518,13 @@ Item {
         // A target is back, so nothing is leaving any more. Cleared BEFORE the branches
         // below run, because the completion clock keys on the flag and would otherwise
         // outlive the exit it was started for.
+        //
+        // `_placed` is deliberately NOT reset with it, and that is what makes a return from
+        // a completed exit travel rather than appear: the exit left the bar somewhere real,
+        // so the target below is a displacement from it - the ordinary `_retargetIndicator`
+        // path, with its wake - and not a first placement. Only a marker that has never been
+        // on a row is a first placement, and that state is `_placed` being false, not "the
+        // last thing that happened was an exit".
         root._markerLeaving = false
         // First placement snaps: there is nothing on screen to travel from.
         if (!root._placed) {
