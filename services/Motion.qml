@@ -59,6 +59,22 @@ QtObject {
     }
 
     // Match popup entry/exit to the bar's floating surface language.
+    //
+    // DELIBERATELY UNUSED, and that is a decision rather than an oversight. A
+    // `scale` with `OutBack` overshoot is the obvious way to make a panel pop, and
+    // it is not what the shell does: the bar's popups and the settings panel are
+    // opened from the same bar by the same hand, so they share one rhythm -
+    // `MotionTokens.settingsSlide` with `OutQuint` in and `InQuad` out (see
+    // `BarPopupHost.startReveal`). An overshoot on one surface and not the other
+    // is what makes two panels read as two shells, and on the popups it would also
+    // have to live on the PAINTED layer only: the layer-shell input region is
+    // committed from the TARGET geometry, so a surface that overshot its own size
+    // would re-commit `set_input_region` on every frame of the bounce, and a region
+    // commit re-evaluates pointer focus under the cursor.
+    //
+    // Left here because the numbers are still the right ones if a future surface
+    // genuinely needs a pop: one that is not a bar popup, has no input region of
+    // its own, and does not sit beside the settings panel.
     property QtObject popup: QtObject {
         readonly property int opacityDuration: 120
         readonly property int opacityEasing: Easing.OutQuad
