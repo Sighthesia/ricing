@@ -2350,12 +2350,24 @@ Item {
                 // action pair at the right edge. The prompt used to be a lifted
                 // white card with word buttons, which read as neither the lock
                 // control nor its sibling row cards.
+                //
+                // The card also grows in rather than appearing: a bare
+                // `visible` flip popped a 48px control into the column and
+                // pushed the list down in one frame. Height carries the open and
+                // close (the column reflows through it, so nothing else has to
+                // animate), the contents ride a separate progress so they are
+                // never painted outside the card's own clip.
                 Rectangle {
                     id: wifiPasswordPanel
                     objectName: "wifiPasswordPanel"
                     width: parent.width
-                    height: root.pendingWifiNetwork ? 48 : 0
-                    visible: root.pendingWifiNetwork !== null
+                    // `visible` stays bound to the prompt being open, so the
+                    // close needs one turn after it flips: `closing` holds the
+                    // card mounted while its height collapses.
+                    property bool closing: false
+                    readonly property bool promptOpen: root.pendingWifiNetwork !== null
+                    height: promptOpen && !closing ? 48 : 0
+                    visible: promptOpen || closing
                     radius: LazerTheme.settingsChoiceRadius
                     color: LazerTheme.settingsControlSurface
                     // The field card is the focus owner, so the control's own
@@ -2365,151 +2377,190 @@ Item {
                         ? LazerTheme.focusRing : LazerTheme.divider
                     clip: true
 
+                    // 0 while collapsed, 1 while open: the contents fade and
+                    // slide up from the card's own bottom edge as it grows.
+                    readonly property real revealProgress:
+                        Math.max(0, Math.min(1, height / 48))
+
+                    onPromptOpenChanged: {
+                        if (promptOpen) {
+                            closing = false
+                            closeDelay.stop()
+                        } else {
+                            closeDelay.restart()
+                        }
+                    }
+
+                    // Unmount only after the collapse has landed. The duration
+                    // matches the height Behavior below; reduced motion skips
+                    // the wait so the card never lingers invisibly.
+                    Timer {
+                        id: closeDelay
+                        interval: MotionTokens.medium + 16
+                        onTriggered: wifiPasswordPanel.closing = false
+                    }
+
+                    Behavior on height {
+                        enabled: !MotionTokens.reducedMotion
+                        NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuint }
+                    }
                     Behavior on border.width {
                         NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
                     }
                     Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
 
-                    // Key glyph at the lock control's own inset, tinted from the
-                    // same white source through MultiEffect.
+                    // The whole contents layer, so one progress drives the glyph,
+                    // the editor and both buttons.
                     Item {
-                        id: wifiPasswordGlyphSlot
-                        anchors.left: parent.left
-                        anchors.leftMargin: 16
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 18
-                        height: 18
-
-                        Image {
-                            id: wifiPasswordGlyphSource
-                            anchors.fill: parent
-                            source: Qt.resolvedUrl("../lazerbar/icons/lock.svg")
-                            fillMode: Image.PreserveAspectFit
-                            visible: false
-                        }
-
-                        MultiEffect {
-                            anchors.fill: wifiPasswordGlyphSource
-                            source: wifiPasswordGlyphSource
-                            colorization: 1
-                            colorizationColor: LazerTheme.settingsAccent
-                        }
+                        id: wifiPasswordContents
+                        anchors.fill: parent
+                        opacity: wifiPasswordPanel.revealProgress
+                        // Reduced motion has no travel and no fade to ride.
+                        y: MotionTokens.reducedMotion
+                            ? 0 : (1 - wifiPasswordPanel.revealProgress) * 8
                     }
 
-                    // osu password masks: the field owns its bullets, caret and
-                    // colour; this host keeps only text, geometry and submit.
-                    OsuPasswordField {
-                        id: wifiPasswordInput
-                        objectName: "wifiPasswordInput"
-                        anchors.left: wifiPasswordGlyphSlot.right
-                        anchors.leftMargin: 12
-                        anchors.right: wifiPasswordConnect.left
-                        anchors.rightMargin: 8
-                        anchors.verticalCenter: parent.verticalCenter
-                        height: 32
-                        text: root.wifiPassword
-                        clip: true
-                        // osu fades its caret to white; on this control that is
-                        // the same ink the accent glyph cannot provide, so the
-                        // bar takes the readable text colour instead.
-                        caretColor: LazerTheme.textPrimary
+                        // Key glyph at the lock control's own inset, tinted from the
+                        // same white source through MultiEffect.
+                        Item {
+                            id: wifiPasswordGlyphSlot
+                            anchors.left: parent.left
+                            anchors.leftMargin: 16
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 18
+                            height: 18
 
-                        onTextChanged: root.wifiPassword = text
-                        Keys.onReturnPressed: root.submitWifiPassword()
-                        Keys.onEnterPressed: root.submitWifiPassword()
-                    }
+                            Image {
+                                id: wifiPasswordGlyphSource
+                                anchors.fill: parent
+                                source: Qt.resolvedUrl("../lazerbar/icons/lock.svg")
+                                fillMode: Image.PreserveAspectFit
+                                visible: false
+                            }
 
-                    // Placeholder sits on the editor's own baseline so the empty
-                    // state names the field instead of showing a bare caret.
-                    Text {
-                        anchors.left: wifiPasswordInput.left
-                        anchors.verticalCenter: wifiPasswordInput.verticalCenter
-                        visible: root.wifiPassword === "" && !wifiPasswordInput.activeFocus
-                        text: Services.Tr.q("popup.network.password")
-                        color: LazerTheme.textMuted
-                        font.pixelSize: 11
-                    }
-
-                    // Confirm: a check, not the word. The button keeps its slot
-                    // while the secret is empty so the pair never shifts.
-                    Rectangle {
-                        id: wifiPasswordConnect
-                        objectName: "wifiPasswordConnect"
-                        anchors.right: wifiPasswordCancel.left
-                        anchors.rightMargin: 2
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 32
-                        height: 32
-                        radius: LazerTheme.settingsChoiceRadius
-                        color: connectHover.hovered ? LazerTheme.hoverFill : "transparent"
-                        enabled: root.wifiPassword !== ""
-                        opacity: enabled ? 1 : LazerTheme.settingsDisabledAlpha
-
-                        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-                        Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
-
-                        Image {
-                            id: connectGlyphSource
-                            anchors.centerIn: parent
-                            width: 16
-                            height: 16
-                            source: Qt.resolvedUrl("../lazerbar/icons/check.svg")
-                            fillMode: Image.PreserveAspectFit
-                            visible: false
+                            MultiEffect {
+                                anchors.fill: wifiPasswordGlyphSource
+                                source: wifiPasswordGlyphSource
+                                colorization: 1
+                                colorizationColor: LazerTheme.settingsAccent
+                            }
                         }
 
-                        MultiEffect {
-                            anchors.fill: connectGlyphSource
-                            source: connectGlyphSource
-                            colorization: 1
-                            colorizationColor: LazerTheme.osuGreen
+                        // osu password masks: the field owns its bullets, caret and
+                        // colour; this host keeps only text, geometry and submit.
+                        OsuPasswordField {
+                            id: wifiPasswordInput
+                            objectName: "wifiPasswordInput"
+                            anchors.left: wifiPasswordGlyphSlot.right
+                            anchors.leftMargin: 12
+                            anchors.right: wifiPasswordConnect.left
+                            anchors.rightMargin: 8
+                            anchors.verticalCenter: parent.verticalCenter
+                            height: 32
+                            text: root.wifiPassword
+                            clip: true
+                            // osu fades its caret to white; on this control that is
+                            // the same ink the accent glyph cannot provide, so the
+                            // bar takes the readable text colour instead.
+                            caretColor: LazerTheme.textPrimary
+
+                            onTextChanged: root.wifiPassword = text
+                            Keys.onReturnPressed: root.submitWifiPassword()
+                            Keys.onEnterPressed: root.submitWifiPassword()
                         }
 
-                        HoverHandler { id: connectHover; enabled: wifiPasswordConnect.enabled }
-                        TapHandler {
-                            objectName: "wifiPasswordConnectTap"
-                            gesturePolicy: TapHandler.ReleaseWithinBounds
-                            enabled: wifiPasswordConnect.enabled
-                            onTapped: root.submitWifiPassword()
-                        }
-                    }
-
-                    // Dismiss the credential prompt without changing network state.
-                    Rectangle {
-                        id: wifiPasswordCancel
-                        objectName: "wifiPasswordCancel"
-                        anchors.right: parent.right
-                        anchors.rightMargin: 8
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 32
-                        height: 32
-                        radius: LazerTheme.settingsChoiceRadius
-                        color: cancelHover.hovered ? LazerTheme.hoverFill : "transparent"
-
-                        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-
-                        Image {
-                            id: cancelGlyphSource
-                            anchors.centerIn: parent
-                            width: 16
-                            height: 16
-                            source: Qt.resolvedUrl("../lazerbar/icons/close.svg")
-                            fillMode: Image.PreserveAspectFit
-                            visible: false
+                        // Placeholder sits on the editor's own baseline so the empty
+                        // state names the field instead of showing a bare caret.
+                        Text {
+                            anchors.left: wifiPasswordInput.left
+                            anchors.verticalCenter: wifiPasswordInput.verticalCenter
+                            visible: root.wifiPassword === "" && !wifiPasswordInput.activeFocus
+                            text: Services.Tr.q("popup.network.password")
+                            color: LazerTheme.textMuted
+                            font.pixelSize: 11
                         }
 
-                        MultiEffect {
-                            anchors.fill: cancelGlyphSource
-                            source: cancelGlyphSource
-                            colorization: 1
-                            colorizationColor: LazerTheme.textMuted
+                        // Confirm: a check, not the word. The button keeps its slot
+                        // while the secret is empty so the pair never shifts.
+                        Rectangle {
+                            id: wifiPasswordConnect
+                            objectName: "wifiPasswordConnect"
+                            anchors.right: wifiPasswordCancel.left
+                            anchors.rightMargin: 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 32
+                            height: 32
+                            radius: LazerTheme.settingsChoiceRadius
+                            color: connectHover.hovered ? LazerTheme.hoverFill : "transparent"
+                            enabled: root.wifiPassword !== ""
+                            opacity: enabled ? 1 : LazerTheme.settingsDisabledAlpha
+
+                            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                            Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+
+                            Image {
+                                id: connectGlyphSource
+                                anchors.centerIn: parent
+                                width: 16
+                                height: 16
+                                source: Qt.resolvedUrl("../lazerbar/icons/check.svg")
+                                fillMode: Image.PreserveAspectFit
+                                visible: false
+                            }
+
+                            MultiEffect {
+                                anchors.fill: connectGlyphSource
+                                source: connectGlyphSource
+                                colorization: 1
+                                colorizationColor: LazerTheme.osuGreen
+                            }
+
+                            HoverHandler { id: connectHover; enabled: wifiPasswordConnect.enabled }
+                            TapHandler {
+                                objectName: "wifiPasswordConnectTap"
+                                gesturePolicy: TapHandler.ReleaseWithinBounds
+                                enabled: wifiPasswordConnect.enabled
+                                onTapped: root.submitWifiPassword()
+                            }
                         }
 
-                        HoverHandler { id: cancelHover }
-                        TapHandler {
-                            objectName: "wifiPasswordCancelTap"
-                            gesturePolicy: TapHandler.ReleaseWithinBounds
-                            onTapped: root.cancelWifiPassword()
+                        // Dismiss the credential prompt without changing network state.
+                        Rectangle {
+                            id: wifiPasswordCancel
+                            objectName: "wifiPasswordCancel"
+                            anchors.right: parent.right
+                            anchors.rightMargin: 8
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 32
+                            height: 32
+                            radius: LazerTheme.settingsChoiceRadius
+                            color: cancelHover.hovered ? LazerTheme.hoverFill : "transparent"
+
+                            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+
+                            Image {
+                                id: cancelGlyphSource
+                                anchors.centerIn: parent
+                                width: 16
+                                height: 16
+                                source: Qt.resolvedUrl("../lazerbar/icons/close.svg")
+                                fillMode: Image.PreserveAspectFit
+                                visible: false
+                            }
+
+                            MultiEffect {
+                                anchors.fill: cancelGlyphSource
+                                source: cancelGlyphSource
+                                colorization: 1
+                                colorizationColor: LazerTheme.textMuted
+                            }
+
+                            HoverHandler { id: cancelHover }
+                            TapHandler {
+                                objectName: "wifiPasswordCancelTap"
+                                gesturePolicy: TapHandler.ReleaseWithinBounds
+                                onTapped: root.cancelWifiPassword()
+                            }
                         }
                     }
                 }

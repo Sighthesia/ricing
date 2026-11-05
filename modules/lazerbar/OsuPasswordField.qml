@@ -42,6 +42,13 @@ TextInput {
     // the glyphs (and the caret) are drawn here.
     echoMode: TextInput.Password
 
+    // Qt defaults a TextInput to AlignTop, so `positionToRectangle` reports the
+    // caret band at the field's top edge and every mask capsule plus the osu
+    // caret is drawn ~6px high inside a 32px host. Centre the line box instead:
+    // the capsules then land on the control's own mid-line, which is where the
+    // glyph and the action buttons sit.
+    verticalAlignment: TextInput.AlignVCenter
+
     // The mask layer is the only visible glyph source, so the native text is
     // hidden; the selection highlight stays and reads at half strength behind
     // the capsules.
