@@ -169,7 +169,11 @@ Item {
     // At the line itself there is a brief blank gap. Inert unless a host
     // calls transitionFrom().
     readonly property int ghostFallTime: 200
-    readonly property real ghostFallDistanceScale: 1.5
+    // The drop itself is osu's contract, not a look of its own: the ghost falls
+    // its own height and fades linearly, exactly as OsuTextField's delete
+    // ghosts do. Only the TRIGGER is Afloat's - the scan line's delay above
+    // paces when each character starts, and that pacing is not in osu.
+    readonly property real ghostFallDistanceScale: 1.0
     // Time for the scan line to cross one whole label.
     readonly property int scanSweepMs: 480
     // Blank window the line leaves before the char behind it fades in.
@@ -497,8 +501,9 @@ Item {
             style: root.textStyle
             styleColor: root.textStyleColor
 
+            // osu's two legs: drop InQuad, fade linear (FadeOut's default).
             Behavior on y { NumberAnimation { duration: root.ghostFallTime; easing.type: Easing.InQuad } }
-            Behavior on opacity { NumberAnimation { duration: root.ghostFallTime; easing.type: Easing.InQuad } }
+            Behavior on opacity { NumberAnimation { duration: root.ghostFallTime; easing.type: Easing.Linear } }
 
             Timer {
                 id: fallTimer
