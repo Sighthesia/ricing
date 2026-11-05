@@ -103,6 +103,9 @@ WlSessionLockSurface {
             ? root.lockContext.showFailure : false
     property date now: new Date()
     property bool inputMode: false
+    // Revert switch for the osu per-cell mask: false restores the single
+    // masked Text and the static empty-field marker.
+    property bool passwordMaskMotion: true
 
     signal releaseRequested()
     // Emitted only after the exit desktop is ready and the closing wave has
@@ -742,7 +745,94 @@ WlSessionLockSurface {
                 }
             }
 
-            // Render the password without mounting a second keyboard owner.
+            // osu-style password cells: one capsule per character, statically
+            // declared because session-lock surfaces never paint Repeater
+            // delegates. The row clips to the text inset, so overflow can never
+            // widen the control.
+            Item {
+                id: passwordRow
+                x: root.passwordTextLeftInset
+                width: Math.max(0, parent.width - root.passwordTextLeftInset
+                                - root.passwordTextRightInset)
+                height: root.authControlHeight
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.inputMode && root.passwordMaskMotion
+                clip: true
+
+                // One FontSize-18 osu cell is half an em wide and one em tall.
+                readonly property real cellWidth: 9
+                readonly property real cellHeight: 18
+                readonly property int count: root.lockContext
+                        ? Math.min(root.lockContext.currentText.length,
+                                   SurfaceLogic.maxMaskedCharacters) : 0
+
+                // Fixed 32-cell strip; its left edge follows the visible run so
+                // the masked string stays centred on the legacy text axis.
+                Item {
+                    id: passwordCells
+                    x: (passwordRow.width - passwordRow.count * passwordRow.cellWidth) / 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 32 * passwordRow.cellWidth
+                    height: passwordRow.cellHeight
+
+                    OsuPasswordDot { index: 0; x: 0 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 1; x: 1 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 2; x: 2 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 3; x: 3 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 4; x: 4 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 5; x: 5 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 6; x: 6 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 7; x: 7 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 8; x: 8 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 9; x: 9 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 10; x: 10 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 11; x: 11 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 12; x: 12 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 13; x: 13 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 14; x: 14 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 15; x: 15 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 16; x: 16 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 17; x: 17 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 18; x: 18 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 19; x: 19 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 20; x: 20 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 21; x: 21 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 22; x: 22 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 23; x: 23 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 24; x: 24 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 25; x: 25 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 26; x: 26 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 27; x: 27 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 28; x: 28 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 29; x: 29 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 30; x: 30 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                    OsuPasswordDot { index: 31; x: 31 * passwordRow.cellWidth; filled: index < passwordRow.count; cellWidth: passwordRow.cellWidth; cellHeight: passwordRow.cellHeight; dotColor: root.authTextColor }
+                }
+            }
+
+            // osu caret at the end of the typed cells. The cells are painted
+            // without a TextInput, so the geometry is explicit.
+            Lazer.OsuTextCaret {
+                target: null
+                visible: root.passwordMaskMotion
+                focused: root.inputMode && keyboardOwner.activeFocus
+                cursorHeight: passwordRow.cellHeight * 0.9
+                // Clamp to the clipped field so a full 32-cell row cannot put
+                // the caret outside the control on a narrow screen.
+                cursorX: Math.min(passwordRow.x + passwordCells.x
+                                  + passwordRow.count * passwordRow.cellWidth,
+                                  passwordRow.x + passwordRow.width - width)
+                cursorY: (passwordRow.height - height) / 2
+                color: root.authTextColor
+                z: 2
+                Behavior on color {
+                    enabled: !root.reducedMotion
+                    ColorAnimation { duration: Lazer.MotionTokens.fast }
+                }
+            }
+
+            // Revert path: the single masked Text and the static empty-field
+            // marker, kept behind passwordMaskMotion.
             Text {
                 id: passwordDisplay
                     anchors.fill: parent
@@ -750,7 +840,8 @@ WlSessionLockSurface {
                 anchors.rightMargin: root.passwordTextRightInset
                 anchors.topMargin: 4
                 anchors.bottomMargin: 4
-                visible: root.inputMode && text.length > 0
+                visible: root.inputMode && !root.passwordMaskMotion
+                         && text.length > 0
                 color: root.authTextColor
                 font.family: "monospace"
                 font.pixelSize: 18
@@ -777,9 +868,10 @@ WlSessionLockSurface {
                 height: 18
                 radius: 1.5
                 color: root.authIconColor
-                opacity: root.inputMode && keyboardOwner.activeFocus
+                opacity: root.inputMode && !root.passwordMaskMotion
+                    && keyboardOwner.activeFocus
                     && (!root.lockContext || root.lockContext.currentText.length === 0) ? 1 : 0
-                visible: root.inputMode
+                visible: root.inputMode && !root.passwordMaskMotion
                 enabled: false
                 Behavior on opacity {
                     enabled: !root.reducedMotion

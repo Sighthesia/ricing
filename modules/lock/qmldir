@@ -5,6 +5,7 @@ LockGrimCapture 1.0 LockGrimCapture.qml
 LockSnapshot 1.0 LockSnapshot.qml
 LockSurface 1.0 LockSurface.qml
 LockBackdrop 1.0 LockBackdrop.qml
+OsuPasswordDot 1.0 OsuPasswordDot.qml
 WallpaperClockLayout 1.0 WallpaperClockLayout.qml
 LockActionBar 1.0 LockActionBar.qml
 LockActionButton 1.0 LockActionButton.qml
