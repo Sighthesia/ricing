@@ -174,6 +174,7 @@
 | 下落 | 200ms `InQuad` |
 | 淡出 | 200ms 线性 |
 | 下落距离 | `1.0 ×` 幽灵自身高 |
+| 裁切 | 宿主（`Media` 药丸、`ActiveWindow`、`BarPopupIdentity`）在扫描期间临时关掉 `clip`，让 1 倍行高能完整落下；扫描结束自动恢复 |
 | 起始延迟 | 扫描线位置决定的 `_fallDelayAt()`（最多 480ms + 240ms 尾部压缩） |
 | 新字入场 | 延迟 `scanGapMs = 260ms` 后 140ms 淡入 |
 

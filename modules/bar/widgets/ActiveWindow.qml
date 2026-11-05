@@ -104,9 +104,11 @@ Item {
         : 0
     implicitWidth: Math.min(Math.max(contentRow.implicitWidth, root.outgoingHoldWidgetWidth) + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
-    // Clip so long-window ghosts do not spill into neighboring gaps when
-    // the title shortens; neighboring widget containers can then cover.
-    clip: true
+    // Clip so long-window ghosts do not spill into neighboring gaps when the
+    // title shortens - EXCEPT while a line is retiring its old text, where the
+    // clip would cut the drop short. Same reasoning as Media's pill; the
+    // exemption ends with the sweep.
+    clip: !titleText.sweeping && !appNameText.sweeping
 
     Component.onCompleted: {
         root.trackedTitle = root.displayTitle
