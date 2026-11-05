@@ -12,13 +12,12 @@ TextInput {
     // bullets, the native caret and the shared text colour.
     property bool osuMotion: true
 
-    // Neither Wi-Fi host sets a font, and the default font.pixelSize is -1
+    // Neither Wi-Fi host sets a font, so the default font.pixelSize is -1
     // ("use the application font"), which would zero the capsule geometry.
-    // fontInfo.pixelSize reports the size actually resolved by the font engine,
-    // with a sane 14 fallback.
-    readonly property real maskPixelSize: root.fontInfo && root.fontInfo.pixelSize > 0
-            ? root.fontInfo.pixelSize
-            : 14
+    // Pin a size the component derives everything from; hosts may override.
+    font.pixelSize: 14
+
+    readonly property real maskPixelSize: Math.max(8, Math.min(48, font.pixelSize > 0 ? font.pixelSize : 14))
 
     // osu! PasswordMaskChar geometry: a cell is FontSize/2 wide and one
     // FontSize tall, and the capsule fills 40% x 80% of that cell.
