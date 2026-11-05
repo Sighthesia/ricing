@@ -362,6 +362,9 @@ Item {
     readonly property var networkService: payload && payload.networkService ? payload.networkService : null
     property var pendingWifiNetwork: null
     property string wifiPassword: ""
+    // The Wi-Fi password row owns the keyboard while it is open; the popup
+    // host reads this to request layer-shell keyboard focus for the surface.
+    readonly property bool wantsKeyboard: actionKind === "network" && pendingWifiNetwork !== null
     readonly property bool wifiEnabled: {
         if (root.networkService && root.networkService.wifiEnabled !== undefined)
             return !!root.networkService.wifiEnabled

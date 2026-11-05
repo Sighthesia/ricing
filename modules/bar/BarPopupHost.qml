@@ -17,6 +17,9 @@ PanelWindow {
     // Keep the full-screen owner below the bar and settings owners.
     // The mask limits input to the small active popup rectangle.
     WlrLayershell.layer: WlrLayer.Top
+    // Take keyboard only while a text field inside the popup is open (the
+    // Wi-Fi password row); otherwise typing stays free for the rest of the session.
+    WlrLayershell.keyboardFocus: popupActions.wantsKeyboard ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // Intent payload from the hovered widget.
     property var intent: null
