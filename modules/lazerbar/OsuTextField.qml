@@ -4,23 +4,22 @@ import "textdiff.js" as TextDiff
 // Drop-in TextInput carrying osu!lazer's text editing feedback:
 //  - a smooth gliding, pulsing caret (see OsuTextCaret);
 //  - deleted characters detach at their exact old position and fall down
-//    one text height while fading out, mirroring BasicTextBox's
-//    FallingDownContainer.Hide(): FadeOut(200) + MoveToY(200, Easing.InQuad).
+//    their own height while fading out, mirroring BasicTextBox's
+//    FallingDownContainer.Hide(): FadeOut(200, linear) + MoveToY(DrawSize.Y,
+//    200, Easing.InQuad), every removed glyph starting at once.
 // All native behaviour (selection, clipboard, IME commit) is untouched; the
 // ghost glyphs are spawned on the scene root so they can fall past every
 // enclosing surface.
 TextInput {
     id: root
 
-    // osu! FallingDownContainer.Hide() timing contract.
+    // osu! FallingDownContainer.Hide() timing contract: one 200ms span for both
+    // legs, the drop eased InQuad and the fade linear (osu's FadeOut default).
     readonly property int ghostFallTime: 200
-    // Fall travel as a multiple of the line box so the drop clearly reads
-    // beyond osu's own-height baseline.
-    readonly property real ghostFallDistanceScale: 1.5
-    // Cascade pacing when several characters are removed in one edit;
-    // capped so a bulk delete never outlives the fall animation itself.
-    readonly property int ghostStaggerStepMs: 24
-    readonly property int ghostStaggerMaxTotalMs: 120
+    // osu travels the glyph drawable's own height (MoveToY(DrawSize.Y)). The
+    // editor reports the line box rather than a per-glyph drawable, so the
+    // ghost's own height IS that figure - no multiplier.
+    readonly property real ghostFallDistanceScale: 1.0
 
     // Set while the host replaces text programmatically so resets and
     // external syncs never spawn falling ghosts.
@@ -79,39 +78,25 @@ TextInput {
         trackedText = text
     }
 
-    // Replays every removed character as an independent falling ghost,
-    // cascading from the rightmost glyph toward the cursor ("one by one").
+    // Replays every removed character as its own falling ghost. osu starts them
+    // all on the same frame - one edit drops the removed run as a single plate,
+    // with no cascade - so there is no stagger and no cross-edit sweep here.
     function spawnDeleteGhosts(oldText, newText) {
         if (MotionTokens.reducedMotion)
             return
         var range = TextDiff.removeRange(oldText, newText)
         if (!range)
             return
-        // A bulk removal sweeps ghosts still airborne from a previous edit:
-        // rapid consecutive switches must read as one cascade, never two
-        // overlapping generations. Single-character edits keep their ripple.
-        if (range.removed.length >= 3)
-            sweepGhosts()
         var anchor = positionToRectangle(range.start)
         var offsets = TextDiff.cumulativeOffsets(range.removed, function(ch) {
             metrics.text = ch
             return metrics.advanceWidth
         })
-        var count = range.removed.length
-        for (var i = count - 1; i >= 0; i--) {
-            createGhost(range.removed[i], anchor.x + offsets[i], anchor,
-                        TextDiff.staggerDelayMs(i, count, ghostStaggerStepMs, ghostStaggerMaxTotalMs))
-        }
+        for (var i = 0; i < range.removed.length; i++)
+            createGhost(range.removed[i], anchor.x + offsets[i], anchor)
     }
 
-    // Destroy every live ghost immediately; used by the bulk-removal sweep.
-    function sweepGhosts() {
-        var kids = ghostLayer.children
-        for (var i = kids.length - 1; i >= 0; i--)
-            kids[i].destroy()
-    }
-
-    function createGhost(ch, x, anchorRect, delayMs) {
+    function createGhost(ch, x, anchorRect) {
         // Map fresh at spawn time: ancestor panels slide and scale between
         // edits, so any cached layer geometry would drift away from the field.
         var origin = root.mapToItem(ghostLayer, x, anchorRect.y)
@@ -128,8 +113,7 @@ TextInput {
             transformOrigin: Item.TopLeft,
             scale: ancestorScale,
             verticalAlignment: Text.AlignVCenter,
-            fallDistance: Math.max(anchorRect.height, metrics.height) * ghostFallDistanceScale * ancestorScale,
-            fallDelayMs: delayMs
+            fallDistance: Math.max(anchorRect.height, metrics.height) * ghostFallDistanceScale * ancestorScale
         })
     }
 
@@ -147,14 +131,21 @@ TextInput {
             id: ghost
 
             property real fallDistance: 10
-            property int fallDelayMs: 0
 
+            // osu's two legs, on their own curves: drop InQuad, fade linear.
             Behavior on y { NumberAnimation { duration: root.ghostFallTime; easing.type: Easing.InQuad } }
-            Behavior on opacity { NumberAnimation { duration: root.ghostFallTime; easing.type: Easing.InQuad } }
+            Behavior on opacity { NumberAnimation { duration: root.ghostFallTime; easing.type: Easing.Linear } }
 
-            Timer { id: fallTimer; interval: Math.max(1, ghost.fallDelayMs); onTriggered: { ghost.y += ghost.fallDistance; ghost.opacity = 0 } }
-            Timer { id: retireTimer; interval: Math.max(1, ghost.fallDelayMs) + root.ghostFallTime; onTriggered: ghost.destroy() }
-            Component.onCompleted: { fallTimer.restart(); retireTimer.restart() }
+            Timer {
+                interval: root.ghostFallTime + 16
+                running: true
+                onTriggered: ghost.destroy()
+            }
+
+            Component.onCompleted: {
+                ghost.y += ghost.fallDistance
+                ghost.opacity = 0
+            }
         }
     }
 }

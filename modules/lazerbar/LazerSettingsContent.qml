@@ -264,13 +264,22 @@ Item {
             onTextEdited: root.searchQueryEdited(searchEditor.text)
         }
 
+        // osu FadingPlaceholderText contract: fade in/out over 200ms instead of
+        // cutting on the focus/empty change.
         Text {
             anchors.left: searchEditor.left
             anchors.verticalCenter: searchEditor.verticalCenter
-            visible: !searchEditor.text && !searchEditor.activeFocus
+            readonly property bool shouldShow: !searchEditor.text && !searchEditor.activeFocus
+            visible: opacity > 0
+            opacity: shouldShow ? 1 : 0
             text: Services.Tr.q("settings.searchPlaceholder")
             color: LazerTheme.textMuted
             font.pixelSize: 13
+
+            Behavior on opacity {
+                enabled: !MotionTokens.reducedMotion
+                NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
+            }
         }
 
         // Clear the query in place without leaving the search field.

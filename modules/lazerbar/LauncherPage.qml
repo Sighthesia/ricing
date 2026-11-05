@@ -1075,13 +1075,22 @@ Item {
                 Keys.onEnterPressed: event => { root.executeSelected(); event.accepted = true }
             }
 
+            // osu FadingPlaceholderText contract: fade in/out over 200ms
+            // instead of cutting on the focus/empty change.
             Text {
                 anchors.left: editor.left
                 anchors.verticalCenter: editor.verticalCenter
-                visible: !editor.text && !editor.activeFocus
+                readonly property bool shouldShow: !editor.text && !editor.activeFocus
+                visible: opacity > 0
+                opacity: shouldShow ? 1 : 0
                 text: Services.Tr.q("launcher.placeholder")
                 color: LazerTheme.textMuted
                 font.pixelSize: 14
+
+                Behavior on opacity {
+                    enabled: !MotionTokens.reducedMotion
+                    NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
+                }
             }
         }
 

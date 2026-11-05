@@ -2457,10 +2457,18 @@ Item {
                         Text {
                             anchors.left: wifiPasswordInput.left
                             anchors.verticalCenter: wifiPasswordInput.verticalCenter
-                            visible: root.wifiPassword === "" && !wifiPasswordInput.activeFocus
+                            readonly property bool shouldShow:
+                                root.wifiPassword === "" && !wifiPasswordInput.activeFocus
+                            visible: opacity > 0
+                            opacity: shouldShow ? 1 : 0
                             text: Services.Tr.q("popup.network.password")
                             color: LazerTheme.textMuted
                             font.pixelSize: 11
+
+                            Behavior on opacity {
+                                enabled: !MotionTokens.reducedMotion
+                                NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
+                            }
                         }
 
                         // Confirm: a check, not the word. The button keeps its slot

@@ -166,13 +166,24 @@ FocusScope {
         }
     }
 
+    // Placeholder fades rather than cutting: osu's FadingPlaceholderText is
+    // Show() = FadeIn(200) / Hide() = FadeOut(200). opacity carries the state;
+    // visible only drops the glyph once the fade-out has landed.
     Text {
+        id: placeholder
         anchors.left: editor.left
         anchors.verticalCenter: editor.verticalCenter
-        visible: !editor.text && !editor.activeFocus
+        readonly property bool shouldShow: !editor.text && !editor.activeFocus
+        visible: opacity > 0
+        opacity: shouldShow ? 1 : 0
         text: root.placeholderText
         color: LazerTheme.textMuted
         font.pixelSize: 14
+
+        Behavior on opacity {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
+        }
     }
 
     // Keep hover state local to the editable surface so its parent row can
