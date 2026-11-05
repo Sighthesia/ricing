@@ -12,16 +12,24 @@ TextInput {
     // bullets, the native caret and the shared text colour.
     property bool osuMotion: true
 
+    // Neither Wi-Fi host sets a font, and the default font.pixelSize is -1
+    // ("use the application font"), which would zero the capsule geometry.
+    // fontInfo.pixelSize reports the size actually resolved by the font engine,
+    // with a sane 14 fallback.
+    readonly property real maskPixelSize: root.fontInfo && root.fontInfo.pixelSize > 0
+            ? root.fontInfo.pixelSize
+            : 14
+
     // osu! PasswordMaskChar geometry: a cell is FontSize/2 wide and one
     // FontSize tall, and the capsule fills 40% x 80% of that cell.
-    readonly property real maskCellWidth: font.pixelSize * 0.5
-    readonly property real capsuleWidth: font.pixelSize * 0.4
-    readonly property real capsuleHeight: font.pixelSize * 0.8
+    readonly property real maskCellWidth: maskPixelSize * 0.5
+    readonly property real capsuleWidth: maskPixelSize * 0.4
+    readonly property real capsuleHeight: maskPixelSize * 0.8
     // Entry is FadeIn/ResizeTo over 500ms OutQuint; a removal drops one cell
     // height over 200ms InQuad while fading out linearly.
     readonly property int maskGrowTime: 500
     readonly property int maskFallTime: 200
-    readonly property real maskFallDistance: font.pixelSize
+    readonly property real maskFallDistance: maskPixelSize
 
     // Previous string, so a text change can be narrowed down to the run that
     // was removed and to where it used to sit.
@@ -75,7 +83,7 @@ TextInput {
                 root.text.length
                 root.cursorPosition
                 root.width
-                root.font.pixelSize
+                root.maskPixelSize
                 capsule.grown
                 return root.positionToRectangle(index)
             }
