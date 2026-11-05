@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import "../lazerbar"
 import "widgets" as ClockWidgets
 import "widgets/BatteryMetrics.js" as BatteryMetrics
@@ -2342,35 +2343,75 @@ Item {
                 }
 
                 // Collect credentials only for an unsaved secured network.
-                // Same card as every sibling row (settingsCard, 6px): the prompt
-                // used to be a lifted white card while the row cards around it
-                // were settingsCard, so the one row that asks for input was also
-                // the one row whose surface hierarchy ran the other way. The
-                // editor sits on that card directly; the caret is tinted
-                // textPrimary because osu's white bar disappears on this tone.
+                //
+                // Same shape as the lock screen's auth control: one 48px card
+                // at settingsChoiceRadius on the control surface, a hairline
+                // divider border, a glyph at the 16px inset, and a two-button
+                // action pair at the right edge. The prompt used to be a lifted
+                // white card with word buttons, which read as neither the lock
+                // control nor its sibling row cards.
                 Rectangle {
                     id: wifiPasswordPanel
                     objectName: "wifiPasswordPanel"
                     width: parent.width
-                    height: root.pendingWifiNetwork ? 74 : 0
+                    height: root.pendingWifiNetwork ? 48 : 0
                     visible: root.pendingWifiNetwork !== null
-                    radius: 6
-                    color: LazerTheme.settingsCard
+                    radius: LazerTheme.settingsChoiceRadius
+                    color: LazerTheme.settingsControlSurface
+                    // The field card is the focus owner, so the control's own
+                    // ring states the same fact the caret does.
+                    border.width: wifiPasswordInput.activeFocus ? 2 : 1
+                    border.color: wifiPasswordInput.activeFocus
+                        ? LazerTheme.focusRing : LazerTheme.divider
                     clip: true
+
+                    Behavior on border.width {
+                        NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+                    }
+                    Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
+
+                    // Key glyph at the lock control's own inset, tinted from the
+                    // same white source through MultiEffect.
+                    Item {
+                        id: wifiPasswordGlyphSlot
+                        anchors.left: parent.left
+                        anchors.leftMargin: 16
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 18
+                        height: 18
+
+                        Image {
+                            id: wifiPasswordGlyphSource
+                            anchors.fill: parent
+                            source: Qt.resolvedUrl("../lazerbar/icons/lock.svg")
+                            fillMode: Image.PreserveAspectFit
+                            visible: false
+                        }
+
+                        MultiEffect {
+                            anchors.fill: wifiPasswordGlyphSource
+                            source: wifiPasswordGlyphSource
+                            colorization: 1
+                            colorizationColor: LazerTheme.settingsAccent
+                        }
+                    }
 
                     // osu password masks: the field owns its bullets, caret and
                     // colour; this host keeps only text, geometry and submit.
                     OsuPasswordField {
                         id: wifiPasswordInput
                         objectName: "wifiPasswordInput"
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
+                        anchors.left: wifiPasswordGlyphSlot.right
+                        anchors.leftMargin: 12
                         anchors.right: wifiPasswordConnect.left
                         anchors.rightMargin: 8
                         anchors.verticalCenter: parent.verticalCenter
                         height: 32
                         text: root.wifiPassword
                         clip: true
+                        // osu fades its caret to white; on this control that is
+                        // the same ink the accent glyph cannot provide, so the
+                        // bar takes the readable text colour instead.
                         caretColor: LazerTheme.textPrimary
 
                         onTextChanged: root.wifiPassword = text
@@ -2378,46 +2419,98 @@ Item {
                         Keys.onEnterPressed: root.submitWifiPassword()
                     }
 
-                    // Submit credentials without exposing the password in the UI.
+                    // Placeholder sits on the editor's own baseline so the empty
+                    // state names the field instead of showing a bare caret.
+                    Text {
+                        anchors.left: wifiPasswordInput.left
+                        anchors.verticalCenter: wifiPasswordInput.verticalCenter
+                        visible: root.wifiPassword === "" && !wifiPasswordInput.activeFocus
+                        text: Services.Tr.q("popup.network.password")
+                        color: LazerTheme.textMuted
+                        font.pixelSize: 11
+                    }
+
+                    // Confirm: a check, not the word. The button keeps its slot
+                    // while the secret is empty so the pair never shifts.
                     Rectangle {
                         id: wifiPasswordConnect
+                        objectName: "wifiPasswordConnect"
                         anchors.right: wifiPasswordCancel.left
-                        anchors.rightMargin: 6
+                        anchors.rightMargin: 2
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 58
+                        width: 32
                         height: 32
-                        radius: 6
-                        color: LazerTheme.settingsAccent
+                        radius: LazerTheme.settingsChoiceRadius
+                        color: connectHover.hovered ? LazerTheme.hoverFill : "transparent"
+                        enabled: root.wifiPassword !== ""
+                        opacity: enabled ? 1 : LazerTheme.settingsDisabledAlpha
 
-                        Text {
+                        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                        Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+
+                        Image {
+                            id: connectGlyphSource
                             anchors.centerIn: parent
-                            text: Services.Tr.q("common.connect")
-                            color: LazerTheme.textPrimary
-                            font.pixelSize: 10
+                            width: 16
+                            height: 16
+                            source: Qt.resolvedUrl("../lazerbar/icons/check.svg")
+                            fillMode: Image.PreserveAspectFit
+                            visible: false
                         }
 
-                        TapHandler { onTapped: root.submitWifiPassword() }
+                        MultiEffect {
+                            anchors.fill: connectGlyphSource
+                            source: connectGlyphSource
+                            colorization: 1
+                            colorizationColor: LazerTheme.osuGreen
+                        }
+
+                        HoverHandler { id: connectHover; enabled: wifiPasswordConnect.enabled }
+                        TapHandler {
+                            objectName: "wifiPasswordConnectTap"
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            enabled: wifiPasswordConnect.enabled
+                            onTapped: root.submitWifiPassword()
+                        }
                     }
 
                     // Dismiss the credential prompt without changing network state.
                     Rectangle {
                         id: wifiPasswordCancel
+                        objectName: "wifiPasswordCancel"
                         anchors.right: parent.right
                         anchors.rightMargin: 8
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 48
+                        width: 32
                         height: 32
-                        radius: 6
-                        color: "transparent"
+                        radius: LazerTheme.settingsChoiceRadius
+                        color: cancelHover.hovered ? LazerTheme.hoverFill : "transparent"
 
-                        Text {
+                        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+
+                        Image {
+                            id: cancelGlyphSource
                             anchors.centerIn: parent
-                            text: Services.Tr.q("common.cancel")
-                            color: LazerTheme.textMuted
-                            font.pixelSize: 10
+                            width: 16
+                            height: 16
+                            source: Qt.resolvedUrl("../lazerbar/icons/close.svg")
+                            fillMode: Image.PreserveAspectFit
+                            visible: false
                         }
 
-                        TapHandler { onTapped: root.cancelWifiPassword() }
+                        MultiEffect {
+                            anchors.fill: cancelGlyphSource
+                            source: cancelGlyphSource
+                            colorization: 1
+                            colorizationColor: LazerTheme.textMuted
+                        }
+
+                        HoverHandler { id: cancelHover }
+                        TapHandler {
+                            objectName: "wifiPasswordCancelTap"
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            onTapped: root.cancelWifiPassword()
+                        }
                     }
                 }
 

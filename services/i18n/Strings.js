@@ -329,6 +329,7 @@ var strings = {
     "popup.network.ipAddress": { zh: "IP 地址", en: "IP address" },
     "popup.network.gateway": { zh: "网关", en: "Gateway" },
     "popup.network.dns": { zh: "DNS", en: "DNS" },
+    "popup.network.password": { zh: "输入密码", en: "Password" },
     "popup.audio.output": { zh: "输出", en: "Output" },
     "popup.audio.input": { zh: "输入", en: "Input" },
     "popup.audio.noOutputDevices": { zh: "没有输出设备", en: "No output devices" },
