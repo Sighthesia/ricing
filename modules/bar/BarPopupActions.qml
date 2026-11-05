@@ -2357,17 +2357,19 @@ Item {
                 // close (the column reflows through it, so nothing else has to
                 // animate), the contents ride a separate progress so they are
                 // never painted outside the card's own clip.
+                //
+                // `visible` therefore may NOT follow the prompt directly: the
+                // instant it flips, the item stops painting and the collapse has
+                // nowhere to play. It rides the animated height instead, so the
+                // card unmounts on the frame its collapse reaches zero - the
+                // only signal that is actually the end of the motion.
                 Rectangle {
                     id: wifiPasswordPanel
                     objectName: "wifiPasswordPanel"
                     width: parent.width
-                    // `visible` stays bound to the prompt being open, so the
-                    // close needs one turn after it flips: `closing` holds the
-                    // card mounted while its height collapses.
-                    property bool closing: false
                     readonly property bool promptOpen: root.pendingWifiNetwork !== null
-                    height: promptOpen && !closing ? 48 : 0
-                    visible: promptOpen || closing
+                    height: promptOpen ? 48 : 0
+                    visible: promptOpen || height > 0.5
                     radius: LazerTheme.settingsChoiceRadius
                     color: LazerTheme.settingsControlSurface
                     // The field card is the focus owner, so the control's own
@@ -2381,24 +2383,6 @@ Item {
                     // slide up from the card's own bottom edge as it grows.
                     readonly property real revealProgress:
                         Math.max(0, Math.min(1, height / 48))
-
-                    onPromptOpenChanged: {
-                        if (promptOpen) {
-                            closing = false
-                            closeDelay.stop()
-                        } else {
-                            closeDelay.restart()
-                        }
-                    }
-
-                    // Unmount only after the collapse has landed. The duration
-                    // matches the height Behavior below; reduced motion skips
-                    // the wait so the card never lingers invisibly.
-                    Timer {
-                        id: closeDelay
-                        interval: MotionTokens.medium + 16
-                        onTriggered: wifiPasswordPanel.closing = false
-                    }
 
                     Behavior on height {
                         enabled: !MotionTokens.reducedMotion
@@ -2418,7 +2402,6 @@ Item {
                         // Reduced motion has no travel and no fade to ride.
                         y: MotionTokens.reducedMotion
                             ? 0 : (1 - wifiPasswordPanel.revealProgress) * 8
-                    }
 
                         // Key glyph at the lock control's own inset, tinted from the
                         // same white source through MultiEffect.
