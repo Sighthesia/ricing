@@ -28,9 +28,19 @@ Item {
 
     // The capsule stays centre-anchored so it grows symmetrically; the falling
     // layer carries the delete offset so the growth itself stays centred.
+    //
+    // The explicit width/height are load-bearing: `anchors.fill` sets top and
+    // bottom, which hands `y` to the anchors and makes every write to it a
+    // no-op. With it, the delete's MoveToY silently did nothing while the
+    // opacity fade still ran, so the capsule dissolved in place instead of
+    // falling. Sizing the layer and positioning it by `y` is what lets the
+    // fall animation own the offset.
     Item {
         id: fallingLayer
-        anchors.fill: parent
+        x: 0
+        y: 0
+        width: dot.width
+        height: dot.height
 
         Rectangle {
             id: capsule
