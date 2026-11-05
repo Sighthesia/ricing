@@ -2342,54 +2342,40 @@ Item {
                 }
 
                 // Collect credentials only for an unsaved secured network.
-                // Sharp settings-panel row: the prompt sits on the section
-                // surface like every other row card, and the field carries the
-                // component-level control surface inside it — the password row
-                // used to float a white rounded card over the popup, which read
-                // as the one row whose hierarchy ran the other way.
+                // Same card as every sibling row (settingsCard, 6px): the prompt
+                // used to be a lifted white card while the row cards around it
+                // were settingsCard, so the one row that asks for input was also
+                // the one row whose surface hierarchy ran the other way. The
+                // editor sits on that card directly; the caret is tinted
+                // textPrimary because osu's white bar disappears on this tone.
                 Rectangle {
                     id: wifiPasswordPanel
                     objectName: "wifiPasswordPanel"
                     width: parent.width
                     height: root.pendingWifiNetwork ? 74 : 0
                     visible: root.pendingWifiNetwork !== null
-                    radius: 0
-                    color: LazerTheme.settingsSection
+                    radius: 6
+                    color: LazerTheme.settingsCard
                     clip: true
 
-                    // Component-level surface card for the editor, so the
-                    // field reads like the panel's other controls instead of
-                    // bleeding into the row.
-                    Rectangle {
-                        id: wifiPasswordFieldSurface
+                    // osu password masks: the field owns its bullets, caret and
+                    // colour; this host keeps only text, geometry and submit.
+                    OsuPasswordField {
+                        id: wifiPasswordInput
+                        objectName: "wifiPasswordInput"
                         anchors.left: parent.left
                         anchors.leftMargin: 10
                         anchors.right: wifiPasswordConnect.left
                         anchors.rightMargin: 8
                         anchors.verticalCenter: parent.verticalCenter
                         height: 32
-                        radius: LazerTheme.settingsControlRadius
-                        color: LazerTheme.settingsControlSurface
+                        text: root.wifiPassword
+                        clip: true
+                        caretColor: LazerTheme.textPrimary
 
-                        // osu password masks: the field owns its bullets, caret and
-                        // colour; this host keeps only text, geometry and submit.
-                        OsuPasswordField {
-                            id: wifiPasswordInput
-                            objectName: "wifiPasswordInput"
-                            anchors.left: parent.left
-                            anchors.leftMargin: 10
-                            anchors.right: parent.right
-                            anchors.rightMargin: 10
-                            anchors.verticalCenter: parent.verticalCenter
-                            height: 32
-                            text: root.wifiPassword
-                            clip: true
-                            caretColor: LazerTheme.textPrimary
-
-                            onTextChanged: root.wifiPassword = text
-                            Keys.onReturnPressed: root.submitWifiPassword()
-                            Keys.onEnterPressed: root.submitWifiPassword()
-                        }
+                        onTextChanged: root.wifiPassword = text
+                        Keys.onReturnPressed: root.submitWifiPassword()
+                        Keys.onEnterPressed: root.submitWifiPassword()
                     }
 
                     // Submit credentials without exposing the password in the UI.
@@ -2400,7 +2386,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         width: 58
                         height: 32
-                        radius: 0
+                        radius: 6
                         color: LazerTheme.settingsAccent
 
                         Text {
@@ -2421,7 +2407,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         width: 48
                         height: 32
-                        radius: 0
+                        radius: 6
                         color: "transparent"
 
                         Text {
