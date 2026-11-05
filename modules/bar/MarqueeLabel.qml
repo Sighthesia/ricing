@@ -76,12 +76,20 @@ Item {
         }
     }
 
+    // Ghost host. It is handed to the SCENE ROOT rather than kept here, for the
+    // same reason OsuTextField's delete ghosts are: every host that puts a
+    // MarqueeLabel on screen also clips something above it - the media pill,
+    // the widget row, the bar section - and a falling glyph is meant to leave
+    // the line it came from. Left inside this item the ghosts inherited all of
+    // those clips, so the same 1.0x-line-height drop read as a short hop in the
+    // pill and as a full drop in the launcher's field, which has no clip above
+    // it. See adoptRootGhostLayer().
     Item {
         id: overlayLayer
 
-        anchors.fill: parent
         clip: false
-        z: -1
+        // A dominant z so no later sibling subtree can paint over a ghost.
+        z: 1000000
     }
 
     // Independent measuring context — unaffected by the label's live layout.
@@ -121,8 +129,39 @@ Item {
             scroll.restart()
     }
 
-    Component.onCompleted: syncScroll()
+    Component.onCompleted: {
+        syncScroll()
+        adoptRootGhostLayer()
+    }
+    onParentChanged: adoptRootGhostLayer()
     onTextChanged: syncScroll()
+
+    // Hand the ghost host to the scene root: no intermediate clip and no later
+    // sibling can cut a fall. Coordinates are mapped at spawn time (see
+    // ghostOrigin), because ancestor panels slide and scale between edits.
+    function adoptRootGhostLayer() {
+        var top = root
+        while (top && top.parent)
+            top = top.parent
+        if (!top || top === root)
+            return
+        overlayLayer.parent = top
+    }
+
+    // Reparented layers do not die with their original owner.
+    Component.onDestruction: overlayLayer.destroy()
+
+    // Where a label-local x sits in the ghost host's coordinates, and how much
+    // the ancestors scale it. Same approach as OsuTextField.createGhost.
+    function ghostOrigin(x, y) {
+        var origin = root.mapToItem(overlayLayer, x, y === undefined ? 0 : y)
+        var unitEnd = root.mapToItem(overlayLayer, x + 1, y === undefined ? 0 : y)
+        return {
+            "x": origin.x,
+            "y": origin.y,
+            "scale": Math.abs(unitEnd.x - origin.x) || 1
+        }
+    }
 
     Connections {
         target: label
@@ -293,15 +332,16 @@ Item {
             // one plate while an uninterrupted one cascaded - the two paths
             // have to be the same motion or the same edit reads differently
             // depending on how recently the user switched.
+            var at = root.ghostOrigin(charX)
             lyricGhostComponent.createObject(overlayLayer, {
                 text: chars[i],
                 color: textColor,
                 font: label.font,
-                x: charX,
-                y: 0,
+                x: at.x,
+                y: at.y,
                 opacity: opacity,
                 delay: root._fallDelayAt(charX, span),
-                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
+                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale * at.scale
             })
         }
     }
@@ -310,8 +350,13 @@ Item {
     // into the same positions occupied by revealed characters. Keep one
     // falling glyph per horizontal span so two generations cannot read as
     // overlapping text or a doubled fall.
-    function _ghostOverlaps(x, width, ignoredGhost) {
+    //
+    // `x` is LABEL-local (the same space every caller computes it in) and is
+    // mapped into the ghost host's space here, because the ghosts now live on
+    // the scene root and their own `x` is scene-relative.
+    function _ghostOverlaps(labelX, width, ignoredGhost) {
         var kids = overlayLayer.children
+        var x = root.ghostOrigin(labelX).x
         var right = x + Math.max(1, width)
         for (var i = 0; i < kids.length; i++) {
             var ghost = kids[i]
@@ -341,22 +386,30 @@ Item {
         // Snapshot the count first - creates below append after.
         for (var i = 0; i < n; i++) {
             var gh = kids[i]
-            if (gh.y > 0 || gh.opacity < 0.99)
+            // "Still standing" is judged against the ghost's OWN start y, not
+            // against 0: ghosts now live on the scene root, so their resting y
+            // is wherever the label sits, not the origin.
+            if (gh.hasFallen === true || gh.opacity < 0.99)
                 continue
             var text = gh.text
-            var x = gh.x
+            // The standing ghost's own x is scene-relative; the wavefront is
+            // paced on LABEL-local positions, so map it back before asking for
+            // a delay and keep the scene x for the replacement.
+            var sceneX = gh.x
+            var sceneY = gh.y
+            var labelX = root.mapFromItem(overlayLayer, sceneX, sceneY).x
             var width = gh.width
             gh.destroy()
-            if (_ghostOverlaps(x, width, gh))
+            if (_ghostOverlaps(labelX, width, gh))
                 continue
             lyricGhostComponent.createObject(overlayLayer, {
                 text: text,
                 color: textColor,
                 font: label.font,
-                x: x,
-                y: 0,
+                x: sceneX,
+                y: sceneY,
                 opacity: 1,
-                delay: root._fallDelayAt(x, span),
+                delay: root._fallDelayAt(labelX, span),
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
         }
@@ -461,16 +514,16 @@ Item {
             if (created >= root.transitionMaxChars)
                 break
             ghostMetrics.text = oldText.slice(0, i)
+            var at = root.ghostOrigin(x)
             lyricGhostComponent.createObject(overlayLayer, {
                 text: oldText[i],
                 color: textColor,
                 font: label.font,
-                x: x,
-                y: 0,
+                x: at.x,
+                y: at.y,
                 opacity: 1,
                 delay: root._fallDelayAt(x, span),
-                // Travel one-and-a-half line heights, like the field's delete ghosts.
-                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
+                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale * at.scale
             })
             created++
         }
@@ -531,6 +584,9 @@ Item {
 
             property real fallDistance: 10
             property int delay: 0
+            // Set when the fall starts, so a later sweep can tell a standing
+            // ghost from one already in flight without assuming y == 0.
+            property bool hasFallen: false
 
             font.pixelSize: root.pixelSize
             elide: Text.ElideNone
@@ -546,6 +602,7 @@ Item {
 
                 interval: ghost.delay > 0 ? ghost.delay + 1 : 1
                 onTriggered: {
+                    ghost.hasFallen = true
                     ghost.y += ghost.fallDistance
                     ghost.opacity = 0
                 }

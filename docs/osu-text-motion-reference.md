@@ -174,6 +174,7 @@
 | 下落 | 200ms `InQuad` |
 | 淡出 | 200ms 线性 |
 | 下落距离 | `1.0 ×` 幽灵自身高 |
+| 宿主 | 幽灵层挂到**场景根**（`adoptRootGhostLayer()`），坐标在生成时用 `ghostOrigin()` 换算；与 `OsuTextField` 的删除幽灵同一做法，因此不被药丸、控件行、顶栏分区的任何 `clip` 裁切 |
 | 起始延迟 | 扫描线位置决定的 `_fallDelayAt()`（最多 480ms + 240ms 尾部压缩） |
 | 新字入场 | 延迟 `scanGapMs = 260ms` 后 140ms 淡入 |
 
