@@ -26,6 +26,7 @@ TopBar 1.0 TopBar.qml
 OsuTopBarButton 1.0 OsuTopBarButton.qml
 OsuTextCaret 1.0 OsuTextCaret.qml
 OsuTextField 1.0 OsuTextField.qml
+OsuPasswordField 1.0 OsuPasswordField.qml
 MusicControlButton 1.0 MusicControlButton.qml
 OsuMusicOverlay 1.0 OsuMusicOverlay.qml
 LazerSettingsRow 1.0 LazerSettingsRow.qml

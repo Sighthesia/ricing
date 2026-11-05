@@ -2348,7 +2348,9 @@ Item {
                     color: LazerTheme.settingsCard
                     clip: true
 
-                    TextInput {
+                    // osu password masks: the field owns its bullets, caret and
+                    // colour; this host keeps only text, geometry and submit.
+                    OsuPasswordField {
                         id: wifiPasswordInput
                         objectName: "wifiPasswordInput"
                         anchors.left: parent.left
@@ -2358,9 +2360,6 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         height: 32
                         text: root.wifiPassword
-                        echoMode: TextInput.Password
-                        color: LazerTheme.textPrimary
-                        selectionColor: LazerTheme.settingsAccent
                         clip: true
 
                         onTextChanged: root.wifiPassword = text

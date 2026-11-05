@@ -906,7 +906,9 @@ Item {
                         NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
                     }
 
-                    TextInput {
+                    // osu password masks: the field owns its bullets, caret and
+                    // colour, so this host only supplies text and geometry.
+                    OsuPasswordField {
                         id: passwordInput
                         objectName: "wifiPasswordInput"
                         anchors.left: parent.left
@@ -918,9 +920,6 @@ Item {
                         // The page owns the secret; the field is bound to it in
                         // both directions so a cancel clears the editor too.
                         text: root.password
-                        echoMode: TextInput.Password
-                        color: LazerTheme.textPrimary
-                        selectionColor: LazerTheme.settingsAccent
                         clip: true
 
                         onTextChanged: root.password = text
