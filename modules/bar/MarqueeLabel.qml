@@ -29,7 +29,20 @@ Item {
     property alias overlay: overlayLayer
 
     implicitWidth: Math.min(metrics.advanceWidth, root.maxWidth)
-    implicitHeight: metrics.height
+    // `metrics.height` is ZERO for empty text, so a host that sizes itself from
+    // this line collapses to nothing the instant the text empties - and a
+    // zero-height item inside a Column/Row does not paint its overflowing
+    // children at all (measured: a 40x40 child inside a zero-height Column item
+    // renders 0 px, versus 1600 px at any non-zero height). That is what made a
+    // retiring sub-line vanish instead of fading while its ghosts fell. Latch
+    // the last real height and keep using it while a sweep is retiring the old
+    // text, so the host has something to shrink and the ghosts have somewhere
+    // to fall.
+    property real _latchedHeight: 0
+    readonly property real measuredHeight: metrics.height > 0 ? metrics.height : root._latchedHeight
+    implicitHeight: measuredHeight
+
+    onMeasuredHeightChanged: if (metrics.height > 0) root._latchedHeight = metrics.height
 
     // Clipping window; the full-width label slides inside it while scrolling.
     Item {
@@ -275,11 +288,11 @@ Item {
             var charWidth = Math.max(1, ghostMetrics.advanceWidth - charStart)
             if (_ghostOverlaps(charX, charWidth))
                 continue
-            // All revealed chars fall immediately in a light left-to-right
-            // stagger. Positional pacing here would just make middle chars
-            // stand frozen waiting for the wavefront — and an immediate
-            // fall can never overlap the reveal, which arrives at any
-            // position no earlier than 220ms from now.
+            // Same wavefront as every other exit. A fixed 8ms ladder here
+            // meant an interrupted sweep dropped its revealed characters as
+            // one plate while an uninterrupted one cascaded - the two paths
+            // have to be the same motion or the same edit reads differently
+            // depending on how recently the user switched.
             lyricGhostComponent.createObject(overlayLayer, {
                 text: chars[i],
                 color: textColor,
@@ -287,7 +300,7 @@ Item {
                 x: charX,
                 y: 0,
                 opacity: opacity,
-                delay: i * 8,
+                delay: root._fallDelayAt(charX, span),
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
         }

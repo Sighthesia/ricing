@@ -63,6 +63,8 @@ Item {
             var prev = root._pendingDesktopPrev
             root._pendingDesktopPrev = ""
             root.trackedTitle = root.displayTitle
+            root.outgoingHoldWidth = root._cappedAdvance(prev)
+            titleHoldTimer.restart()
             titleText.transitionFrom(prev, root.displayTitle)
         }
     }
@@ -81,7 +83,19 @@ Item {
         }
     }
 
-    implicitWidth: Math.min(contentRow.implicitWidth + 8, root.maxWidth)
+    // Width floor held by the outgoing title while its scan transition
+    // retires, the same contract Media's pill uses: the widget grows to fit
+    // the wider of old/new first and settles to the incoming width only after
+    // the ghosts have landed. Without it `implicitWidth` collapsed to the new
+    // short title on the same frame the scan started, and `clip: true` below
+    // then sliced the falling ghosts at the new edge - the old title was cut
+    // off mid-fall rather than finishing its drop.
+    property real outgoingHoldWidth: 0
+    // The text span only; the caller's own 8px padding is added once, below.
+    readonly property int outgoingHoldWidgetWidth: root.outgoingHoldWidth > 0
+        ? root.outgoingHoldWidth + (root.hasIcon ? LazerTheme.barGlyphSize + 6 : 0)
+        : 0
+    implicitWidth: Math.min(Math.max(contentRow.implicitWidth, root.outgoingHoldWidgetWidth) + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
     // Clip so long-window ghosts do not spill into neighboring gaps when
     // the title shortens; neighboring widget containers can then cover.
@@ -93,6 +107,34 @@ Item {
         root.syncFocusedWindow()
         root.trackedIconSource = root.iconSource
         incomingIcon.source = root.iconSource
+    }
+
+    // Measure a title with the title label's own font, capped the way the
+    // label itself is capped, so the hold width matches what was on screen.
+    // True while either line is retiring its old text. Exposed here because
+    // the two labels' ids are declared further down this file and are not
+    // visible from `contentRow`'s scope.
+    readonly property bool anyLineSweeping: titleText.sweeping || appNameText.sweeping
+
+    function _cappedAdvance(text) {
+        holdProbe.text = String(text || "")
+        return Math.min(holdProbe.advanceWidth, root.maxTitleWidth)
+    }
+
+    // Independent measuring context: reading the live label's metrics would
+    // feed the hold back into its own layout.
+    TextMetrics {
+        id: holdProbe
+        font: titleText.label.font
+    }
+
+    // One full scan transition: sweep across, gap, reveal, plus the ghost fall
+    // tail. Releasing exactly after this keeps the hold invisible.
+    Timer {
+        id: titleHoldTimer
+        interval: titleText.scanSweepMs + titleText.scanGapMs
+            + titleText.scanRevealMs + MotionTokens.fast
+        onTriggered: root.outgoingHoldWidth = 0
     }
 
     function syncFocusedWindow() {
@@ -172,6 +214,10 @@ Item {
         }
         root._pendingDesktopPrev = ""
         root.trackedTitle = root.displayTitle
+        // Hold the outgoing title's width until the scan has retired, so the
+        // widget does not shrink under the falling ghosts.
+        root.outgoingHoldWidth = root._cappedAdvance(previous)
+        titleHoldTimer.restart()
         // Per-char fade-in entrance plus staggered falling ghost exit,
         // reusing the media pill's main-line contract via MarqueeLabel.
         titleText.transitionFrom(previous, root.displayTitle)
@@ -228,7 +274,17 @@ Item {
 
         anchors.verticalCenter: parent.verticalCenter
         anchors.left: parent.left
-        spacing: root.hasIcon ? 6 : 0
+        // The icon column is deferred off the scan, not driven by `hasIcon`
+        // directly. `hasIcon` follows `currentAppId`, which arrives through
+        // Qt.callLater on a different turn than the title, so switching
+        // between a window with an icon and one without reflowed this Row
+        // (24px glyph + 6px gap) in the middle of the title's scan. The
+        // MarqueeLabel then measured its own slot against a width that was
+        // still moving, and the per-character ghosts came out evenly spaced -
+        // a whole plate dropping instead of a cascade. Holding the previous
+        // icon state until the sweep retires keeps one clock for the reflow.
+        readonly property bool iconShown: root.hasIcon || root.anyLineSweeping
+        spacing: iconShown ? 6 : 0
 
         move: Transition { NumberAnimation { properties: "x"; duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
         Behavior on spacing { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
@@ -239,9 +295,9 @@ Item {
             id: iconContainer
 
             anchors.verticalCenter: parent.verticalCenter
-            width: root.hasIcon ? LazerTheme.barGlyphSize : 0
+            width: contentRow.iconShown ? LazerTheme.barGlyphSize : 0
             height: LazerTheme.barGlyphSize
-            opacity: root.hasIcon ? 1 : 0
+            opacity: contentRow.iconShown ? 1 : 0
 
             Behavior on width { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
@@ -335,7 +391,12 @@ Item {
 
                 text: root.displayAppName
                 readonly property bool shouldShow: text.length > 0 || appNameText.sweeping
-                height: shouldShow ? implicitHeight : 0
+                // Height comes from `measuredHeight`, which latches the last
+                // real line height: `implicitHeight` is 0 for empty text, so
+                // binding to it collapsed the line in 160ms no matter what
+                // `shouldShow` said - and a zero-height item inside this
+                // Column stops painting its own ghost overlay entirely.
+                height: shouldShow ? appNameText.measuredHeight : 0
                 opacity: shouldShow ? 1 : 0
                 enabled: shouldShow
                 maxWidth: root.maxTitleWidth
