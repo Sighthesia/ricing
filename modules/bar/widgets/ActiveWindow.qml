@@ -64,6 +64,7 @@ Item {
             root._pendingDesktopPrev = ""
             root.trackedTitle = root.displayTitle
             root.outgoingHoldWidth = root._cappedAdvance(prev)
+            root.outgoingHoldHadIcon = root.hasIcon
             titleHoldTimer.restart()
             titleText.transitionFrom(prev, root.displayTitle)
         }
@@ -91,9 +92,15 @@ Item {
     // then sliced the falling ghosts at the new edge - the old title was cut
     // off mid-fall rather than finishing its drop.
     property real outgoingHoldWidth: 0
+    // Icon state at the moment the hold began. The hold has to describe the
+    // frame the scan started in, not the frame it is running in: `hasIcon`
+    // flips on its own clock (it follows `currentAppId`, which arrives one
+    // turn later), and reading it live here let the held width change under
+    // the falling ghosts.
+    property bool outgoingHoldHadIcon: false
     // The text span only; the caller's own 8px padding is added once, below.
     readonly property int outgoingHoldWidgetWidth: root.outgoingHoldWidth > 0
-        ? root.outgoingHoldWidth + (root.hasIcon ? LazerTheme.barGlyphSize + 6 : 0)
+        ? root.outgoingHoldWidth + (root.outgoingHoldHadIcon ? LazerTheme.barGlyphSize + 6 : 0)
         : 0
     implicitWidth: Math.min(Math.max(contentRow.implicitWidth, root.outgoingHoldWidgetWidth) + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
@@ -111,11 +118,6 @@ Item {
 
     // Measure a title with the title label's own font, capped the way the
     // label itself is capped, so the hold width matches what was on screen.
-    // True while either line is retiring its old text. Exposed here because
-    // the two labels' ids are declared further down this file and are not
-    // visible from `contentRow`'s scope.
-    readonly property bool anyLineSweeping: titleText.sweeping || appNameText.sweeping
-
     function _cappedAdvance(text) {
         holdProbe.text = String(text || "")
         return Math.min(holdProbe.advanceWidth, root.maxTitleWidth)
@@ -209,6 +211,9 @@ Item {
             var coalescedPrev = root._pendingDesktopPrev !== "" ? root._pendingDesktopPrev : previous
             root._pendingDesktopPrev = ""
             root.trackedTitle = root.displayTitle
+            root.outgoingHoldWidth = root._cappedAdvance(coalescedPrev)
+            root.outgoingHoldHadIcon = root.hasIcon
+            titleHoldTimer.restart()
             titleText.transitionFrom(coalescedPrev, root.displayTitle)
             return
         }
@@ -217,6 +222,7 @@ Item {
         // Hold the outgoing title's width until the scan has retired, so the
         // widget does not shrink under the falling ghosts.
         root.outgoingHoldWidth = root._cappedAdvance(previous)
+        root.outgoingHoldHadIcon = root.hasIcon
         titleHoldTimer.restart()
         // Per-char fade-in entrance plus staggered falling ghost exit,
         // reusing the media pill's main-line contract via MarqueeLabel.
@@ -274,17 +280,16 @@ Item {
 
         anchors.verticalCenter: parent.verticalCenter
         anchors.left: parent.left
-        // The icon column is deferred off the scan, not driven by `hasIcon`
-        // directly. `hasIcon` follows `currentAppId`, which arrives through
-        // Qt.callLater on a different turn than the title, so switching
-        // between a window with an icon and one without reflowed this Row
-        // (24px glyph + 6px gap) in the middle of the title's scan. The
-        // MarqueeLabel then measured its own slot against a width that was
-        // still moving, and the per-character ghosts came out evenly spaced -
-        // a whole plate dropping instead of a cascade. Holding the previous
-        // icon state until the sweep retires keeps one clock for the reflow.
-        readonly property bool iconShown: root.hasIcon || root.anyLineSweeping
-        spacing: iconShown ? 6 : 0
+        // The icon follows `hasIcon` on the frame it changes, so the title
+        // slides left into place as the switch starts rather than after the
+        // scan retires. Deferring it here (an earlier attempt) left the row
+        // misaligned for the whole transition and then snapped.
+        //
+        // The falling ghosts do not suffer from this reflow: the widget's own
+        // width is held by `outgoingHoldWidth` below, and that hold drops the
+        // icon term in the same frame the icon does, so the text region keeps
+        // its width while the column moves left under it.
+        spacing: root.hasIcon ? 6 : 0
 
         move: Transition { NumberAnimation { properties: "x"; duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
         Behavior on spacing { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
@@ -295,9 +300,9 @@ Item {
             id: iconContainer
 
             anchors.verticalCenter: parent.verticalCenter
-            width: contentRow.iconShown ? LazerTheme.barGlyphSize : 0
+            width: root.hasIcon ? LazerTheme.barGlyphSize : 0
             height: LazerTheme.barGlyphSize
-            opacity: contentRow.iconShown ? 1 : 0
+            opacity: root.hasIcon ? 1 : 0
 
             Behavior on width { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
