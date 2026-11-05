@@ -51,7 +51,12 @@ Rectangle {
 
     width: 3
     radius: 1
-    color: caretColor
+    // This rectangle is a carrier, not the bar: it owns geometry and the
+    // show/hide fade, and paints nothing. Leaving it filled put a second, fully
+    // opaque bar under the pulsing one - two stacked fills compose to
+    // 1-(1-1)(1-p) = 1, so the caret sat solid at full strength and the pulse
+    // was invisible while still running.
+    color: "transparent"
     opacity: 0
 
     height: cursorHeight
@@ -75,18 +80,16 @@ Rectangle {
         id: barPulse
         anchors.fill: parent
         radius: caretRoot.radius
-        // Read the caret's own colour so the 200ms FadeColour below paints on
-        // this, the only visible, layer.
-        color: caretRoot.color
+        color: caretRoot.caretColor
         opacity: 1
-    }
 
-    // osu! FadeColour(White, 200, Easing.Out) on every DisplayAt. The Behavior
-    // sits on the colour this bar actually paints, so a host that re-tints the
-    // caret (the lock screen follows the scheme) fades rather than snapping.
-    Behavior on color {
-        enabled: !MotionTokens.reducedMotion
-        ColorAnimation { duration: caretRoot.colourFadeTime; easing.type: Easing.OutQuad }
+        // osu! FadeColour(White, 200, Easing.Out) on every DisplayAt, carried by
+        // the layer that actually paints. A host that re-tints the caret (the
+        // lock screen follows the scheme) therefore fades rather than snapping.
+        Behavior on color {
+            enabled: !MotionTokens.reducedMotion
+            ColorAnimation { duration: caretRoot.colourFadeTime; easing.type: Easing.OutQuad }
+        }
     }
 
     // osu! pulse: the snap is a zero-duration step, the decay is one beat.

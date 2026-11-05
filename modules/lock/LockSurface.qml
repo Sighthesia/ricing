@@ -821,12 +821,12 @@ WlSessionLockSurface {
                                   + passwordRow.count * passwordRow.cellWidth,
                                   passwordRow.x + passwordRow.width - width)
                 cursorY: (passwordRow.height - height) / 2
-                color: root.authTextColor
+                // Tint through caretColor, not `color`: the caret's own
+                // rectangle is a transparent carrier now, and its 200ms
+                // FadeColour already covers scheme changes, so the local
+                // Behavior here would have been a second, competing fade.
+                caretColor: root.authTextColor
                 z: 2
-                Behavior on color {
-                    enabled: !root.reducedMotion
-                    ColorAnimation { duration: Lazer.MotionTokens.fast }
-                }
             }
 
             // Shake the unchanged input region when authentication fails.
