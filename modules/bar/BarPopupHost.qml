@@ -19,7 +19,14 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Top
     // Take keyboard only while a text field inside the popup is open (the
     // Wi-Fi password row); otherwise typing stays free for the rest of the session.
-    WlrLayershell.keyboardFocus: popupActions.wantsKeyboard ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    // The guard is load-bearing: the body loader mounts after this window, so
+    // `popupActions` is null on the binding's first evaluation and an unguarded
+    // read throws — Qt then drops the binding for the whole session and the
+    // surface stays keyboardFocus: None forever (measured: the unguarded
+    // binding produced exactly that TypeError at startup and niri reported
+    // keyboard_interactivity None while the password row was open).
+    WlrLayershell.keyboardFocus: popupActions && popupActions.wantsKeyboard
+            ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // Intent payload from the hovered widget.
     property var intent: null

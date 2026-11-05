@@ -33,6 +33,10 @@ Rectangle {
 
     // osu! OsuCaret values (see the header).
     property bool osuPulse: true
+    // Bar color. osu fades the caret to white (FadeColour(Color4.White));
+    // hosts on light surfaces override this so the bar keeps its contrast —
+    // the Afloat default stays white to keep the osu contract in one place.
+    property color caretColor: "#FFFFFF"
     readonly property int moveTime: 60
     readonly property int pulseDecay: 300
     readonly property int hideFadeTime: 200
@@ -46,7 +50,7 @@ Rectangle {
 
     width: 3
     radius: 1
-    color: "#FFFFFF"
+    color: caretColor
     opacity: 0
 
     height: cursorHeight

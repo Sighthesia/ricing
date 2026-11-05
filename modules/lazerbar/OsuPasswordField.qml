@@ -12,6 +12,10 @@ TextInput {
     // bullets, the native caret and the shared text colour.
     property bool osuMotion: true
 
+    // Caret bar colour, handed to the osu caret. osu fades its caret to white;
+    // hosts on light surfaces override so the bar stays visible.
+    property color caretColor: "#FFFFFF"
+
     // Neither Wi-Fi host sets a font, so the default font.pixelSize is -1
     // ("use the application font"), which would zero the capsule geometry.
     // Pin a size the component derives everything from; hosts may override.
@@ -60,7 +64,7 @@ TextInput {
         id: caretLoader
         active: root.osuMotion
         z: 4
-        sourceComponent: OsuTextCaret { target: root }
+        sourceComponent: OsuTextCaret { target: root; caretColor: root.caretColor }
     }
 
     // One capsule per character, positioned from the editor's own caret
