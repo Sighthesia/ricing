@@ -318,12 +318,26 @@ Item {
             }
 
             // Sub-line shows the application name like Media's artist line.
+            //
+            // It stays MOUNTED while it retires instead of flipping `visible`:
+            // an invisible item paints nothing and its Behavior is skipped, so
+            // focusing an empty workspace cut the line away in one frame while
+            // its title ghosts were still falling. Height carries the collapse
+            // (the column reflows through it) and opacity carries the ink, and
+            // the line is held for as long as either its own text or its own
+            // sweep still has something to show.
+            //
+            // `sweeping`, not `_sweepActive`: the underscore property lives in
+            // MarqueeLabel's scope, so reading it here evaluated to undefined
+            // and the hold never applied.
             MarqueeLabel {
                 id: appNameText
 
                 text: root.displayAppName
-                visible: text.length > 0 || _sweepActive
-                height: visible ? implicitHeight : 0
+                readonly property bool shouldShow: text.length > 0 || appNameText.sweeping
+                height: shouldShow ? implicitHeight : 0
+                opacity: shouldShow ? 1 : 0
+                enabled: shouldShow
                 maxWidth: root.maxTitleWidth
                 textColor: LazerTheme.barSubtitle
                 pixelSize: 10

@@ -186,6 +186,12 @@ Item {
     readonly property int transitionMaxChars: 48
     property var _enterRow: null
     property bool _sweepActive: false
+    // Public, read-only view of the sweep state. A host that has to know
+    // whether its own line is mid-transition (ActiveWindow keeps its sub-line
+    // mounted while a sweep runs) must read this rather than guess: the
+    // private underscore name is not in the host's scope, and reading it
+    // there silently evaluates to undefined.
+    readonly property bool sweeping: root._sweepActive
     // State of the in-flight sweep, for collapsing it mid-flight.
     property string _sweepRowChars: ""
     property var _sweepDelays: []
@@ -202,18 +208,25 @@ Item {
         return Math.round(root.scanSweepMs * Math.min(1, Math.max(0, xOffset / span)))
     }
 
+    // Width of the paced tail past the incoming line's own width. A short
+    // incoming line (the empty-workspace label is two characters, ~20px) would
+    // otherwise squeeze a full outgoing title into a 240ms window: about 17ms
+    // apart per character, which reads as one plate dropping rather than a
+    // cascade. Giving the tail the same span as the head keeps the per-character
+    // step audible while still bounding the total at two sweeps.
+    readonly property int fallTailMs: scanSweepMs
+
     // Fall delay for a ghost at pixel offset x — ONE monotonic wavefront:
     // within the incoming title's width the line moves at sweep pace;
-    // past its right edge the pace compresses into a bounded tail, so
-    // surplus chars keep falling in sequence instead of forming a second,
-    // faster front.
+    // past its right edge the pace continues over a bounded tail, so surplus
+    // chars keep falling in sequence instead of forming a second, faster front.
     function _fallDelayAt(xOffset, span) {
         var s = Math.max(1, span)
         if (xOffset <= s)
             return Math.round(root.scanSweepMs * Math.max(0, xOffset / s))
         var maxX = Math.max(s + 1, root.maxWidth)
         return Math.round(root.scanSweepMs
-            + 240 * (xOffset - s) / (maxX - s))
+            + root.fallTailMs * (xOffset - s) / (maxX - s))
     }
 
     // Tear down any in-flight sweep row and restore the real label.
@@ -302,14 +315,17 @@ Item {
     }
 
     // Standing ghosts of the interrupted sweep are debris from an older
-    // title: they fall immediately in a tight stagger. Re-anchoring them
-    // onto the new wavefront instead lets rapid switching defer them
-    // indefinitely (each interrupt resets their delay), so they never
-    // exit at all. Snapshot the count first — creates below append after.
-    function _collapseStandingGhosts() {
+    // title. They are re-anchored onto the SAME wavefront the fresh ghosts use,
+    // not a fixed 8ms ladder: two interruptions in a row ran the ladder pace
+    // while an uninterrupted switch ran the scan pace, so the same edit looked
+    // like a per-character cascade or like one plate dropping depending only on
+    // how recently the user had switched before. Re-anchoring cannot defer them
+    // for ever, because the wavefront is a function of position, not of the
+    // interrupt count.
+    function _collapseStandingGhosts(span) {
         var kids = overlayLayer.children
         var n = kids.length
-        var stagger = 0
+        // Snapshot the count first - creates below append after.
         for (var i = 0; i < n; i++) {
             var gh = kids[i]
             if (gh.y > 0 || gh.opacity < 0.99)
@@ -327,7 +343,7 @@ Item {
                 x: x,
                 y: 0,
                 opacity: 1,
-                delay: (stagger++) * 8,
+                delay: root._fallDelayAt(x, span),
                 fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
             })
         }
@@ -380,7 +396,7 @@ Item {
             // Interrupted sweep: only already-revealed chars fall, standing
             // ghosts from the previous generation keep falling. This keeps
             // a half-entered title from flashing complete before falling.
-            _collapseStandingGhosts()
+            _collapseStandingGhosts(fallSpan)
             _collapseRevealedChars(elapsed, fallSpan)
         } else {
             _clearGhosts()
@@ -473,11 +489,18 @@ Item {
     }
 
     // Fallback restores the label if the enter row's own timers ever fail.
+    // NOT a sweep-length budget: the sweep ends when its own retire timer
+    // fires, which is derived from the real scan length below. This used to
+    // run at a flat 2400ms and was the authority on `_sweepActive`, so any
+    // switch inside that window was treated as an interrupted sweep - the
+    // collapse path - even when the previous scan had long finished.
     Timer {
         id: enterGuard
 
-        interval: 2400
+        interval: root.scanSweepMs + root.scanGapMs + root.scanRevealMs + 600
         onTriggered: {
+            if (!root._sweepActive)
+                return
             root._sweepActive = false
             root._stopSweepRow()
         }
