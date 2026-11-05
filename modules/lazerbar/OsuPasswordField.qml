@@ -8,10 +8,6 @@ import "textdiff.js" as TextDiff
 TextInput {
     id: root
 
-    // Revert switch: false hides every custom layer and restores the native
-    // bullets, the native caret and the shared text colour.
-    property bool osuMotion: true
-
     // Caret bar colour, handed to the osu caret. osu fades its caret to white;
     // hosts on light surfaces override so the bar stays visible.
     property color caretColor: "#FFFFFF"
@@ -52,24 +48,21 @@ TextInput {
     // The mask layer is the only visible glyph source, so the native text is
     // hidden; the selection highlight stays and reads at half strength behind
     // the capsules.
-    color: root.osuMotion ? "transparent" : LazerTheme.textPrimary
+    color: "transparent"
     // Selected bullets must stay invisible too, or the mask glyphs reappear
     // under the selection highlight.
-    selectedTextColor: root.osuMotion ? "transparent" : LazerTheme.textPrimary
-    selectionColor: root.osuMotion
-        ? Qt.rgba(LazerTheme.settingsAccent.r, LazerTheme.settingsAccent.g,
-                  LazerTheme.settingsAccent.b, 0.5)
-        : LazerTheme.settingsAccent
+    selectedTextColor: "transparent"
+    selectionColor: Qt.rgba(LazerTheme.settingsAccent.r, LazerTheme.settingsAccent.g,
+                            LazerTheme.settingsAccent.b, 0.5)
 
-    // Empty delegate swallows the native caret; OsuTextCaret draws the real
-    // one, and null hands the native caret back on the revert path.
-    cursorDelegate: root.osuMotion ? emptyCursor : null
+    // Empty delegate swallows the native caret; OsuTextCaret draws the real one.
+    cursorDelegate: emptyCursor
 
     // The osu caret contract shares geometry with a TextInput, so it only
-    // needs the target; it is unmounted with the custom mask layer.
+    // needs the target.
     Loader {
         id: caretLoader
-        active: root.osuMotion
+        active: true
         z: 4
         sourceComponent: OsuTextCaret { target: root; caretColor: root.caretColor }
     }
@@ -77,7 +70,7 @@ TextInput {
     // One capsule per character, positioned from the editor's own caret
     // geometry so scrolling and selection keep the masks over the real text.
     Repeater {
-        model: root.osuMotion ? root.text.length : 0
+        model: root.text.length
 
         delegate: Rectangle {
             id: capsule
@@ -187,8 +180,7 @@ TextInput {
     Component.onCompleted: root.trackedText = root.text
 
     onTextChanged: {
-        if (root.osuMotion)
-            spawnFallMasks(root.trackedText, root.text)
+        spawnFallMasks(root.trackedText, root.text)
         root.trackedText = root.text
     }
 

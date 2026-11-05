@@ -11,8 +11,6 @@ import QtQuick
 //  - beat-synced pulse: snap to 0.7, then InOutSine decay to 0.4 over one beat
 //    (MinimumBeatLength = 300ms, so 300ms here);
 //  - Hide() = FadeOut(200).
-// `osuPulse: false` restores the previous 250ms symmetric breathe, so the
-// change can be reverted from one place without touching any call site.
 Rectangle {
     id: caretRoot
 
@@ -32,7 +30,6 @@ Rectangle {
             : 0
 
     // osu! OsuCaret values (see the header).
-    property bool osuPulse: true
     // Bar color. osu fades the caret to white (FadeColour(Color4.White));
     // hosts on light surfaces override this so the bar keeps its contrast —
     // the Afloat default stays white to keep the osu contract in one place.
@@ -42,8 +39,6 @@ Rectangle {
     readonly property int hideFadeTime: 200
     readonly property real blinkHigh: 0.7
     readonly property real blinkLow: 0.4
-    // Previous Afloat implementation, kept for the revert path.
-    readonly property int legacyHalfPeriod: 250
 
     // Test-facing read-only view of the visible bar's current opacity.
     readonly property real visualOpacity: opacity
@@ -79,25 +74,6 @@ Rectangle {
         }
     }
 
-    // Revert path: the old triangle wave, eased in both directions.
-    Timer {
-        id: legacyBlinkTimer
-        interval: caretRoot.legacyHalfPeriod
-        repeat: true
-        onTriggered: {
-            var mid = (caretRoot.blinkHigh + caretRoot.blinkLow) / 2
-            legacyBlink.to = caretRoot.opacity < mid ? caretRoot.blinkHigh : caretRoot.blinkLow
-            legacyBlink.restart()
-        }
-    }
-    NumberAnimation {
-        id: legacyBlink
-        target: caretRoot
-        property: "opacity"
-        duration: caretRoot.legacyHalfPeriod
-        easing.type: Easing.InOutSine
-    }
-
     // osu! OsuCaret.Hide().
     NumberAnimation {
         id: hideFade
@@ -112,8 +88,6 @@ Rectangle {
 
     function syncFocusState() {
         osuBlink.stop()
-        legacyBlinkTimer.stop()
-        legacyBlink.stop()
         hideFade.stop()
 
         if (!caretRoot.focused) {
@@ -129,15 +103,7 @@ Rectangle {
             return
         }
 
-        if (caretRoot.osuPulse) {
-            caretRoot.opacity = caretRoot.blinkHigh
-            osuBlink.start()
-        } else {
-            // Keep the old fade-in on focus instead of leaving the bar
-            // invisible until the first half period elapses.
-            legacyBlink.to = caretRoot.blinkHigh
-            legacyBlink.restart()
-            legacyBlinkTimer.start()
-        }
+        caretRoot.opacity = caretRoot.blinkHigh
+        osuBlink.start()
     }
 }

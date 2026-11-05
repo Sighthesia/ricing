@@ -136,16 +136,15 @@
 | 脉冲 | 瞬时到 0.7，再 300ms `InOutSine` 落到 0.4 | 节拍驱动，下限 300ms |
 | 失焦 | 200ms 淡出 | 同 |
 | 选择态宽光标 | 不复刻 | `selectionWidth + 1.5`、`SelectionColour`、`FadeTo(0.5)` |
-| 回退 | `osuPulse: false` → 旧的 250ms 半周期对称呼吸（0.7 ↔ 0.4） | — |
 
 选择态交给 Qt 原生选择高亮，不再画第二根宽光标：`TextInput` 的选区已经盖住同一段像素，再叠一层半透明色块只会让它变浑。
 
 ### 密码（Wi-Fi 与锁屏）
 
-| 位置 | 实现 | 开关 |
-| --- | --- | --- |
-| Wi-Fi 密码 | `modules/lazerbar/OsuPasswordField.qml`，用于 `ControlCenterNetwork.qml` 与 `BarPopupActions.qml` 两处 | `osuMotion`（默认 `true`） |
-| 锁屏 | `modules/lock/OsuPasswordDot.qml`（每字符一格）+ `modules/lock/LockSurface.qml` | `passwordMaskMotion`（默认 `true`） |
+| 位置 | 实现 |
+| --- | --- |
+| Wi-Fi 密码 | `modules/lazerbar/OsuPasswordField.qml`，用于 `ControlCenterNetwork.qml` 与 `BarPopupActions.qml` 两处 |
+| 锁屏 | `modules/lock/OsuPasswordDot.qml`（每字符一格）+ `modules/lock/LockSurface.qml` |
 
 两边共同复刻的部分：
 
@@ -160,15 +159,12 @@
 两处平台偏差：
 
 - **Wi-Fi 的字符步进跟着 Qt 的密码字宽**。胶囊位置来自 `TextInput.positionToRectangle(index)` 给出的 bullet 宽度，无法强制 osu 的 0.5em 网格；osu 的 cell 宽只在 `positionToRectangle` 返回空宽时兜底用。删除幽灵也按 `maskCellWidth` 等距排列，与 osu 的逐字符 sprite 布局同构但不是同一套度量。
-- **锁屏保持原有的水平居中构图**。可见的胶囊组（`count × 9px`）整体在控件中轴上居中，空密码时 3px 光标落在中轴；非空时光标跟在最后一枚胶囊右侧，与 osu 的末尾光标一致。删除动画由每格自己的 `fallAnimation` 播放，并被 `passwordRow` 的 `clip` 裁掉，不像 Wi-Fi 那样在独立 ghost 层上飞出去。
+- **锁屏的胶囊组左对齐**。一行从 `passwordTextLeftInset`（56px）开始向右生长，光标跟在末枚胶囊右侧，与 osu 的末尾光标一致。这里刻意不做居中：居中时 `count` 每减 1 整条带就右移半个格子，光标同时左移一个格子，被删的那格是向右滑走、光标先越过它、胶囊随后才消失——这正是「清除效果不佳」的观感来源。左对齐后删除只摘掉最右一格，存活格子原地不动，光标后退一格。删除动画由每格自己的 `fallAnimation` 播放，并被 `passwordRow` 的 `clip` 裁掉，不像 Wi-Fi 那样在独立 ghost 层上飞出去。
 
-## 回退方式
+## 动效降低开关
 
-以下开关都是代码里的本地属性，不是设置面板项；默认值即当前行为。
+实现已经定型，原先为逐个区域设置的回退属性（`OsuPasswordField.osuMotion`、`LockSurface.passwordMaskMotion`、`OsuTextCaret.osuPulse`）连同它们的旧实现一并删除，避免留下第二套平行分支。
 
-| 开关 | 位置 | 默认 | 改成 `false` 的效果 |
+| 开关 | 位置 | 默认 | 效果 |
 | --- | --- | --- | --- |
-| `osuMotion` | `OsuPasswordField.qml` | `true` | 卸载胶囊层与 osu 光标，恢复 Qt 原生 bullets、原生 `cursorDelegate`、`textPrimary` 文字色；选区高亮从不透明 accent 的半透明版回到实色 |
-| `passwordMaskMotion` | `LockSurface.qml` | `true` | 锁屏密码回到单一等宽掩码 `Text` + 静态空态竖条，没有生长、下落和 osu 光标 |
-| `osuPulse` | `OsuTextCaret.qml` | `true` | 脉冲回到旧的 250ms 半周期对称呼吸（0.7 ↔ 0.4，两端 `InOutSine`）；移动 60ms、失焦 200ms 不变 |
 | `MotionTokens.reducedMotion` | `MotionTokens.qml` | `false` | 字符幽灵、密码胶囊、光标脉冲全部不播，直接落到终态 |

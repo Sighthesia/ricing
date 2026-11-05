@@ -2,7 +2,6 @@
 
 // Cap the rendered mask so a runaway buffer can never inflate the surface.
 var maxMaskedCharacters = 32
-var maskCharacter = "\u25CF"
 
 // Background modes the surface understands. The default (and any unknown
 // value) captures the desktop before locking; "wallpaper" skips the capture
@@ -40,29 +39,6 @@ function stopAll(animations) {
 
 function stopAnimations(enterAnimation, exitAnimation) {
     stopAll([enterAnimation, exitAnimation])
-}
-
-// Render the live password as fixed-size bullets without ever exposing it.
-function maskedPassword(text) {
-    var length = String(text || "").length
-    if (length <= 0)
-        return ""
-    var visible = Math.min(length, maxMaskedCharacters)
-    var masked = ""
-    for (var i = 0; i < visible; ++i)
-        masked += maskCharacter
-    return masked
-}
-
-// The horizontal center of the password field: the control minus the glyph
-// inset on the left and the right inset. The masked bullets are centered here,
-// and so is the empty-field caret, so clearing the input cannot leave the
-// insertion mark sitting somewhere the text had never been.
-function passwordTextAxis(controlWidth, leftInset, rightInset) {
-    var left = Number(leftInset) || 0
-    var right = Number(rightInset) || 0
-    var width = Number(controlWidth) || 0
-    return left + (width - left - right) / 2
 }
 
 // Choose the visible status line and its tone for the current auth state.

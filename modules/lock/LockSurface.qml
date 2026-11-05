@@ -57,15 +57,13 @@ WlSessionLockSurface {
     // sharing this margin is what puts them on the same horizontal line.
     readonly property real authControlBottomMargin: 56
     readonly property real authControlHeight: 48
-    // The password field occupies the control between the glyph inset and the
-    // right inset. The masked bullets and the empty-field caret are both
-    // centered on this one axis: the caret used to center on the whole control
-    // instead, so an emptied field showed its mark 18px left of where the
-    // bullets had been.
+    // The password cells occupy the control between the glyph inset and the
+    // right inset. They grow from this left edge and the caret tracks their end,
+    // the way osu's own mask does: a centred run re-centred itself on every
+    // keystroke, so a deleted capsule slid right while the caret stepped left
+    // past it and only then disappeared.
     readonly property real passwordTextLeftInset: 56
     readonly property real passwordTextRightInset: 20
-    readonly property real passwordTextAxis: SurfaceLogic.passwordTextAxis(
-        authControl.width, root.passwordTextLeftInset, root.passwordTextRightInset)
     readonly property color authControlColor: root.themeSnapshotReady
             ? root.lockThemeSnapshot.control
             : (root.lightScheme ? Lazer.LazerTheme.bgLight : Lazer.LazerTheme.settingsControlSurface)
@@ -103,9 +101,6 @@ WlSessionLockSurface {
             ? root.lockContext.showFailure : false
     property date now: new Date()
     property bool inputMode: false
-    // Revert switch for the osu per-cell mask: false restores the single
-    // masked Text and the static empty-field marker.
-    property bool passwordMaskMotion: true
 
     signal releaseRequested()
     // Emitted only after the exit desktop is ready and the closing wave has
@@ -756,7 +751,7 @@ WlSessionLockSurface {
                                 - root.passwordTextRightInset)
                 height: root.authControlHeight
                 anchors.verticalCenter: parent.verticalCenter
-                visible: root.inputMode && root.passwordMaskMotion
+                visible: root.inputMode
                 clip: true
 
                 // One FontSize-18 osu cell is half an em wide and one em tall.
@@ -766,11 +761,15 @@ WlSessionLockSurface {
                         ? Math.min(root.lockContext.currentText.length,
                                    SurfaceLogic.maxMaskedCharacters) : 0
 
-                // Fixed 32-cell strip; its left edge follows the visible run so
-                // the masked string stays centred on the legacy text axis.
+                // Fixed 32-cell strip anchored to the text's left edge. Left
+                // alignment is what makes a deletion read as one capsule falling
+                // away: the surviving cells hold their positions and only the
+                // caret steps back. A centred strip re-centred itself on every
+                // keystroke, so the capsule being deleted slid right under the
+                // caret instead of staying where it was typed.
                 Item {
                     id: passwordCells
-                    x: (passwordRow.width - passwordRow.count * passwordRow.cellWidth) / 2
+                    x: 0
                     anchors.verticalCenter: parent.verticalCenter
                     width: 32 * passwordRow.cellWidth
                     height: passwordRow.cellHeight
@@ -814,7 +813,6 @@ WlSessionLockSurface {
             // without a TextInput, so the geometry is explicit.
             Lazer.OsuTextCaret {
                 target: null
-                visible: root.passwordMaskMotion
                 focused: root.inputMode && keyboardOwner.activeFocus
                 cursorHeight: passwordRow.cellHeight * 0.9
                 // Clamp to the clipped field so a full 32-cell row cannot put
@@ -828,57 +826,6 @@ WlSessionLockSurface {
                 Behavior on color {
                     enabled: !root.reducedMotion
                     ColorAnimation { duration: Lazer.MotionTokens.fast }
-                }
-            }
-
-            // Revert path: the single masked Text and the static empty-field
-            // marker, kept behind passwordMaskMotion.
-            Text {
-                id: passwordDisplay
-                    anchors.fill: parent
-                anchors.leftMargin: root.passwordTextLeftInset
-                anchors.rightMargin: root.passwordTextRightInset
-                anchors.topMargin: 4
-                anchors.bottomMargin: 4
-                visible: root.inputMode && !root.passwordMaskMotion
-                         && text.length > 0
-                color: root.authTextColor
-                font.family: "monospace"
-                font.pixelSize: 18
-                font.weight: Font.DemiBold
-                verticalAlignment: TextInput.AlignVCenter
-                horizontalAlignment: Text.AlignHCenter
-                text: root.lockContext
-                        ? SurfaceLogic.maskedPassword(root.lockContext.currentText) : ""
-                Behavior on color {
-                    enabled: !root.reducedMotion
-                    ColorAnimation { duration: Lazer.MotionTokens.fast }
-                }
-            }
-
-            // Empty focused field: a slim caret on the bullets' own axis. It
-            // was a 12x6 pill centered on the whole control, which had the same
-            // footprint as one masked character and sat left of the text, so a
-            // cleared field read as a stray circle rather than a cursor.
-            Rectangle {
-                id: emptyPasswordMarker
-                x: root.passwordTextAxis - width / 2
-                anchors.verticalCenter: parent.verticalCenter
-                width: 3
-                height: 18
-                radius: 1.5
-                color: root.authIconColor
-                opacity: root.inputMode && !root.passwordMaskMotion
-                    && keyboardOwner.activeFocus
-                    && (!root.lockContext || root.lockContext.currentText.length === 0) ? 1 : 0
-                visible: root.inputMode && !root.passwordMaskMotion
-                enabled: false
-                Behavior on opacity {
-                    enabled: !root.reducedMotion
-                    NumberAnimation {
-                        duration: Lazer.MotionTokens.fast
-                        easing.type: Easing.OutQuint
-                    }
                 }
             }
 
