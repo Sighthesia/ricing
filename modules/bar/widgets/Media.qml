@@ -99,17 +99,14 @@ BarPill {
             value = fallback
         return Math.max(0, Math.min(600, Math.round(value)))
     }
-    // Width floor held by the outgoing primary line while its scan
-    // transition retires: the island-media morph contract — the surface
-    // grows to fit the wider of old/new first, and only settles to the
-    // incoming width after the handback, so the pill never clips the
-    // falling ghosts by shrinking under them.
-    property real outgoingHoldWidth: 0
-    readonly property int outgoingHoldPillWidth: root.coverSize + 8 + 3 + 8
-        + Math.min(root.outgoingHoldWidth, root.maxTextWidth) + 12
-
     visible: hasMedia
-    implicitWidth: visible ? Math.max(root.minPillWidth, contentRow.implicitWidth + 12, root.outgoingHoldPillWidth) : 0
+    // The pill is exactly as wide as its CURRENT content: the falling glyphs
+    // are ghosts outside the layout, so the surface can take the incoming
+    // track's width on the frame the switch starts and let the neighbouring
+    // widgets slide over whatever is still dropping. Reserving the outgoing
+    // width instead kept the pill wide after the exit had finished, and its
+    // release was a visible jump.
+    implicitWidth: visible ? Math.max(root.minPillWidth, contentRow.implicitWidth + 12) : 0
     // Clip the pill so a shrinking widget cannot paint over its neighbours -
     // EXCEPT while a line is retiring its old text. A falling ghost travels one
     // full line height, which is more than the pill has room for below the
@@ -211,8 +208,6 @@ BarPill {
         // until the scan transition finishes retiring its ghosts, so the
         // pill grows first and settles afterwards instead of shrinking
         // under the falling characters.
-        root.outgoingHoldWidth = root._cappedAdvance(oldText)
-        morphHoldTimer.restart()
         // Shared per-character contract: staggered falling ghost exit plus
         // left-to-right fade-in entrance, living in MarqueeLabel.
         titleMarquee.transitionFrom(oldText, root.primaryText)
@@ -275,30 +270,6 @@ BarPill {
                 coverPrevImage.opacity = 0
             })
         }
-    }
-
-    // Measure text with the title label's own font in an independent
-    // context — the label's internal metrics must never be fed foreign
-    // text, or the live layout would briefly follow the probe.
-    TextMetrics {
-        id: morphProbe
-
-        font: titleMarquee.label.font
-    }
-
-    function _cappedAdvance(text) {
-        morphProbe.text = text
-        return Math.min(morphProbe.advanceWidth, root.maxTextWidth)
-    }
-
-    // One full scan transition: sweep across, gap, reveal, plus the ghost
-    // fall tail. Releasing exactly after this keeps the hold invisible.
-    Timer {
-        id: morphHoldTimer
-
-        interval: titleMarquee.scanSweepMs + titleMarquee.scanGapMs
-            + titleMarquee.scanRevealMs + MotionTokens.fast
-        onTriggered: root.outgoingHoldWidth = 0
     }
 
     WheelHandler {

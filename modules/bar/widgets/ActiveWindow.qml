@@ -87,9 +87,6 @@ Item {
             root._pendingDesktopPrev = ""
             root.trackedTitle = root.displayTitle
             root.shownTitle = root.displayTitle
-            root.outgoingHoldWidth = root._cappedAdvance(prev)
-            root.outgoingHoldHadIcon = root.hasIcon
-            titleHoldTimer.restart()
             titleText.transitionFrom(prev, root.displayTitle)
         }
     }
@@ -115,22 +112,13 @@ Item {
     // Width floor held by the outgoing title while its scan transition
     // retires, the same contract Media's pill uses: the widget grows to fit
     // the wider of old/new first and settles to the incoming width only after
-    // the ghosts have landed. Without it `implicitWidth` collapsed to the new
-    // short title on the same frame the scan started, and `clip: true` below
-    // then sliced the falling ghosts at the new edge - the old title was cut
-    // off mid-fall rather than finishing its drop.
-    property real outgoingHoldWidth: 0
-    // Icon state at the moment the hold began. The hold has to describe the
-    // frame the scan started in, not the frame it is running in: `hasIcon`
-    // flips on its own clock (it follows `currentAppId`, which arrives one
-    // turn later), and reading it live here let the held width change under
-    // the falling ghosts.
-    property bool outgoingHoldHadIcon: false
-    // The text span only; the caller's own 8px padding is added once, below.
-    readonly property int outgoingHoldWidgetWidth: root.outgoingHoldWidth > 0
-        ? root.outgoingHoldWidth + (root.outgoingHoldHadIcon ? LazerTheme.barGlyphSize + 6 : 0)
-        : 0
-    implicitWidth: Math.min(Math.max(contentRow.implicitWidth, root.outgoingHoldWidgetWidth) + 8, root.maxWidth)
+    // The widget is exactly as wide as its CURRENT content. There is no hold
+    // for the outgoing title: the falling glyphs are ghosts that leave the
+    // layout, so the row is free to take the incoming title's width on the
+    // frame the switch starts and let the neighbours slide over whatever is
+    // still dropping. Reserving the old width instead kept the widget wide
+    // after the exit had finished, and the release was a visible jump.
+    implicitWidth: Math.min(contentRow.implicitWidth + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
     // Clip so long-window ghosts do not spill into neighboring gaps when the
     // title shortens - EXCEPT while a line is retiring its old text, where the
@@ -146,29 +134,6 @@ Item {
         root.syncFocusedWindow()
         root.trackedIconSource = root.iconSource
         incomingIcon.source = root.iconSource
-    }
-
-    // Measure a title with the title label's own font, capped the way the
-    // label itself is capped, so the hold width matches what was on screen.
-    function _cappedAdvance(text) {
-        holdProbe.text = String(text || "")
-        return Math.min(holdProbe.advanceWidth, root.maxTitleWidth)
-    }
-
-    // Independent measuring context: reading the live label's metrics would
-    // feed the hold back into its own layout.
-    TextMetrics {
-        id: holdProbe
-        font: titleText.label.font
-    }
-
-    // One full scan transition: sweep across, gap, reveal, plus the ghost fall
-    // tail. Releasing exactly after this keeps the hold invisible.
-    Timer {
-        id: titleHoldTimer
-        interval: titleText.scanSweepMs + titleText.scanGapMs
-            + titleText.scanRevealMs + MotionTokens.fast
-        onTriggered: root.outgoingHoldWidth = 0
     }
 
     function syncFocusedWindow() {
@@ -245,20 +210,12 @@ Item {
             root._pendingDesktopPrev = ""
             root.trackedTitle = root.displayTitle
             root.shownTitle = root.displayTitle
-            root.outgoingHoldWidth = root._cappedAdvance(coalescedPrev)
-            root.outgoingHoldHadIcon = root.hasIcon
-            titleHoldTimer.restart()
             titleText.transitionFrom(coalescedPrev, root.displayTitle)
             return
         }
         root._pendingDesktopPrev = ""
         root.trackedTitle = root.displayTitle
         root.shownTitle = root.displayTitle
-        // Hold the outgoing title's width until the scan has retired, so the
-        // widget does not shrink under the falling ghosts.
-        root.outgoingHoldWidth = root._cappedAdvance(previous)
-        root.outgoingHoldHadIcon = root.hasIcon
-        titleHoldTimer.restart()
         // Per-char fade-in entrance plus staggered falling ghost exit,
         // reusing the media pill's main-line contract via MarqueeLabel.
         titleText.transitionFrom(previous, root.displayTitle)
@@ -320,13 +277,8 @@ Item {
         anchors.left: parent.left
         // The icon follows `hasIcon` on the frame it changes, so the title
         // slides left into place as the switch starts rather than after the
-        // scan retires. Deferring it here (an earlier attempt) left the row
-        // misaligned for the whole transition and then snapped.
-        //
-        // The falling ghosts do not suffer from this reflow: the widget's own
-        // width is held by `outgoingHoldWidth` below, and that hold drops the
-        // icon term in the same frame the icon does, so the text region keeps
-        // its width while the column moves left under it.
+        // scan retires. The falling glyphs are ghosts outside the layout, so
+        // this reflow does not disturb them.
         spacing: root.hasIcon ? 6 : 0
 
         move: Transition { NumberAnimation { properties: "x"; duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
