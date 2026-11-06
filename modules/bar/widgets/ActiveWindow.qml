@@ -164,10 +164,13 @@ Item {
 
     // One full scan transition: sweep across, gap, reveal, plus the ghost fall
     // tail. Releasing exactly after this keeps the hold invisible.
+    // Release the width when the LAST ghost lands, not when the reveal
+    // finishes. `sweepExitMs` is measured from the ghosts actually spawned
+    // (delay + drop), so a short title frees its space in ~200ms instead of
+    // holding it for the full scan budget.
     Timer {
         id: titleHoldTimer
-        interval: titleText.scanSweepMs + titleText.scanGapMs
-            + titleText.scanRevealMs + MotionTokens.fast
+        interval: Math.max(MotionTokens.fast, titleText.sweepExitMs + MotionTokens.fast)
         onTriggered: root.outgoingHoldWidth = 0
     }
 

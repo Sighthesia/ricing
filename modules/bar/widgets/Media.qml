@@ -291,13 +291,13 @@ BarPill {
         return Math.min(morphProbe.advanceWidth, root.maxTextWidth)
     }
 
-    // One full scan transition: sweep across, gap, reveal, plus the ghost
-    // fall tail. Releasing exactly after this keeps the hold invisible.
+    // Release the width when the last ghost lands, not when the reveal
+    // finishes: `sweepExitMs` is measured from the ghosts actually spawned, so
+    // the pill stops reserving space as soon as nothing is falling through it.
     Timer {
         id: morphHoldTimer
 
-        interval: titleMarquee.scanSweepMs + titleMarquee.scanGapMs
-            + titleMarquee.scanRevealMs + MotionTokens.fast
+        interval: Math.max(MotionTokens.fast, titleMarquee.sweepExitMs + MotionTokens.fast)
         onTriggered: root.outgoingHoldWidth = 0
     }
 

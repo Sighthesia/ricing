@@ -221,6 +221,14 @@ Item {
     // private underscore name is not in the host's scope, and reading it
     // there silently evaluates to undefined.
     readonly property bool sweeping: root._sweepActive
+    // How long the CURRENT sweep keeps falling glyphs on screen, measured from
+    // the moment transitionFrom() ran: the last ghost's delay plus its own
+    // 200ms drop. A host that holds layout space for the exit has to release it
+    // when the last glyph LANDS, not when the reveal finishes - the two are
+    // different numbers, and using the reveal's left the space reserved after
+    // everything had already fallen (a short title fell in 200ms and the width
+    // stayed wide for another 780ms).
+    property int sweepExitMs: 0
     // State of the in-flight sweep, for collapsing it mid-flight.
     property string _sweepRowChars: ""
     property var _sweepDelays: []
@@ -448,9 +456,29 @@ Item {
         root._sweepDelays = delays
         root._sweepOffsets = offsets
         root._sweepStart = Date.now()
+        // Publish when the last ghost lands. Ghosts are spawned above with
+        // `_fallDelayAt`, so the tail is the largest delay any of them got;
+        // reading it back from the live children covers the interrupted path
+        // too, where the collapse spawns its own set.
+        root.sweepExitMs = root._measureSweepExit()
         // Safety net: no matter what happens inside the row, the real
         // label always comes back.
         enterGuard.restart()
+    }
+
+    // Latest (delay + fall) among the ghosts currently on screen.
+    function _measureSweepExit() {
+        var kids = overlayLayer.children
+        var latest = 0
+        for (var i = 0; i < kids.length; i++) {
+            var g = kids[i]
+            if (g.hasFallen === true)
+                continue
+            var ends = (Number(g.delay) || 0) + root.ghostFallTime
+            if (ends > latest)
+                latest = ends
+        }
+        return latest
     }
 
     // Old characters fall away as the line reaches them; ghosts ride the
