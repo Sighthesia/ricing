@@ -106,6 +106,27 @@ BarPill {
     // widgets slide over whatever is still dropping. Reserving the outgoing
     // width instead kept the pill wide after the exit had finished, and its
     // release was a visible jump.
+    // One drop distance for both lines.
+    //
+    // osu drops a removed glyph by that glyph's own drawable height
+    // (FallingDownContainer's DrawSize.Y), and a text box only ever has ONE
+    // font size - so "every character falls the same distance" is a
+    // consequence of one size, not a separate rule. Two lines at two sizes
+    // have to share the number explicitly, or the 10px line visibly falls
+    // less than the 12px one for a reason osu never had.
+    //
+    // Derived from the two pixel sizes rather than from the labels' own
+    // ids: those are declared further down this file, and a binding here
+    // would evaluate before they exist.
+    TextMetrics {
+        id: dropProbe
+        // The TALLER of the two lines (the 12px title), which is the line whose
+        // glyph box osu would be measuring.
+        font.pixelSize: 12
+        text: "Ag"
+    }
+    readonly property real lineFallDistance: Math.ceil(dropProbe.height)
+
     implicitWidth: visible ? Math.max(root.minPillWidth, contentRow.implicitWidth + 12) : 0
     // Clip the pill to its own box. The exemption that used to be here (off
     // while a line was retiring) let the pill's own text and surface paint over
@@ -419,6 +440,10 @@ BarPill {
                 id: titleMarquee
 
                 text: root.primaryText
+                // Both lines fall the same distance - see the note on the
+                // active-window widget: osu's per-glyph drop height is one
+                // number because a text box has one font size.
+                fallDistanceOverride: root.lineFallDistance
                 maxWidth: root.maxTextWidth
                 textColor: LazerTheme.textPrimary
                 pixelSize: 12
@@ -435,6 +460,7 @@ BarPill {
                 id: subtitleMarquee
 
                 text: root.secondaryText
+                fallDistanceOverride: root.lineFallDistance
                 height: subtitleMarquee.lineHeight
                 maxWidth: root.maxTextWidth
                 textColor: LazerTheme.barSubtitle

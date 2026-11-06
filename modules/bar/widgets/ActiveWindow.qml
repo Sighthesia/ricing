@@ -118,6 +118,27 @@ Item {
     // frame the switch starts and let the neighbours slide over whatever is
     // still dropping. Reserving the old width instead kept the widget wide
     // after the exit had finished, and the release was a visible jump.
+    // One drop distance for both lines.
+    //
+    // osu drops a removed glyph by that glyph's own drawable height
+    // (FallingDownContainer's DrawSize.Y), and a text box only ever has ONE
+    // font size - so "every character falls the same distance" is a
+    // consequence of one size, not a separate rule. Two lines at two sizes
+    // have to share the number explicitly, or the 10px line visibly falls
+    // less than the 12px one for a reason osu never had.
+    //
+    // Derived from the two pixel sizes rather than from the labels' own
+    // ids: those are declared further down this file, and a binding here
+    // would evaluate before they exist.
+    TextMetrics {
+        id: dropProbe
+        // The TALLER of the two lines (the 12px title), which is the line whose
+        // glyph box osu would be measuring.
+        font.pixelSize: 12
+        text: "Ag"
+    }
+    readonly property real lineFallDistance: Math.ceil(dropProbe.height)
+
     implicitWidth: Math.min(contentRow.implicitWidth + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
     // Clip the widget to its own box. The exemption that used to be here (off
@@ -392,6 +413,13 @@ Item {
                 id: titleText
 
                 text: root.shownTitle
+                // Both lines fall the SAME distance. osu's mask drops a glyph
+                // by that glyph's own drawable height, and a text box only ever
+                // has one font size - so osu's "same distance for every
+                // character" is a consequence of one size, not a choice against
+                // it. Two lines at two sizes need the shared number spelled out,
+                // or the 10px line appears to fall less than the 12px one.
+                fallDistanceOverride: root.lineFallDistance
                 textColor: LazerTheme.textPrimary
                 maxWidth: root.maxTitleWidth
                 pixelSize: 12
@@ -418,6 +446,7 @@ Item {
                 id: appNameText
 
                 text: root.shownAppName
+                fallDistanceOverride: root.lineFallDistance
                 height: appNameText.lineHeight
                 maxWidth: root.maxTitleWidth
                 textColor: LazerTheme.barSubtitle

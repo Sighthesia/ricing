@@ -43,6 +43,11 @@ Item {
     // A host that wants a PERMANENT line slot sizes to this: it is the font's
     // own line height and therefore never dips to 0 on an empty or mid-swap
     // text, which `metrics.height` does.
+    //
+    // It is also the figure osu drops a removed glyph by: osu measures the
+    // character's own FallingDownContainer (DrawSize.Y), and with one font size
+    // per text box that is simply this line's height. Hosts that stack two
+    // lines at two sizes read it to agree on ONE drop distance.
     readonly property real lineHeight: Math.ceil(fontProbe.height)
     TextMetrics {
         id: fontProbe
@@ -203,6 +208,18 @@ Item {
     // ghosts do. Only the TRIGGER is Afloat's - the scan line's delay above
     // paces when each character starts, and that pacing is not in osu.
     readonly property real ghostFallDistanceScale: 1.0
+    // osu drops a removed glyph by its own drawable height (DrawSize.Y of that
+    // character's FallingDownContainer), and a text box only ever has ONE font
+    // size - so in osu every character in a field falls the same distance.
+    // A host that stacks two lines at different sizes has to say so explicitly:
+    // 0 means "my own line height", any positive value replaces it. Two lines
+    // that pass the same number fall the same distance, which is the osu
+    // semantic; leaving them to their own heights makes the smaller line fall
+    // visibly less for no reason osu ever had.
+    property real fallDistanceOverride: 0
+    readonly property real effectiveFallDistance:
+        root.fallDistanceOverride > 0 ? root.fallDistanceOverride
+                                      : Math.max(1, label.height)
     // Time for the scan line to cross one whole label.
     readonly property int scanSweepMs: 480
     // Blank window the line leaves before the char behind it fades in.
@@ -317,7 +334,7 @@ Item {
                 y: 0,
                 opacity: opacity,
                 delay: root._fallDelayAt(charX, span),
-                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
+                fallDistance: root.effectiveFallDistance * root.ghostFallDistanceScale
             })
         }
     }
@@ -373,7 +390,7 @@ Item {
                 y: 0,
                 opacity: 1,
                 delay: root._fallDelayAt(x, span),
-                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
+                fallDistance: root.effectiveFallDistance * root.ghostFallDistanceScale
             })
         }
     }
@@ -486,7 +503,7 @@ Item {
                 opacity: 1,
                 delay: root._fallDelayAt(x, span),
                 // Travel one-and-a-half line heights, like the field's delete ghosts.
-                fallDistance: Math.max(1, label.height) * root.ghostFallDistanceScale
+                fallDistance: root.effectiveFallDistance * root.ghostFallDistanceScale
             })
             created++
         }
