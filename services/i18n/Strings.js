@@ -307,6 +307,7 @@ var strings = {
     "calendar.nextMonth": { zh: "下个月", en: "Next month" },
     "settings.resetDefault": { zh: "恢复默认", en: "Reset to default" },
     "widget.activeWindow.desktop": { zh: "桌面", en: "Desktop" },
+    "widget.activeWindow.compositor": { zh: "Niri", en: "Niri" },
     // ── Bar hover popups (volume, brightness, media, battery, network) ────
     "popup.battery.chargeRate": { zh: "充电速率", en: "Charge rate" },
     "popup.battery.dischargeRate": { zh: "放电速率", en: "Discharge rate" },

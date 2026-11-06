@@ -40,6 +40,15 @@ Item {
     // to fall.
     property real _latchedHeight: 0
     readonly property real measuredHeight: metrics.height > 0 ? metrics.height : root._latchedHeight
+    // A host that wants a PERMANENT line slot sizes to this: it is the font's
+    // own line height and therefore never dips to 0 on an empty or mid-swap
+    // text, which `metrics.height` does.
+    readonly property real lineHeight: Math.ceil(fontProbe.height)
+    TextMetrics {
+        id: fontProbe
+        font: label.font
+        text: "Ag"
+    }
     implicitHeight: measuredHeight
 
     onMeasuredHeightChanged: if (metrics.height > 0) root._latchedHeight = metrics.height

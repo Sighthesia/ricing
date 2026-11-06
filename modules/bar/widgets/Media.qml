@@ -28,11 +28,22 @@ BarPill {
         Services.MediaControlService.showCompactLyric
                 ? Services.MediaControlService.compactPrimaryLyric
                 : Services.MediaControlService.title
-    readonly property string secondaryText:
-        Services.MediaControlService.showCompactLyric
-                ? Services.MediaControlService.artist
-                    + (Services.MediaControlService.title !== "" ? " - " + Services.MediaControlService.title : "")
-                : Services.MediaControlService.artist
+    // The sub-line is never empty while a player exists: a track with no artist
+    // metadata names the player instead. Both lines are permanent (see the
+    // Column below), so a blank slot would read as a hole rather than a state.
+    readonly property string secondaryText: {
+        if (!root.hasMedia)
+            return ""
+        if (Services.MediaControlService.showCompactLyric) {
+            var artist = Services.MediaControlService.artist
+            var title = Services.MediaControlService.title
+            if (artist !== "")
+                return title !== "" ? artist + " - " + title : artist
+            return Services.MediaControlService.playerName || ""
+        }
+        var a = Services.MediaControlService.artist
+        return a !== "" ? a : (Services.MediaControlService.playerName || "")
+    }
     // Width cap where dynamic growth stops and the title starts scrolling.
     readonly property int maxTextWidth: 300
     // Square cover region centered on the music glyph, translucent over text.
@@ -448,12 +459,16 @@ BarPill {
             }
 
             // Sub-line follows the same contract: scroll instead of ellipsis.
+            //
+            // Permanent slot, like the active-window widget's: its height is the
+            // font's own line height and never collapses, so the title above it
+            // cannot be re-centred by a track whose artist field is empty. Only
+            // the text changes, and that runs the shared scan transition.
             MarqueeLabel {
                 id: subtitleMarquee
 
                 text: root.secondaryText
-                visible: text.length > 0 || _sweepActive
-                height: visible ? implicitHeight : 0
+                height: subtitleMarquee.lineHeight
                 maxWidth: root.maxTextWidth
                 textColor: LazerTheme.barSubtitle
                 pixelSize: 10
@@ -463,9 +478,6 @@ BarPill {
                 // and a beat-driven bar field. Tone and fill stay untouched.
                 textStyle: Text.Outline
                 textStyleColor: LazerTheme.barSubtitleOutline
-
-                Behavior on height { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
             }
         }
     }

@@ -27,9 +27,14 @@ Item {
     readonly property bool hasWindow: Services.NiriService.activeTitle.length > 0 && root.activeAppId.length > 0
     // Friendly app label: collapse reverse-DNS ids ("org.mozilla.firefox")
     // down to their final segment so the sub-line reads like Media's artist.
+    //
+    // An empty workspace is not an empty sub-line: the two lines are always
+    // both present, so the desk state says what is on screen (the compositor)
+    // instead of leaving a hole. That is also what makes the pair hold a fixed
+    // height - see the Column below.
     readonly property string displayAppName: {
         if (!root.hasWindow)
-            return ""
+            return Services.Tr.q("widget.activeWindow.compositor")
         var id = root.activeAppId
         var dot = id.lastIndexOf(".")
         return dot >= 0 && dot < id.length - 1 ? id.substring(dot + 1) : id
@@ -382,30 +387,25 @@ Item {
 
             // Sub-line shows the application name like Media's artist line.
             //
-            // It stays MOUNTED while it retires instead of flipping `visible`:
-            // an invisible item paints nothing and its Behavior is skipped, so
-            // focusing an empty workspace cut the line away in one frame while
-            // its title ghosts were still falling. Height carries the collapse
-            // (the column reflows through it) and opacity carries the ink, and
-            // the line is held for as long as either its own text or its own
-            // sweep still has something to show.
+            // The two lines are PERMANENT: this one always occupies its height
+            // and only its text changes. It used to collapse to zero when the
+            // app name emptied (an empty workspace), which had two costs - the
+            // Column re-centred, so the title jumped half a line, and the
+            // collapse itself was a hard cut because the height only released
+            // after the whole scan retired. Holding the slot means the title
+            // never moves and the sub-line never has to animate away: its ink
+            // is replaced by the next sub-line text, which is the same
+            // transition the title already runs.
             //
-            // `sweeping`, not `_sweepActive`: the underscore property lives in
-            // MarqueeLabel's scope, so reading it here evaluated to undefined
-            // and the hold never applied.
+            // The slot height is FIXED, derived from the line's own font, not
+            // measured: `implicitHeight` is 0 for empty text, and a measured
+            // value would dip through 0 for a frame during a text swap, which
+            // is exactly the reflow this is here to prevent.
             MarqueeLabel {
                 id: appNameText
 
                 text: root.displayAppName
-                readonly property bool shouldShow: text.length > 0 || appNameText.sweeping
-                // Height comes from `measuredHeight`, which latches the last
-                // real line height: `implicitHeight` is 0 for empty text, so
-                // binding to it collapsed the line in 160ms no matter what
-                // `shouldShow` said - and a zero-height item inside this
-                // Column stops painting its own ghost overlay entirely.
-                height: shouldShow ? appNameText.measuredHeight : 0
-                opacity: shouldShow ? 1 : 0
-                enabled: shouldShow
+                height: appNameText.lineHeight
                 maxWidth: root.maxTitleWidth
                 textColor: LazerTheme.barSubtitle
                 pixelSize: 10
@@ -414,9 +414,6 @@ Item {
                 // contract instead of per-widget improvisation.
                 textStyle: Text.Outline
                 textStyleColor: LazerTheme.barSubtitleOutline
-
-                Behavior on height { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
             }
         }
     }
