@@ -68,14 +68,14 @@ BarPill {
         id: bellHost
 
         anchors.centerIn: parent
-        width: LazerTheme.barWidgetHeight - 6
-        height: LazerTheme.barWidgetHeight - 6
+        width: LazerTheme.barWidgetHeight
+        height: LazerTheme.barWidgetHeight
 
         // Scheme-aware bell (dark in light mode, white in dark mode).
         BarIcon {
             anchors.centerIn: parent
-            width: LazerTheme.barGlyphSize
-            height: LazerTheme.barGlyphSize
+            width: LazerTheme.barStrokeGlyphSize
+            height: LazerTheme.barStrokeGlyphSize
             source: Qt.resolvedUrl("../../lazerbar/icons/bell.svg")
             opacity: root.dnd ? 0.4 : 0.9
 

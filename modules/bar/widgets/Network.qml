@@ -123,8 +123,8 @@ BarPill {
         id: networkIcon
 
         anchors.centerIn: parent
-        width: LazerTheme.barGlyphSize - 4
-        height: LazerTheme.barGlyphSize - 4
+        width: LazerTheme.barStrokeGlyphSize
+        height: LazerTheme.barStrokeGlyphSize
         source: Qt.resolvedUrl(root.iconFile)
         opacity: !root.wifiEnabled && !root.ethernetConnected ? 0.35 : (root.linkUp ? 0.9 : 0.6)
 
@@ -137,7 +137,7 @@ BarPill {
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: networkIcon.bottom
-        anchors.topMargin: 4
+        anchors.topMargin: LazerTheme.barLevelGap
         width: LazerTheme.barWidgetHeight - 16
         height: LazerTheme.barIndicatorHeight
         radius: LazerTheme.barIndicatorRadius

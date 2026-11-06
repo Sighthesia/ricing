@@ -45,7 +45,7 @@ Item {
     property real indicatorCenterX: 0
     property bool indicatorVisible: false
 
-    readonly property int iconSize: 16
+    readonly property int iconSize: Math.round(LazerTheme.barGlyphSize * 0.75)
     readonly property int iconSpacing: 4
     readonly property int cellPadding: 8
     // Wheel throttle: one focus step per 120ms so a single flick never
@@ -528,7 +528,7 @@ Item {
                         color: workspaceSquare.isActive
                                ? LazerTheme.textPrimary
                                : workspaceSquare.hovered ? LazerTheme.hoverForeground : LazerTheme.iconInactive
-                        font.pixelSize: 13
+                        font.pixelSize: 14
                         font.bold: workspaceSquare.isActive
                     }
 
@@ -601,8 +601,9 @@ Item {
     }
 
     // Single workspace indicator: same width/height/radius as the volume
-    // level bar, workspace green kept, top edge derived from the centered
-    // bar glyph so it aligns with the volume/battery/brightness bars. Its
+    // level bar, workspace green kept, top edge comes from
+    // LazerTheme.barLevelTop so it shares one line with the
+    // volume/battery/brightness level bars. Its
     // width is owned by the dual-speed edge tracker below.
     readonly property int indicatorBarWidth: LazerTheme.barWidgetHeight - 16
     // Identity of the current indicator target (focused window or active
@@ -629,7 +630,7 @@ Item {
         // also what keeps the first one a placement rather than a switch.
         targetValid: root.indicatorVisible
         visible: root.indicatorVisible
-        crossAxis: Math.round(root.height / 2 + (LazerTheme.barGlyphSize - 4) / 2 + 4)
+        crossAxis: LazerTheme.barLevelTop
     }
 
     // Sliding active highlight behind the squares (z below the row).

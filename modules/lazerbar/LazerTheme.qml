@@ -269,6 +269,17 @@ QtObject {
     readonly property real barIndicatorHeight: 3
     readonly property real barIndicatorRadius: barIndicatorHeight / 2
 
+    // Stroke glyphs read a step under the colour icons at the same box: app and
+    // tray icons are drawn edge to edge, while a 24-unit SVG spends ~2 units of
+    // its box on margins. 22 keeps both families on one optical size.
+    readonly property int barStrokeGlyphSize: Math.max(15, Math.round(barLiveHeight * 0.46))
+    // The level bar under volume/brightness/bluetooth/network/battery and the
+    // workspace indicator all sit on one line. Gap and derived top live here so
+    // no widget invents its own +4 while the glyph size changes.
+    readonly property int barLevelGap: 3
+    readonly property int barLevelTop:
+        Math.round((barWidgetHeight + barStrokeGlyphSize) / 2) + barLevelGap
+
     // osu Nub and outlined control tokens shared by settings controls.
     readonly property real nubBorder: 3
     readonly property real nubBorderChecked: 8.5

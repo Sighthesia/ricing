@@ -25,8 +25,8 @@ BarPill {
     // here because BarIcon resolves relative paths against its own file.
     BarIcon {
         anchors.centerIn: parent
-        width: LazerTheme.barGlyphSize
-        height: LazerTheme.barGlyphSize
+        width: LazerTheme.barStrokeGlyphSize
+        height: LazerTheme.barStrokeGlyphSize
         source: Qt.resolvedUrl("../../lazerbar/icons/settings.svg")
         opacity: root.hovered ? 1 : 0.85
 

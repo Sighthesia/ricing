@@ -370,8 +370,8 @@ BarPill {
             // Scheme-aware (dark in light mode, white in dark mode).
             BarIcon {
                 anchors.centerIn: parent
-                width: LazerTheme.barGlyphSize - 6
-                height: LazerTheme.barGlyphSize - 6
+                width: LazerTheme.barStrokeGlyphSize
+                height: LazerTheme.barStrokeGlyphSize
                  source: Qt.resolvedUrl("../../lazerbar/icons/music.svg")
                 visible: !root.hasCoverArt || !coverImage.visible
                 opacity: visible ? (root.playing ? 0.95 : 0.5) : 0

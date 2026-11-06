@@ -106,8 +106,8 @@ BarPill {
         id: bluetoothIcon
 
         anchors.centerIn: parent
-        width: LazerTheme.barGlyphSize - 4
-        height: LazerTheme.barGlyphSize - 4
+        width: LazerTheme.barStrokeGlyphSize
+        height: LazerTheme.barStrokeGlyphSize
         source: Qt.resolvedUrl("../icons/bluetooth.svg")
         opacity: !root.available ? 0.3 : (root.adapterEnabled ? 0.9 : 0.45)
 
@@ -134,7 +134,7 @@ BarPill {
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: bluetoothIcon.bottom
-        anchors.topMargin: 4
+        anchors.topMargin: LazerTheme.barLevelGap
         width: LazerTheme.barWidgetHeight - 16
         height: LazerTheme.barIndicatorHeight
         radius: LazerTheme.barIndicatorRadius

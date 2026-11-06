@@ -106,8 +106,8 @@ BarPill {
         id: volumeIcon
 
         anchors.centerIn: parent
-        width: LazerTheme.barGlyphSize - 4
-        height: LazerTheme.barGlyphSize - 4
+        width: LazerTheme.barStrokeGlyphSize
+        height: LazerTheme.barStrokeGlyphSize
         source: Qt.resolvedUrl("../icons/volume.svg")
         opacity: root.muted ? 0.4 : 0.9
 
@@ -120,7 +120,7 @@ BarPill {
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: volumeIcon.bottom
-        anchors.topMargin: 4
+        anchors.topMargin: LazerTheme.barLevelGap
         width: LazerTheme.barWidgetHeight - 16
         height: LazerTheme.barIndicatorHeight
         radius: LazerTheme.barIndicatorRadius

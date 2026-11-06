@@ -100,8 +100,8 @@ BarPill {
         id: brightnessIcon
 
         anchors.centerIn: parent
-        width: LazerTheme.barGlyphSize - 4
-        height: LazerTheme.barGlyphSize - 4
+        width: LazerTheme.barStrokeGlyphSize
+        height: LazerTheme.barStrokeGlyphSize
         source: Qt.resolvedUrl("../icons/brightness.svg")
         opacity: 0.9
     }
@@ -112,7 +112,7 @@ BarPill {
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: brightnessIcon.bottom
-        anchors.topMargin: 4
+        anchors.topMargin: LazerTheme.barLevelGap
         width: LazerTheme.barWidgetHeight - 16
         height: LazerTheme.barIndicatorHeight
         radius: LazerTheme.barIndicatorRadius

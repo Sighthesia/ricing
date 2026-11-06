@@ -312,8 +312,8 @@ Item {
                     anchors.centerIn: parent
                     visible: root.resolvedIcon !== ""
                     source: root.resolvedIcon
-                    width: 22
-                    height: 22
+                    width: 24
+                    height: 24
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
                 }
