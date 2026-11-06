@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Widgets
 import ".."
@@ -44,7 +45,13 @@ Item {
     // expose a transient empty activeAppId before windows are reloaded.
     property string currentAppId: ""
     readonly property string iconSource: root.currentAppId.length > 0 ? Quickshell.iconPath(root.currentAppId, true) : ""
-    readonly property bool hasIcon: root.showIcon && root.hasWindow && root.currentAppId.length > 0 && root.iconSource !== ""
+    // The icon SLOT is permanent (like the two text lines): an empty workspace
+    // shows a compositor glyph instead of collapsing the slot and sliding the
+    // title left. `hasIcon` therefore answers "is the slot shown", and
+    // `hasAppIcon` answers "is there a real window icon to draw in it".
+    readonly property bool hasIcon: root.showIcon
+    readonly property bool hasAppIcon: root.hasWindow
+        && root.currentAppId.length > 0 && root.iconSource !== ""
     property string trackedIconSource: ""
     property string outgoingIconSource: ""
     property int iconTransitionRevision: 0
@@ -314,6 +321,33 @@ Item {
             Behavior on width { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
             Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
 
+            // Desk state: no window, so the slot carries the compositor glyph
+            // instead of an application icon. Same white source + MultiEffect
+            // tint recipe the identity rail uses.
+            Item {
+                id: deskGlyphSlot
+
+                anchors.fill: parent
+                opacity: root.hasAppIcon ? 0 : 1
+                Behavior on opacity { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+
+                Image {
+                    id: deskGlyphSource
+
+                    anchors.fill: parent
+                    source: Qt.resolvedUrl("../../lazerbar/icons/globe.svg")
+                    fillMode: Image.PreserveAspectFit
+                    visible: false
+                }
+
+                MultiEffect {
+                    anchors.fill: deskGlyphSource
+                    source: deskGlyphSource
+                    colorization: 1
+                    colorizationColor: LazerTheme.barIcon
+                }
+            }
+
             IconImage {
                 id: outgoingIcon
 
@@ -324,7 +358,7 @@ Item {
                 // Keep the short-lived transition layer off the long-lived
                 // async pixmap reader, which can lose icons after churn.
                 asynchronous: false
-                visible: root.outgoingIconSource !== "" && opacity > 0.01
+                visible: root.hasAppIcon && root.outgoingIconSource !== "" && opacity > 0.01
                 opacity: 0
             }
 
@@ -338,6 +372,7 @@ Item {
                 // Synchronous loading keeps both crossfade layers stable
                 // during long-running window churn.
                 asynchronous: false
+                visible: root.hasAppIcon
                 opacity: 1
             }
 
