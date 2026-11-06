@@ -56,6 +56,17 @@ Item {
     property string outgoingIconSource: ""
     property int iconTransitionRevision: 0
 
+    // The title the label actually RENDERS. It is deliberately NOT bound to
+    // `displayTitle`: niri reports "no window" for a frame or two in the middle
+    // of a workspace switch, so a direct binding painted the desktop label,
+    // then repainted the previous window's title when the window snapshot came
+    // back, and then painted the desktop label again when the hold expired -
+    // three visible states where the user should see one transition. The
+    // transition code below is the only writer, and it decides when the text
+    // moves.
+    property string shownTitle: ""
+    // The sub-line's counterpart of `shownTitle`, for the same reason.
+    property string shownAppName: ""
     // Tracks the last choreographed title so the first render never plays
     // the exit/enter transition for content that was never visible.
     property string trackedTitle: ""
@@ -75,6 +86,7 @@ Item {
             var prev = root._pendingDesktopPrev
             root._pendingDesktopPrev = ""
             root.trackedTitle = root.displayTitle
+            root.shownTitle = root.displayTitle
             root.outgoingHoldWidth = root._cappedAdvance(prev)
             root.outgoingHoldHadIcon = root.hasIcon
             titleHoldTimer.restart()
@@ -87,12 +99,16 @@ Item {
         id: desktopAppHold
         interval: 120
         onTriggered: {
-            if (root.displayAppName !== "" || root._pendingDesktopAppPrev === "")
+            // The desk state is a label now ("Niri"), not an empty string, so
+            // the guard asks whether a window is still absent rather than
+            // whether the text is empty.
+            if (root.hasWindow || root._pendingDesktopAppPrev === "")
                 return
             var prev = root._pendingDesktopAppPrev
             root._pendingDesktopAppPrev = ""
-            root.trackedAppName = ""
-            appNameText.transitionFrom(prev, "")
+            root.trackedAppName = root.displayAppName
+            root.shownAppName = root.displayAppName
+            appNameText.transitionFrom(prev, root.displayAppName)
         }
     }
 
@@ -123,6 +139,8 @@ Item {
     clip: !titleText.sweeping && !appNameText.sweeping
 
     Component.onCompleted: {
+        root.shownTitle = root.displayTitle
+        root.shownAppName = root.displayAppName
         root.trackedTitle = root.displayTitle
         root.trackedAppName = root.displayAppName
         root.syncFocusedWindow()
@@ -208,6 +226,7 @@ Item {
                 root._pendingDesktopPrev = ""
             }
             root.trackedTitle = root.displayTitle
+            root.shownTitle = root.displayTitle
             return
         }
         // Window -> desktop: hold briefly to see if a new window follows
@@ -225,6 +244,7 @@ Item {
             var coalescedPrev = root._pendingDesktopPrev !== "" ? root._pendingDesktopPrev : previous
             root._pendingDesktopPrev = ""
             root.trackedTitle = root.displayTitle
+            root.shownTitle = root.displayTitle
             root.outgoingHoldWidth = root._cappedAdvance(coalescedPrev)
             root.outgoingHoldHadIcon = root.hasIcon
             titleHoldTimer.restart()
@@ -233,6 +253,7 @@ Item {
         }
         root._pendingDesktopPrev = ""
         root.trackedTitle = root.displayTitle
+        root.shownTitle = root.displayTitle
         // Hold the outgoing title's width until the scan has retired, so the
         // widget does not shrink under the falling ghosts.
         root.outgoingHoldWidth = root._cappedAdvance(previous)
@@ -250,6 +271,7 @@ Item {
                 root._pendingDesktopAppPrev = ""
             }
             root.trackedAppName = root.displayAppName
+            root.shownAppName = root.displayAppName
             return
         }
         var prevApp = root.trackedAppName
@@ -263,7 +285,7 @@ Item {
         // App -> desktop (empty): hold briefly to see if a new window follows
         // within the workspace switch animation, avoiding an intermediate
         // empty flash that would clear the outgoing app's falling ghosts.
-        if (root.displayAppName === "") {
+        if (!root.hasWindow) {
             root._pendingDesktopAppPrev = prevApp
             desktopAppHold.restart()
             return
@@ -275,10 +297,12 @@ Item {
             var coalescedPrev = root._pendingDesktopAppPrev !== "" ? root._pendingDesktopAppPrev : prevApp
             root._pendingDesktopAppPrev = ""
             root.trackedAppName = root.displayAppName
+            root.shownAppName = root.displayAppName
             appNameText.transitionFrom(coalescedPrev, root.displayAppName)
             return
         }
         root.trackedAppName = root.displayAppName
+        root.shownAppName = root.displayAppName
         appNameText.transitionFrom(prevApp, root.displayAppName)
     }
 
@@ -416,7 +440,7 @@ Item {
             MarqueeLabel {
                 id: titleText
 
-                text: root.displayTitle
+                text: root.shownTitle
                 textColor: LazerTheme.textPrimary
                 maxWidth: root.maxTitleWidth
                 pixelSize: 12
@@ -442,7 +466,7 @@ Item {
             MarqueeLabel {
                 id: appNameText
 
-                text: root.displayAppName
+                text: root.shownAppName
                 height: appNameText.lineHeight
                 maxWidth: root.maxTitleWidth
                 textColor: LazerTheme.barSubtitle
