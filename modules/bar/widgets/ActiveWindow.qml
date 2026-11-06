@@ -18,6 +18,11 @@ Item {
     property string screenName: ""
 
     readonly property var widgetSettings: Services.SettingsService.widgetSettingsObject("active-window", root.instanceKey)
+    // True while either line is retiring old text. Read by the bar's section
+    // row so this widget floats above its siblings for the length of the
+    // transition: its falling glyphs live inside it, and the next widget in
+    // the Row would otherwise be painted over them.
+    readonly property bool textTransitionActive: titleText.sweeping || appNameText.sweeping
     readonly property bool showIcon: widgetSettings ? widgetSettings.showIcon !== false : true
     readonly property int maxTitleWidth: widgetSettings && widgetSettings.maxTitleWidth ? widgetSettings.maxTitleWidth : 200
     readonly property int maxWidth: widgetSettings && widgetSettings.maxWidth ? widgetSettings.maxWidth : 240

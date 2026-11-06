@@ -22,6 +22,10 @@ BarPill {
     property string section: ""
     property string screenName: ""
 
+    // True while either line is retiring old text. Read by the bar's section
+    // row so this widget floats above its siblings for the length of the
+    // transition (see the comment there).
+    readonly property bool textTransitionActive: titleMarquee.sweeping || subtitleMarquee.sweeping
     readonly property bool hasMedia: Services.MediaControlService.hasMedia
     readonly property bool playing: Services.MediaControlService.playbackState === "playing"
     readonly property string primaryText:

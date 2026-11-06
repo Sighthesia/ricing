@@ -532,6 +532,14 @@ Item {
                 opacity: Services.BarLayoutService.draggedInstanceKey === modelData.instanceKey
                          ? 0.3 : 1
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+
+                // A widget that is retiring old text floats above its siblings
+                // for the length of the transition. Its falling glyphs now live
+                // in a ghost host inside the widget (a scene-root host does not
+                // paint on this layer-shell surface), so without this the next
+                // widget in the Row - painted later, therefore above - covered
+                // the drop instead of the drop passing over it.
+                z: item && item.textTransitionActive === true ? 1 : 0
             }
         }
     }
