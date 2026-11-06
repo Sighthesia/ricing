@@ -18,11 +18,6 @@ Item {
     property string screenName: ""
 
     readonly property var widgetSettings: Services.SettingsService.widgetSettingsObject("active-window", root.instanceKey)
-    // True while either line is retiring old text. Read by the bar's section
-    // row so this widget floats above its siblings for the length of the
-    // transition: its falling glyphs live inside it, and the next widget in
-    // the Row would otherwise be painted over them.
-    readonly property bool textTransitionActive: titleText.sweeping || appNameText.sweeping
     readonly property bool showIcon: widgetSettings ? widgetSettings.showIcon !== false : true
     readonly property int maxTitleWidth: widgetSettings && widgetSettings.maxTitleWidth ? widgetSettings.maxTitleWidth : 200
     readonly property int maxWidth: widgetSettings && widgetSettings.maxWidth ? widgetSettings.maxWidth : 240
@@ -125,11 +120,10 @@ Item {
     // after the exit had finished, and the release was a visible jump.
     implicitWidth: Math.min(contentRow.implicitWidth + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
-    // Clip so long-window ghosts do not spill into neighboring gaps when the
-    // title shortens - EXCEPT while a line is retiring its old text, where the
-    // clip would cut the drop short. Same reasoning as Media's pill; the
-    // exemption ends with the sweep.
-    clip: !titleText.sweeping && !appNameText.sweeping
+    // Clip the widget to its own box. The exemption that used to be here (off
+    // while a line was retiring) let the widget's own text and surface paint
+    // over its neighbours, which is a worse artefact than a shortened drop.
+    clip: true
 
     Component.onCompleted: {
         root.shownTitle = root.displayTitle

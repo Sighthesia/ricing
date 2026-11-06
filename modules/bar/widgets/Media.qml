@@ -22,10 +22,6 @@ BarPill {
     property string section: ""
     property string screenName: ""
 
-    // True while either line is retiring old text. Read by the bar's section
-    // row so this widget floats above its siblings for the length of the
-    // transition (see the comment there).
-    readonly property bool textTransitionActive: titleMarquee.sweeping || subtitleMarquee.sweeping
     readonly property bool hasMedia: Services.MediaControlService.hasMedia
     readonly property bool playing: Services.MediaControlService.playbackState === "playing"
     readonly property string primaryText:
@@ -111,14 +107,10 @@ BarPill {
     // width instead kept the pill wide after the exit had finished, and its
     // release was a visible jump.
     implicitWidth: visible ? Math.max(root.minPillWidth, contentRow.implicitWidth + 12) : 0
-    // Clip the pill so a shrinking widget cannot paint over its neighbours -
-    // EXCEPT while a line is retiring its old text. A falling ghost travels one
-    // full line height, which is more than the pill has room for below the
-    // baseline, so clipping during the scan cut the drop in half and made this
-    // pill's exit look shorter than the launcher field's, whose field has no
-    // clip above it at all. The exemption is bounded by the scan itself: the
-    // ghost host empties when the sweep retires, about a second later.
-    clip: !titleMarquee.sweeping && !subtitleMarquee.sweeping
+    // Clip the pill to its own box. The exemption that used to be here (off
+    // while a line was retiring) let the pill's own text and surface paint over
+    // its neighbours, which is a worse artefact than a shortened drop.
+    clip: true
     // Smooth width morph like the legacy media pill: growth/shrink eases
     // instead of snapping when lyric lengths change.
     Behavior on implicitWidth {

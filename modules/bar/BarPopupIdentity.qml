@@ -38,11 +38,6 @@ Rectangle {
     // What the announcement is keyed on: a counter the host bumps once per fired
     // shortcut. Only meaningful together with `animatedText` / `changeFlash`.
     property int announceToken: 0
-    // True while either animated line is retiring its old text. The two
-    // MarqueeLabels are declared inside the Column below this property, which
-    // is why the flag is republished here rather than read at the clip.
-    readonly property bool animatedLineSweeping: titleText.sweeping || summaryText.sweeping
-
     signal closeRequested()
 
     implicitWidth: hostWidth
@@ -50,11 +45,9 @@ Rectangle {
     width: hostWidth
     height: 48
     color: LazerTheme.settingsRail
-    // Same exemption as the bar widgets: the rail's own title swaps in place
-    // when a shortcut is held, and clipping would cut the falling glyphs. The
-    // two labels live inside a Column below, so their ids are not visible from
-    // this scope - `animatedLineSweeping` republishes the flag.
-    clip: !root.animatedLineSweeping
+    // Clipped like every other surface: the rail's own content must not paint
+    // past its box while a line transitions.
+    clip: true
     radius: 0
 
     // The change wash. Declared before the row so it tints the rail UNDER the
