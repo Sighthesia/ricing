@@ -126,6 +126,14 @@ BarPill {
         text: "Ag"
     }
     readonly property real lineFallDistance: Math.ceil(dropProbe.height)
+    // Space between the two lines; the 1px a Column used to apply as spacing.
+    readonly property real lineGap: 1
+    TextMetrics {
+        id: subProbe
+        font.pixelSize: 10
+        text: "Ag"
+    }
+    readonly property real subLineHeight: Math.ceil(subProbe.height)
 
     implicitWidth: visible ? Math.max(root.minPillWidth, contentRow.implicitWidth + 12) : 0
     // Clip the pill to its own box. The exemption that used to be here (off
@@ -427,11 +435,19 @@ BarPill {
             }
         }
 
-        Column {
+        // Absolutely positioned lines, not a Column: a positioner fixes paint
+        // order by declaration and ignores `z`, and the title's drop passes
+        // through the sub-line's band. See the same note on the active-window
+        // widget.
+        Item {
             id: textColumn
 
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 1
+            width: Math.max(titleMarquee.implicitWidth, subtitleMarquee.implicitWidth)
+            // Line heights come from the shared probe, not from the labels:
+            // a binding that reads a child id can evaluate before that child
+            // has a size, which zeroes the block.
+            height: root.lineFallDistance + root.lineGap + root.subLineHeight
 
             // Primary line grows with content; once past the cap it clips
             // and marquee-scrolls (static elide under reduced motion). Ghosts
@@ -444,6 +460,10 @@ BarPill {
                 // active-window widget: osu's per-glyph drop height is one
                 // number because a text box has one font size.
                 fallDistanceOverride: root.lineFallDistance
+                y: 0
+                // Outranks the sub-line while its ghosts are falling, so a drop
+                // crossing the sub-line's band stays visible.
+                z: titleMarquee.sweeping ? 1 : 0
                 maxWidth: root.maxTextWidth
                 textColor: LazerTheme.textPrimary
                 pixelSize: 12
@@ -461,6 +481,7 @@ BarPill {
 
                 text: root.secondaryText
                 fallDistanceOverride: root.lineFallDistance
+                y: root.lineFallDistance + root.lineGap
                 height: subtitleMarquee.lineHeight
                 maxWidth: root.maxTextWidth
                 textColor: LazerTheme.barSubtitle

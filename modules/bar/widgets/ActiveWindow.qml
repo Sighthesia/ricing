@@ -138,6 +138,18 @@ Item {
         text: "Ag"
     }
     readonly property real lineFallDistance: Math.ceil(dropProbe.height)
+    // Space between the two lines; the same 1px the Column used to apply as
+    // `spacing`, now applied by hand because the lines are positioned.
+    readonly property real lineGap: 1
+    // The sub-line's own height, measured from its own pixel size rather than
+    // read off the label (child ids are not reliably sized when the parent's
+    // bindings first evaluate).
+    TextMetrics {
+        id: subProbe
+        font.pixelSize: 10
+        text: "Ag"
+    }
+    readonly property real subLineHeight: Math.ceil(subProbe.height)
 
     implicitWidth: Math.min(contentRow.implicitWidth + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
@@ -399,19 +411,36 @@ Item {
             }
         }
 
-        Column {
+        // Two absolutely positioned lines, NOT a Column.
+        //
+        // A positioner decides paint order from declaration order and ignores
+        // `z` entirely (measured: a sibling with z=1 still painted below the
+        // one declared after it). That mattered here because the title's drop
+        // lands inside the sub-line's band - the lines are 1px apart and a line
+        // height is 16px - so the sub-line covered the title's exit and the
+        // title's transition read as barely there while the sub-line's, which
+        // falls into empty space, read clearly. Positioning them by hand is what
+        // lets the title's ghosts out-rank the sub-line.
+        Item {
             id: textColumn
 
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 1
-            move: Transition { NumberAnimation { properties: "x,y"; duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
-            Behavior on y { NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad } }
+            width: Math.max(titleText.implicitWidth, appNameText.implicitWidth)
+            // Line heights come from the shared probe, not from the labels:
+            // a binding that reads a child id can evaluate before that child
+            // has a size, which zeroes the block.
+            height: root.lineFallDistance + root.lineGap + root.subLineHeight
 
             // Primary line grows with content; once past the cap it clips
             // and marquee-scrolls instead of being elided short.
             MarqueeLabel {
                 id: titleText
 
+                y: 0
+                // While its ghosts are falling the title outranks the sub-line,
+                // so a drop that passes through the sub-line's band stays
+                // visible. Outside the transition the two never overlap.
+                z: titleText.sweeping ? 1 : 0
                 text: root.shownTitle
                 // Both lines fall the SAME distance. osu's mask drops a glyph
                 // by that glyph's own drawable height, and a text box only ever
@@ -445,6 +474,7 @@ Item {
             MarqueeLabel {
                 id: appNameText
 
+                y: root.lineFallDistance + root.lineGap
                 text: root.shownAppName
                 fallDistanceOverride: root.lineFallDistance
                 height: appNameText.lineHeight
