@@ -76,12 +76,19 @@ Item {
         }
     }
 
+    // Ghost host, ABOVE the label. It used to sit at z: -1, which put the
+    // falling glyphs underneath the line they came from - and the incoming
+    // text is revealed into exactly that space a moment later, so a dark bold
+    // primary line covered its own ghosts while a light, small secondary line
+    // did not. That is why the same 1.0x drop read clearly on the sub-line and
+    // barely at all on the title. A departing glyph belongs on top of the line
+    // that is replacing it.
     Item {
         id: overlayLayer
 
         anchors.fill: parent
         clip: false
-        z: -1
+        z: 2
     }
 
     // Independent measuring context — unaffected by the label's live layout.
