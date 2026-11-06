@@ -335,7 +335,10 @@ Item {
                     id: deskGlyphSource
 
                     anchors.fill: parent
-                    source: Qt.resolvedUrl("../../lazerbar/icons/globe.svg")
+                    // niri's own mark (docs/wiki/logo/niri-icon-smol.svg,
+                    // CC BY-SA, filtered shadow layers stripped, fills
+                    // flattened to white for the tint below).
+                    source: Qt.resolvedUrl("../../lazerbar/icons/niri.svg")
                     fillMode: Image.PreserveAspectFit
                     visible: false
                 }
