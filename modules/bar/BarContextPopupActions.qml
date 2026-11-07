@@ -65,6 +65,16 @@ Item {
     readonly property var rootBlocks: MenuLogic.rootBlocks(root.hasWidgetTarget)
     readonly property var moveRows: MenuLogic.rowsForMove(root.hasWidgetTarget)
 
+    // Page swap state: the page being left stays mounted beside the page being
+    // entered, and the two slide past each other inside the same clip. This is
+    // the popup host's own exchange - one clock, a cross-fade, and a distance
+    // frozen for the whole move - because a page change here IS the same kind of
+    // move the host makes between two hover menus, and it should read the same.
+    property string _outgoingPage: ""
+    property real pageSlideProgress: 1
+    property int pageSlideSign: 1
+    readonly property real pageSlideDistance: Math.max(pageHost.width, 260)
+
     // Live value of one declared setting, defaulted against the registry.
     function settingValue(settingKey) {
         return ContextSettings.valueOf(WidgetSettingsRegistry, root.widgetId,
@@ -104,14 +114,56 @@ Item {
         // taps per widget.
     }
 
+    // Enter a page from the right, leave it to the left: the same direction rule
+    // the host uses, where the incoming face arrives from the edge the content
+    // is travelling toward.
     function openPage(next) {
-        if (next === root.page)
-            return
-        root.page = String(next)
+        root.beginPageSwap(String(next), 1)
     }
 
     function closePage() {
-        root.page = ""
+        root.beginPageSwap("", -1)
+    }
+
+    function beginPageSwap(next, sign) {
+        if (next === root.page && root._outgoingPage === "")
+            return
+        // A swap already in flight lands before the next one starts: two tracks
+        // overlapping would make the direction describe neither move.
+        if (root.pageSlideProgress < 1) {
+            pageSlideMotion.stop()
+            root.pageSlideProgress = 1
+        }
+        root._outgoingPage = root.page
+        root.pageSlideSign = Number(sign) < 0 ? -1 : 1
+        root.page = next
+        if (MotionTokens.reducedMotion) {
+            root.pageSlideProgress = 1
+            root._outgoingPage = ""
+            return
+        }
+        root.pageSlideProgress = 0
+        pageSlideMotion.restart()
+    }
+
+    function pageVisible(name) {
+        return root.page === name || root._outgoingPage === name
+    }
+
+    function pageX(name) {
+        if (root.page === name)
+            return root.pageSlideSign * root.pageSlideDistance * (1 - root.pageSlideProgress)
+        if (root._outgoingPage === name)
+            return -root.pageSlideSign * root.pageSlideDistance * root.pageSlideProgress
+        return 0
+    }
+
+    function pageOpacity(name) {
+        if (root.page === name)
+            return root.pageSlideProgress
+        if (root._outgoingPage === name)
+            return 1 - root.pageSlideProgress
+        return 0
     }
 
     // A row's own behaviour: disclose a page, or run its command.
@@ -158,6 +210,9 @@ Item {
     // Remount on the root page with any drilled-down page closed whenever the
     // menu retargets another widget: a page belongs to the target that opened it.
     onInstanceKeyChanged: {
+        pageSlideMotion.stop()
+        root._outgoingPage = ""
+        root.pageSlideProgress = 1
         root.page = ""
     }
 
@@ -175,12 +230,29 @@ Item {
         // The arrow is its own control, not part of a titled row: the page name
         // is a heading, and a heading that can be tapped to go elsewhere reads
         // as a link. So the arrow owns the tap and the name is painted beside it.
+        // The header belongs to the page that owns it, so it travels with it:
+        // going back slides the root list in from the left and this title leaves
+        // to the right, which is what makes the two read as one surface moving
+        // rather than as a title that blinks out of existence.
         Item {
             id: pageHeader
 
             width: bodyColumn.width
-            height: root.page === "" ? 0 : 32
-            visible: height > 0
+            // The slot grows and collapses on the geometry glide, not instantly:
+            // the pages below are positioned under it, so a header that appeared
+            // or vanished in one frame would shift the incoming page mid-slide.
+            height: root.page === "" && root._outgoingPage === "" ? 0 : 32
+            visible: height > 0.5
+            Behavior on height {
+                enabled: !MotionTokens.reducedMotion
+                NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuint }
+            }
+            x: root.page === ""
+                ? -root.pageSlideSign * root.pageSlideDistance * root.pageSlideProgress
+                : root.pageSlideSign * root.pageSlideDistance * (1 - root.pageSlideProgress)
+            opacity: root.page === ""
+                ? 1 - root.pageSlideProgress
+                : root.pageSlideProgress
 
             Rectangle {
                 anchors.fill: parent
@@ -226,7 +298,10 @@ Item {
                 anchors.right: parent.right
                 anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
-                text: Services.Tr.q(MenuLogic.pageTitleKey(root.page))
+                // While the header leaves, it still names the page that is
+                // leaving; reading `page` alone would relabel it mid-slide.
+                text: Services.Tr.q(MenuLogic.pageTitleKey(root.page !== ""
+                    ? root.page : root._outgoingPage))
                 color: LazerTheme.textPrimary
                 font.pixelSize: 13
                 font.bold: true
@@ -255,6 +330,24 @@ Item {
                 NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuint }
             }
 
+            // The swap clock. Same duration and curve as the host's content
+            // slide, so a page change and a menu change are one motion in the
+            // eye; reduced motion lands the page without travel.
+            NumberAnimation {
+                id: pageSlideMotion
+
+                target: root
+                property: "pageSlideProgress"
+                from: 0
+                to: 1
+                duration: MotionTokens.reducedMotion ? 0 : MotionTokens.slow
+                easing.type: Easing.OutCubic
+                onFinished: {
+                    if (root.pageSlideProgress >= 1)
+                        root._outgoingPage = ""
+                }
+            }
+
             // Root page: three blocks of commands. The gap between blocks carries
             // the grouping, so no block draws a header row.
             Column {
@@ -262,15 +355,16 @@ Item {
 
                 width: pageHost.width
                 spacing: 6
+                // A page is painted while it is entering or leaving, and only
+                // then: the swap slides the two past each other, so both must be
+                // drawn for the length of the move and neither may be left
+                // painting afterwards (a page sharing this node would show
+                // through the gaps of the one above it).
                 y: 0
+                x: root.pageX("")
+                visible: root.pageVisible("")
                 enabled: root.page === ""
-                // Paint only on top: every page shares this node, so an
-                // invisible-but-painted page would show through the gaps of the
-                // one above it. `visible` (not just opacity) is what keeps it
-                // from being drawn and from contributing to measured size.
-                visible: root.page === ""
-                opacity: visible ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+                opacity: root.pageOpacity("")
 
                 Repeater {
                     model: root.rootBlocks
@@ -336,10 +430,10 @@ Item {
                 implicitHeight: moveCard.implicitHeight
                 height: implicitHeight
                 y: 0
-                visible: root.page === "move"
-                enabled: visible
-                opacity: visible ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+                x: root.pageX("move")
+                visible: root.pageVisible("move")
+                enabled: root.page === "move"
+                opacity: root.pageOpacity("move")
 
                 Rectangle {
                     anchors.fill: moveCard
@@ -379,10 +473,10 @@ Item {
                 implicitHeight: addCard.implicitHeight
                 height: implicitHeight
                 y: 0
-                visible: root.page === "add-widget"
-                enabled: visible
-                opacity: visible ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+                x: root.pageX("add-widget")
+                visible: root.pageVisible("add-widget")
+                enabled: root.page === "add-widget"
+                opacity: root.pageOpacity("add-widget")
 
                 Rectangle {
                     anchors.fill: addCard
@@ -463,10 +557,10 @@ Item {
                 width: pageHost.width
                 spacing: 0
                 y: 0
-                visible: root.page === "widget-settings"
-                enabled: visible
-                opacity: visible ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+                x: root.pageX("widget-settings")
+                visible: root.pageVisible("widget-settings")
+                enabled: root.page === "widget-settings"
+                opacity: root.pageOpacity("widget-settings")
 
                 Repeater {
                     model: root.settingsRows
