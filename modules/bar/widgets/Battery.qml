@@ -124,9 +124,7 @@ BarPill {
         }
     }
 
-    // Single level icon centered on the pill. The artwork spans 17 of its 24
-    // units vertically, the same ink band as the bell and the volume glyph, so
-    // this box is the only size knob and the charge block stays legible.
+    // Single level icon centered on the pill.
     // Scheme-aware glyph (dark in light mode, white in dark mode).
     BarIcon {
         id: batteryIcon
