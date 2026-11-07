@@ -295,9 +295,24 @@ Item {
             const appId = String(rows[j].appId || "")
             let at = root.iconIndexFor(model, want)
             if (at < 0) {
+                // Inserted at a LIVE position, not at `j`.
+                //
+                // `j` is the index in the ARRIVING list, and the model still holds the rows
+                // playing their exit - so the two numberings disagree for exactly as long as
+                // an exit lasts. Inserting at `j` pushed a live row past a departing one:
+                // measured, opening a window while another was dissolving put the live row
+                // BEHIND the departing slot, so it travelled right and the departing one
+                // took its place - both of them moving for no reason the user could see.
+                let at2 = 0
+                let seen = 0
+                while (at2 < model.count && seen < j) {
+                    if (!model.get(at2).retiring)
+                        seen++
+                    at2++
+                }
                 // Arrivals cascade left to right, and the slot opens before the ink
                 // lands - see the delegate.
-                model.insert(j, {
+                model.insert(at2, {
                     winId: want,
                     appId: appId,
                     retiring: false,
@@ -360,25 +375,35 @@ Item {
     // position: it is something the strip is drawing through, and the live rows close over it
     // as its slot narrows.
     function orderLiveRows(model, rows) {
-        const liveSlots = []
-        for (let i = 0; i < model.count; i++)
-            if (!model.get(i).retiring)
-                liveSlots.push(i)
-        for (let k = 0; k < rows.length && k < liveSlots.length; k++) {
+        // A retiring row is a HOLE, not a position.
+        //
+        // This used to renumber the live rows into the model's own indices, which ignored the
+        // slots playing their exit - so a live row was pulled in front of a departing one, and
+        // the departing row's index grew. Its `x` is the sum of the slots before it, so it
+        // then TRAVELLED right while dissolving: measured, a departing icon went 36 -> 52
+        // while the icon it had just been moved behind slid 44 -> 31 to make room, and both
+        // snapped back when the slot was finally dropped.
+        //
+        // So the live rows keep the ORDER the snapshot gives them, but they are written into
+        // the model so that no departing row changes its index. The honest way to say that is
+        // not to renumber at all when a departure is in flight: the live rows are already in
+        // the snapshot's order by construction (`syncIconModel` inserts arrivals at their
+        // arriving index), and a genuine reorder arrives when nothing is retiring.
+        for (let i = 0; i < model.count; i++) {
+            if (model.get(i).retiring) {
+                // A departure is on screen: the live rows hold their places too, and the
+                // strip closes over the shrinking slot instead of shuffling around it.
+                return
+            }
+        }
+        for (let k = 0; k < rows.length && k < model.count; k++) {
             const want = String(rows[k].winId)
-            const slot = liveSlots[k]
-            if (String(model.get(slot).winId) === want)
+            if (String(model.get(k).winId) === want)
                 continue
             const from = root.iconIndexFor(model, want)
             if (from < 0)
                 continue
-            model.move(from, slot, 1)
-            // `move` renumbers, so the live positions have to be re-read after it - the
-            // remaining slots shift by one when a row is pulled forward.
-            liveSlots.length = 0
-            for (let i = 0; i < model.count; i++)
-                if (!model.get(i).retiring)
-                    liveSlots.push(i)
+            model.move(from, k, 1)
         }
     }
 
