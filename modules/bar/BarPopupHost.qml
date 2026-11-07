@@ -1337,6 +1337,25 @@ PanelWindow {
             root.rebaseGlide()
             return
         }
+        // Settled host, no exchange in flight: this retarget came from the
+        // content measuring itself, and the content is ALREADY animating on its
+        // own clock (a menu page's height, a tray's rows arriving, a submenu's
+        // width). Starting a fresh glide here restarted the progress from 0 on
+        // every frame the content grew, so the panel stood at its old height for
+        // the whole growth and only caught up once the content stopped - the
+        // panel and its content visibly desynchronised. Follow the measurement
+        // instead: one motion, the content's own, with the panel glued to it.
+        if (root.transitionProgress >= 0.999) {
+            transitionMotion.stop()
+            root.displayX = root.targetX
+            root.displayY = root.targetY
+            root.displayWidth = root.targetWidth
+            root.displayHeight = root.targetHeight
+            root._snapshotStart()
+            root._snapshotTarget()
+            root.transitionProgress = 1
+            return
+        }
         root.startGlide()
     }
 
@@ -1982,6 +2001,15 @@ PanelWindow {
                             // Visible height channel: animate toward the new content's
                             // natural height so the exchange grows/shrinks smoothly
                             // instead of snapping while the slide travels.
+                            //
+                            // Gated on the exchange, and it has to stay that way. This
+                            // slot is the PAINTED face, so a Behavior here is a second
+                            // height clock: measured with it always on, a menu page
+                            // grew on its own 240ms clock while the host followed the
+                            // measurement immediately, and the panel led its own content
+                            // by 164px. A body that changes height outside an exchange
+                            // (a menu page) already animates itself; this slot just
+                            // follows it.
                             Behavior on height {
                                 enabled: root._exchangeCommitted && !MotionTokens.reducedMotion
                                 NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutCubic }
