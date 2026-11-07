@@ -19,6 +19,7 @@ var DEFAULT_WIDGET_SOURCE_BY_ID = {
     "notifications": "../../modules/bar/widgets/Notifications.qml",
     "settings": "../../modules/bar/widgets/SettingsButton.qml",
     "launcher": "../../modules/bar/widgets/LauncherButton.qml",
+    "divider": "../../modules/bar/widgets/Divider.qml",
 }
 
 function normalizeWidgetId(widgetId, widgetSource) {
@@ -167,6 +168,13 @@ var AVAILABLE_WIDGETS = [
         description: "widgetDesc.launcher",
         section: "left",
         source: "../../modules/bar/widgets/LauncherButton.qml",
+    },
+    {
+        id: "divider",
+        label: "widget.divider",
+        description: "widgetDesc.divider",
+        section: "right",
+        source: "../../modules/bar/widgets/Divider.qml",
     },
 ]
 

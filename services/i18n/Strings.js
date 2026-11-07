@@ -550,6 +550,8 @@ var strings = {
     "widgetDesc.notifications": { zh: "未读徽标与勿扰开关", en: "Unread badge with do-not-disturb toggle." },
     "widgetDesc.settings": { zh: "打开桌面设置中心", en: "Open the shell settings center." },
     "widgetDesc.launcher": { zh: "打开应用启动器搜索", en: "Toggle the app launcher search." },
+    "widget.divider": { zh: "分隔线", en: "Divider" },
+    "widgetDesc.divider": { zh: "在组件之间添加垂直分隔线", en: "Vertical separator between widgets." },
 
     // ── niri shortcut editing ────────────────────────────────────────────
     "shortcuts.loading": { zh: "正在读取 niri 快捷键…", en: "Reading niri shortcuts…" },
