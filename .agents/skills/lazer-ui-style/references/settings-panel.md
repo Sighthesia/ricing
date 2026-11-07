@@ -72,12 +72,15 @@
 - 修改 QML 后运行相关 `qmllint`、`pytest` 和 `qs -p .`；QML 测试若被 `qrc:/qs-blackhole` 环境资源阻塞，要明确记录。
 - 修改滑条反馈后额外检查 `flashOverlay` 是否锚定 `trackFillItem`，以及 `Scale` 是否以 slider 中心为 origin；不要用 width/height 动画制造震动。
 
-## 小组件设置行（右键菜单内联）
+## 右键菜单的分页结构
 
-顶栏 widget 的右键菜单按 `services/WidgetSettingsRegistry.js` 里的 `controls` 声明就地展开设置行，不打开第二个表面：
+顶栏 widget 的右键菜单是**一个表面内的分页列表**，不是一列不断变长的行，也不是挂在旁边的第二个表面：
 
-- 行本身是标准 `LazerSettingsRow`，控件按 `kind` 选择：`swatch` → `LazerSettingsSwatch`，`slider` → `LazerSettingsSlider`。
+- 根页只放能独立决定的命令，按「栏 / 小组件 / 外壳」分成三个区块卡片；块间空隙就是分组，块不画标题行。
+- 会展开成控件或清单的东西各占一页（`move`、`widget-settings`、`add-widget`），从带 chevron 的行进入，用页头的返回箭头退出。页头里返回箭头是独立控件，页名只是标题，不做成可点行。
+- 页高决定宿主几何：`pageHost` 一个 `clip` 容器用 `medium/OutQuint` 过渡，非当前页 `visible: false`（不是只改 opacity），否则共享同一个节点时下层内容会从上层空隙里透出来，同时污染测量。
+- widget 声明的设置项（`services/WidgetSettingsRegistry.js` 的 `controls`）在 `widget-settings` 页里用标准 `LazerSettingsRow` 渲染：`swatch` → `LazerSettingsSwatch`，`slider` → `LazerSettingsSlider`。
 - 行的**形状**（kind / label / range / default）来自声明，行的**值**必须逐控件绑到服务读取，不能放进模型：每次写入都会 bump settings revision，模型一旦带值就会在拖动途中重建 delegate，指针下的 slider 直接消失。
-- 展开容器 `clip: true`，高度用 `slow/InOutQuad` 过渡、内容 `fast` 淡入；收起后高度归零，不留画出来的空带。
-- 面板类控件点击写入走 `SettingsService.setWidgetInstanceSettingValue`；不要再额外调 `save()`，服务自己已有 debounce。
-- 有设置页的 widget（clock / active-window / media 等）仍走设置面板；只有声明了 `controls` 的 widget 就地展开。
+- 写入走 `SettingsService.setWidgetInstanceSettingValue`，不要再额外调 `save()`；服务自己已有 debounce。
+- 有设置页的 widget（clock / active-window / media 等）仍走设置面板；只有声明了 `controls` 的 widget 才有本地 `widget-settings` 页。
+- 「添加小组件」是两列图标 + 名称网格，不是一列带描述的卡片：一个 widget 名字本身就是要做的决定，第二行说明只会把页面撑长。
