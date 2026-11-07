@@ -1122,6 +1122,19 @@ Item {
         const target = root._journeyTarget()
         if (!isFinite(target))
             return
+        // `_pinArmed` describes a pin that is RUNNING, and a finished pin is not one. It is
+        // cleared by the pin's own tick when the crossing ends - but a crossing can end
+        // without another tick, and then this carry reads `_pinHead` from the journey BEFORE
+        // it and shifts both ends by the whole difference between that stale target and this
+        // one. Measured: the head jumped -34 -> 92.6 on the frame a workspace with windows
+        // came back, and spent 300ms easing down from a place it had never been - the
+        // "overshoots going down" report.
+        if (!root._markerCrossing) {
+            _pinArmed = false
+            _pinHead = target
+            _journeyScroll = strip.scrollOffset
+            return
+        }
         if (_pinArmed) {
             const step = target - _pinHead
             _tailY += step
@@ -1593,9 +1606,24 @@ Item {
             // consequence of `windowRowMove` and `slow * 2` not being an exact 2:1 pair
             // (320 against 480), so it is written out rather than derived from a ratio that
             // does not exist.
-            duration: (strip.rowsTransitioning
+            // A STEP THAT IS ONLY THE LAYOUT SETTLING TAKES NO TRAIL.
+            //
+            // A focus step's tail outliving its head by three to one is the whole of what a
+            // wake IS, and it is right when the mark genuinely moves somewhere. This one
+            // does not: the rendered index goes 2 -> 1 when a departing slot is dropped, the
+            // focused row does not change, and the mark is being walked back from a place it
+            // only ever occupied because a hole was being counted. A wake drawn under that
+            // is a bar stretched a full pitch below the row it marks and closing slowly -
+            // measured, its lower edge sat at 95 while the row's was at 61, and the user read
+            // it as an overshoot on the way down.
+            //
+            // So when the index is falling while a slot is still closing, both ends take the
+            // head's clock and the bar moves as one piece. A reorder keeps its proportional
+            // 1.9 for the reason recorded above.
+            duration: (strip.rowsReordering
                 ? MotionTokens.windowRowMove * 1.9
-                : MotionTokens.slow * 2) * debugTimeScale
+                : (root._settlingIndex ? MotionTokens.medium : MotionTokens.slow * 2))
+                * debugTimeScale
             easing.type: Easing.OutSine
         }
     }
@@ -2068,6 +2096,9 @@ Item {
     // strip because that is where the travel lives, and asked as its own property so this
     // file reads one flag rather than reaching into a column's items.
     readonly property bool _rowsTravelling: strip.rowsTransitioning
+    // The rendered index just fell while a slot is still closing: the layout settling, not
+    // the mark moving. Read by the tail's duration.
+    property bool _settlingIndex: false
 
     // Apply a drift that landed mid-trail, once the tail has caught up. The widget's
     // `_edgePendingCenterX` timer, and for the same reason: it waits on the TAIL rather
@@ -2801,6 +2832,7 @@ Item {
     Connections {
         target: strip
         function onFocusedRowIndexChanged() {
+            root._settlingIndex = strip.rowsTransitioning
             root._syncIndicator()
         }
     }
