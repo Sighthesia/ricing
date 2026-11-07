@@ -28,7 +28,20 @@ Item {
     // clip window (e.g. exit ghosts falling past the surface).
     property alias overlay: overlayLayer
 
+    // LAYOUT width follows the text; the CLIP window below does not, for the
+    // length of a sweep. They are separate on purpose:
+    //   * `implicitWidth` is what the host lays out with, so the widget takes the
+    //     incoming title's width on the frame the switch starts;
+    //   * `clipSlot` is what decides whether a glyph is painted, and it has to
+    //     stay wide enough for the OUTGOING run while that run is still falling.
+    //     Binding it to the live text meant the moment the new (shorter) text
+    //     arrived the window snapped narrow and cut the old glyphs - which reads
+    //     as the widget clipping its own text, not as an exit animation.
     implicitWidth: Math.min(metrics.advanceWidth, root.maxWidth)
+    // Widest text this label has held since the current sweep began. It sizes
+    // the CLIP window only (see clipSlot), never the layout: the host must be
+    // free to take the incoming width immediately.
+    property real sweepWidth: 0
     // `metrics.height` is ZERO for empty text, so a host that sizes itself from
     // this line collapses to nothing the instant the text empties - and a
     // zero-height item inside a Column/Row does not paint its overflowing
@@ -62,7 +75,14 @@ Item {
     Item {
         id: clipSlot
 
-        anchors.fill: parent
+        // The clip window keeps the outgoing run's width for as long as that
+        // run is falling. Following the label would snap it narrow the instant
+        // the shorter incoming text arrived, cutting the old glyphs mid-drop -
+        // which is exactly what "the widget clips its own text" looks like.
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        width: Math.max(root.width, root.sweepWidth)
         clip: true
 
         Text {
@@ -464,6 +484,8 @@ Item {
         root._sweepRowChars = newText
         root._sweepDelays = delays
         root._sweepOffsets = offsets
+        // Hold the clip window at the outgoing run's width while it falls.
+        root.sweepWidth = Math.max(root.sweepWidth, Math.min(oldWidth, root.maxWidth))
         root._sweepStart = Date.now()
         // Safety net: no matter what happens inside the row, the real
         // label always comes back.
@@ -548,6 +570,7 @@ Item {
             if (!root._sweepActive)
                 return
             root._sweepActive = false
+            root.sweepWidth = 0
             root._stopSweepRow()
         }
     }
@@ -662,6 +685,7 @@ Item {
                 interval: root.scanSweepMs + root.scanGapMs + root.scanRevealMs + MotionTokens.fast
                 onTriggered: {
                     root._sweepActive = false
+                    root.sweepWidth = 0
                     if (root._enterRow === enterRow)
                         root._enterRow = null
                     label.opacity = 1
