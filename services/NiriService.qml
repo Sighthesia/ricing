@@ -268,12 +268,23 @@ Singleton {
             // same event, so the seam's occlusion test has to follow it.
             const rawView = layout.tile_pos_in_workspace_view
             const view = (Array.isArray(rawView) && rawView.length >= 2) ? rawView : null
+            // The window's PLACE in the tiling, which is what a reorder changes and what
+            // the hint's row list is ordered by. This event is the one niri sends when a
+            // window is moved, and without this line the place was only ever read from a
+            // full `WindowsChanged` - so a move updated every field except the one that
+            // says the window moved, and the panel's rows kept the order they had.
+            const rawPos = layout.pos_in_scrolling_layout
+            const pos = (Array.isArray(rawPos) && rawPos.length >= 2) ? rawPos : null
 
             for (let w = 0; w < windows.count; w++) {
                 if (windows.get(w).winId !== winId)
                     continue
                 windows.setProperty(w, "tileWidth", Number(tile[0]))
                 windows.setProperty(w, "tileHeight", Number(tile[1]))
+                if (pos) {
+                    windows.setProperty(w, "colIdx", pos[0])
+                    windows.setProperty(w, "rowIdx", pos[1])
+                }
                 if (view) {
                     windows.setProperty(w, "viewX", Number(view[0]))
                     windows.setProperty(w, "viewY", Number(view[1]))
