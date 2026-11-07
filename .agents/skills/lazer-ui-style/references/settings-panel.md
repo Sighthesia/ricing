@@ -79,6 +79,7 @@
 - 根页只放能独立决定的命令，按「栏 / 小组件 / 外壳」分成三个区块卡片；块间空隙就是分组，块不画标题行。
 - 会展开成控件或清单的东西各占一页（`move`、`widget-settings`、`add-widget`），从带 chevron 的行进入，用页头的返回箭头退出。页头里返回箭头是独立控件，页名只是标题，不做成可点行。
 - 页高决定宿主几何：`pageHost` 一个 `clip` 容器用 `medium/OutQuint` 过渡，非当前页 `visible: false`（不是只改 opacity），否则共享同一个节点时下层内容会从上层空隙里透出来，同时污染测量。
+- 换页用宿主 hover 弹层交换的滑动：旧页向行进方向滑出、新页从行进方向滑入，各自交叉淡化，一个 `slow/OutCubic` 时钟驱动（`pageSlideProgress` + `pageSlideSign`）；返回根页取反方向。页头跟随所属页一起滑动，但离场期间标题仍写它正在离开的那一页。滑动进行中再换页要先落定旧滑（stop + progress=1），两轨重叠会让方向同时描述两次移动。
 - widget 声明的设置项（`services/WidgetSettingsRegistry.js` 的 `controls`）在 `widget-settings` 页里用标准 `LazerSettingsRow` 渲染：`swatch` → `LazerSettingsSwatch`，`slider` → `LazerSettingsSlider`。
 - 行的**形状**（kind / label / range / default）来自声明，行的**值**必须逐控件绑到服务读取，不能放进模型：每次写入都会 bump settings revision，模型一旦带值就会在拖动途中重建 delegate，指针下的 slider 直接消失。
 - 写入走 `SettingsService.setWidgetInstanceSettingValue`，不要再额外调 `save()`；服务自己已有 debounce。
