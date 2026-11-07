@@ -336,10 +336,16 @@ Item {
     // edge, where the next snapshot with windows brings it down onto the card: an arrival
     // rather than a blink.
     readonly property real noRowTop: _offTop
-    // The focused row's drawn top edge - the row's OWN position, asked of the strip, which
-    // is the same arithmetic `slotTopAt` uses to place the rows themselves.
-    readonly property real focusedRowTop: focusedRowIndex < 0 ? noRowTop
-        : strip.liveRowTop(focusedRowIndex)
+    // The focused row's top edge, for the CROSSING only - the marker's landing place on a
+    // workspace switch, where there is no transition running in the target column.
+    //
+    // Deliberately the plain pitch and not `liveRowTop`: that walks the slots' shortfalls,
+    // and reading them here closes a loop - the shortfall is driven by `presence`, which the
+    // column reports through `rowRevision`, which invalidates this binding again. The
+    // binding loop is what the shell log reported. A crossing's landing row is a settled row
+    // in a column that is not transitioning, so the correction it would apply is zero.
+    readonly property real focusedRowTop: focusedRowIndex < 0
+        ? noRowTop : focusedRowIndex * rowPitch - strip.scrollOffset
     // The frame's glide target in UNSCROLLED list coordinates: the row's own top
     // edge, before the viewport offset is applied. The drawn `y` below subtracts
     // the scroll on the way out, so one glide covers both a focus step and the
