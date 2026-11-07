@@ -1934,6 +1934,25 @@ Item {
         if (Math.abs(top - _anchorY) < 0.5)
             return
         if (Math.abs(_headY - _tailY) > 0.5) {
+            // A wake is still open, so this target waits for the tail - the widget's own
+            // `_edgePendingCenterX`. That is right for CONTENT CHURN: a drift that lands
+            // mid-trail should not cut the trail short, and waiting costs nothing because
+            // the place it is drifting to is not going anywhere.
+            //
+            // A ROW THAT IS TRAVELLING IS NOT THAT CASE. It is moving right now, and the
+            // target written here is where it is THIS FRAME - so holding it until the tail
+            // closes makes the bar arrive at a position the row has already left. Measured
+            // on a fast run of moves: the pending target was applied by a SNAP once the wake
+            // closed, which is the hop the user still sees at speed.
+            //
+            // Re-aimed instead, which is what the widget does when a target genuinely moves:
+            // both ends are handed the new place and continue from wherever they are, so a
+            // run of moves is one chase rather than a series of held targets and snaps.
+            if (root._rowsTravelling || root._frameStep > 1.5) {
+                _pendingTop = -1
+                _retargetIndicator(top, "moving:" + root.focusedWindowKey, false)
+                return
+            }
             _pendingTop = top
             return
         }
@@ -1978,7 +1997,15 @@ Item {
                 return
             var pending = root._pendingTop
             root._pendingTop = -1
-            root._snapIndicator(pending)
+            // A held target that belongs to a moving row is RE-AIMED, not cut. The snap is
+            // this timer's answer to content churn - a drift that arrived while a trail was
+            // open - and it is the right one there because nothing is moving any more. A
+            // reorder is the opposite: the row is still travelling, so cutting to where it
+            // was when the target was taken is a jump. See the note in `_retargetIndicator`.
+            if (root._rowsTravelling || root._frameStep > 1.5)
+                root._retargetIndicator(pending, "moving:" + root.focusedWindowKey, false)
+            else
+                root._snapIndicator(pending)
         }
     }
 
