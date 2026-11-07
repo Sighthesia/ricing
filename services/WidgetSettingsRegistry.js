@@ -76,6 +76,38 @@ var _definitions = {
         instanceScoped: true,
         defaults: {},
     },
+    // Divider is the first widget whose settings are reachable only from the
+    // bar's own right-click menu: the shared settings panel has no per-instance
+    // page, and a divider is only meaningful in the place it sits. `controls`
+    // is what the context menu renders; `defaults` is what persists.
+    "divider": {
+        title: "widgetSettings.divider",
+        panelKey: "divider",
+        instanceScoped: true,
+        defaults: {
+            color: "default",
+            opacity: 22,
+        },
+        controls: [
+            { kind: "swatch", settingKey: "color", labelKey: "widgetSettings.divider.color",
+              options: ["default", "white", "muted", "pink", "green"] },
+            { kind: "slider", settingKey: "opacity", labelKey: "widgetSettings.divider.opacity",
+              from: 5, to: 100, stepSize: 1, suffix: "%" },
+        ],
+    },
+}
+
+// Palette the swatch controls offer. Each entry is a symbolic name written to
+// settings plus the theme token its ink is drawn from. "builtin" names no token
+// on purpose: it means the widget's own rule, so that option keeps following the
+// palette when the theme changes instead of freezing a colour that was picked
+// against an old wallpaper.
+var swatchPalette = {
+    "default": { source: "builtin" },
+    "white": { source: "textPrimary" },
+    "muted": { source: "textMuted" },
+    "pink": { source: "osuPink" },
+    "green": { source: "osuGreen" },
 }
 
 function definition(widgetId) {
@@ -109,6 +141,35 @@ function panelKey(widgetId) {
 function defaults(widgetId) {
     var info = definition(widgetId)
     return info && info.defaults ? JSON.parse(JSON.stringify(info.defaults)) : ({})
+}
+
+// Declarative controls the bar's context menu renders for a widget.
+// Deliberately data-only: a widget declares what it exposes, and the menu (or
+// any future host) decides how to draw it, so adding a widget setting never
+// means editing menu code.
+function controls(widgetId) {
+    var info = definition(widgetId)
+    if (!info || !info.controls)
+        return []
+
+    return JSON.parse(JSON.stringify(info.controls))
+}
+
+function hasControls(widgetId) {
+    return controls(widgetId).length > 0
+}
+
+function swatch(name) {
+    var entry = swatchPalette[String(name || "default")]
+    return entry ? JSON.parse(JSON.stringify(entry)) : JSON.parse(JSON.stringify(swatchPalette["default"]))
+}
+
+// Swatch names in the order a control declared them.
+function swatchNames(control) {
+    if (!control || !control.options)
+        return []
+
+    return control.options.slice()
 }
 
 function settingsObject(widgetId, settingsRoot) {

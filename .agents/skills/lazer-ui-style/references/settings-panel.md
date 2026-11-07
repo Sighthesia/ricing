@@ -71,3 +71,13 @@
 - 检查从非默认值恢复到默认值后，按钮向左滑回；移除 `defaultValue` 后才变为不可见。
 - 修改 QML 后运行相关 `qmllint`、`pytest` 和 `qs -p .`；QML 测试若被 `qrc:/qs-blackhole` 环境资源阻塞，要明确记录。
 - 修改滑条反馈后额外检查 `flashOverlay` 是否锚定 `trackFillItem`，以及 `Scale` 是否以 slider 中心为 origin；不要用 width/height 动画制造震动。
+
+## 小组件设置行（右键菜单内联）
+
+顶栏 widget 的右键菜单按 `services/WidgetSettingsRegistry.js` 里的 `controls` 声明就地展开设置行，不打开第二个表面：
+
+- 行本身是标准 `LazerSettingsRow`，控件按 `kind` 选择：`swatch` → `LazerSettingsSwatch`，`slider` → `LazerSettingsSlider`。
+- 行的**形状**（kind / label / range / default）来自声明，行的**值**必须逐控件绑到服务读取，不能放进模型：每次写入都会 bump settings revision，模型一旦带值就会在拖动途中重建 delegate，指针下的 slider 直接消失。
+- 展开容器 `clip: true`，高度用 `slow/InOutQuad` 过渡、内容 `fast` 淡入；收起后高度归零，不留画出来的空带。
+- 面板类控件点击写入走 `SettingsService.setWidgetInstanceSettingValue`；不要再额外调 `save()`，服务自己已有 debounce。
+- 有设置页的 widget（clock / active-window / media 等）仍走设置面板；只有声明了 `controls` 的 widget 就地展开。

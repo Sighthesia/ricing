@@ -85,6 +85,7 @@ Afloat 的视觉域：osu!lazer "sharp" 形态语言、风格权威样本（设�
 | 通用滚动系统（接管区 / 阻力 / 回弹 / 波浪挂起） | `modules/lazerbar/LazerSettingsSections.qml` |
 | 导航项高亮 / 侧栏点击闪烁 | `modules/lazerbar/LazerSettingsSidebar.qml`、`LazerSettingsNavItem.qml` |
 | 选中指示条（拖尾动效） | `modules/lazerbar/TrailIndicator.qml`；配方见 `lazer-motion-perf` |
+| 命名色板（色块条 + 选中细条指示） | `modules/lazerbar/LazerSettingsSwatch.qml` |
 | 全部时长与缓动常量 | `modules/lazerbar/MotionTokens.qml` |
 | 颜色令牌 | `modules/lazerbar/LazerTheme.qml` |
 
@@ -107,6 +108,16 @@ hover / focus / active / 禁用：用色块亮度、透明度、指示条切换�
 - 逻辑宽度与视觉宽度分离：逻辑宽度是交互区（28px），视觉宽度 = 逻辑宽度 + 主表面圆角（34px）；多出的圆角宽度向主表面内侧延伸并被裁掉。
 - 图标以可见区域为居中基准，不以扩展后的视觉宽度为基准。
 - 状态表达仍走色块亮度/hover swap，月牙形态本身静态不变。
+
+### 命名色板（色块条）
+
+需要"在几个命名色之间选一个"时用 `LazerSettingsSwatch`，不要另造下拉或输入框：
+
+- 色块本身就是样本（`22px`、`chipRadius 4`），不配文字标签；条带高度只有 `chipSize + indicatorGap + indicatorHeight`。
+- 选中态是色块下方一条 `barIndicatorHeight` 的 accent 细条，滑动用 `fast/OutQuint`；不给色块描边外框。
+- 「跟随主题」的选项画成空心描边（`hollow`），不用某个具体颜色冒充它。
+- hover 用一圈 `0.35` 的白色描边，不做缩放；键盘 focus 环是独立层，不改命中区与条带尺寸。
+- 模型里只放 `{ value, color, hollow? }`：控件自身不持有色板知识，颜色名到色值的映射留在调用方。
 
 ### 输入隔离
 

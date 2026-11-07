@@ -57,6 +57,7 @@ var strings = {
     "context.widgetSettings": { zh: "小组件设置", en: "Widget settings" },
     "context.removeWidget": { zh: "移除小组件", en: "Remove widget" },
     "context.addWidgets": { zh: "添加小组件", en: "Add widgets" },
+    "context.widgetSettingsEmpty": { zh: "这个小组件没有可调选项", en: "This widget has nothing to adjust" },
 
     // ── Tray / bar tray menu ─────────────────────────────────────────────
     "tray.noItems": { zh: "没有菜单项", en: "No menu items" },
@@ -529,6 +530,9 @@ var strings = {
     "widgetSettings.bluetooth": { zh: "蓝牙设置", en: "Bluetooth Settings" },
     "widgetSettings.network": { zh: "网络设置", en: "Network Settings" },
     "widgetSettings.volume": { zh: "音量设置", en: "Volume Settings" },
+    "widgetSettings.divider": { zh: "分隔线设置", en: "Divider Settings" },
+    "widgetSettings.divider.color": { zh: "颜色", en: "Colour" },
+    "widgetSettings.divider.opacity": { zh: "不透明度", en: "Opacity" },
     "widgetSettings.fallback": { zh: "小组件设置", en: "Widget Settings" },
     "widget.clock": { zh: "时钟", en: "Clock" },
     "widget.tray": { zh: "系统托盘", en: "System Tray" },
