@@ -6,7 +6,6 @@ import ".."
 import "../../lazerbar"
 import "TraySlotLogic.js" as SlotLogic
 import "../../services" as Services
-import "../../../services/barlayout/BarLayoutSections.js" as BarLayoutSections
 
 // StatusNotifier tray icons with activate and secondary actions.
 //
@@ -43,20 +42,13 @@ Item {
 
     // 0 while the icon strip is folded away, 1 while revealed.
     property real trayReveal: root.trayExpanded ? 1 : 0
-    readonly property real iconInset: (LazerTheme.barWidgetHeight - LazerTheme.barGlyphSize) / 2
-    // The boundary strip separates two widgets, so it has to keep on its left
-    // what the widget on its right keeps in front of its own glyph: one widget
-    // gap plus that widget's glyph padding. Trimming the sliver of slot gap and
-    // glyph inset alone (as it used to) left the last tray icon pressed against
-    // the divider while the glyph after it sat a whole padding further away.
-    readonly property real dividerPadding: BarLayoutSections.widgetSpacing
-            + (LazerTheme.barWidgetHeight - LazerTheme.barStrokeGlyphSize) / 2
+    // The strip owns only its icons: separation from the next bar group is the
+    // layout's job, not a rule drawn inside the tray.
     readonly property real trayStripWidth: Math.max(0,
-            trayRow.implicitWidth - root.slotGap / 2 - root.iconInset + root.dividerPadding)
+            trayRow.implicitWidth - root.slotGap)
 
     implicitWidth: root.liveCount > 0
-            ? (LazerTheme.barWidgetHeight + boundaryStrip.implicitWidth
-                    + root.trayStripWidth * root.trayReveal)
+            ? (LazerTheme.barWidgetHeight + root.trayStripWidth * root.trayReveal)
             : 0
     implicitHeight: LazerTheme.barWidgetHeight
 
@@ -677,19 +669,6 @@ Item {
                     }
                 }
             }
-        }
-
-        // Vertical boundary strip at the tray's right edge. Its 15px box is the
-        // shared rule plus 6px of room on each side; the extra room that keeps
-        // it off the last icon lives in `dividerPadding` above, not here.
-        BarBoundaryStrip {
-            id: boundaryStrip
-
-            // The strip is glyph-tall, not slot-tall: centre it against the
-            // icon slots rather than letting the Row top-align it.
-            anchors.verticalCenter: parent.verticalCenter
-            hPadding: 6
-            visible: root.liveCount > 0
         }
     }
 }
