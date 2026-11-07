@@ -1650,7 +1650,11 @@ Item {
                 return false
             // Load-bearing revision read: the qs engine drops bare expressions,
             // so a decode landing has to be referenced or this never re-runs.
-            var rev = root._thumbRev
+            // This is the PANE tier's revision: the pane image lands with
+            // `_paneThumbRev`, and keying off the row tier's `_thumbRev` left
+            // this stuck at true forever - the loading plate never lifted off
+            // an already-painted image.
+            var rev = root._paneThumbRev
             if (rev < 0)
                 return false
             var id = String(r.id == null ? "" : r.id)
@@ -1797,12 +1801,13 @@ Item {
                         mipmap: true
                         // The pane is the largest painted surface a clipboard
                         // entry ever reaches, so it decodes the pane tier (a
-                        // 1024x1280 JPEG) instead of the row's 208px PNG. The
+                        // 2048px JPEG, sized in physical pixels for the
+                        // 1.75x panel) instead of the row's 208px PNG. The
                         // cap is stated here as well, because the tier file is
                         // whatever an older cache left behind and the pane must
                         // never decode a full-resolution paste on its own.
-                        sourceSize.width: 1024
-                        sourceSize.height: 1280
+                        sourceSize.width: 2048
+                        sourceSize.height: 2048
                         // Assigned imperatively from paneThumbSource below: the
                         // qs engine does not re-run this binding on property
                         // change notifications here.

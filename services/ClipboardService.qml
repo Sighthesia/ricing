@@ -790,15 +790,21 @@ Singleton {
     // which is a dozen frames. Two tiers, both written in the one process spawn
     // that already produced the decode:
     //
-    //   row  144x208  (2x the 72x104 the 36x52 rail paints)  ~11ms to decode
-    //   pane 1024x... (the preview pane's largest painted size) ~20ms
+    //   row  208px box (2x the 72x104 the 36x52 rail paints)  ~11ms to decode
+    //   pane 2048px box (the preview pane painted at 1.75x scale) ~20ms
+    //
+    // The pane tier is sized in PHYSICAL pixels, not logical: the pane paints
+    // at screen scale (1.75 on the 2880x1800 panel), so a 1024px file was
+    // upscaled ~1.2x on screen and read as soft. 2048 covers the pane's
+    // largest painted extent with headroom. The `-pane2.jpg` suffix retires
+    // the earlier 1024/1280 cache entries rather than serving them forever.
     //
     // The medium tier is a JPEG because at that size PNG is 10x the bytes for
     // pixels the pane never shows at 1:1; the row tier keeps the source
     // format, where a 30KB PNG decodes faster than the equivalent JPEG.
     readonly property string _thumbDir: root._cacheDir + "/clipboard-thumbs"
     readonly property int _thumbRowMaxEdge: 208
-    readonly property int _thumbPaneMaxEdge: 1280
+    readonly property int _thumbPaneMaxEdge: 2048
 
     // Path a caller asks for, by tier. Empty when the entry is not a decodable
     // image id, which is the only case a caller has to handle itself.
@@ -806,7 +812,7 @@ Singleton {
         var safeId = String(id == null ? "" : id)
         if (!/^[0-9]+$/.test(safeId))
             return ""
-        var suffix = String(tier) === "pane" ? "-pane.jpg" : "-row.png"
+        var suffix = String(tier) === "pane" ? "-pane2.jpg" : "-row.png"
         return root._thumbDir + "/" + safeId + suffix
     }
 
@@ -885,7 +891,7 @@ Singleton {
         var raw = root._thumbDir + "/raw-" + job.clipId + ".img"
         var edge = job.tier === "pane" ? root._thumbPaneMaxEdge : root._thumbRowMaxEdge
         var encode = job.tier === "pane"
-                ? "-thumbnail '1024x1280>' -quality 82"
+                ? "-thumbnail '" + edge + "x" + edge + ">' -quality 88"
                 : "-thumbnail '" + edge + "x" + edge + ">' -define png:compression-level=6"
         var args = [
             "sh", "-c",
