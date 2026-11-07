@@ -469,23 +469,49 @@ Item {
     // frame and closed the wake before it could open. That is the report - "the indicator
     // teleports instead of moving, no trail" - and it was the handler, not the animation.
     property int rowRevision: 0
+    // The outstanding height of the slots ABOVE the focused row, in pixels: the correction
+    // that turns `index * rowPitch` into where that row is actually DRAWN.
+    //
+    // The same walk `slotTopAt` does for the rows themselves, so the two cannot disagree -
+    // verified against it at every frame of an exit, 68 -> 59.5 -> 51 -> 42.5 -> 34. Only a
+    // LEAVING slot contributes: an arriving one opens into space the list does not have yet,
+    // and counting its shortfall is what once summed eleven opening slots into a lift of 199
+    // and put the mark above the panel.
+    // The SAME arithmetic the rows are drawn with, asked about the focused row.
+    //
+    // `rowLiftFor` -> `RowMotion.liftAt` counts a slot's shortfall only while
+    // `phase === "exit"`, which is right for the layout's own purposes and wrong here: the
+    // moment the departing record is dropped from the list, that term stops existing and the
+    // lift jumps to zero in one frame. The rows do not jump - `slotTopAt` walks `presence`
+    // and the last frame before the drop still had a few tenths left in it - so the mark and
+    // the row it marks parted company by the whole remaining height on that frame.
+    //
+    // So this walks the same way `slotTopAt` does, over the rows above the focused one, and
+    // asks each for its `presence` rather than for its phase. Measured on "close the middle
+    // window, focus lands on the next one": 64.6 -> 35 in one frame against a row that moved
+    // 38 -> 34.
     readonly property real rowLift: {
         root.rowRevision
-        return root.rowLiftFor(root.focusedRowIndex)
+        var list = root.activeRows
+        var pitch = root.rowHeight + root.listSpacing
+        var lift = 0
+        for (var i = 0; i < list.length && i < root.focusedRowIndex; ++i) {
+            if (!list[i])
+                continue
+            // Only a LEAVING slot shortens the rows below it. An arriving one is opening
+            // into space the list does not have yet, so it takes nothing off them - the same
+            // distinction `liftAt` draws, and it has to survive here or the first frame of a
+            // panel build sums eleven opening slots into a lift of 199 and puts the mark
+            // above the panel.
+            if (list[i].phase !== "exit")
+                continue
+            var presence = list[i].presence !== undefined ? Number(list[i].presence) : 1
+            if (!isFinite(presence))
+                presence = 1
+            lift += pitch * (1 - Math.max(0, Math.min(1, presence)))
+        }
+        return lift
     }
-    // The focused row's index in the RENDERED list, and separately the index it would hold
-    // if the rows that are leaving were not there.
-    //
-    // The second one is what a marker's resting place must be built from, and the difference
-    // is the whole of a reported fault. A departing row keeps its slot so it can dissolve in
-    // place, so it still occupies an index - and when focus lands on the row AFTER it, the
-    // rendered index counts that hole: `a bX c*` puts the focus at 2 where it would be 1. A
-    // marker anchored on `index * rowPitch` therefore jumped a whole row DOWN on the frame
-    // the window closed, and then slid back up as the hole collapsed - measured, 68 -> 34.
-    //
-    // Focus landing on the row BEFORE the hole was unaffected, which is exactly the
-    // asymmetry that was reported: closing a window and having focus land on the next one
-    // moved the mark, and landing on the previous one did not.
     readonly property int focusedRowIndex: {
         var list = root.activeRows
         for (var i = 0; i < list.length; ++i) {
@@ -493,43 +519,6 @@ Item {
                 return i
         }
         return -1
-    }
-    // The same row, counted over the rows that are NOT leaving.
-    readonly property int focusedLiveIndex: {
-        var list = root.activeRows
-        var live = 0
-        for (var i = 0; i < list.length; ++i) {
-            if (!list[i])
-                continue
-            if (list[i].isFocused === true)
-                return live
-            if (list[i].phase !== "exit")
-                live++
-        }
-        return -1
-    }
-
-    // The rendered top edge of the row at `index`, in the strip's scrolled space. ONE
-    // place the layout offset caused by mid-flight rows is added up, so the body does not
-    // re-derive it and cannot disagree with where the row is drawn.
-    // Where the FOCUSED row is drawn, without ever counting a departing slot as a position.
-    //
-    // This is the number the markers are placed from, and it is not `liveRowTop(focusedRowIndex)`
-    // - see `focusedLiveIndex` for why: the rendered index includes the holes left by rows
-    // that are dissolving, so anchoring on it jumps a whole pitch the moment a window closes
-    // above the newly focused one.
-    //
-    // The two terms are the resting place of the focused row among the SURVIVING rows
-    // (`focusedLiveIndex * rowPitch`) and the amount the holes still owe it (`rowLift`, which
-    // is what every departing slot above it has yet to close). While a hole closes, the first
-    // term is already final and the second shrinks to zero, so the mark rises to its place
-    // exactly as the row does - which is the motion the panel already had, now anchored
-    // correctly.
-    readonly property real focusedLiveTop: {
-        root.rowRevision
-        if (root.focusedLiveIndex < 0)
-            return root.noRowTop
-        return root.focusedLiveIndex * root.rowPitch - root.rowLift - root.scrollOffset
     }
 
     function liveRowTop(index) {

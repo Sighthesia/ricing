@@ -336,11 +336,10 @@ Item {
     // edge, where the next snapshot with windows brings it down onto the card: an arrival
     // rather than a blink.
     readonly property real noRowTop: _offTop
-    // The focused row's drawn top edge. `strip.focusedLiveTop`, not `liveRowTop(index)`: the
-    // index the renderer holds includes the holes left by rows that are dissolving, so a
-    // marker anchored on it jumps a whole pitch the moment a window above the newly focused
-    // one closes. See `BarWindowHintStrip.focusedLiveIndex`.
-    readonly property real focusedRowTop: strip.focusedLiveTop
+    // The focused row's drawn top edge - the row's OWN position, asked of the strip, which
+    // is the same arithmetic `slotTopAt` uses to place the rows themselves.
+    readonly property real focusedRowTop: focusedRowIndex < 0 ? noRowTop
+        : strip.liveRowTop(focusedRowIndex)
     // The frame's glide target in UNSCROLLED list coordinates: the row's own top
     // edge, before the viewport offset is applied. The drawn `y` below subtracts
     // the scroll on the way out, so one glide covers both a focus step and the
@@ -367,9 +366,8 @@ Item {
     // window one pitch too low (`a bX c*` reads index 2 where the row rests at 1), so closing
     // a window moved the mark down a row and then slid it back up as the hole closed. Focus
     // landing on the PREVIOUS window was unaffected, which is exactly what was seen.
-    property real _frameAnchorY: strip.focusedLiveIndex < 0
-        ? noRowTop + strip.scrollOffset
-        : strip.focusedLiveIndex * rowPitch + strip.rowLift
+    property real _frameAnchorY: focusedRowIndex < 0
+        ? noRowTop + strip.scrollOffset : focusedRowIndex * rowPitch
     // How far the frame is being asked to travel, in row pitches: the distance from where it
     // was DRAWN to where it now belongs. Read by the glide's own `Behavior` to decide whether
     // this is a focus step or a reorder - see the note there.
@@ -1378,8 +1376,11 @@ Item {
     // is the viewport's, and `rowLift` is a slot above being shorter than its pitch while
     // it opens or closes - which is the same kind of statement, so it is the same
     // subtraction rather than a second mechanism.
-    readonly property real _barTop: Math.min(_headY, _tailY)
-        - strip.scrollOffset - strip.rowLift
+    // `rowLift` is NOT subtracted here: the tracker is aimed with `liveRowTop`, which
+    // already walks the slots' shortfalls - the same number the rows are drawn with. Taking
+    // it off again took the whole height of a closing slot off twice, measured as a bar that
+    // sat 30 pixels above its own outline and snapped back when the slot was dropped.
+    readonly property real _barTop: Math.min(_headY, _tailY) - strip.scrollOffset
     readonly property real _barLength: indicatorLength + _wake
 
     readonly property bool hasTarget: focusedRowIndex >= 0
@@ -1984,7 +1985,10 @@ Item {
             // run of moves is one chase rather than a series of held targets and snaps.
             if (root._rowsTravelling || root._frameStep > 1.5) {
                 _pendingTop = -1
-                _retargetIndicator(top, "moving:" + root.focusedWindowKey, false)
+                // `_aimIndicator`, NOT `_retargetIndicator` with the same key: the key this
+                // branch would hand over is the one already committed, so the call came
+                // straight back here - the recursion is silent in QML and nothing moved.
+                _aimIndicator(top)
                 return
             }
             _pendingTop = top
@@ -2004,15 +2008,68 @@ Item {
         // So a travelling row is handed to the animated path - the same two `Behavior`s a
         // focus change uses, which is what puts the wake back.
         if (root._rowsTravelling)
-            _retargetIndicator(top, "moving:" + root.focusedWindowKey, false)
+            _aimIndicator(top)
         else
             _snapIndicator(top)
+    }
+
+    // Re-aim both ends at `top`, animating, WITHOUT asking whether the identity changed.
+    //
+    // This is the body of `_retargetIndicator`'s switch branch, split out because that
+    // branch cannot be reached twice for one identity: `_retargetIndicator` compares the key
+    // it is handed against `_targetKey`, and a caller that passes the SAME key - which is
+    // exactly what a row travelling under a settled focus does - fell through to a line that
+    // called `_retargetIndicator` with that same key again. The recursion was silent and
+    // total: nothing moved, because the innermost call re-entered at the same point and the
+    // stack ran out before any write happened. Measured on "close the middle window, focus
+    // lands on the next one": the row travelled 68 -> 34 and the bar did not move at all.
+    function _aimIndicator(top) {
+        if (!isFinite(top))
+            return
+        if (Math.abs(top - _anchorY) < 0.5)
+            return
+        // A BIG STEP IS A RELOCATION, not a layout follow, and the two want opposite
+        // treatment. The transition's first frame is one: the focused row's index moves and
+        // the mark has to travel a pitch to reach it, which is an ordinary focus step and
+        // must be animated or the mark is cut across the panel. Every frame after that is
+        // the layout carrying the row a pixel at a time, which must NOT be animated - see
+        // below. Half a pitch is the dividing line and it is not arbitrary: a slot's whole
+        // shortfall is one pitch, so anything under half of it is the collapse itself.
+        if (Math.abs(top - _anchorY) > root.rowPitch / 2) {
+            _retargetIndicator(top, "moving:" + root.focusedWindowKey, false)
+            return
+        }
+        _pendingTop = -1
+        _anchorY = top
+        // FOLLOWED, not animated - and the distinction is the whole of it. This is called on
+        // every frame of a slot opening or closing, so a `Behavior` here is handed a new
+        // target 60 times a second: each write restarts the easing from wherever the value
+        // had got to, which is a few tenths of a pixel, and the head never leaves its start.
+        // Measured, exactly that - `_anchorY` walked 35 -> 64.6 with the collapsing slot
+        // while `_headY` stayed at 35.000 for the entire exit.
+        //
+        // The bar is not travelling under its own power here: it is being carried by the
+        // layout, and the rows it sits between are not animating either - they are where
+        // `slotTopAt` puts them on this frame. So the mark goes there on this frame too.
+        // `_snapping` only stops a NEW animation from starting; it does not end one already
+        // in flight, and the frame this first runs on has the previous flight's `Behavior`
+        // still running. Every write after that is then swallowed by an animation that is
+        // easing toward a target from before the transition began - measured, the head froze
+        // at 38.3 for the whole exit while the row it marks travelled 59 -> 35.
+        //
+        // Stopping it outright is what makes the follow a follow.
+        indicatorHeadAnimation.stop()
+        indicatorTailAnimation.stop()
+        _snapping = true
+        _headY = top
+        _tailY = top
+        _snapping = false
     }
 
     // Is a row on the ACTIVE column travelling out of a reorder right now? Asked of the
     // strip because that is where the travel lives, and asked as its own property so this
     // file reads one flag rather than reaching into a column's items.
-    readonly property bool _rowsTravelling: strip.rowsReordering
+    readonly property bool _rowsTravelling: strip.rowsTransitioning
 
     // Apply a drift that landed mid-trail, once the tail has caught up. The widget's
     // `_edgePendingCenterX` timer, and for the same reason: it waits on the TAIL rather
@@ -2480,11 +2537,28 @@ Item {
     // Named rather than written out because it has more than one caller, and one of them
     // had put the marker's own landing back on a negative row.
     function _restingY() {
-        // The LIVE index, for the reason `_frameAnchorY` records: `focusedRowIndex` counts
-        // the slots playing their exit, so the bar was aimed one pitch low whenever focus
-        // landed on the row after a closing window - and then walked back up as that slot
-        // collapsed. The outline beside it had the same fault and the same fix.
-        return root.hasTarget ? root._targetYFor(strip.focusedLiveIndex)
+        // The SAME formula the frame's anchor uses, and it has to be: the bar is the
+        // outline's own lower edge, so the two cannot be built from different indices.
+        //
+        // The live index is where the row will REST (it does not count the holes); `rowLift`
+        // is what those holes still owe, asked at the rendered index. Their sum is where the
+        // row is DRAWN - verified against `slotTopAt` at every step of an exit, 68 -> 34.
+        //
+        // `_targetYFor(index)` alone is neither: aimed at the rendered index it counted the
+        // hole as a position and put the bar a pitch low, and aimed at the live index it
+        // dropped the holes' debt and left the bar still while its row travelled.
+        // The row's OWN drawn position, not `_targetYFor(index)`.
+        //
+        // `_targetYFor` is `index * rowPitch` plus the marker's centring offset, and it has
+        // no idea that a slot above the row can be shorter than its pitch while it closes.
+        // The rows are drawn by `slotTopAt`, which walks those shortfalls, so aiming at the
+        // pure index put the bar 30 pixels below its own outline for the whole of an exit -
+        // the outline glided up with the row and the bar stayed where the row had started.
+        //
+        // `liveRowTop` is the same walk the rows use, plus a reordering row's own travel, so
+        // the bar and the row it marks are one number.
+        return root.hasTarget
+            ? strip.liveRowTop(root.focusedRowIndex) + rowHeight / 2 - indicatorLength / 2
             : root.noRowTop + strip.scrollOffset + root.markerOffset
     }
 
@@ -2706,6 +2780,23 @@ Item {
     // second is a no-op when the first already ran.
     onFocusedWindowKeyChanged: Qt.callLater(_syncIndicator)
     onHasTargetChanged: _syncIndicator()
+    // A ROW ARRIVING OR LEAVING MOVES THE MARK WITHOUT CHANGING ITS TARGET.
+    //
+    // The two hooks above fire on identity, which is the right question for a focus change
+    // and the wrong one for a slot opening or closing under a settled mark: nothing about
+    // WHICH row is marked changed, but where that row is drawn does, for every frame of the
+    // transition. Measured on "close the middle window, focus lands on the next one": the
+    // row travelled 68 -> 34 while the bar sat at 35 for the whole exit, then nothing
+    // reconciled the two.
+    //
+    // The per-frame quantity is the strip's `rowLift`, so the subscription is there; this
+    // hook is on the proxy the file already reads the layout through.
+    Connections {
+        target: strip
+        function onRowLiftChanged() {
+            root._syncIndicator()
+        }
+    }
 
 
     Component.onCompleted: {
