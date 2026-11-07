@@ -274,7 +274,14 @@ Item {
     // that has to survive the delegate being rebuilt; the PROGRESS lives here, because it
     // only means anything while this item is drawing.
     property real _moveProgress: 1
-    on_MoveProgressChanged: root.rowMoved()
+    on_MoveProgressChanged: {
+        // Written back every frame, because a second move landing mid-travel needs to know
+        // how far this one got - see the reconcile's note on `liveProgress`. The record is
+        // the only thing that survives the delegate being rebuilt.
+        if (root.record)
+            root.record.moveProgress = root._moveProgress
+        root.rowMoved()
+    }
 
     NumberAnimation {
         id: moveAnim
@@ -288,7 +295,12 @@ Item {
         // later rebuild of this row replay the same journey - measured, a reorder followed
         // by a departing slot being retired slid the moved row into place and then slid it
         // again from the same place, because the record still named it.
-        onFinished: if (root.record) root.record.moveFrom = -1
+        onFinished: {
+            if (!root.record)
+                return
+            root.record.moveFrom = -1
+            root.record.moveProgress = 1
+        }
     }
 
     // The resting state, written without an animation: the values a finished entry
@@ -458,6 +470,10 @@ Item {
             return
         // From the old place. Written before the restart so the animation's `from` is the
         // start of this travel rather than wherever the record happened to be.
+        // The START comes from the record, which the reconcile has already set to where
+        // this row actually is - not to where the previous travel was heading. `from` is
+        // read at restart, so it has to be the live position or a second move in a fast run
+        // makes the row hop forward and slide back out of it.
         root._moveProgress = 0
         if (MotionTokens.reducedMotion) {
             root._moveProgress = 1

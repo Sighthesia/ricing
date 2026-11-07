@@ -71,6 +71,9 @@ function _copy(record) {
     var out = _fields(record)
     out.key = record.key
     out.moveFrom = record.moveFrom === undefined ? -1 : record.moveFrom
+    // Carried for the same reason `moveFrom` is: a second move landing mid-travel needs to
+    // know how far the first one got, and that is a field of this record.
+    out.moveProgress = record.moveProgress === undefined ? 1 : record.moveProgress
     out.phase = record.phase
     out.delayMs = record.delayMs || 0
     out.presence = record.presence === undefined ? 1 : record.presence
@@ -274,7 +277,28 @@ function reconcileRows(previous, incoming, stepMs) {
                 var incomingIndex = _indexAmongSurviving(next, key, previousByKey)
                 if (previousIndex >= 0 && incomingIndex >= 0
                         && previousIndex !== incomingIndex) {
-                    merged.moveFrom = previousIndex
+                    // WHERE THE ROW ACTUALLY IS, not where the last publish put it.
+                    //
+                    // A second move can land while the first is still travelling - a fast
+                    // run of move-column, which is the reported case. `previousIndex` is the
+                    // place the row was HEADING FOR, so starting the new travel from it
+                    // makes the row jump forward to that place and slide back out of it:
+                    // the eye sees a hop, not a longer journey.
+                    //
+                    // `moveFrom` and `moveProgress` together say where it really is, in the
+                    // previous list's coordinates, and that is the honest start of the new
+                    // one. A row that had settled carries `moveFrom === -1` and no progress,
+                    // which lands on `previousIndex` as before.
+                    var liveFrom = record.moveFrom
+                    var liveProgress = record.moveProgress
+                    if (liveFrom !== undefined && liveFrom >= 0
+                            && liveProgress !== undefined && liveProgress < 1) {
+                        var left = (liveFrom - previousIndex) * (1 - liveProgress)
+                        merged.moveFrom = previousIndex + left
+                    } else {
+                        merged.moveFrom = previousIndex
+                    }
+                    merged.moveProgress = 0
                     merged.moveEpoch = (merged.moveEpoch || 0) + 1
                 }
             }
