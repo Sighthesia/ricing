@@ -1,6 +1,7 @@
 import QtQuick
 import "../lazerbar"
 import "./ShippedWidgets.js" as ShippedWidgets
+import "./WidgetIcons.js" as WidgetIcons
 import "../../services" as Services
 import "../../services/barlayout/BarLayoutSections.js" as BarLayoutSections
 
@@ -262,15 +263,10 @@ Item {
         var item = loader.item
         var point = item.mapToGlobal(item.width / 2, item.height / 2)
         var widgetId = String(item.widgetId || "")
-        var iconSource = widgetId === "volume" ? Qt.resolvedUrl("icons/volume.svg")
-                : widgetId === "brightness" ? Qt.resolvedUrl("icons/brightness.svg")
-                : widgetId === "battery" ? Qt.resolvedUrl("icons/battery.svg")
-                : widgetId === "bluetooth" ? Qt.resolvedUrl("icons/bluetooth.svg")
-                : widgetId === "network" ? Qt.resolvedUrl(Services.NetworkService.ethernetConnected
-                    ? "icons/network-wired.svg" : "icons/wifi.svg")
-                : widgetId === "media" ? Qt.resolvedUrl("../lazerbar/icons/music.svg")
-                : widgetId === "notifications" ? Qt.resolvedUrl("../lazerbar/icons/bell.svg")
-                : widgetId === "tray" ? Qt.resolvedUrl("../lazerbar/icons/apps.svg") : ""
+        var iconName = widgetId === "network"
+                ? WidgetIcons.networkSource(Services.NetworkService.ethernetConnected)
+                : WidgetIcons.sourceFor(widgetId)
+        var iconSource = root.glyphUrl(iconName)
         return {
             kind: "context",
             widgetId: widgetId,
@@ -286,6 +282,20 @@ Item {
             availableWidgets: Services.BarLayoutService.availableWidgets,
             payload: root.contextPayload(Number(point.x)),
         }
+    }
+
+    // Turn a symbolic glyph name from WidgetIcons.js into a real URL. The table
+    // is a library file, so it names the icon set rather than resolving a path
+    // that would only be correct from one importer.
+    function glyphUrl(iconName) {
+        var name = String(iconName || "")
+        if (name === "")
+            return ""
+        if (name.indexOf("bar:") === 0)
+            return Qt.resolvedUrl("icons/" + name.slice(4))
+        if (name.indexOf("lazer:") === 0)
+            return Qt.resolvedUrl("../lazerbar/icons/" + name.slice(6))
+        return ""
     }
 
     // Localised display name for a widget id. One table, so a widget's title in

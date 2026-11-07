@@ -48,8 +48,10 @@ var strings = {
     "widget.widget": { zh: "小组件", en: "Widget" },
 
     // ── Bar right-click menu (BarContextPopupActions) ────────────────────
+    "context.layoutMode": { zh: "布局模式", en: "Layout mode" },
     "context.enterLayoutMode": { zh: "进入布局模式", en: "Enter layout mode" },
     "context.exitLayoutMode": { zh: "退出布局模式", en: "Exit layout mode" },
+    "context.moveWidget": { zh: "移动小组件", en: "Move widget" },
     "context.shellSettings": { zh: "桌面设置", en: "Shell settings" },
     "context.moveLeft": { zh: "左移", en: "Move left" },
     "context.moveRight": { zh: "右移", en: "Move right" },
