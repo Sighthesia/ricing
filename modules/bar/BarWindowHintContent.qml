@@ -357,12 +357,44 @@ Item {
     // glide, and the drawn position below subtracts the layout's own offset on the way out.
     property real _frameAnchorY: focusedRowIndex < 0
         ? noRowTop + strip.scrollOffset : focusedRowIndex * rowPitch
+    // How far the frame is being asked to travel, in row pitches: the distance from where it
+    // was DRAWN to where it now belongs. Read by the glide's own `Behavior` to decide whether
+    // this is a focus step or a reorder - see the note there.
+    // Written BEFORE the anchor moves, from the index change that moves it - the only
+    // moment the distance is knowable ahead of the `Behavior` reading it.
+    property real _frameStep: 0
+    property int _frameShownIndex: -1
     Behavior on _frameAnchorY {
         enabled: !root._markerCrossing && !MotionTokens.reducedMotion
         NumberAnimation {
             id: focusFrameGlide
-            duration: MotionTokens.settingsSidebarCollapse * debugTimeScale
-            easing.type: Easing.OutQuint
+            // A REORDER carries the frame on its own clock, not the sidebar's.
+            //
+            // `settingsSidebarCollapse` (300ms) is the right weight for a focus step inside
+            // a still list, and it was what this always used. But a reorder moves the rows
+            // UNDER the frame at the same time, and two motions on one mark read as the mark
+            // skimming over cards that are still sliding - the reported "it teleports while
+            // the cards travel". Sharing `windowRowMove` makes the frame and the rows it is
+            // crossing arrive together, which is what makes it one gesture.
+            // A REORDER IS PACED FROM ITS OWN LENGTH, not from the strip's flag.
+            //
+            // `strip.rowsTransitioning` is the honest question, but it goes true on the SAME
+            // frame the index changes - and a `Behavior` reads its `duration` before that
+            // turn's bindings have settled, so the first frame of every reorder was still
+            // paced as a one-row focus step. Measured, that put the frame at 77.6 on the
+            // frame the index changed, from 102, which is the hop the user saw.
+            //
+            // How far the frame is going is known here without asking anything: `_frameStep`
+            // is the distance from where the frame was drawn to where it now belongs, in row
+            // pitches. One row is a focus step; several is a reorder.
+            duration: (root._frameStep > 1.5
+                ? MotionTokens.windowRowMove
+                : MotionTokens.settingsSidebarCollapse) * debugTimeScale
+            // `OutCubic` for the long step: `OutQuint` spends a quarter of the distance in
+            // the first frame, which for the frame's whole-list travel is a visible hop. The
+            // cards move on `OutQuint` and move a SINGLE pitch each, so the same curve is a
+            // much smaller step for them.
+            easing.type: root._frameStep > 1.5 ? Easing.OutCubic : Easing.OutQuint
         }
     }
     // The leaving frame's own height, from the row counts of the frame being held
@@ -1484,7 +1516,19 @@ Item {
             && !MotionTokens.reducedMotion && !root._snapping
         NumberAnimation {
             id: indicatorHeadAnimation
-            duration: MotionTokens.medium * debugTimeScale
+            // A REORDER IS THE ROWS' GESTURE, so the head travels on the rows' clock.
+            //
+            // `medium` (160ms) is the widget's own head, and it is right for a focus step
+            // inside a still list: the bar overtakes the outline slightly and settles, which
+            // is what gives the widget its snap. During a reorder the outline and the rows
+            // are BOTH travelling, and a head twice as fast arrives at the new row while the
+            // cards are still half way there - which is the reported "the indicator
+            // teleports": it is not teleporting, it is finishing first, against a background
+            // that is still moving. Matching `windowRowMove` puts the mark and the rows it
+            // crosses on one clock, so it reads as the bar being carried by the list.
+            duration: (strip.rowsTransitioning
+                ? MotionTokens.windowRowMove
+                : MotionTokens.medium) * debugTimeScale
             easing.type: Easing.OutQuad
         }
     }
@@ -1893,8 +1937,29 @@ Item {
             _pendingTop = top
             return
         }
-        _snapIndicator(top)
+        // A ROW THAT IS TRAVELLING IS A MOVE, not a drift.
+        //
+        // This branch is the widget's answer to content churn: the target has not changed
+        // identity, so the bar is CUT to where it now belongs instead of flying there -
+        // right for a slot closing under a settled row, where a flight would be a second
+        // motion invented by a layout correction.
+        //
+        // A reorder is the opposite case and it arrives here, because the window that is
+        // focused is the SAME window (`focusedWindowKey` does not change) while the row it
+        // sits on travels several pitches. Cutting there is the reported "the indicator
+        // teleports during a reorder": the rows slide and the bar arrives already there.
+        // So a travelling row is handed to the animated path - the same two `Behavior`s a
+        // focus change uses, which is what puts the wake back.
+        if (root._rowsTravelling)
+            _retargetIndicator(top, "moving:" + root.focusedWindowKey, false)
+        else
+            _snapIndicator(top)
     }
+
+    // Is a row on the ACTIVE column travelling out of a reorder right now? Asked of the
+    // strip because that is where the travel lives, and asked as its own property so this
+    // file reads one flag rather than reaching into a column's items.
+    readonly property bool _rowsTravelling: strip.rowsTransitioning
 
     // Apply a drift that landed mid-trail, once the tail has caught up. The widget's
     // `_edgePendingCenterX` timer, and for the same reason: it waits on the TAIL rather
@@ -2163,8 +2228,18 @@ Item {
         // position: anchor minus scroll, with no `Behavior` of its own. A `Behavior`
         // here would chase a target the reveal scroll rewrites every tick and pin
         // the frame until the scroll lands - see `_frameAnchorY`.
+        // The anchor minus the viewport's scroll, and NOT `rowLift`.
+        //
+        // `rowLift` is the sum of the slots ABOVE the focused row being shorter than their
+        // pitch - which is what a collapsing row does to everything below it, and it is
+        // already in the anchor's own travel: `_frameAnchorY` is a pure function of the
+        // index, and `liveRowTop` is what adds the layout's offset to it. Subtracting it
+        // here as well meant a reorder moved the frame by the travel of the rows it crossed,
+        // on top of the glide that was already carrying it - measured, a four-row swap put
+        // the frame at 77.6 on the frame the index changed instead of starting from the 102
+        // it was drawn at.
         y: root._markerCrossing ? root.crossingTop
-            : root._frameAnchorY - strip.scrollOffset - strip.rowLift
+            : root._frameAnchorY - strip.scrollOffset
         width: root._markerCrossing ? root.markerWidth : strip.activeCardWidth
         height: root.rowHeight
         // Drawn for the whole of an exit, so the outline is the thing the bar is seen to
@@ -2537,6 +2612,13 @@ Item {
     }
 
     onFocusedRowIndexChanged: {
+        // How far the frame is being asked to travel, in rows - read by its glide to tell a
+        // reorder from a focus step, and written here because this is the turn the anchor
+        // moves on. See the note in the `Behavior`.
+        const shown = root._frameShownIndex
+        root._frameShownIndex = root.focusedRowIndex
+        root._frameStep = (shown < 0 || root.focusedRowIndex < 0)
+            ? 0 : Math.abs(root.focusedRowIndex - shown)
         // The tracker waits a turn, and the ordering is why. `_syncIndicator` reads
         // `hasTarget` and `focusedRowIndex`, both of which are derived from `activeColumn`
         // and `plan`; a change handler runs as soon as its own property is notified, which

@@ -289,7 +289,11 @@ Item {
         property: "_moveProgress"
         to: 1
         duration: MotionTokens.windowRowMove
-        easing.type: Easing.OutCubic
+        // `OutQuint`: the shell's primary ease, and the one the workspace highlight and the
+        // focus frame already travel on. `OutCubic` spent a fifth of the distance in the
+        // first frame, which is what made a swap read as a twitch rather than as two cards
+        // passing each other - see the token.
+        easing.type: Easing.OutQuint
         // The travel is SPENT once it has arrived, and the record says so. `moveFrom` is
         // what the next delegate reads to know where to start, so leaving it set makes every
         // later rebuild of this row replay the same journey - measured, a reorder followed
