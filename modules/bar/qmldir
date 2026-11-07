@@ -19,3 +19,4 @@ BarAudioDeviceList 1.0 BarAudioDeviceList.qml
 BarAudioMixer 1.0 BarAudioMixer.qml
 BarContextPopupActions 1.0 BarContextPopupActions.qml
 BarTrayMenuContent 1.0 BarTrayMenuContent.qml
+BarDivider 1.0 ../lazerbar/BarBoundaryStrip.qml

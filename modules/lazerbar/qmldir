@@ -70,3 +70,4 @@ LauncherExitCard 1.0 LauncherExitCard.qml
 LazerSplitSurface 1.0 LazerSplitSurface.qml
 TwoLayerPopup 1.0 TwoLayerPopup.qml
 BarSeamFillets 1.0 BarSeamFillets.qml
+BarDivider 1.0 BarBoundaryStrip.qml
