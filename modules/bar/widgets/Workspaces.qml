@@ -45,6 +45,15 @@ Item {
     // active workspace or the focused app changes.
     property real indicatorCenterX: 0
     property bool indicatorVisible: false
+    // Is the thing the mark points at itself moving? A reorder moves the focused icon's
+    // place every frame, and a mark handed a new number every frame cannot be eased to it -
+    // see `TrailIndicator.targetTravelling`.
+    //
+    // Written by `updateIndicator` itself, which is the routine that already runs whenever a
+    // slot moves: it asks the focused slot whether it has arrived. No second clock and no
+    // change handler - a `Behavior`-driven write does not notify the properties derived from
+    // it, which is why two earlier attempts at watching it never fired once.
+    property bool indicatorTravelling: false
 
     readonly property int iconSize: Math.round(LazerTheme.barGlyphSize * 0.75)
     readonly property int iconSpacing: 4
@@ -495,6 +504,16 @@ Item {
         root.indicatorTargetKey = focusedIndex >= 0 ? "w" + root.focusedWinId
                                                     : "s" + targetIndex
         root.indicatorCenterX = centerX
+        // Is the thing we just pointed at still travelling? A slot mid-reorder is, and the
+        // mark has to be PINNED to it for as long as that lasts - see
+        // `TrailIndicator.targetTravelling`. Asked here because this routine is already
+        // called on every frame a slot moves (`onXChanged`), and because a
+        // `Behavior`-driven write notifies no derived property: two earlier attempts at
+        // watching it from a handler never fired once.
+        if (focusedIndex >= 0)
+            root.indicatorTravelling = targetItem.iconTravelsFor(root.focusedWinId)
+        else
+            root.indicatorTravelling = false
         if (!root.indicatorVisible)
             root.indicatorVisible = true
     }
@@ -585,6 +604,20 @@ Item {
                 function centerXInRoot() {
                     const p = workspaceSquare.mapToItem(root, workspaceSquare.width / 2, 0)
                     return p.x
+                }
+
+                // Is this workspace's slot for `winId` moving right now? Asked of the
+                // delegate's own `Behavior`, which is the only thing that knows.
+                function iconTravelsFor(winId) {
+                    const target = String(winId)
+                    for (let i = 0; i < windowRepeater.count; i++) {
+                        const item = windowRepeater.itemAt(i)
+                        if (!item || item.winId === undefined)
+                            continue
+                        if (String(item.winId) === target)
+                            return item.travels === true
+                    }
+                    return false
                 }
 
                 // Center of one app icon in Workspaces coordinates; NaN when
@@ -749,7 +782,11 @@ Item {
                             // binding on their `presence` - so a slot arriving or leaving
                             // shifts the ones after it on the same frame, and a reorder
                             // slides the ones in between.
-                            x: {
+                            // Where this slot BELONGS: everything before it, and nothing
+                            // else. Split out from `x` so that the difference between the two
+                            // is readable - that difference is the travel, and it is what the
+                            // indicator is told about (see `travels`).
+                            readonly property real slotX: {
                                 workspaceSquare._stripRevision
                                 let left = indexLabel.width
                                 for (let i = 0; i < windowIcon.index && i < windowRepeater.count; i++) {
@@ -759,6 +796,7 @@ Item {
                                 }
                                 return left
                             }
+                            x: slotX
 
                             // The travel itself, on the slot's own clock. `OutCubic` rather
                             // than the hint list's `OutQuint`: this strip is one icon tall
@@ -768,6 +806,7 @@ Item {
                             // computes every slot's place from nothing, and animating that
                             // would slide the whole strip in from the left edge.
                             Behavior on x {
+                                id: xBehavior
                                 enabled: root._iconPrimed && !MotionTokens.reducedMotion
                                 NumberAnimation {
                                     duration: MotionTokens.windowRowMove
@@ -789,6 +828,17 @@ Item {
                             // travel and then jumped to the new one when something else
                             // happened to ask. Measured on a two-icon swap, the icons crossed
                             // frame by frame while the indicator did not move at all.
+                            // Exposed for `iconTravelsFor`: the square asks its own
+                            // delegate whether it is under way.
+                            //
+                            // Measured as "not yet where it belongs", not from the
+                            // animation's own `running`: a `Behavior`'s `NumberAnimation`
+                            // does not report that reliably inside this component - measured,
+                            // a handler on it never fired once across a whole reorder while
+                            // the icons were visibly travelling. The slot's `x` and the sum it
+                            // is heading for are both available, and their difference is the
+                            // honest answer.
+                            readonly property bool travels: Math.abs(x - slotX) > 0.5
                             onXChanged: Qt.callLater(root.updateIndicator)
                             onWidthChanged: Qt.callLater(root.updateIndicator)
 
@@ -989,6 +1039,7 @@ Item {
         // Nothing to aim at until the widget has published a target, which is
         // also what keeps the first one a placement rather than a switch.
         targetValid: root.indicatorVisible
+        targetTravelling: root.indicatorTravelling
         visible: root.indicatorVisible
         crossAxis: LazerTheme.barLevelTop
     }

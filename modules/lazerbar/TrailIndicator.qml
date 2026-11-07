@@ -79,6 +79,23 @@ Item {
 // normal state DURING a switch.
     property bool targetValid: true
 
+    // The target is TRAVELLING: the thing this mark points at is itself moving, so
+    // `targetCenter` is a new number on every frame rather than a place it was committed to.
+    //
+    // This is the one case the two-`Behavior` recipe cannot serve, and the reason is in the
+    // numbers above: a `Behavior` animates toward the value it is next ASSIGNED, and an
+    // assignment re-aimed every frame restarts its easing before it leaves the start of its
+    // curve - measured at ~5% of the gap on the first tick, which is a tail that never
+    // moves. It is also why the drift branch below cannot be the answer: that branch treats
+    // a moved target as layout churn and CUTS to it, which is right for a resize and wrong
+    // for a mark whose subject is crossing the strip.
+    //
+    // So this is the pinned case, and it uses the pinned mechanism: the head is written
+    // straight to the target every frame, and the tail follows it on a wall-clock tick.
+    // `modules/bar/BarWindowHintContent.qml` is where both halves of that split were
+    // measured; `lazer-motion-perf` records it.
+    property bool targetTravelling: false
+
     // --- Tracker ----------------------------------------------------------
 
     // Same-selection movement smaller than this is layout noise, not a
@@ -136,13 +153,69 @@ Item {
 
     // Head on the widget's own curve, tail on its own slower one. Same gate on
     // both, so neither can be re-targeted a frame ahead of the other.
+    //
+    // Both stand down while `targetTravelling` is set: see the pinned path below, which is
+    // the one case where a fixed target does not exist.
     Behavior on _head {
         enabled: root._committed && !MotionTokens.reducedMotion && !root._snapping
+            && !root.targetTravelling
         NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad }
     }
     Behavior on _tail {
         enabled: root._committed && !MotionTokens.reducedMotion && !root._snapping
+            && !root.targetTravelling
         NumberAnimation { duration: MotionTokens.slow * 2; easing.type: Easing.OutSine }
+    }
+
+    // --- the pinned path: a target that is itself moving -------------------
+    //
+    // While `targetTravelling` is set the two `Behavior`s above are disabled and this pair
+    // takes over: the head is WRITTEN to the target every frame (a sweep has no fixed place
+    // to fly to), and the tail closes a fraction of the remaining gap per tick, so the wake
+    // is the head's own travel over the last `interval / k` of wall time.
+    //
+    // The rate is `BarWindowHintContent.trailCatchUp`'s 0.2, which is the value that split
+    // was tuned to: a wake is `1/k` of the head's per-tick travel, so 0.2 draws a trail five
+    // times the distance the head covers in a tick, and it closes in about 330ms.
+    readonly property real followRate: 0.2
+
+    // Pinned every frame by the handler below, so nothing here needs to know how often the
+    // target moves - it only has to be told that it did.
+    function _pin() {
+        if (!root.targetTravelling || !root.targetValid || !isFinite(root.targetCenter))
+            return
+        const target = root._target
+        if (!root._committed) {
+            root._snapTo(root.targetCenter)
+            return
+        }
+        // A new identity while travelling is still a switch: commit the anchor and blink,
+        // and let the travel carry both ends from wherever they are.
+        if (String(root.targetKey) !== root._key) {
+            root._key = String(root.targetKey)
+            root._anchor = target
+            flashAnimation.restart()
+        }
+        root._snapping = true
+        root._head = target
+        root._snapping = false
+        root._anchor = target
+        root._hasPending = false
+    }
+
+    Timer {
+        id: followTick
+        interval: 16
+        repeat: true
+        running: root.targetTravelling && root._committed && !MotionTokens.reducedMotion
+        onTriggered: {
+            const gap = root._head - root._tail
+            if (Math.abs(gap) < 0.5)
+                return
+            root._snapping = true
+            root._tail += gap * root.followRate
+            root._snapping = false
+        }
     }
 
     // Apply a held drift as one snap, but only once the mark has landed.
@@ -234,7 +307,33 @@ Item {
 
     // --- Geometry changes and target changes all land here ---------------
 
-    onTargetCenterChanged: _schedule()
+    onTargetCenterChanged: {
+        // A travelling target is pinned on the frame it moves; the coalesced commit below is
+        // for a target that was COMMITTED to a place, and would cut the wake.
+        if (root.targetTravelling) {
+            root._pin()
+            return
+        }
+        _schedule()
+    }
+    onTargetTravellingChanged: {
+        if (root.targetTravelling) {
+            // Hand the head to the target now rather than easing into a sweep, and let the
+            // tail follow from wherever it was - that is the wake the travel starts with.
+            root._pin()
+            return
+        }
+        // The travel is over: hand both ends back to the `Behavior`s, which re-aim from
+        // where they are onto the committed anchor. Deferred a turn, because a `Behavior`
+        // captures its target when its `enabled` goes true.
+        Qt.callLater(function () {
+            if (root.targetTravelling || !root._committed)
+                return
+            root._anchor = root._target
+            root._head = root._target
+            root._tail = root._target
+        })
+    }
     onTargetKeyChanged: _schedule()
     onTargetValidChanged: _schedule()
     onMarkLengthChanged: _schedule()
