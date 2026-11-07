@@ -377,6 +377,30 @@ function anyMoving(rows) {
     return false
 }
 
+// Is a row CROSSING to a new place - which is a different question from "is anything
+// happening", and the difference is a whole mechanism.
+//
+// `anyMoving` answers the first: an arrival or a departure changes the LAYOUT, so anything
+// placed by summing slots has to be recomputed while it runs. This answers the second: a row
+// is travelling from one place to another, so the thing that marks it has no fixed target to
+// ease toward and has to be PINNED instead.
+//
+// They were the same predicate, and that is what put a trail on a window closing. A
+// departing row does not move - it dissolves where it is - so its marker's target does not
+// move either; but `anyMoving` was true for it, the marker was switched to the pinned
+// mechanism, and the pinned mechanism's head was written to a target that never changed
+// while its tail walked in from wherever the previous travel had left it. Measured: head
+// pinned at 35 for the whole exit while the tail crawled -30 -> 35 behind it, a wake drawn
+// under a mark that was not going anywhere.
+function anyReordering(rows) {
+    var list = _list(rows)
+    for (var i = 0; i < list.length; ++i) {
+        if (list[i] && list[i].moveFrom !== undefined && list[i].moveFrom >= 0)
+            return true
+    }
+    return false
+}
+
 // How much shorter than its resting height the slot at `index` is, in pixels, right
 // now: a collapsing or opening slot changes the offset of every row below it, and
 // the focus markers are placed against the rows, not against the pitch.

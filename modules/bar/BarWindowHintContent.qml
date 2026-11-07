@@ -2012,7 +2012,7 @@ Item {
     // Is a row on the ACTIVE column travelling out of a reorder right now? Asked of the
     // strip because that is where the travel lives, and asked as its own property so this
     // file reads one flag rather than reaching into a column's items.
-    readonly property bool _rowsTravelling: strip.rowsTransitioning
+    readonly property bool _rowsTravelling: strip.rowsReordering
 
     // Apply a drift that landed mid-trail, once the tail has caught up. The widget's
     // `_edgePendingCenterX` timer, and for the same reason: it waits on the TAIL rather

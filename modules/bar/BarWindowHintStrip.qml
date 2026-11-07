@@ -377,6 +377,13 @@ Item {
         root.rowRevision
         return RowMotion.anyMoving(root.activeRows)
     }
+    // A row CROSSING to a new place, which is NOT the same question - see `anyReordering`.
+    // Only this one means the markers have no fixed target to ease toward; a row arriving or
+    // leaving changes the layout under them but leaves their target where it is.
+    readonly property bool rowsReordering: {
+        root.rowRevision
+        return RowMotion.anyReordering(root.activeRows)
+    }
 
     // The strip's own columns, as objects: what is actually on the strip right now, rather
     // than what the model says should be. Readable from outside this file because a
