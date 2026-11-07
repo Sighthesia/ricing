@@ -5,6 +5,7 @@ import Quickshell.Widgets
 import "../../lazerbar"
 import "../../../services" as Services
 import "WorkspacesWheel.js" as WheelLogic
+import "TraySlotLogic.js" as SlotLogic
 
 // Workspace overview squares that expand to show each workspace's app icons
 // (noctalia-shell grouped mode): click a square to focus the workspace, click
@@ -48,6 +49,11 @@ Item {
     readonly property int iconSize: Math.round(LazerTheme.barGlyphSize * 0.75)
     readonly property int iconSpacing: 4
     readonly property int cellPadding: 8
+    // The first population must not replay an arrival for every icon the shell already
+    // had. Set one turn after the widget is built, so the initial sync lands settled and
+    // only real changes animate after it.
+    property bool _iconPrimed: false
+
     // Wheel throttle: one focus step per 120ms so a single flick never
     // floods niri with a burst of focus-window/focus-workspace calls.
     property double _lastWheelTimeMs: 0
@@ -69,6 +75,11 @@ Item {
         return root.workspaceModels[String(wsId)]
     }
 
+    // Does this square still need the icon strip? A workspace whose last windows are
+    // playing their exit still does: collapsing the square to a bare number on that frame
+    // would clip the icons mid-dissolve, which is a worse cut than the one being removed.
+    // The square closes when the last slot is retired, which is what `completeIconRetire`
+    // asks for.
     function hasWindowsFor(wsId) {
         const model = root.winsFor(wsId)
         return !!model && model.count > 0
@@ -104,16 +115,7 @@ Item {
     }
 
     function iconPathForApp(appId) {
-        const fallback = Quickshell.iconPath("application-x-executable")
-        const normalizedAppId = String(appId || "")
-        if (!normalizedAppId)
-            return fallback
-
-        const entry = Quickshell.desktopEntries
-            ? Quickshell.desktopEntries.byId(normalizedAppId)
-            : null
-        const iconName = entry && entry.icon ? String(entry.icon) : normalizedAppId
-        return Quickshell.iconPath(iconName, "application-x-executable") || fallback
+        return Services.WindowHintService.iconPathForApp(appId)
     }
 
     // Plain-array snapshots so the wheel resolver stays testable without
@@ -242,40 +244,122 @@ Item {
     // refresh changed app identities. Untouched rows (and their delegates
     // and images) are never modified.
     function syncIconModel(model, rows) {
+        // A window that left is FLAGGED, not removed: its slot stays resident so the
+        // delegate can play the exit, and the row is dropped by `completeIconRetire`
+        // once that has run. Removing it here would be a cut - the strip would close
+        // its gap and re-place every icon to its right on the same frame.
+        const wanted = {}
+        for (let k = 0; k < rows.length; k++)
+            wanted[String(rows[k].winId)] = true
+        let departing = 0
+        for (let i = 0; i < model.count; i++)
+            if (!wanted[String(model.get(i).winId)] && !model.get(i).retiring)
+                departing++
+        let goneSoFar = 0
         for (let i = model.count - 1; i >= 0; i--) {
             const id = String(model.get(i).winId)
-            let keep = false
-            for (let k = 0; k < rows.length; k++) {
-                if (String(rows[k].winId) === id) {
-                    keep = true
-                    break
-                }
-            }
-            if (!keep)
-                model.remove(i, 1)
+            if (wanted[id] || model.get(i).retiring)
+                continue
+            // Departures cascade right to left, the same wavefront the tray strip uses
+            // for the icons it loses.
+            model.setProperty(i, "delayMs", SlotLogic.cascadeDelayMs(
+                goneSoFar, departing, MotionTokens.windowRowStagger, true))
+            model.setProperty(i, "retiring", true)
+            goneSoFar++
         }
+        let arriving = 0
+        for (let j = 0; j < rows.length; j++)
+            if (root.iconIndexFor(model, String(rows[j].winId)) < 0)
+                arriving++
+        let arrivedSoFar = 0
         for (let j = 0; j < rows.length; j++) {
             const want = String(rows[j].winId)
             const appId = String(rows[j].appId || "")
-            let at = -1
-            for (let m = 0; m < model.count; m++) {
-                if (String(model.get(m).winId) === want) {
-                    at = m
-                    break
-                }
-            }
+            let at = root.iconIndexFor(model, want)
             if (at < 0) {
+                // Arrivals cascade left to right, and the slot opens before the ink
+                // lands - see the delegate.
                 model.insert(j, {
                     winId: want,
-                    appId: appId
+                    appId: appId,
+                    retiring: false,
+                    delayMs: SlotLogic.cascadeDelayMs(
+                        arrivedSoFar, arriving, MotionTokens.windowRowStagger, false)
                 })
+                arrivedSoFar++
             } else {
                 if (at !== j)
                     model.move(at, j, 1)
                 if (String(model.get(j).appId) !== appId)
                     model.setProperty(j, "appId", appId)
+                // A window that came back during its exit revives its slot rather than
+                // growing a second one for the same identity.
+                if (model.get(j).retiring)
+                    model.setProperty(j, "retiring", false)
             }
         }
+        root.settleIconOrder(model)
+    }
+
+    // The index of `winId` in a model, or -1. A function rather than a loop at each use,
+    // because three of them now ask.
+    function iconIndexFor(model, winId) {
+        if (!model)
+            return -1
+        const target = String(winId)
+        for (let i = 0; i < model.count; i++)
+            if (String(model.get(i).winId) === target)
+                return i
+        return -1
+    }
+
+    // Is this window still on the workspace the model belongs to?
+    function isIconLive(model, winId) {
+        const target = String(winId)
+        for (let w = 0; w < Services.NiriService.windows.count; w++) {
+            const win = Services.NiriService.windows.get(w)
+            if (String(win.winId) === target)
+                return true
+        }
+        return false
+    }
+
+    // Push every retiring slot to the END of the model, past the live ones.
+    //
+    // The live icons' order is the contract: they are the strip the user reads, and a
+    // slot on its way out must not hold one of them out of its place while it plays.
+    // The retiring rows keep their own relative order, so the departures cascade in the
+    // order they were flagged.
+    function settleIconOrder(model) {
+        let live = 0
+        for (let i = 0; i < model.count; i++)
+            if (!model.get(i).retiring)
+                live++
+        let tail = live
+        for (let i = 0; i < model.count; i++) {
+            if (!model.get(i).retiring)
+                continue
+            if (i !== tail)
+                model.move(i, tail, 1)
+            tail++
+        }
+    }
+
+    // A retiring icon finished its exit. Drop the row only if the window really is gone;
+    // one that came back during the exit revived its slot instead.
+    function completeIconRetire(model, winId) {
+        const at = root.iconIndexFor(model, winId)
+        if (at < 0)
+            return
+        if (!model.get(at).retiring)
+            return
+        if (root.isIconLive(model, winId))
+            return
+        model.remove(at, 1)
+        // The square may have just lost its last slot, in which case it now has to
+        // collapse - and the strip it was holding open has to stop being counted.
+        Qt.callLater(root.updateIndicator)
+        Qt.callLater(root.updateHighlight)
     }
 
     // Event-stream bursts coalesce into one rebuild per frame.
@@ -413,6 +497,8 @@ Item {
         root.refreshWindowMap()
         Qt.callLater(root.updateIndicator)
         Qt.callLater(root.updateHighlight)
+        // Only after the first population has been written: see `_iconPrimed`.
+        Qt.callLater(function () { root._iconPrimed = true })
     }
 
     implicitWidth: workspaceRow.implicitWidth
@@ -461,8 +547,12 @@ Item {
                 readonly property bool hasWindows: root.hasWindowsFor(wsId)
                 readonly property bool hovered: hoverHandler.hovered
 
-                width: hasWindows ? contentRow.implicitWidth + root.cellPadding * 2
-                                  : LazerTheme.barWidgetHeight
+                // The trailing gap is subtracted: every icon slot is `iconSize +
+                // `iconSpacing` wide so that a closing one takes its gap with it, which
+                // leaves one gap at the end of the strip that belongs to nothing.
+                width: hasWindows
+                    ? contentRow.implicitWidth - root.iconSpacing + root.cellPadding * 2
+                    : LazerTheme.barWidgetHeight
                 height: LazerTheme.barWidgetHeight
 
                 onXChanged: {
@@ -520,7 +610,12 @@ Item {
                     id: contentRow
 
                     anchors.centerIn: parent
-                    spacing: root.iconSpacing
+                    // Zero, because each icon slot carries its own trailing gap (see the
+                    // delegate's `width`): with `Row` spacing as well, a slot closing to
+                    // nothing would leave that gap behind, which is a dead gap exactly
+                    // where an icon is leaving. `Tray.qml` does the same, and the square's
+                    // width subtracts the trailing gap back out.
+                    spacing: 0
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
@@ -544,6 +639,8 @@ Item {
 
                             required property string winId
                             required property string appId
+                            required property bool retiring
+                            required property int delayMs
 
                             // Bound to the shared focus property: focus-only
                             // events never rebuild delegates, and the role
@@ -551,21 +648,175 @@ Item {
                             readonly property bool isFocused: windowIcon.winId === root.focusedWinId
                             readonly property bool hovered: iconHover.hovered
 
-                            width: root.iconSize
-                            height: root.iconSize
+                            // The windowhint row recipe, at the bar's icon size: the slot
+                            // opens before its ink lands, and closes only once the ink is
+                            // gone. `presence` is the slot's WIDTH (this strip runs along
+                            // the bar, so a slot opening is a width), `ink` is the icon's
+                            // opacity.
+                            //
+                            // These live on the ITEM, not on the model row. A row is a
+                            // plain object, so assigning a field on it notifies nothing -
+                            // a width bound to it would keep the value it computed on the
+                            // first frame and draw a slot that never moves.
+                            // Written by `settle()`, not bound: a BINDING here would
+                            // re-evaluate the moment `_iconPrimed` flips and drop every
+                            // already-placed icon to zero, replaying an arrival for the
+                            // whole strip. The initial value is the settled one, and only
+                            // a real arrival animates from zero.
+                            property real presence: 1
+                            property real ink: 1
 
+                            // The slot carries its own gap, so a slot closing to nothing
+                            // takes its gap with it instead of leaving the strip one gap
+                            // wider until the row is dropped.
+                            width: presence * (root.iconSize + root.iconSpacing)
+                            height: root.iconSize
+                            // Off while it has no size or no ink: a slot mid-flight takes no
+                            // hover and no tap.
+                            enabled: !windowIcon.retiring && presence > 0.99 && ink > 0.99
+
+                            // The indicator resolves its position through
+                            // `iconCenterXInRoot`, which reads this item's own width - and a
+                            // width that is animating has no binding to invalidate in a
+                            // function call. Without this the mark sits on the old position
+                            // for the whole of a slot's arrival or departure and then jumps.
+                            onWidthChanged: Qt.callLater(root.updateIndicator)
+
+                            // --- arrival: open the slot, then let the ink in ---------
+                            SequentialAnimation {
+                                id: iconEnter
+                                animations: [
+                                    NumberAnimation {
+                                        target: windowIcon
+                                        property: "presence"
+                                        to: 1
+                                        duration: MotionTokens.windowRowEnter
+                                        easing.type: Easing.OutQuad
+                                    },
+                                    NumberAnimation {
+                                        target: windowIcon
+                                        property: "ink"
+                                        to: 1
+                                        duration: MotionTokens.windowRowEnterInk
+                                        easing.type: Easing.OutQuad
+                                    }
+                                ]
+                            }
+
+                            Timer {
+                                id: iconEnterDelay
+                                onTriggered: iconEnter.restart()
+                            }
+
+                            // --- departure: dissolve the ink while the slot closes -----
+                            ParallelAnimation {
+                                id: iconExit
+                                animations: [
+                                    NumberAnimation {
+                                        target: windowIcon
+                                        property: "ink"
+                                        to: 0
+                                        duration: MotionTokens.windowRowExitInk
+                                        easing.type: Easing.OutQuad
+                                    },
+                                    NumberAnimation {
+                                        target: windowIcon
+                                        property: "presence"
+                                        to: 0
+                                        duration: MotionTokens.windowRowExit
+                                        easing.type: Easing.InQuad
+                                    }
+                                ]
+                                // The row is dropped by the OWNER once the slot is empty,
+                                // and it asks the model whether the window really left - a
+                                // window that came back mid-exit revived its slot instead.
+                                onFinished: root.completeIconRetire(
+                                    windowSquare ? windowSquare.wins : null, windowIcon.winId)
+                            }
+
+                            Timer {
+                                id: iconExitDelay
+                                onTriggered: iconExit.restart()
+                            }
+
+                            // The state this delegate was created into. A slot already on
+                            // its way out picks up where the previous delegate left it -
+                            // `retiring` is the model's answer, so a delegate rebuilt by an
+                            // unrelated publish does not restart an exit that is half done.
+                            function settle() {
+                                if (!root._iconPrimed) {
+                                    // The first population lands settled.
+                                    windowIcon.presence = 1
+                                    windowIcon.ink = 1
+                                    return
+                                }
+                                // An arrival starts from nothing; a revival of a slot that
+                                // was on its way out keeps whatever it had reached.
+                                if (!windowIcon.retiring && windowIcon.presence > 0.01
+                                        && windowIcon.presence < 0.99) {
+                                    iconEnter.restart()
+                                    return
+                                }
+                                if (windowIcon.retiring) {
+                                    iconExitDelay.interval = windowIcon.delayMs
+                                    if (iconExitDelay.interval > 0)
+                                        iconExitDelay.restart()
+                                    else
+                                        iconExit.restart()
+                                    return
+                                }
+                                iconEnterDelay.interval = windowIcon.delayMs
+                                if (iconEnterDelay.interval > 0)
+                                    iconEnterDelay.restart()
+                                else
+                                    iconEnter.restart()
+                            }
+
+                            onRetiringChanged: windowIcon.settle()
+                            Component.onCompleted: windowIcon.settle()
+
+                            // Reduced motion has no travel to show: the slot lands on its
+                            // final state in one step, and a departure is retired at once.
+                            Connections {
+                                target: MotionTokens
+                                function onReducedMotionChanged() {
+                                    if (!MotionTokens.reducedMotion)
+                                        return
+                                    windowIcon.presence = windowIcon.retiring ? 0 : 1
+                                    windowIcon.ink = windowIcon.retiring ? 0 : 1
+                                    if (windowIcon.retiring)
+                                        root.completeIconRetire(
+                                            windowSquare ? windowSquare.wins : null,
+                                            windowIcon.winId)
+                                }
+                            }
+
+                            // Resolve to the default theme icon when the requested
+                            // icon is missing/broken (avoids black/purple blocks).
                             IconImage {
+                                id: workspaceAppIcon
+
                                 anchors.fill: parent
-                                source: root.iconPathForApp(windowIcon.appId)
+                                property string requestedSource: root.iconPathForApp(windowIcon.appId)
+                                property string fallbackSource: Quickshell.iconPath("application-x-executable")
+                                property bool useFallback: false
+                                source: useFallback ? fallbackSource : requestedSource
+                                onRequestedSourceChanged: useFallback = false
+                                onStatusChanged: {
+                                    if (status === Image.Error)
+                                        useFallback = true
+                                }
                                 // These tiny, persistent delegates should not
                                 // keep feeding the long-lived async icon
                                 // provider during compositor event bursts.
                                 asynchronous: false
                                 backer.fillMode: Image.PreserveAspectFit
                                 smooth: true
-                                opacity: windowIcon.isFocused
+                                // `ink` is the slot's arrival/departure; the rest is the
+                                // focus and hover treatment the strip already had.
+                                opacity: windowIcon.ink * (windowIcon.isFocused
                                          ? 1
-                                         : windowIcon.hovered ? 0.85 : 0.55
+                                         : windowIcon.hovered ? 0.85 : 0.55)
 
                                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
                             }
