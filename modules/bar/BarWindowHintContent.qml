@@ -1376,10 +1376,11 @@ Item {
     // is the viewport's, and `rowLift` is a slot above being shorter than its pitch while
     // it opens or closes - which is the same kind of statement, so it is the same
     // subtraction rather than a second mechanism.
-    // `rowLift` is NOT subtracted here: the tracker is aimed with `liveRowTop`, which
-    // already walks the slots' shortfalls - the same number the rows are drawn with. Taking
-    // it off again took the whole height of a closing slot off twice, measured as a bar that
-    // sat 30 pixels above its own outline and snapped back when the slot was dropped.
+    // The tracker and the bar are both in the list's own unscrolled space, so the only
+    // offset between them is the viewport's. `rowLift` is deliberately NOT here: the tracker
+    // is aimed at `focusedRowIndex * rowPitch` - the frame's own target - and that number
+    // has no layout correction in it either. Subtracting the lift would take a closing
+    // slot's height off the bar alone and leave it floating above the frame it outlines.
     readonly property real _barTop: Math.min(_headY, _tailY) - strip.scrollOffset
     readonly property real _barLength: indicatorLength + _wake
 
@@ -1540,7 +1541,14 @@ Item {
             // teleports": it is not teleporting, it is finishing first, against a background
             // that is still moving. Matching `windowRowMove` puts the mark and the rows it
             // crosses on one clock, so it reads as the bar being carried by the list.
-            duration: (strip.rowsTransitioning
+            // A REORDER IS THE ROWS' GESTURE and the head travels on their clock. An EXIT is
+            // not: the row that is leaving dissolves in place and the focused row only
+            // changes index, which is an ordinary focus step - so it takes the ordinary
+            // duration, the same one the focus frame beside it uses. Using the reorder's
+            // clock for both made the bar arrive a full pitch behind the frame it is drawn
+            // around: measured, the frame finished 34 -> 68 -> 34 in fourteen frames while
+            // the head was still climbing at sixty-nine.
+            duration: (strip.rowsReordering
                 ? MotionTokens.windowRowMove
                 : MotionTokens.medium) * debugTimeScale
             easing.type: Easing.OutQuad
@@ -2023,81 +2031,26 @@ Item {
     // total: nothing moved, because the innermost call re-entered at the same point and the
     // stack ran out before any write happened. Measured on "close the middle window, focus
     // lands on the next one": the row travelled 68 -> 34 and the bar did not move at all.
+    // Hand both ends a new target and let the two `Behavior`s carry them, asking NOTHING
+    // about identity.
+    //
+    // Every branch that wants to MOVE the bar arrives here, and it is deliberately this
+    // small. It is separate from `_retargetIndicator` because that function is gated on the
+    // key CHANGING - the gate decides whether to blink, and the position write sits inside
+    // the same `if` - so a caller whose key is already committed cannot use it. Every attempt
+    // to do so passed `"moving:" + focusedWindowKey`, fell through the gate, and came back
+    // to the branch that had asked.
+    //
+    // It is also why this writes all three properties unconditionally rather than following
+    // the layout per frame. The target here is the frame's own - `focusedRowIndex * rowPitch`
+    // - which changes only when the index does, so the writes are discrete events a
+    // `Behavior` can ease. Re-aiming at a per-frame quantity (`liveRowTop`, `rowLift`)
+    // restarts the easing from the current value on every frame, which holds the mark at its
+    // start; that was measured here, and it is why the per-frame subscription is gone.
     function _aimIndicator(top) {
         if (!isFinite(top))
             return
         if (Math.abs(top - _anchorY) < 0.5)
-            return
-        // A BIG STEP IS A RELOCATION, not a layout follow, and the two want opposite
-        // treatment. The transition's first frame is one: the focused row's index moves and
-        // the mark has to travel a pitch to reach it, which is an ordinary focus step and
-        // must be animated or the mark is cut across the panel. Every frame after that is
-        // the layout carrying the row a pixel at a time, which must NOT be animated - see
-        // below. Half a pitch is the dividing line and it is not arbitrary: a slot's whole
-        // shortfall is one pitch, so anything under half of it is the collapse itself.
-        if (Math.abs(top - _anchorY) > root.rowPitch / 2) {
-            _glideIndicator(top)
-            return
-        }
-        _pendingTop = -1
-        _anchorY = top
-        // FOLLOWED, not animated - and the distinction is the whole of it. This is called on
-        // every frame of a slot opening or closing, so a `Behavior` here is handed a new
-        // target 60 times a second: each write restarts the easing from wherever the value
-        // had got to, which is a few tenths of a pixel, and the head never leaves its start.
-        // Measured, exactly that - `_anchorY` walked 35 -> 64.6 with the collapsing slot
-        // while `_headY` stayed at 35.000 for the entire exit.
-        //
-        // The bar is not travelling under its own power here: it is being carried by the
-        // layout, and the rows it sits between are not animating either - they are where
-        // `slotTopAt` puts them on this frame. So the mark goes there on this frame too.
-        // `_snapping` only stops a NEW animation from starting; it does not end one already
-        // in flight, and the frame this first runs on has the previous flight's `Behavior`
-        // still running. Every write after that is then swallowed by an animation that is
-        // easing toward a target from before the transition began - measured, the head froze
-        // at 38.3 for the whole exit while the row it marks travelled 59 -> 35.
-        //
-        // Stopping it outright is what makes the follow a follow.
-        // A FLIGHT THAT IS ALREADY RUNNING IS THE ONE THAT SHOULD CARRY THIS.
-        //
-        // The first frame of a transition is a relocation - the mark has a whole pitch to
-        // travel and `_glideIndicator` started easing it. Every frame after that is the same
-        // transition still running, and stopping the flight to write the pixel here is what
-        // made the travel invisible: the mark took one animated step, was cut, and appeared
-        // at its destination. Measured, head 38.3 -> 68.4 in a single frame.
-        //
-        // So while a flight is in the air this only re-aims it: the target follows the row
-        // and the easing keeps going from wherever it has got to, which is one motion rather
-        // than a step and a cut. The follow below is for the case the flight is not running -
-        // a reorder, where the row is already moving under a settled mark.
-        // A FLIGHT IN THE AIR OWNS THE POSITION until it lands. Re-aiming restarts the
-        // easing from the current value sixty times a second, which freezes the mark at its
-        // start; stopping the flight to write the pixel here cuts the travel to one frame.
-        // Both were measured. So this waits, and the target keeps being recomputed meanwhile.
-        if (indicatorHeadAnimation.running || indicatorTailAnimation.running) {
-            _anchorY = top
-            return
-        }
-        _snapping = true
-        _headY = top
-        _tailY = top
-        _snapping = false
-    }
-
-    // Re-aim both ends at `top` and let the two `Behavior`s carry them, asking NOTHING about
-    // identity.
-    //
-    // This is the animated half of a focus step, and it is separate from `_retargetIndicator`
-    // because that function is gated on the key CHANGING - it is what decides whether to
-    // blink, and the position write happens inside the same `if`. A caller that already has
-    // the right key committed therefore cannot use it, and every attempt to do so ended in
-    // the same silent recursion: `_retargetIndicator(top, "moving:" + focusedWindowKey)` for
-    // an unchanged key falls through its gate and comes back to whoever wanted to animate.
-    //
-    // The gate is genuinely about the blink - a switch between two marked things blinks, a
-    // step that keeps the same one does not - so the position write belongs outside it.
-    function _glideIndicator(top) {
-        if (!isFinite(top))
             return
         _pendingTop = -1
         _anchorY = top
@@ -2586,24 +2539,25 @@ Item {
         // `_targetYFor(index)` alone is neither: aimed at the rendered index it counted the
         // hole as a position and put the bar a pitch low, and aimed at the live index it
         // dropped the holes' debt and left the bar still while its row travelled.
-        // The focused row's RESTING place - where it will be once the slots above it have
-        // finished closing - and not where it is drawn on this frame.
+        // The SAME target the focus frame is aimed at: `focusedRowIndex * rowPitch`, the
+        // rendered index. The frame and the bar mark one thing, so they are handed one
+        // number and each animates to it on its own clock - the frame on `_frameAnchorY`,
+        // the bar on `_headY`/`_tailY`.
         //
-        // The two are different for exactly as long as an exit lasts, and the difference is
-        // the whole question. A window closing ABOVE the focused row makes that row slide up
-        // into the gap, so following its drawn position walks the mark down to where the row
-        // started and back up again - a lap the user reported as "the bar moves up and then
-        // jumps back", and one the mark has no business making: it is not following a row
-        // through space, it is saying WHICH window has focus, and that window is not going
-        // anywhere.
+        // That index counts a departing row's slot, so when focus lands on the row AFTER a
+        // closing window it reads one high (`a bX c*` puts focus at 2 where the row rests at
+        // 1) and comes back down when the slot is dropped. The frame has always walked that
+        // sequence - 34 -> 68 -> 34 - and it is the behaviour the user holds up as correct.
+        // Aiming the bar at the live index instead held it still through the whole of it,
+        // because focus moving to the NEXT window leaves the live index unchanged at 1.
         //
-        // `focusedLiveIndex` counts the rows that are not leaving, which is precisely the
-        // list the row will belong to when the transition ends. The mark therefore sits on
-        // the row's destination for the whole exit and needs no motion at all - measured,
-        // 35 -> 34 across the whole of "close the middle window, focus lands on the next
-        // one", against a row that travelled 68 -> 34 underneath it.
+        // What the bar must not do is take that number every frame: `liveRowTop` walks the
+        // slots' shortfalls, so it moves while the exit runs, and re-aiming a `Behavior` at a
+        // per-frame target restarts its easing from the current value sixty times a second.
+        // The target is therefore the frame's own - discrete, changing only when the index
+        // does - and the transitions between them are the two `Behavior`s below.
         return root.hasTarget
-            ? root._targetYFor(strip.focusedLiveIndex)
+            ? root._targetYFor(root.focusedRowIndex)
             : root.noRowTop + strip.scrollOffset + root.markerOffset
     }
 
@@ -2827,18 +2781,20 @@ Item {
     onHasTargetChanged: _syncIndicator()
     // A ROW ARRIVING OR LEAVING MOVES THE MARK WITHOUT CHANGING ITS TARGET.
     //
-    // The two hooks above fire on identity, which is the right question for a focus change
-    // and the wrong one for a slot opening or closing under a settled mark: nothing about
-    // WHICH row is marked changed, but where that row is drawn does, for every frame of the
-    // transition. Measured on "close the middle window, focus lands on the next one": the
-    // row travelled 68 -> 34 while the bar sat at 35 for the whole exit, then nothing
-    // reconciled the two.
+    // The two hooks above fire on identity, and that is not enough on its own: focus landing
+    // on the row AFTER a closing window keeps the same window key, and the only thing that
+    // moves is the rendered index - 1 -> 2 as the departing slot is inserted ahead of it,
+    // then 2 -> 1 when the slot is dropped. The frame follows both steps because it is bound
+    // to that index; the bar has to be TOLD, or it sits on a target that no longer exists.
     //
-    // The per-frame quantity is the strip's `rowLift`, so the subscription is there; this
-    // hook is on the proxy the file already reads the layout through.
+    // Indexed on the rendered index and NOT on the layout's per-frame `rowLift`: the index
+    // changes twice per transition and each change is a relocation the two `Behavior`s
+    // should carry. `rowLift` changes sixty times a second, and re-aiming an animation that
+    // often restarts its easing from the current value every frame - a mark frozen at its
+    // start, which is a fault already measured here once.
     Connections {
         target: strip
-        function onRowLiftChanged() {
+        function onFocusedRowIndexChanged() {
             root._syncIndicator()
         }
     }
