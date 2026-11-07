@@ -1999,19 +1999,26 @@ PanelWindow {
                             implicitHeight: root.popupHeightForIntent(root.currentIntent)
                             height: implicitHeight
                             // Visible height channel: animate toward the new content's
-                            // natural height so the exchange grows/shrinks smoothly
-                            // instead of snapping while the slide travels.
+                            // natural height so an INTENT exchange grows and shrinks
+                            // smoothly instead of snapping while the slide travels.
                             //
-                            // Gated on the exchange, and it has to stay that way. This
-                            // slot is the PAINTED face, so a Behavior here is a second
-                            // height clock: measured with it always on, a menu page
-                            // grew on its own 240ms clock while the host followed the
-                            // measurement immediately, and the panel led its own content
-                            // by 164px. A body that changes height outside an exchange
-                            // (a menu page) already animates itself; this slot just
-                            // follows it.
+                            // Context menus are excluded, and that exclusion is the
+                            // whole point. A menu body animates its own height already
+                            // (a page swap interpolates its clip over 240ms), so
+                            // `implicitHeight` changes on every frame of that animation
+                            // - and a Behavior restarts from the live value on every
+                            // change, so it can never make progress while its input is
+                            // moving. Measured on a page swap: implicitHeight climbed
+                            // 220 -> 340 across the slide while this slot sat frozen at
+                            // 220, then ran its own 240ms ease only after the page had
+                            // stopped. The menu was therefore always one full animation
+                            // behind its own content, which is what a drilled-down page
+                            // overflowing the panel looks like. Context bodies follow
+                            // their measurement outright; every other body keeps this
+                            // ease.
                             Behavior on height {
                                 enabled: root._exchangeCommitted && !MotionTokens.reducedMotion
+                                    && String(root.currentIntent ? root.currentIntent.kind : "") !== "context"
                                 NumberAnimation { duration: MotionTokens.slow; easing.type: Easing.OutCubic }
                             }
                             // Keep hover replacement layers inside the content column;
