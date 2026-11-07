@@ -196,6 +196,22 @@ Item {
         return ""
     }
 
+    // How much of the page header's slot is open, 0..1, driven by the slide.
+    //
+    // Three cases, because the header belongs to the page being entered or left
+    // and not to the swap itself:
+    //   * entering a page from the root list  -> opens as the page arrives
+    //   * returning to the root list          -> closes as the page leaves
+    //   * one page to another                 -> stays open, the title swaps
+    // At rest (`_outgoingPage` empty) it is simply "is a page on top".
+    readonly property real headerWeight: {
+        if (root._outgoingPage === "")
+            return root.page === "" ? 0 : root.pageSlideProgress
+        if (root.page === "")
+            return 1 - root.pageSlideProgress
+        return 1
+    }
+
     // Height of the page currently on top, which is what the host measures.
     readonly property real pageHeight: {
         if (root.page === "")
@@ -216,13 +232,26 @@ Item {
         root.page = ""
     }
 
-    Column {
+    // Two slots, positioned explicitly instead of stacked in a Column.
+    //
+    // A Column sums its children's `height`, and an item with a `Behavior` on
+    // height still reports its OLD height for the frames the animation runs -
+    // measured: the header animated 32 -> 0 while the column stayed at 204 the
+    // whole time, so the page below never moved up and the menu kept a band
+    // above it until the header's animation ended. Offsetting each slot from
+    // numbers this component owns makes the two move together on the same frame.
+    Item {
         id: bodyColumn
 
         x: 8
         y: 8
         width: parent.width - 16
-        spacing: 6
+        // The gap travels with the header, so the collapse has no 6px pop at
+        // the end when the slot finishes closing.
+        readonly property real headerGap: 6 * root.headerWeight
+        readonly property real headerSlotHeight: pageHeader.height + headerGap
+        implicitHeight: headerSlotHeight + pageHost.height
+        height: implicitHeight
 
         // Page header: a back arrow, then the page's name. It collapses to
         // nothing on the root page rather than showing a title nothing needs.
@@ -238,15 +267,15 @@ Item {
             id: pageHeader
 
             width: bodyColumn.width
-            // The slot grows and collapses on the geometry glide, not instantly:
-            // the pages below are positioned under it, so a header that appeared
-            // or vanished in one frame would shift the incoming page mid-slide.
-            height: root.page === "" && root._outgoingPage === "" ? 0 : 32
+            y: 0
+            // The slot opens and closes ON the page-slide clock, not after it.
+            // Waiting for the slide to finish before collapsing left a 32px band
+            // above the returning list for the whole exit - the header was still
+            // 32px high while `_outgoingPage` was set, and only started shrinking
+            // once that cleared. Riding the slide keeps the two in step: the band
+            // is gone by the frame the incoming page is centred.
+            height: 32 * root.headerWeight
             visible: height > 0.5
-            Behavior on height {
-                enabled: !MotionTokens.reducedMotion
-                NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuint }
-            }
             x: root.page === ""
                 ? -root.pageSlideSign * root.pageSlideDistance * root.pageSlideProgress
                 : root.pageSlideSign * root.pageSlideDistance * (1 - root.pageSlideProgress)
@@ -279,7 +308,7 @@ Item {
                     anchors.centerIn: parent
                     width: 16
                     height: 16
-                    source: Qt.resolvedUrl("../lazerbar/icons/chevron-back.svg")
+                    source: Qt.resolvedUrl("../lazerbar/icons/chevron-left.svg")
                     tint: LazerTheme.textPrimary
                 }
 
@@ -319,6 +348,7 @@ Item {
             id: pageHost
 
             width: bodyColumn.width
+            y: bodyColumn.headerSlotHeight
             // Height follows the ACTIVE page. Taking it from the root list was
             // the whole-menu bug: the host grew to the root list's height and
             // painted the drilled-down page inside that clip, so a longer page
