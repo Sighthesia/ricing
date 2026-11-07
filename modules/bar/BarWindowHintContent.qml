@@ -1593,9 +1593,15 @@ Item {
             // consequence of `windowRowMove` and `slow * 2` not being an exact 2:1 pair
             // (320 against 480), so it is written out rather than derived from a ratio that
             // does not exist.
-            duration: (strip.rowsTransitioning
+            // A STEP THAT IS ONLY THE LAYOUT SETTLING TAKES NO TRAIL, and it is the same
+            // predicate the head uses. The focused row does not change here, so a 480ms wake
+            // under it holds the bar's lower edge a full pitch below the row it marks and
+            // closes slowly - measured on the live shell, 95 against the row's 61, easing
+            // back over 300ms. That is the reported "overshoots going down".
+            duration: (strip.rowsReordering
                 ? MotionTokens.windowRowMove * 1.9
-                : MotionTokens.slow * 2) * debugTimeScale
+                : (root._settlingIndex ? MotionTokens.medium : MotionTokens.slow * 2))
+                * debugTimeScale
             easing.type: Easing.OutSine
         }
     }
@@ -1997,7 +2003,11 @@ Item {
             // Re-aimed instead, which is what the widget does when a target genuinely moves:
             // both ends are handed the new place and continue from wherever they are, so a
             // run of moves is one chase rather than a series of held targets and snaps.
-            if (root._rowsTravelling || root._frameStep > 1.5) {
+            // `_settlingIndex` belongs here, and its absence was the overshoot: the target
+            // really did move a whole pitch, and held in `_pendingTop` instead it waited for
+            // the tail - measured on the live shell, `head` sat at 69 while the row it marks
+            // was already at 35, and the bar's lower edge hung 34px past it.
+            if (root._rowsTravelling || root._settlingIndex || root._frameStep > 1.5) {
                 _pendingTop = -1
                 // `_aimIndicator`, NOT `_retargetIndicator` with the same key: the key this
                 // branch would hand over is the one already committed, so the call came
@@ -2021,7 +2031,7 @@ Item {
         // teleports during a reorder": the rows slide and the bar arrives already there.
         // So a travelling row is handed to the animated path - the same two `Behavior`s a
         // focus change uses, which is what puts the wake back.
-        if (root._rowsTravelling)
+        if (root._rowsTravelling || root._settlingIndex)
             _aimIndicator(top)
         else
             _snapIndicator(top)
@@ -2068,6 +2078,9 @@ Item {
     // strip because that is where the travel lives, and asked as its own property so this
     // file reads one flag rather than reaching into a column's items.
     readonly property bool _rowsTravelling: strip.rowsTransitioning
+    // The rendered index just fell while a slot is still closing: the layout settling, not
+    // the mark moving. A step like that must be travelled, and it takes no trail.
+    property bool _settlingIndex: false
 
     // Apply a drift that landed mid-trail, once the tail has caught up. The widget's
     // `_edgePendingCenterX` timer, and for the same reason: it waits on the TAIL rather
@@ -2756,6 +2769,9 @@ Item {
     }
 
     onFocusedRowIndexChanged: {
+        // Written BEFORE anything re-aims: the tail's `Behavior` reads it to choose its
+        // duration for this step.
+        root._settlingIndex = strip.rowsTransitioning
         // How far the frame is being asked to travel, in rows - read by its glide to tell a
         // reorder from a focus step, and written here because this is the turn the anchor
         // moves on. See the note in the `Behavior`.
