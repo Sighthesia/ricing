@@ -23,6 +23,10 @@ Item {
     property string section: ""
     property string screenName: ""
 
+    // Whether the icon strip is revealed. The toggle button stays visible so the
+    // tray can always be folded back out.
+    property bool trayExpanded: true
+
     // Gap between slots. It lives *inside* each slot rather than in
     // Row.spacing so a slot collapsing to zero takes its gap with it; with
     // Row.spacing the icons after it would jump the gap's width the moment the
@@ -36,8 +40,19 @@ Item {
     // Downward travel of a leaving icon, sized so the bar never slices it.
     readonly property real fallDistance: SlotLogic.fallDistance(LazerTheme.barWidgetHeight, LazerTheme.barGlyphSize)
 
-    implicitWidth: Math.max(0, trayRow.implicitWidth - root.slotGap)
+    // 0 while the icon strip is folded away, 1 while revealed.
+    property real trayReveal: root.trayExpanded ? 1 : 0
+    readonly property real trayStripWidth: Math.max(0, trayRow.implicitWidth - root.slotGap)
+
+    implicitWidth: root.liveCount > 0
+            ? (LazerTheme.barWidgetHeight + root.trayStripWidth * root.trayReveal)
+            : 0
     implicitHeight: LazerTheme.barWidgetHeight
+
+    Behavior on trayReveal {
+        enabled: !MotionTokens.reducedMotion
+        NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutCubic }
+    }
 
     // Opt-in hover intent publication for BarPopupHost (per-delegate).
     signal popupRequested(var intent)
@@ -75,6 +90,13 @@ Item {
     readonly property bool primed: root._primed
 
     onLiveValuesChanged: Qt.callLater(root.syncSlots)
+    onTrayExpandedChanged: {
+        if (!root.trayExpanded) {
+            root.hoveredTrayModel = null
+            root.hoveredTrayDelegate = null
+            root.popupCloseRequested()
+        }
+    }
 
     Component.onCompleted: {
         root.syncSlots()
@@ -292,274 +314,345 @@ Item {
     onWidthChanged: republishHoveredAnchor()
 
     Row {
-        id: trayRow
+        id: trayLayout
 
         // The gap rides inside each slot, so this stays 0 (see root.slotGap).
         spacing: 0
         anchors.verticalCenter: parent.verticalCenter
-        anchors.horizontalCenter: parent.horizontalCenter
-        // The row is one gap wider than the widget; shift it back so the icons
-        // land exactly where the old spacing-based layout put them.
-        anchors.horizontalCenterOffset: root.slotGap / 2
+        anchors.left: parent.left
 
-        Repeater {
-            model: slotModel
+        // Fold toggle: reveals or hides the icon strip while staying addressable.
+        Item {
+            id: foldButton
 
-            // One slot per tray item. The slot is the layout box: it opens
-            // before its ink starts and closes only once the ink is gone, so
-            // the strip never drags a neighbour across a half-drawn icon.
-            delegate: Item {
-                id: trayIcon
+            width: LazerTheme.barWidgetHeight
+            height: LazerTheme.barWidgetHeight
+            visible: root.liveCount > 0
+            Accessible.role: Accessible.Button
+            Accessible.name: root.trayExpanded
+                    ? (Services.Tr && typeof Services.Tr.q === "function"
+                            ? Services.Tr.q("tray.collapse") : "Collapse tray")
+                    : (Services.Tr && typeof Services.Tr.q === "function"
+                            ? Services.Tr.q("tray.expand") : "Expand tray")
 
-                // Snapshot contract from the stable model. Everything an exit
-                // needs lives here, so a leaving slot never reads a
-                // SystemTrayItem that has already been unregistered.
-                required property string slotKey
-                required property string iconSource
-                required property string label
-                required property bool retiring
-                required property int delayMs
+            readonly property bool hovered: foldHover.hovered
 
-                // Live object for activation, menus and hover. Null the moment
-                // the slot starts leaving.
-                readonly property var liveItem: trayIcon.retiring
-                        ? null : root.liveItemFor(trayIcon.slotKey)
+            // Sharp hover surface matching bar icon buttons.
+            Rectangle {
+                anchors.fill: parent
+                radius: 0
+                color: foldButton.hovered ? LazerTheme.hoverFill : "transparent"
 
-                // 0 while the slot is closed, 1 while it is open. Drives the
-                // box width only, so the falling icon keeps the position it had.
-                property real presence: root.primed ? 0 : 1
-                // Ink opacity: 0 until the box has finished opening, 0 again
-                // once the icon has dissolved under the closing box.
-                property real ink: root.primed ? 0 : 1
-                // Downward travel of a leaving icon.
-                property real fall: 0
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+            }
 
-                width: (LazerTheme.barWidgetHeight + root.slotGap) * trayIcon.presence
-                height: LazerTheme.barWidgetHeight
-                // Off while invisible: a slot mid-flight takes no hover, no tap.
-                enabled: !trayIcon.retiring && trayIcon.ink > 0.99
-                // Nothing clips here — the icon has to be able to leave the
-                // shrinking box, the same contract the marquee ghosts ride.
-                Accessible.role: Accessible.Button
-                Accessible.name: trayIcon.label
+            // Chevron points in the direction of the action: left to fold, right
+            // to reveal the icons sitting to the right of this button.
+            BarIcon {
+                anchors.centerIn: parent
+                width: LazerTheme.barStrokeGlyphSize
+                height: LazerTheme.barStrokeGlyphSize
+                source: Qt.resolvedUrl("../../lazerbar/icons/chevron-left.svg")
+                rotation: root.trayExpanded ? 0 : 180
+                opacity: foldButton.hovered ? 1 : 0.85
 
-                readonly property bool hovered: iconHover.hovered
-
-                // Test seam: the enter/exit recipes, exposed the way
-                // OsuTopBarButton exposes its flash animation so a harness can
-                // assert the contract instead of sampling a frame mid-flight.
-                readonly property Animation openAnimationItem: openAnim
-                readonly property Animation enterAnimationItem: enterInkAnim
-                readonly property Animation exitAnimationItem: exitInkAnim
-                readonly property Animation fallAnimationItem: fallAnim
-                readonly property Animation closeAnimationItem: closeAnim
-
-                // One hover square per tray item; icons stay theme-provided.
-                // It fills the open slot, so it tracks the box as it collapses.
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 0
-                    color: trayIcon.hovered ? LazerTheme.hoverFill : "transparent"
-
-                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+                Behavior on rotation {
+                    enabled: !MotionTokens.reducedMotion
+                    NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutCubic }
                 }
+            }
 
-                // The icon rides the slot's open box, not its shrinking width,
-                // so a closing slot closes around the falling icon instead of
-                // dragging it sideways.
-                IconImage {
-                    id: glyph
+            HoverHandler {
+                id: foldHover
+                objectName: "trayFoldHoverHandler"
+            }
 
-                    x: (LazerTheme.barWidgetHeight - LazerTheme.barGlyphSize) / 2
-                    y: (LazerTheme.barWidgetHeight - LazerTheme.barGlyphSize) / 2 + trayIcon.fall
-                    width: LazerTheme.barGlyphSize
-                    height: LazerTheme.barGlyphSize
-                    asynchronous: true
-                    backer.fillMode: Image.PreserveAspectFit
-                    source: trayIcon.iconSource
-                    // Failed loads stay invisible instead of rendering blank.
-                    opacity: trayIcon.ink * (status === Image.Ready ? 1 : 0)
-                }
+            TapHandler {
+                objectName: "trayFoldTap"
+                acceptedButtons: Qt.LeftButton
+                gesturePolicy: TapHandler.ReleaseWithinBounds
+                onTapped: root.trayExpanded = !root.trayExpanded
+            }
+        }
 
-                // --- Arrival: open the box, then fade the ink in. ---
-                // Sequential on purpose. The slot has to be fully open before
-                // any ink lands in it, otherwise the icon it is pushing aside
-                // would slide across a half-drawn neighbour.
-                SequentialAnimation {
-                    id: enterAnim
+        // Reveal container: clips the icon strip as the tray folds away.
+        Item {
+            id: trayRevealHost
 
-                    animations: [openAnim, enterInkAnim]
-                }
-                Timer {
-                    id: enterDelay
+            width: root.trayStripWidth * root.trayReveal
+            height: LazerTheme.barWidgetHeight
+            clip: true
+            visible: width > 0.5
 
-                    interval: trayIcon.delayMs
-                    onTriggered: enterAnim.restart()
-                }
-                NumberAnimation {
-                    id: openAnim
+            Row {
+                id: trayRow
 
-                    target: trayIcon
-                    property: "presence"
-                    to: 1
-                    duration: MotionTokens.fast
-                    easing.type: Easing.OutQuad
-                }
-                NumberAnimation {
-                    id: enterInkAnim
+                // The gap rides inside each slot, so this stays 0 (see root.slotGap).
+                spacing: 0
+                anchors.verticalCenter: parent.verticalCenter
+                x: root.slotGap / 2
 
-                    target: trayIcon
-                    property: "ink"
-                    to: 1
-                    duration: MotionTokens.trayIconEnter
-                    easing.type: Easing.OutQuad
-                }
+                Repeater {
+                    model: slotModel
 
-                // --- Departure: drop and dissolve while the box closes. ---
-                // The ink fade is front-loaded and the box's collapse is
-                // InQuad on purpose: together they keep the neighbour that
-                // slides into the freed slot from ever crossing a readable icon.
-                ParallelAnimation {
-                    id: exitAnim
+                    // One slot per tray item. The slot is the layout box: it opens
+                    // before its ink starts and closes only once the ink is gone, so
+                    // the strip never drags a neighbour across a half-drawn icon.
+                    delegate: Item {
+                        id: trayIcon
 
-                    animations: [exitInkAnim, fallAnim, closeAnim]
-                }
-                Timer {
-                    id: exitDelay
+                        // Snapshot contract from the stable model. Everything an exit
+                        // needs lives here, so a leaving slot never reads a
+                        // SystemTrayItem that has already been unregistered.
+                        required property string slotKey
+                        required property string iconSource
+                        required property string label
+                        required property bool retiring
+                        required property int delayMs
 
-                    interval: trayIcon.delayMs
-                    onTriggered: exitAnim.restart()
-                }
-                // The row is dropped on its own clock rather than from the
-                // collapse's onFinished: an animation nested in a group does
-                // not reliably report completion, and a slot left behind would
-                // hold its gap open forever.
-                Timer {
-                    id: retireTimer
+                        // Live object for activation, menus and hover. Null the moment
+                        // the slot starts leaving.
+                        readonly property var liveItem: trayIcon.retiring
+                                ? null : root.liveItemFor(trayIcon.slotKey)
 
-                    interval: trayIcon.delayMs + MotionTokens.slow
-                    onTriggered: root.completeRetire(trayIcon.slotKey)
-                }
-                NumberAnimation {
-                    id: exitInkAnim
+                        // 0 while the slot is closed, 1 while it is open. Drives the
+                        // box width only, so the falling icon keeps the position it had.
+                        property real presence: root.primed ? 0 : 1
+                        // Ink opacity: 0 until the box has finished opening, 0 again
+                        // once the icon has dissolved under the closing box.
+                        property real ink: root.primed ? 0 : 1
+                        // Downward travel of a leaving icon.
+                        property real fall: 0
 
-                    target: trayIcon
-                    property: "ink"
-                    to: 0
-                    duration: MotionTokens.trayIconExit
-                    easing.type: Easing.OutQuad
-                }
-                NumberAnimation {
-                    id: fallAnim
+                        width: (LazerTheme.barWidgetHeight + root.slotGap) * trayIcon.presence
+                        height: LazerTheme.barWidgetHeight
+                        // Off while invisible: a slot mid-flight takes no hover, no tap.
+                        enabled: !trayIcon.retiring && trayIcon.ink > 0.99
+                        // Nothing clips here — the icon has to be able to leave the
+                        // shrinking box, the same contract the marquee ghosts ride.
+                        Accessible.role: Accessible.Button
+                        Accessible.name: trayIcon.label
 
-                    target: trayIcon
-                    property: "fall"
-                    to: root.fallDistance
-                    duration: MotionTokens.trayIconExit
-                    easing.type: Easing.OutQuad
-                }
-                NumberAnimation {
-                    id: closeAnim
+                        readonly property bool hovered: iconHover.hovered
 
-                    target: trayIcon
-                    property: "presence"
-                    to: 0
-                    duration: MotionTokens.slow
-                    easing.type: Easing.InQuad
-                }
+                        // Test seam: the enter/exit recipes, exposed the way
+                        // OsuTopBarButton exposes its flash animation so a harness can
+                        // assert the contract instead of sampling a frame mid-flight.
+                        readonly property Animation openAnimationItem: openAnim
+                        readonly property Animation enterAnimationItem: enterInkAnim
+                        readonly property Animation exitAnimationItem: exitInkAnim
+                        readonly property Animation fallAnimationItem: fallAnim
+                        readonly property Animation closeAnimationItem: closeAnim
 
-                function startEnter() {
-                    exitDelay.stop()
-                    retireTimer.stop()
-                    exitAnim.stop()
-                    enterDelay.stop()
-                    if (MotionTokens.reducedMotion || !root.primed) {
-                        trayIcon.presence = 1
-                        trayIcon.ink = 1
-                        trayIcon.fall = 0
-                        return
-                    }
-                    if (trayIcon.presence >= 1 && trayIcon.ink >= 1)
-                        return
-                    // Captured before the restart: the sequential group reads
-                    // each `from` when its own leg begins.
-                    openAnim.from = trayIcon.presence
-                    enterInkAnim.from = trayIcon.ink
-                    enterDelay.restart()
-                }
+                        // One hover square per tray item; icons stay theme-provided.
+                        // It fills the open slot, so it tracks the box as it collapses.
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 0
+                            color: trayIcon.hovered ? LazerTheme.hoverFill : "transparent"
 
-                function startExit() {
-                    enterDelay.stop()
-                    enterAnim.stop()
-                    if (MotionTokens.reducedMotion) {
-                        root.retireNow(trayIcon.slotKey)
-                        return
-                    }
-                    exitInkAnim.from = trayIcon.ink
-                    fallAnim.from = trayIcon.fall
-                    closeAnim.from = trayIcon.presence
-                    exitDelay.restart()
-                    retireTimer.restart()
-                }
+                            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                        }
 
-                onRetiringChanged: trayIcon.retiring ? trayIcon.startExit() : trayIcon.startEnter()
-                Component.onCompleted: trayIcon.startEnter()
+                        // The icon rides the slot's open box, not its shrinking width,
+                        // so a closing slot closes around the falling icon instead of
+                        // dragging it sideways.
+                        IconImage {
+                            id: glyph
 
-                Component.onDestruction: {
-                    if (root.hoveredTrayDelegate === trayIcon) {
-                        root.hoveredTrayModel = null
-                        root.hoveredTrayDelegate = null
-                        root.popupCloseRequested()
-                    }
-                }
+                            x: (LazerTheme.barWidgetHeight - LazerTheme.barGlyphSize) / 2
+                            y: (LazerTheme.barWidgetHeight - LazerTheme.barGlyphSize) / 2 + trayIcon.fall
+                            width: LazerTheme.barGlyphSize
+                            height: LazerTheme.barGlyphSize
+                            asynchronous: true
+                            backer.fillMode: Image.PreserveAspectFit
+                            source: trayIcon.iconSource
+                            // Failed loads stay invisible instead of rendering blank.
+                            opacity: trayIcon.ink * (status === Image.Ready ? 1 : 0)
+                        }
 
-                // An app that swaps its own icon mid-life reuses the slot.
-                Connections {
-                    target: trayIcon.liveItem
-                    function onIconChanged() { root.writeSnapshot(trayIcon.slotKey) }
-                    function onTitleChanged() { root.writeSnapshot(trayIcon.slotKey) }
-                    function onTooltipTitleChanged() { root.writeSnapshot(trayIcon.slotKey) }
-                }
+                        // --- Arrival: open the box, then fade the ink in. ---
+                        // Sequential on purpose. The slot has to be fully open before
+                        // any ink lands in it, otherwise the icon it is pushing aside
+                        // would slide across a half-drawn neighbour.
+                        SequentialAnimation {
+                            id: enterAnim
 
-                HoverHandler {
-                    id: iconHover
-                    objectName: "trayHoverHandler"
-                    onHoveredChanged: {
-                        if (hovered) {
-                            if (!trayIcon.liveItem) return
-                            root.hoveredTrayModel = trayIcon.liveItem
-                            root.hoveredTrayDelegate = trayIcon
-                            root.popupRequested(root.buildTrayIntent(trayIcon.liveItem, trayIcon))
-                        } else {
+                            animations: [openAnim, enterInkAnim]
+                        }
+                        Timer {
+                            id: enterDelay
+
+                            interval: trayIcon.delayMs
+                            onTriggered: enterAnim.restart()
+                        }
+                        NumberAnimation {
+                            id: openAnim
+
+                            target: trayIcon
+                            property: "presence"
+                            to: 1
+                            duration: MotionTokens.fast
+                            easing.type: Easing.OutQuad
+                        }
+                        NumberAnimation {
+                            id: enterInkAnim
+
+                            target: trayIcon
+                            property: "ink"
+                            to: 1
+                            duration: MotionTokens.trayIconEnter
+                            easing.type: Easing.OutQuad
+                        }
+
+                        // --- Departure: drop and dissolve while the box closes. ---
+                        // The ink fade is front-loaded and the box's collapse is
+                        // InQuad on purpose: together they keep the neighbour that
+                        // slides into the freed slot from ever crossing a readable icon.
+                        ParallelAnimation {
+                            id: exitAnim
+
+                            animations: [exitInkAnim, fallAnim, closeAnim]
+                        }
+                        Timer {
+                            id: exitDelay
+
+                            interval: trayIcon.delayMs
+                            onTriggered: exitAnim.restart()
+                        }
+                        // The row is dropped on its own clock rather than from the
+                        // collapse's onFinished: an animation nested in a group does
+                        // not reliably report completion, and a slot left behind would
+                        // hold its gap open forever.
+                        Timer {
+                            id: retireTimer
+
+                            interval: trayIcon.delayMs + MotionTokens.slow
+                            onTriggered: root.completeRetire(trayIcon.slotKey)
+                        }
+                        NumberAnimation {
+                            id: exitInkAnim
+
+                            target: trayIcon
+                            property: "ink"
+                            to: 0
+                            duration: MotionTokens.trayIconExit
+                            easing.type: Easing.OutQuad
+                        }
+                        NumberAnimation {
+                            id: fallAnim
+
+                            target: trayIcon
+                            property: "fall"
+                            to: root.fallDistance
+                            duration: MotionTokens.trayIconExit
+                            easing.type: Easing.OutQuad
+                        }
+                        NumberAnimation {
+                            id: closeAnim
+
+                            target: trayIcon
+                            property: "presence"
+                            to: 0
+                            duration: MotionTokens.slow
+                            easing.type: Easing.InQuad
+                        }
+
+                        function startEnter() {
+                            exitDelay.stop()
+                            retireTimer.stop()
+                            exitAnim.stop()
+                            enterDelay.stop()
+                            if (MotionTokens.reducedMotion || !root.primed) {
+                                trayIcon.presence = 1
+                                trayIcon.ink = 1
+                                trayIcon.fall = 0
+                                return
+                            }
+                            if (trayIcon.presence >= 1 && trayIcon.ink >= 1)
+                                return
+                            // Captured before the restart: the sequential group reads
+                            // each `from` when its own leg begins.
+                            openAnim.from = trayIcon.presence
+                            enterInkAnim.from = trayIcon.ink
+                            enterDelay.restart()
+                        }
+
+                        function startExit() {
+                            enterDelay.stop()
+                            enterAnim.stop()
+                            if (MotionTokens.reducedMotion) {
+                                root.retireNow(trayIcon.slotKey)
+                                return
+                            }
+                            exitInkAnim.from = trayIcon.ink
+                            fallAnim.from = trayIcon.fall
+                            closeAnim.from = trayIcon.presence
+                            exitDelay.restart()
+                            retireTimer.restart()
+                        }
+
+                        onRetiringChanged: trayIcon.retiring ? trayIcon.startExit() : trayIcon.startEnter()
+                        Component.onCompleted: trayIcon.startEnter()
+
+                        Component.onDestruction: {
                             if (root.hoveredTrayDelegate === trayIcon) {
                                 root.hoveredTrayModel = null
                                 root.hoveredTrayDelegate = null
                                 root.popupCloseRequested()
                             }
                         }
+
+                        // An app that swaps its own icon mid-life reuses the slot.
+                        Connections {
+                            target: trayIcon.liveItem
+                            function onIconChanged() { root.writeSnapshot(trayIcon.slotKey) }
+                            function onTitleChanged() { root.writeSnapshot(trayIcon.slotKey) }
+                            function onTooltipTitleChanged() { root.writeSnapshot(trayIcon.slotKey) }
+                        }
+
+                        HoverHandler {
+                            id: iconHover
+                            objectName: "trayHoverHandler"
+                            onHoveredChanged: {
+                                if (hovered) {
+                                    if (!trayIcon.liveItem) return
+                                    root.hoveredTrayModel = trayIcon.liveItem
+                                    root.hoveredTrayDelegate = trayIcon
+                                    root.popupRequested(root.buildTrayIntent(trayIcon.liveItem, trayIcon))
+                                } else {
+                                    if (root.hoveredTrayDelegate === trayIcon) {
+                                        root.hoveredTrayModel = null
+                                        root.hoveredTrayDelegate = null
+                                        root.popupCloseRequested()
+                                    }
+                                }
+                            }
+                        }
+
+                        // Update anchor while the delegate or bar layout moves. The
+                        // ownership check is the point: `iconHover.hovered` alone is
+                        // stale for a frame after the pointer crosses to the next icon.
+                        onXChanged: {
+                            if (root.hoveredTrayDelegate === trayIcon)
+                                root.republishHoveredAnchor()
+                        }
+
+                        TapHandler {
+                            objectName: "trayActivateTap"
+                            acceptedButtons: Qt.LeftButton
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            onTapped: if (trayIcon.liveItem) trayIcon.liveItem.activate()
+                        }
+
+                        TapHandler {
+                            objectName: "traySecondaryTap"
+                            acceptedButtons: Qt.RightButton
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+                            onTapped: if (trayIcon.liveItem) trayIcon.liveItem.secondaryActivate()
+                        }
                     }
-                }
-
-                // Update anchor while the delegate or bar layout moves. The
-                // ownership check is the point: `iconHover.hovered` alone is
-                // stale for a frame after the pointer crosses to the next icon.
-                onXChanged: {
-                    if (root.hoveredTrayDelegate === trayIcon)
-                        root.republishHoveredAnchor()
-                }
-
-                TapHandler {
-                    objectName: "trayActivateTap"
-                    acceptedButtons: Qt.LeftButton
-                    gesturePolicy: TapHandler.ReleaseWithinBounds
-                    onTapped: if (trayIcon.liveItem) trayIcon.liveItem.activate()
-                }
-
-                TapHandler {
-                    objectName: "traySecondaryTap"
-                    acceptedButtons: Qt.RightButton
-                    gesturePolicy: TapHandler.ReleaseWithinBounds
-                    onTapped: if (trayIcon.liveItem) trayIcon.liveItem.secondaryActivate()
                 }
             }
         }

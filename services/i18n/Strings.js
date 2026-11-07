@@ -61,6 +61,8 @@ var strings = {
     // ── Tray / bar tray menu ─────────────────────────────────────────────
     "tray.noItems": { zh: "没有菜单项", en: "No menu items" },
     "tray.item": { zh: "托盘项", en: "Tray item" },
+    "tray.collapse": { zh: "折叠托盘", en: "Collapse tray" },
+    "tray.expand": { zh: "展开托盘", en: "Expand tray" },
 
     // ── Control centre: shared ───────────────────────────────────────────
     "cc.network.title": { zh: "网络", en: "Network" },
