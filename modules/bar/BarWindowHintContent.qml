@@ -1546,7 +1546,28 @@ Item {
             && !MotionTokens.reducedMotion && !root._snapping
         NumberAnimation {
             id: indicatorTailAnimation
-            duration: MotionTokens.slow * 2 * debugTimeScale
+            // The tail lingers on a REORDER, because the head does.
+            //
+            // The wake's length is how far the head gets ahead before the tail closes, so it
+            // is set by the two clocks' ratio - and the two paths have different heads:
+            // `medium` (160ms) for a focus step, `windowRowMove` (320ms) during a reorder.
+            // A tail pinned at `slow * 2` therefore halves the reorder's trail for the same
+            // travel: measured, 25.8px against 37.6px, which reads as a smaller gesture than
+            // a plain focus change.
+            //
+            // A focus step keeps the widget's own 480ms, which is `slow * 2` and is what
+            // gives the at-rest wake its 55%-of-travel shape. A reorder's head takes twice
+            // as long, so its tail has to linger proportionally - the same ratio is the same
+            // length of trail.
+            //
+            // 1.9 rather than a round 2: measured on a four-row swap, 2.0 overshot to 39.7px
+            // against the focus step's 37.6, and 1.9 lands at 37.3. The number is a
+            // consequence of `windowRowMove` and `slow * 2` not being an exact 2:1 pair
+            // (320 against 480), so it is written out rather than derived from a ratio that
+            // does not exist.
+            duration: (strip.rowsTransitioning
+                ? MotionTokens.windowRowMove * 1.9
+                : MotionTokens.slow * 2) * debugTimeScale
             easing.type: Easing.OutSine
         }
     }
