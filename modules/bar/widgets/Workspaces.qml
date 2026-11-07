@@ -54,6 +54,15 @@ Item {
     // only real changes animate after it.
     property bool _iconPrimed: false
 
+    // Bumped whenever a slot's width or order changes.
+    //
+    // The strip's positions are sums over the slots' live `presence` values, and those are
+    // plain properties of the delegates - so a slot opening, closing or moving notifies
+    // nothing that a binding above it could depend on. Every one of those writes bumps this
+    // instead, which is the one dependency the two sums (`contentRow.implicitWidth` and each
+    // slot's `x`) are written against.
+    property int _stripRevision: 0
+
     // Wheel throttle: one focus step per 120ms so a single flick never
     // floods niri with a burst of focus-window/focus-workspace calls.
     property double _lastWheelTimeMs: 0
@@ -299,6 +308,10 @@ Item {
             }
         }
         root.settleIconOrder(model)
+        // One bump for the whole batch: the sums are recomputed once, and each slot whose
+        // place changed travels on its own `Behavior`. A per-move bump would restart every
+        // slot's travel on every move of a cascade.
+        root._stripRevision++
     }
 
     // The index of `winId` in a model, or -1. A function rather than a loop at each use,
@@ -497,8 +510,11 @@ Item {
         root.refreshWindowMap()
         Qt.callLater(root.updateIndicator)
         Qt.callLater(root.updateHighlight)
-        // Only after the first population has been written: see `_iconPrimed`.
-        Qt.callLater(function () { root._iconPrimed = true })
+        // Only after the first population has been written AND laid out: see
+        // `_iconPrimed`. Two turns, because one is spent creating the delegates - their
+        // first `x` is computed from a strip that has not measured itself yet, and priming
+        // before that slides the whole strip in from the left edge.
+        Qt.callLater(function () { Qt.callLater(function () { root._iconPrimed = true }) })
     }
 
     implicitWidth: workspaceRow.implicitWidth
@@ -606,18 +622,46 @@ Item {
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                 }
 
-                Row {
+                // NO POSITIONER, and that is what makes a reorder a travel.
+                //
+                // A `Row` places its children from their measured widths, and the model's
+                // `move()` changes which delegate is where - so a window moved inside its
+                // workspace was two icons trading places between two frames, with nothing to
+                // animate: the positioner had already re-laid them out.
+                //
+                // Here each slot places ITSELF from the sum of the slots before it, and that
+                // sum is a binding over their live `presence` values. A `move()` changes the
+                // sum a slot sees, so the slot travels to its new place - and the ones it
+                // crosses travel the other way on the same frame, because their sums changed
+                // too. This is the mod-key hint's list, laid along the bar.
+                Item {
                     id: contentRow
+                    objectName: "workspaceStrip"
 
                     anchors.centerIn: parent
-                    // Zero, because each icon slot carries its own trailing gap (see the
-                    // delegate's `width`): with `Row` spacing as well, a slot closing to
-                    // nothing would leave that gap behind, which is a dead gap exactly
-                    // where an icon is leaving. `Tray.qml` does the same, and the square's
-                    // width subtracts the trailing gap back out.
-                    spacing: 0
+                    implicitWidth: {
+                        // The revision is the dependency: `presence` lives on the delegates
+                        // and is a plain property of an Item, so the width has to be asked
+                        // for again whenever one of them moves.
+                        workspaceSquare._stripRevision
+                        let w = indexLabel.width
+                        for (let i = 0; i < windowRepeater.count; i++) {
+                            const item = windowRepeater.itemAt(i)
+                            if (item)
+                                w += item.width
+                        }
+                        return w
+                    }
+                    implicitHeight: root.iconSize
+                    width: implicitWidth
+                    height: implicitHeight
 
+                    // The workspace number, which is the first thing in the strip and the
+                    // one thing that never moves.
                     Text {
+                        id: indexLabel
+                        objectName: "workspaceIndexLabel"
+                        x: 0
                         anchors.verticalCenter: parent.verticalCenter
                         text: workspaceSquare.idx
                         color: workspaceSquare.isActive
@@ -641,6 +685,11 @@ Item {
                             required property string appId
                             required property bool retiring
                             required property int delayMs
+                            // Declared rather than relying on the injected `index`: the
+                            // injected one is a context property of the delegate's own
+                            // scope, and a binding that reads it from inside a child (the
+                            // slot's `x` sum does) resolves it as undefined.
+                            required property int index
 
                             // Bound to the shared focus property: focus-only
                             // events never rebuild delegates, and the role
@@ -665,12 +714,59 @@ Item {
                             // a real arrival animates from zero.
                             property real presence: 1
                             property real ink: 1
+                            // Every frame of a slot opening or closing changes the sum the
+                            // slots after it are placed by - see `_stripRevision`.
+                            onPresenceChanged: root._stripRevision++
+                            // `index` is injected by the `Repeater`, not a property of this
+                            // item, so there is no `onIndexChanged` to hook. A `move()` is
+                            // announced by the model's own `syncIconModel` instead, which
+                            // bumps the revision once for the whole batch.
 
                             // The slot carries its own gap, so a slot closing to nothing
                             // takes its gap with it instead of leaving the strip one gap
                             // wider until the row is dropped.
                             width: presence * (root.iconSize + root.iconSpacing)
                             height: root.iconSize
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            // WHERE THIS SLOT SITS: everything before it, and nothing else.
+                            //
+                            // `index` is the delegate's own place in the model, so a
+                            // `move()` renumbers the slots rather than moving anything - and
+                            // a slot whose index changed therefore has a different sum to
+                            // travel to. That is the whole reorder: the model says where
+                            // each window goes, and each slot computes the distance from
+                            // the neighbours it has to cross.
+                            //
+                            // The sum reads every earlier slot's WIDTH, which is a live
+                            // binding on their `presence` - so a slot arriving or leaving
+                            // shifts the ones after it on the same frame, and a reorder
+                            // slides the ones in between.
+                            x: {
+                                workspaceSquare._stripRevision
+                                let left = indexLabel.width
+                                for (let i = 0; i < windowIcon.index && i < windowRepeater.count; i++) {
+                                    const item = windowRepeater.itemAt(i)
+                                    if (item)
+                                        left += item.width
+                                }
+                                return left
+                            }
+
+                            // The travel itself, on the slot's own clock. `OutCubic` rather
+                            // than the hint list's `OutQuint`: this strip is one icon tall
+                            // and a reorder moves it a few glyph widths, not the height of a
+                            // panel, so the gentler start would read as a delay.
+                            // Gated on `_iconPrimed` as well: the first population
+                            // computes every slot's place from nothing, and animating that
+                            // would slide the whole strip in from the left edge.
+                            Behavior on x {
+                                enabled: root._iconPrimed && !MotionTokens.reducedMotion
+                                NumberAnimation {
+                                    duration: MotionTokens.windowRowMove
+                                    easing.type: Easing.OutCubic
+                                }
+                            }
                             // Off while it has no size or no ink: a slot mid-flight takes no
                             // hover and no tap.
                             enabled: !windowIcon.retiring && presence > 0.99 && ink > 0.99
@@ -731,7 +827,7 @@ Item {
                                 // and it asks the model whether the window really left - a
                                 // window that came back mid-exit revived its slot instead.
                                 onFinished: root.completeIconRetire(
-                                    windowSquare ? windowSquare.wins : null, windowIcon.winId)
+                                    windowRepeater.model, windowIcon.winId)
                             }
 
                             Timer {
@@ -786,8 +882,7 @@ Item {
                                     windowIcon.ink = windowIcon.retiring ? 0 : 1
                                     if (windowIcon.retiring)
                                         root.completeIconRetire(
-                                            windowSquare ? windowSquare.wins : null,
-                                            windowIcon.winId)
+                                            windowRepeater.model, windowIcon.winId)
                                 }
                             }
 
