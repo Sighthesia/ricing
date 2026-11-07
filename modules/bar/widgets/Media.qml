@@ -461,9 +461,6 @@ BarPill {
                 // number because a text box has one font size.
                 fallDistanceOverride: root.lineFallDistance
                 y: 0
-                // Outranks the sub-line while its ghosts are falling, so a drop
-                // crossing the sub-line's band stays visible.
-                z: titleMarquee.sweeping ? 1 : 0
                 maxWidth: root.maxTextWidth
                 textColor: LazerTheme.textPrimary
                 pixelSize: 12

@@ -44,7 +44,8 @@ Item {
     // legacy ActiveWindow implementation; workspace activation can otherwise
     // expose a transient empty activeAppId before windows are reloaded.
     property string currentAppId: ""
-    readonly property string iconSource: root.currentAppId.length > 0 ? Quickshell.iconPath(root.currentAppId, true) : ""
+    readonly property string iconSource: root.currentAppId.length > 0 ? Services.WindowHintService.iconPathForApp(root.currentAppId) : ""
+    readonly property string fallbackIconSource: Quickshell.iconPath("application-x-executable")
     // The icon SLOT is permanent (like the two text lines): an empty workspace
     // shows a compositor glyph instead of collapsing the slot and sliding the
     // title left. `hasIcon` therefore answers "is the slot shown", and
@@ -371,6 +372,10 @@ Item {
                 asynchronous: false
                 visible: root.hasAppIcon && root.outgoingIconSource !== "" && opacity > 0.01
                 opacity: 0
+                onStatusChanged: {
+                    if (status === Image.Error && source !== "" && source !== root.fallbackIconSource)
+                        source = root.fallbackIconSource
+                }
             }
 
             IconImage {
@@ -385,6 +390,10 @@ Item {
                 asynchronous: false
                 visible: root.hasAppIcon
                 opacity: 1
+                onStatusChanged: {
+                    if (status === Image.Error && source !== "" && source !== root.fallbackIconSource)
+                        source = root.fallbackIconSource
+                }
             }
 
             // Explicitly run the same two-layer opacity crossfade as Media.
@@ -437,10 +446,6 @@ Item {
                 id: titleText
 
                 y: 0
-                // While its ghosts are falling the title outranks the sub-line,
-                // so a drop that passes through the sub-line's band stays
-                // visible. Outside the transition the two never overlap.
-                z: titleText.sweeping ? 1 : 0
                 text: root.shownTitle
                 // Both lines fall the SAME distance. osu's mask drops a glyph
                 // by that glyph's own drawable height, and a text box only ever
