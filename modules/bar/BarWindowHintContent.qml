@@ -336,8 +336,11 @@ Item {
     // edge, where the next snapshot with windows brings it down onto the card: an arrival
     // rather than a blink.
     readonly property real noRowTop: _offTop
-    readonly property real focusedRowTop: focusedRowIndex < 0 ? noRowTop
-        : strip.liveRowTop(focusedRowIndex)
+    // The focused row's drawn top edge. `strip.focusedLiveTop`, not `liveRowTop(index)`: the
+    // index the renderer holds includes the holes left by rows that are dissolving, so a
+    // marker anchored on it jumps a whole pitch the moment a window above the newly focused
+    // one closes. See `BarWindowHintStrip.focusedLiveIndex`.
+    readonly property real focusedRowTop: strip.focusedLiveTop
     // The frame's glide target in UNSCROLLED list coordinates: the row's own top
     // edge, before the viewport offset is applied. The drawn `y` below subtracts
     // the scroll on the way out, so one glide covers both a focus step and the
@@ -355,8 +358,18 @@ Item {
     // anchor, and that is the same arrangement the scroll already has: the anchor is a pure
     // function of the index, so a slot collapsing somewhere above cannot retarget the
     // glide, and the drawn position below subtracts the layout's own offset on the way out.
-    property real _frameAnchorY: focusedRowIndex < 0
-        ? noRowTop + strip.scrollOffset : focusedRowIndex * rowPitch
+    // The same rule as `focusedRowTop`, in the UNSCROLLED coordinates the glide works in:
+    // the focused row's place among the rows that are NOT leaving, plus whatever the holes
+    // above it still owe. A pure function of the LIVE index, so the glide is aimed at where
+    // the row will rest rather than at a position that counts the row being dissolved.
+    //
+    // This is the fix for the reported asymmetry: `focusedRowIndex` put focus on the NEXT
+    // window one pitch too low (`a bX c*` reads index 2 where the row rests at 1), so closing
+    // a window moved the mark down a row and then slid it back up as the hole closed. Focus
+    // landing on the PREVIOUS window was unaffected, which is exactly what was seen.
+    property real _frameAnchorY: strip.focusedLiveIndex < 0
+        ? noRowTop + strip.scrollOffset
+        : strip.focusedLiveIndex * rowPitch + strip.rowLift
     // How far the frame is being asked to travel, in row pitches: the distance from where it
     // was DRAWN to where it now belongs. Read by the glide's own `Behavior` to decide whether
     // this is a focus step or a reorder - see the note there.
@@ -2467,7 +2480,11 @@ Item {
     // Named rather than written out because it has more than one caller, and one of them
     // had put the marker's own landing back on a negative row.
     function _restingY() {
-        return root.hasTarget ? root._targetYFor(root.focusedRowIndex)
+        // The LIVE index, for the reason `_frameAnchorY` records: `focusedRowIndex` counts
+        // the slots playing their exit, so the bar was aimed one pitch low whenever focus
+        // landed on the row after a closing window - and then walked back up as that slot
+        // collapsed. The outline beside it had the same fault and the same fix.
+        return root.hasTarget ? root._targetYFor(strip.focusedLiveIndex)
             : root.noRowTop + strip.scrollOffset + root.markerOffset
     }
 

@@ -466,6 +466,19 @@ Item {
         root.rowRevision
         return root.rowLiftFor(root.focusedRowIndex)
     }
+    // The focused row's index in the RENDERED list, and separately the index it would hold
+    // if the rows that are leaving were not there.
+    //
+    // The second one is what a marker's resting place must be built from, and the difference
+    // is the whole of a reported fault. A departing row keeps its slot so it can dissolve in
+    // place, so it still occupies an index - and when focus lands on the row AFTER it, the
+    // rendered index counts that hole: `a bX c*` puts the focus at 2 where it would be 1. A
+    // marker anchored on `index * rowPitch` therefore jumped a whole row DOWN on the frame
+    // the window closed, and then slid back up as the hole collapsed - measured, 68 -> 34.
+    //
+    // Focus landing on the row BEFORE the hole was unaffected, which is exactly the
+    // asymmetry that was reported: closing a window and having focus land on the next one
+    // moved the mark, and landing on the previous one did not.
     readonly property int focusedRowIndex: {
         var list = root.activeRows
         for (var i = 0; i < list.length; ++i) {
@@ -474,10 +487,44 @@ Item {
         }
         return -1
     }
+    // The same row, counted over the rows that are NOT leaving.
+    readonly property int focusedLiveIndex: {
+        var list = root.activeRows
+        var live = 0
+        for (var i = 0; i < list.length; ++i) {
+            if (!list[i])
+                continue
+            if (list[i].isFocused === true)
+                return live
+            if (list[i].phase !== "exit")
+                live++
+        }
+        return -1
+    }
 
     // The rendered top edge of the row at `index`, in the strip's scrolled space. ONE
     // place the layout offset caused by mid-flight rows is added up, so the body does not
     // re-derive it and cannot disagree with where the row is drawn.
+    // Where the FOCUSED row is drawn, without ever counting a departing slot as a position.
+    //
+    // This is the number the markers are placed from, and it is not `liveRowTop(focusedRowIndex)`
+    // - see `focusedLiveIndex` for why: the rendered index includes the holes left by rows
+    // that are dissolving, so anchoring on it jumps a whole pitch the moment a window closes
+    // above the newly focused one.
+    //
+    // The two terms are the resting place of the focused row among the SURVIVING rows
+    // (`focusedLiveIndex * rowPitch`) and the amount the holes still owe it (`rowLift`, which
+    // is what every departing slot above it has yet to close). While a hole closes, the first
+    // term is already final and the second shrinks to zero, so the mark rises to its place
+    // exactly as the row does - which is the motion the panel already had, now anchored
+    // correctly.
+    readonly property real focusedLiveTop: {
+        root.rowRevision
+        if (root.focusedLiveIndex < 0)
+            return root.noRowTop
+        return root.focusedLiveIndex * root.rowPitch - root.rowLift - root.scrollOffset
+    }
+
     function liveRowTop(index) {
         // The row's own travel is part of where it is, not an adjustment to the index it
         // currently holds: a reordering row is drawn between two places, and the marker has
