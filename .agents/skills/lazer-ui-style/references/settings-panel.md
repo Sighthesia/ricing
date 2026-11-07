@@ -80,6 +80,7 @@
 - 会展开成控件或清单的东西各占一页（`move`、`widget-settings`、`add-widget`），从带 chevron 的行进入，用页头的返回箭头退出。页头里返回箭头是独立控件，页名只是标题，不做成可点行。
 - 页高决定宿主几何：`pageHost` 一个 `clip` 容器用 `medium/OutQuint` 过渡，非当前页 `visible: false`（不是只改 opacity），否则共享同一个节点时下层内容会从上层空隙里透出来，同时污染测量。
 - 换页用宿主 hover 弹层交换的滑动：旧页向行进方向滑出、新页从行进方向滑入，各自交叉淡化，一个 `slow/OutCubic` 时钟驱动（`pageSlideProgress` + `pageSlideSign`）；返回根页取反方向。页头跟随所属页一起滑动，但离场期间标题仍写它正在离开的那一页。滑动进行中再换页要先落定旧滑（stop + progress=1），两轨重叠会让方向同时描述两次移动。
+- 二级页在已落定的弹层里改高时，宿主必须**直接采纳测量值**，不能重起滑动：`BarPopupHost.retargetGeometry` 的兜底 `startGlide()` 会把 `transitionProgress` 归零，内容每帧长高就每帧归零，面板会一直停在起始高度直到内容长完（实测内容 340、面板卡在 280）。落定态没有别的运动，内容本身就是那段动画，面板贴着它走即可。反过来，内容槽自己的高度 `Behavior` 只能挂在交换期间：它画的是可见面，常开就等于第二套高度时钟（实测面板领先自己内容 164px）。
 - 页头槽位必须**骑在滑动时钟上**（`32 * headerWeight`），不能等滑动结束再收：后者会让返回根页时菜单顶部整段留白直到退场完成。同理，包住「页头 + 页」的容器不能是 `Column`——带 `Behavior on height` 的子项在整个动画期间向父布局汇报旧高度，布局收不动；要用显式 y 偏移的两个槽位，页头槽高、间隔和页的 y 都从同一个时钟推导。
 - widget 声明的设置项（`services/WidgetSettingsRegistry.js` 的 `controls`）在 `widget-settings` 页里用标准 `LazerSettingsRow` 渲染：`swatch` → `LazerSettingsSwatch`，`slider` → `LazerSettingsSlider`。
 - 行的**形状**（kind / label / range / default）来自声明，行的**值**必须逐控件绑到服务读取，不能放进模型：每次写入都会 bump settings revision，模型一旦带值就会在拖动途中重建 delegate，指针下的 slider 直接消失。
