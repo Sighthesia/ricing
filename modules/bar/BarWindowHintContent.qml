@@ -412,6 +412,15 @@ Item {
             // cards move on `OutQuint` and move a SINGLE pitch each, so the same curve is a
             // much smaller step for them.
             easing.type: root._frameStep > 1.5 ? Easing.OutCubic : Easing.OutQuint
+            // The settle window closes when the frame has landed - on its own clock, at the
+            // place the head was following it to. Closing on a duration would be a guess
+            // that either leaves the head owned by the frame after it stopped (so the next
+            // focus step starts from a head nobody moved) or hands it back mid-flight.
+            // Closing on `onStopped` alone is not enough: a glide that is re-aimed mid-flight
+            // never reports stopped, and the window then stays open with the head owned by a
+            // frame that is no longer moving. The close is also driven by the follow timer,
+            // which sees the frame arrive whatever path it took here.
+            onStopped: if (root._settling) root._endSettle()
         }
     }
     // The leaving frame's own height, from the row counts of the frame being held
@@ -474,6 +483,73 @@ Item {
     property real _headY: 0
     property real _tailY: 0
     property bool _snapping: false
+
+    // THE SETTLE WINDOW'S ONLY HEAD WRITER.
+    //
+    // The frame and the bar mark one thing, and during a settle they must MOVE as one thing:
+    // the frame glides on `settingsSidebarCollapse`/OutCubic (300ms) and the head on
+    // `medium`/OutQuad (160ms), so even with one shared target the two are at different
+    // places for most of the step - the head arrives first, stops, and waits while the frame
+    // is still travelling. On a 1px outline that reads as a hop; on a 26px bar with a tail
+    // it reads as the bar diving past the row and coming back.
+    //
+    // So while the window is open the head is not animated at all: it is placed on the
+    // frame's own current position, every tick of the frame's glide. One writer, no
+    // `Behavior`, no `_pendingTop`, no `_aimIndicator`.
+    Connections {
+        target: root
+        enabled: root._settling
+        function onFrameAnchorYChanged() { root._followSettleFrame() }
+    }
+    Timer {
+        interval: 16
+        repeat: true
+        running: root._settling
+        onTriggered: root._followSettleFrame()
+    }
+    // Hand the head BACK, on the value it already has, so the handover cannot be a jump.
+    //
+    // `_anchorY` is set to where the head actually is rather than to the target the frame
+    // was heading for: the two differ by the frame's last few tenths of a pixel, and taking
+    // the target would make the `Behavior` ease that away as a second little motion after
+    // the bar had visibly stopped.
+    function _endSettle() {
+        root._settling = false
+        root._anchorY = root._headY
+    }
+
+    function _followSettleFrame() {
+        if (!root._settling)
+            return
+        // The frame's DRAWN top edge, in the same unscrolled space the tracker uses: its own
+        // `y` is `_frameAnchorY - scrollOffset`, so the scroll is added back rather than
+        // subtracted twice. `markerOffset` is the bar's standing one-offset-below rule.
+        root._pendingTop = -1
+        _snapping = true
+        _headY = root._frameAnchorY + root.markerOffset
+        // BOTH ends, every tick of the window, and the reason is what the tail is FOR.
+        //
+        // A wake is the record of a journey: the tail lags the head so the bar shows where
+        // the mark came from. During a settle there is no journey - the focused row does not
+        // change, the mark is not travelling anywhere, and the only motion is the frame
+        // arriving at a place the slot it just lost no longer occupies. A tail kept on the
+        // old target therefore describes a trip nobody took: measured, the head following the
+        // frame down to 35 while the tail still climbed toward 69, holding the bar at
+        // [44.7, 95] around a row at 34 for 300ms. That is the overshoot.
+        //
+        // So the window moves the bar as one piece, and hands the wake back when it ends.
+        _tailY = _headY
+        _snapping = false
+        // The frame has ARRIVED, so the window has done its job: the bar is on the row and
+        // the head can go back to being driven by its own `Behavior`.
+        //
+        // Asked of the glide's own RUNNING state, not of a distance: `_frameAnchorY` is the
+        // animated value, so comparing it with `focusedRowIndex * rowPitch` is true for the
+        // whole second half of every glide and closed the window while the frame was still
+        // travelling - measured, delta jumping to 8.9 mid-settle.
+        if (!focusFrameGlide.running)
+            root._endSettle()
+    }
     // Committed target, never animated. Dedupe and same-anchor drift read this,
     // because _headY is the Behavior's in-flight frame and is numerically equal to
     // _tailY until the first tick, which would make a same-frame switch look
@@ -2081,6 +2157,17 @@ Item {
     // The rendered index just fell while a slot is still closing: the layout settling, not
     // the mark moving. A step like that must be travelled, and it takes no trail.
     property bool _settlingIndex: false
+    // THE SETTLE WINDOW, latched from the event rather than guessed from a flag.
+    //
+    // `_settlingIndex` asks `rowsTransitioning` at the moment the index changes, which is a
+    // different question and can answer either way depending on whether the departing
+    // record has already been dropped: false there means the step is still held in
+    // `_pendingTop` and the head sits on its old target, true means a plain focus step gets
+    // its tail shortened. This is opened by the index FALLING while the focused window is
+    // unchanged - which is exactly a departing slot being removed under a settled focus -
+    // and closed when the frame's own glide lands.
+    property bool _settling: false
+    property int _settleFromIndex: -1
 
     // Apply a drift that landed mid-trail, once the tail has caught up. The widget's
     // `_edgePendingCenterX` timer, and for the same reason: it waits on the TAIL rather
@@ -2772,6 +2859,14 @@ Item {
         // Written BEFORE anything re-aims: the tail's `Behavior` reads it to choose its
         // duration for this step.
         root._settlingIndex = strip.rowsTransitioning
+        // THE SETTLE WINDOW opens on the EVENT, not on a flag: the rendered index fell and
+        // the focused window is the same one, which is a departing slot being removed under
+        // a settled focus and nothing else. `_settleFromIndex` remembers where it started so
+        // the close can tell the frame has arrived.
+        if (root.focusedRowIndex >= 0 && root.focusedRowIndex < root._settleFromIndex
+                && root.focusedWindowKey === root._targetKey)
+            root._settling = true
+        root._settleFromIndex = root.focusedRowIndex
         // How far the frame is being asked to travel, in rows - read by its glide to tell a
         // reorder from a focus step, and written here because this is the turn the anchor
         // moves on. See the note in the `Behavior`.
