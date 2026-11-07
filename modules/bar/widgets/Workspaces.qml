@@ -596,7 +596,14 @@ Item {
                         if (!item || item.winId === undefined)
                             continue
                         if (String(item.winId) === target) {
-                            const p = item.mapToItem(root, item.width / 2, 0)
+                            // The GLYPH's centre, not the slot's. A slot's width is
+                            // `presence * (iconSize + iconSpacing)` - it carries the trailing
+                            // gap so a closing slot takes that gap with it - so the middle of
+                            // the slot sits half a gap to the right of the icon it holds.
+                            // Mapping `width / 2` put the mark off-centre by that much on
+                            // every icon, and by a moving amount while the slot animated.
+                            const p = item.mapToItem(root,
+                                item.width / 2 - root.iconSpacing / 2, 0)
                             return p.x
                         }
                     }
@@ -772,10 +779,17 @@ Item {
                             enabled: !windowIcon.retiring && presence > 0.99 && ink > 0.99
 
                             // The indicator resolves its position through
-                            // `iconCenterXInRoot`, which reads this item's own width - and a
-                            // width that is animating has no binding to invalidate in a
-                            // function call. Without this the mark sits on the old position
-                            // for the whole of a slot's arrival or departure and then jumps.
+                            // `iconCenterXInRoot`, which MAPS this item into the root - so
+                            // both its width and its place are inputs, and neither has a
+                            // binding to invalidate inside a function call.
+                            //
+                            // Width alone was not enough, and that was the fault: a slot
+                            // arriving or leaving changes its width, but a REORDER changes
+                            // only `x` - so the mark sat on the old place for the whole of a
+                            // travel and then jumped to the new one when something else
+                            // happened to ask. Measured on a two-icon swap, the icons crossed
+                            // frame by frame while the indicator did not move at all.
+                            onXChanged: Qt.callLater(root.updateIndicator)
                             onWidthChanged: Qt.callLater(root.updateIndicator)
 
                             // --- arrival: open the slot, then let the ink in ---------
