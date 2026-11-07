@@ -684,12 +684,18 @@ Item {
                         ? Number(list[i].presence) : 1
                     if (!isFinite(presence))
                         presence = 1
-                    // The slot's own height, plus wherever a REORDER has that row right now.
-                    // A row crossing its neighbours occupies the space it is passing
-                    // through, so the rows it is crossing have to make room for it on the
-                    // same frame - which is the same arithmetic `liftAt` does for the
-                    // markers, so the two cannot disagree about where a row is.
-                    top += pitch * (presence + stripColumn.moveOffsetAt(i))
+                    // The slot's own height, and NOT its travel.
+                    //
+                    // This used to add `moveOffsetAt(i)` as well, on the argument that a
+                    // row crossing its neighbours occupies the space it passes through. That
+                    // double-counts the same displacement: `rowTopAt` adds the row's own
+                    // travel on top of this sum, so every row below a moving one was pushed
+                    // by it a second time - measured, a swap put the three rows that were
+                    // only being displaced at 89.3 / 95.6 / 102 instead of 0 / 34 / 68, and
+                    // they slid back out of nowhere. A row's travel is its own; the rows
+                    // below it are moved by its SLOT, which is the `presence` term and does
+                    // not change on a reorder.
+                    top += pitch * presence
                 }
                 return top
             }
