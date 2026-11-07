@@ -42,10 +42,12 @@ Item {
 
     // 0 while the icon strip is folded away, 1 while revealed.
     property real trayReveal: root.trayExpanded ? 1 : 0
-    readonly property real trayStripWidth: Math.max(0, trayRow.implicitWidth - root.slotGap)
+    readonly property real iconInset: (LazerTheme.barWidgetHeight - LazerTheme.barGlyphSize) / 2
+    readonly property real trayStripWidth: Math.max(0,
+            trayRow.implicitWidth - root.slotGap - root.iconInset)
 
     implicitWidth: root.liveCount > 0
-            ? (LazerTheme.barWidgetHeight + root.trayStripWidth * root.trayReveal)
+            ? (LazerTheme.barWidgetHeight + 15 + root.trayStripWidth * root.trayReveal)
             : 0
     implicitHeight: LazerTheme.barWidgetHeight
 
@@ -123,7 +125,10 @@ Item {
             return normalized
         if (normalized.charAt(0) === "." || normalized.charAt(0) === "/")
             return Qt.resolvedUrl(normalized)
-        return String(Quickshell.iconPath(normalized, true) || "")
+        // Use unchecked icon lookup with fallback to avoid theme-check failures
+        // (e.g. Papirus) leaving StatusNotifier icons blank.
+        var path = Quickshell.iconPath(normalized, "application-x-executable")
+        return String(path || "")
     }
 
     function normalizeTrayIconSource(source) {
@@ -353,7 +358,7 @@ Item {
                 width: LazerTheme.barStrokeGlyphSize
                 height: LazerTheme.barStrokeGlyphSize
                 source: Qt.resolvedUrl("../../lazerbar/icons/chevron-left.svg")
-                rotation: root.trayExpanded ? 0 : 180
+                rotation: root.trayExpanded ? 180 : 0
                 opacity: foldButton.hovered ? 1 : 0.85
 
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
@@ -461,15 +466,23 @@ Item {
                         IconImage {
                             id: glyph
 
+                            property string fallbackSource: Quickshell.iconPath("application-x-executable")
+                            property bool useFallback: false
                             x: (LazerTheme.barWidgetHeight - LazerTheme.barGlyphSize) / 2
                             y: (LazerTheme.barWidgetHeight - LazerTheme.barGlyphSize) / 2 + trayIcon.fall
                             width: LazerTheme.barGlyphSize
                             height: LazerTheme.barGlyphSize
                             asynchronous: true
                             backer.fillMode: Image.PreserveAspectFit
-                            source: trayIcon.iconSource
-                            // Failed loads stay invisible instead of rendering blank.
-                            opacity: trayIcon.ink * (status === Image.Ready ? 1 : 0)
+                            source: useFallback ? fallbackSource : trayIcon.iconSource
+                            onSourceChanged: useFallback = false
+                            onStatusChanged: {
+                                if (status === Image.Error && !useFallback && source !== fallbackSource)
+                                    useFallback = true
+                            }
+                            // Fall back to the default theme icon on load failure
+                            // instead of leaving a blank slot.
+                            opacity: trayIcon.ink * (status === Image.Ready || useFallback ? 1 : 0)
                         }
 
                         // --- Arrival: open the box, then fade the ink in. ---
@@ -654,6 +667,24 @@ Item {
                         }
                     }
                 }
+            }
+        }
+
+        // Vertical boundary strip at the tray's right edge, styled like the
+        // media widget's progress track.
+        Item {
+            width: 15
+            height: LazerTheme.barWidgetHeight
+            visible: root.liveCount > 0
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: 3
+                height: LazerTheme.barGlyphSize
+                radius: 1.5
+                color: Qt.rgba(LazerTheme.barIcon.r, LazerTheme.barIcon.g, LazerTheme.barIcon.b, 0.22)
+
+                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
             }
         }
     }
