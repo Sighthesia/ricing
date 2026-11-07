@@ -520,6 +520,28 @@ Item {
         }
         return -1
     }
+    // The same row, counted over the rows that are NOT leaving: the index it will hold once
+    // the transition ends.
+    //
+    // The two differ for exactly as long as an exit lasts, and a marker wants this one. A
+    // departing row keeps its slot so it can dissolve in place, so it still occupies an
+    // index - and focus landing on the row AFTER it then reads one too high. That index is
+    // where the row is DRAWN today, which is not where it is going: a closing window above
+    // the focused row makes that row slide up into the gap, and a mark built on the drawn
+    // position has to follow the whole slide and come back.
+    readonly property int focusedLiveIndex: {
+        var list = root.activeRows
+        var live = 0
+        for (var i = 0; i < list.length; ++i) {
+            if (!list[i])
+                continue
+            if (list[i].isFocused === true)
+                return live
+            if (list[i].phase !== "exit")
+                live++
+        }
+        return -1
+    }
 
     function liveRowTop(index) {
         // The row's own travel is part of where it is, not an adjustment to the index it
