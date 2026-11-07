@@ -317,14 +317,20 @@ function reconcileRows(previous, incoming, stepMs) {
         out.splice(c, 0, _arriving(_fields(next[c]), arrivalKey,
             arriving.indexOf(arrivalKey), arriving.length, step))
     }
-    // ORDERED BY THE INCOMING LIST, not by the previous one.
+    // ORDERED BY THE INCOMING LIST, with every departure left in the place it held.
     //
-    // The loop above walks `prev` so that a row on its way out keeps the place the user
-    // last saw it in - but everything that STAYS belongs in the order the snapshot now
-    // says, or a reorder would be invisible: the rows would keep their slots and only the
-    // titles under them would change. Departures are appended at the end, where a row that
-    // no longer has a place belongs.
+    // The rows that STAY belong in the order the snapshot now says, or a reorder would be
+    // invisible: they would keep their slots and only the titles under them would change.
+    //
+    // A row on its way OUT is the opposite case and must not be re-ordered at all. Appending
+    // departures to the end - which is what this did - is a real change of place, so the row
+    // TRAVELLED to the bottom of the list and dissolved there. Measured, closing the second
+    // of four rows made it slide past two neighbours and fade at the bottom edge, which is
+    // the reported "a closing card always moves to the bottom instead of leaving where it
+    // was". A row that is leaving has no place in the new order, so the place it already
+    // occupies is the only honest one.
     var ordered = []
+    var departures = []
     for (var d = 0; d < next.length; ++d) {
         var wantKey = keyFor(next[d], d)
         for (var e = 0; e < out.length; ++e) {
@@ -335,7 +341,22 @@ function reconcileRows(previous, incoming, stepMs) {
             }
         }
     }
-    return ordered.concat(out)
+    for (var f = 0; f < out.length; ++f) {
+        if (out[f] && out[f].phase === "exit")
+            departures.push(out[f])
+    }
+    // The live rows in the snapshot's order, with each departure spliced back at the index
+    // it held in the PREVIOUS list - which is where the user last saw it.
+    for (var g = 0; g < departures.length; ++g) {
+        var was = _indexOfKey(prev, departures[g].key)
+        if (was < 0) {
+            ordered.push(departures[g])
+            continue
+        }
+        var at = Math.min(was, ordered.length)
+        ordered.splice(at, 0, departures[g])
+    }
+    return ordered
 }
 
 // Is a row arriving or leaving anywhere in this list? The one question the panel

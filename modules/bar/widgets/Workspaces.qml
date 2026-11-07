@@ -306,16 +306,15 @@ Item {
                 })
                 arrivedSoFar++
             } else {
-                if (at !== j)
-                    model.move(at, j, 1)
-                if (String(model.get(j).appId) !== appId)
-                    model.setProperty(j, "appId", appId)
+                if (String(model.get(at).appId) !== appId)
+                    model.setProperty(at, "appId", appId)
                 // A window that came back during its exit revives its slot rather than
                 // growing a second one for the same identity.
-                if (model.get(j).retiring)
-                    model.setProperty(j, "retiring", false)
+                if (model.get(at).retiring)
+                    model.setProperty(at, "retiring", false)
             }
         }
+        root.orderLiveRows(model, rows)
         root.settleIconOrder(model)
         // One bump for the whole batch: the sums are recomputed once, and each slot whose
         // place changed travels on its own `Behavior`. A per-move bump would restart every
@@ -346,25 +345,61 @@ Item {
         return false
     }
 
-    // Push every retiring slot to the END of the model, past the live ones.
+    // Put the LIVE rows in the snapshot's order, and leave every departing row in the place
+    // it already holds.
     //
-    // The live icons' order is the contract: they are the strip the user reads, and a
-    // slot on its way out must not hold one of them out of its place while it plays.
-    // The retiring rows keep their own relative order, so the departures cascade in the
-    // order they were flagged.
-    function settleIconOrder(model) {
-        let live = 0
+    // This is the one thing `syncIconModel`'s insertion loop cannot do for itself: that loop
+    // walks the ARRIVING list, and the model still holds the rows playing their exit - so the
+    // two numberings disagree for exactly as long as an exit lasts. Moving to the arriving
+    // index pushed every departing slot to the end of the strip (measured: closing the second
+    // of four icons put it at index 3 before it dissolved), and not moving at all lost the
+    // reorder.
+    //
+    // So the live rows are gathered into the snapshot's order and written back into the LIVE
+    // POSITIONS, which are the indices they already occupy. A departing row is never a
+    // position: it is something the strip is drawing through, and the live rows close over it
+    // as its slot narrows.
+    function orderLiveRows(model, rows) {
+        const liveSlots = []
         for (let i = 0; i < model.count; i++)
             if (!model.get(i).retiring)
-                live++
-        let tail = live
-        for (let i = 0; i < model.count; i++) {
-            if (!model.get(i).retiring)
+                liveSlots.push(i)
+        for (let k = 0; k < rows.length && k < liveSlots.length; k++) {
+            const want = String(rows[k].winId)
+            const slot = liveSlots[k]
+            if (String(model.get(slot).winId) === want)
                 continue
-            if (i !== tail)
-                model.move(i, tail, 1)
-            tail++
+            const from = root.iconIndexFor(model, want)
+            if (from < 0)
+                continue
+            model.move(from, slot, 1)
+            // `move` renumbers, so the live positions have to be re-read after it - the
+            // remaining slots shift by one when a row is pulled forward.
+            liveSlots.length = 0
+            for (let i = 0; i < model.count; i++)
+                if (!model.get(i).retiring)
+                    liveSlots.push(i)
         }
+    }
+
+    // A departing slot STAYS WHERE IT IS until its exit has played.
+    //
+    // This used to push every retiring row past the live ones, on the argument that a slot
+    // on its way out must not hold a live icon out of its place. That is true of the ORDER
+    // but it is the wrong mechanism: the move is a real change of place, so the slot
+    // TRAVELLED to the end of the strip and dissolved there. Measured, closing the second
+    // of four icons made it slide right past two of its neighbours and fade out at the far
+    // edge - the reported "a closing icon always moves to the far right instead of leaving
+    // where it was".
+    //
+    // Leaving it in place costs nothing that matters: the live icons keep their relative
+    // order, the departing one keeps its own slot, and the strip's positions are sums over
+    // every slot - so the ones to its right ride left on its closing width, which is the
+    // motion that was wanted in the first place.
+    function settleIconOrder(model) {
+        // Nothing to re-order. Kept as the one place a future rule about retiring rows
+        // would go, and called by `syncIconModel` so the two cannot drift apart.
+        void model
     }
 
     // A retiring icon finished its exit. Drop the row only if the window really is gone;
