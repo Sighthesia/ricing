@@ -40,7 +40,11 @@ Item {
                 onClicked: root.routeRequested(modelData.id === "library" ? "beatmap" : modelData.id === "wiki" ? "wiki" : modelData.id === "news" ? "news" : "", this)
             }
         }
-        Rectangle { visible: root.visibleIds.indexOf("music") >= 0; width: visible ? 1 : 0; height: 22; anchors.verticalCenter: parent.verticalCenter; color: LazerTheme.divider
+        BarBoundaryStrip {
+            visible: root.visibleIds.indexOf("music") >= 0
+            width: visible ? implicitWidth : 0
+            anchors.verticalCenter: parent.verticalCenter
+
             Behavior on width { NumberAnimation { duration: MotionTokens.fast } }
         }
         OsuTopBarButton {

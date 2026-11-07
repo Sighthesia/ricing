@@ -16,7 +16,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 12
         UserProfile { username: root.username; avatarSource: root.avatarSource }
-        Rectangle { width: 1; height: 24; anchors.verticalCenter: parent.verticalCenter; color: LazerTheme.divider }
+        BarBoundaryStrip { anchors.verticalCenter: parent.verticalCenter }
         ClockWidget { anchors.verticalCenter: parent.verticalCenter }
         IconButton { source: "icons/bell.svg"; accessibleName: Services.Tr.q("cc.notifications.title"); active: root.notificationsActive; activeColor: LazerTheme.osuPink; onClicked: root.activateNotification() }
     }

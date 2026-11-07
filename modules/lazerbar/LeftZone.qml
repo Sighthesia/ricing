@@ -24,7 +24,7 @@ Item {
             onClicked: root.settingsRequested()
         }
         IconButton { source: "icons/home.svg"; accessibleName: Services.Tr.q("sidebar.home") }
-        Rectangle { width: 1; height: 22; anchors.verticalCenter: parent.verticalCenter; color: LazerTheme.divider }
+        BarBoundaryStrip { anchors.verticalCenter: parent.verticalCenter }
         ModeSelector {
             id: modes
             osuSource: "icons/mode-osu.svg"

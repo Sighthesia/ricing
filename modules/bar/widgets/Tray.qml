@@ -55,7 +55,8 @@ Item {
             trayRow.implicitWidth - root.slotGap / 2 - root.iconInset + root.dividerPadding)
 
     implicitWidth: root.liveCount > 0
-            ? (LazerTheme.barWidgetHeight + 15 + root.trayStripWidth * root.trayReveal)
+            ? (LazerTheme.barWidgetHeight + boundaryStrip.implicitWidth
+                    + root.trayStripWidth * root.trayReveal)
             : 0
     implicitHeight: LazerTheme.barWidgetHeight
 
@@ -678,24 +679,17 @@ Item {
             }
         }
 
-        // Vertical boundary strip at the tray's right edge, styled like the
-        // media widget's progress track. Its 15px box is split evenly around
-        // the rule; the room that keeps the rule off the last icon lives in
-        // `dividerPadding` above, not in this width.
-        Item {
-            width: 15
-            height: LazerTheme.barWidgetHeight
+        // Vertical boundary strip at the tray's right edge. Its 15px box is the
+        // shared rule plus 6px of room on each side; the extra room that keeps
+        // it off the last icon lives in `dividerPadding` above, not here.
+        BarBoundaryStrip {
+            id: boundaryStrip
+
+            // The strip is glyph-tall, not slot-tall: centre it against the
+            // icon slots rather than letting the Row top-align it.
+            anchors.verticalCenter: parent.verticalCenter
+            hPadding: 6
             visible: root.liveCount > 0
-
-            Rectangle {
-                anchors.centerIn: parent
-                width: 3
-                height: LazerTheme.barGlyphSize
-                radius: 1.5
-                color: Qt.rgba(LazerTheme.barIcon.r, LazerTheme.barIcon.g, LazerTheme.barIcon.b, 0.22)
-
-                Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-            }
         }
     }
 }
