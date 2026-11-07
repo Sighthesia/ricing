@@ -71,6 +71,10 @@ Item {
     // frozen for the whole move - because a page change here IS the same kind of
     // move the host makes between two hover menus, and it should read the same.
     property string _outgoingPage: ""
+    // Height the clip started from when the current swap began.
+    property real _pageFromHeight: 0
+    // True from the first frame of a swap until its clock has landed.
+    property bool _pageSwapActive: false
     property real pageSlideProgress: 1
     property int pageSlideSign: 1
     readonly property real pageSlideDistance: Math.max(pageHost.width, 260)
@@ -134,15 +138,29 @@ Item {
             pageSlideMotion.stop()
             root.pageSlideProgress = 1
         }
-        root._outgoingPage = root.page
+        // Freeze the height the clip starts from, and start the clock BEFORE the
+        // page changes. Both orders matter: `pageHeight` is a binding on
+        // `root.page`, so the moment that property moves it reports the incoming
+        // page's height. Reading it afterwards - or leaving `pageSlideProgress`
+        // at 1 for even one binding evaluation - made the clip snap straight to
+        // the destination and the whole interpolation was dead on arrival
+        // (measured: clip at 286 on the very frame the swap started).
+        root._pageFromHeight = root.naturalPageHeight(root.page)
         root.pageSlideSign = Number(sign) < 0 ? -1 : 1
-        root.page = next
         if (MotionTokens.reducedMotion) {
-            root.pageSlideProgress = 1
+            root._pageSwapActive = false
             root._outgoingPage = ""
+            root.page = next
+            root.pageSlideProgress = 1
             return
         }
+        // Raise the flag and zero the clock BEFORE the page changes: the clip's
+        // height reads both, and it must already be at the start of the move when
+        // the incoming page's own height becomes the target.
+        root._pageSwapActive = true
         root.pageSlideProgress = 0
+        root._outgoingPage = root.page
+        root.page = next
         pageSlideMotion.restart()
     }
 
@@ -212,22 +230,42 @@ Item {
         return 1
     }
 
-    // Height of the page currently on top, which is what the host measures.
-    readonly property real pageHeight: {
-        if (root.page === "")
+    // Natural height of one named page ("" is the root list).
+    function naturalPageHeight(name) {
+        if (name === "")
             return rootPage.implicitHeight
-        if (root.page === "move")
+        if (name === "move")
             return movePage.implicitHeight
-        if (root.page === "add-widget")
+        if (name === "add-widget")
             return addPage.implicitHeight
         return settingsPage.implicitHeight
     }
+
+    // Height of the page currently on top, which is what the host measures.
+    readonly property real pageHeight: root.naturalPageHeight(root.page)
+
+    // The clip the pages are painted inside. While a swap runs it interpolates
+    // from the page being left to the page being entered on the slide's own
+    // clock, so the panel opens exactly as fast as the incoming page travels and
+    // never lags behind it. At rest it is simply the page's own height.
+    //
+    // `_pageSwapActive` is what makes the interpolation possible at all: while
+    // the swap is being set up, `pageSlideProgress` is still 1 (the previous
+    // move's end state), so a formula keyed on the progress alone would evaluate
+    // to the DESTINATION height on the very frame the swap begins and the panel
+    // would snap. The flag goes up before anything else moves and only comes down
+    // once the clock has landed.
+    readonly property real pageClipHeight: !root._pageSwapActive
+        ? root.pageHeight
+        : root._pageFromHeight + (root.pageHeight - root._pageFromHeight) * root.pageSlideProgress
 
     // Remount on the root page with any drilled-down page closed whenever the
     // menu retargets another widget: a page belongs to the target that opened it.
     onInstanceKeyChanged: {
         pageSlideMotion.stop()
         root._outgoingPage = ""
+        root._pageFromHeight = 0
+        root._pageSwapActive = false
         root.pageSlideProgress = 1
         root.page = ""
     }
@@ -353,12 +391,14 @@ Item {
             // the whole-menu bug: the host grew to the root list's height and
             // painted the drilled-down page inside that clip, so a longer page
             // (the catalog) was cut off at the root list's bottom edge.
-            height: root.pageHeight
+            //
+            // No Behavior here. A second clock on this clip is exactly what made
+            // the panel and its content disagree: the clip eased over 160ms while
+            // the page slid over 240ms, so the height only finished after the
+            // crossing was over. `pageClipHeight` is already a function of the
+            // slide, so this reads one motion, not two.
+            height: root.pageClipHeight
             clip: true
-            Behavior on height {
-                enabled: !MotionTokens.reducedMotion
-                NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuint }
-            }
 
             // The swap clock. Same duration and curve as the host's content
             // slide, so a page change and a menu change are one motion in the
@@ -373,8 +413,10 @@ Item {
                 duration: MotionTokens.reducedMotion ? 0 : MotionTokens.slow
                 easing.type: Easing.OutCubic
                 onFinished: {
-                    if (root.pageSlideProgress >= 1)
+                    if (root.pageSlideProgress >= 1) {
                         root._outgoingPage = ""
+                        root._pageSwapActive = false
+                    }
                 }
             }
 
