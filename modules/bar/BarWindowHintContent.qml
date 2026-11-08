@@ -424,11 +424,6 @@ Item {
 
     property real _headY: 0
     property real _tailY: 0
-    // How far the tail was asked to travel on the last re-aim, in pixels. The tail's
-    // `Behavior` reads it to scale its own duration: a trail is proportional to the journey
-    // it draws, and a fixed duration makes a one-row move drag a longer wake than a
-    // three-row one.
-    property real _trailSpan: 0
     property bool _snapping: false
     // Committed target, never animated. Dedupe and same-anchor drift read this,
     // because _headY is the Behavior's in-flight frame and is numerically equal to
@@ -1507,24 +1502,7 @@ Item {
             && !MotionTokens.reducedMotion && !root._snapping
         NumberAnimation {
             id: indicatorTailAnimation
-            // A TRAIL IS PROPORTIONAL TO THE DISTANCE IT DESCRIBES, and a fixed duration
-            // makes it the opposite.
-            //
-            // `slow * 2` is the widget's 480ms and it is right for a full focus step, where
-            // the mark crosses several rows and the wake is the gesture. A window closing
-            // above the focused row moves that row ONE row, and the same 480ms then spends
-            // its whole length on a 34px displacement: measured, the head was home at 35
-            // while the tail was still at 52, holding the bar 44.8px tall - longer than the
-            // 63.6px wake of a two-row focus step, on a move half its size. That is the
-            // overshoot: not the mark arriving anywhere wrong, but a trail that outgrows the
-            // journey it is drawing.
-            //
-            // So the duration follows the distance, clamped at the widget's own 480ms. One
-            // row gets a short wake, several rows get the full one.
-            duration: Math.min(MotionTokens.slow * 2,
-                MotionTokens.slow * 2 * Math.min(1, Math.max(0.25,
-                    root._trailSpan / Math.max(1, root.rowPitch * 3))))
-                * debugTimeScale
+            duration: MotionTokens.slow * 2 * debugTimeScale
             easing.type: Easing.OutSine
         }
     }
@@ -1900,10 +1878,6 @@ Item {
             // arrangement exists to remove, and it is measured - with the tail write missing
             // the wake sat at 204.0px, the travel itself, for the whole flight and closed in
             // about 670ms, a bar drawn five and a half times its resting length.
-            // The distance the TAIL has to cover, measured before it is re-aimed - the
-            // `Behavior` reads it to scale its own duration, and after the write the gap is
-            // already the new one.
-            _trailSpan = Math.abs(top - _tailY)
             _tailY = top
             // The blink is the widget's response to a switch between two things that are
             // BOTH marked. An exit is a switch to nothing: there is no new identity to
