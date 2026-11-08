@@ -372,14 +372,8 @@ Item {
     // window one pitch too low (`a bX c*` reads index 2 where the row rests at 1), so closing
     // a window moved the mark down a row and then slid it back up as the hole closed. Focus
     // landing on the PREVIOUS window was unaffected, which is exactly what was seen.
-    // The LIVE index, not the rendered one - see `strip.focusedLiveIndex`. The rendered
-    // index counts a departing row's slot as a position, so focus landing on the row after a
-    // closing window read one pitch low and the frame walked DOWN onto the emptied slot and
-    // back up when the record was dropped. That walk is the reported overshoot - the frame
-    // is the red outline in the screenshots, sitting on an EMPTY row while the focused card
-    // slid up into it. The row never moved: it took over the closing window's slot.
-    property real _frameAnchorY: strip.focusedLiveIndex < 0
-        ? noRowTop + strip.scrollOffset : strip.focusedLiveIndex * rowPitch
+    property real _frameAnchorY: focusedRowIndex < 0
+        ? noRowTop + strip.scrollOffset : focusedRowIndex * rowPitch
     // How far the frame is being asked to travel, in row pitches: the distance from where it
     // was DRAWN to where it now belongs. Read by the glide's own `Behavior` to decide whether
     // this is a focus step or a reorder - see the note there.
@@ -2669,7 +2663,7 @@ Item {
         // The target is therefore the frame's own - discrete, changing only when the index
         // does - and the transitions between them are the two `Behavior`s below.
         return root.hasTarget
-            ? root._targetYFor(strip.focusedLiveIndex)
+            ? root._targetYFor(root.focusedRowIndex)
             : root.noRowTop + strip.scrollOffset + root.markerOffset
     }
 
@@ -2869,17 +2863,17 @@ Item {
         // the focused window is the same one, which is a departing slot being removed under
         // a settled focus and nothing else. `_settleFromIndex` remembers where it started so
         // the close can tell the frame has arrived.
-        if (strip.focusedLiveIndex >= 0 && strip.rowsTransitioning
-                && strip.hasExitingRow && strip.focusedLiveIndex !== root._settleFromIndex)
+        if (root.focusedRowIndex >= 0 && root.focusedRowIndex < root._settleFromIndex
+                && root.focusedWindowKey === root._targetKey)
             root._settling = true
-        root._settleFromIndex = strip.focusedLiveIndex
+        root._settleFromIndex = root.focusedRowIndex
         // How far the frame is being asked to travel, in rows - read by its glide to tell a
         // reorder from a focus step, and written here because this is the turn the anchor
         // moves on. See the note in the `Behavior`.
         const shown = root._frameShownIndex
-        root._frameShownIndex = strip.focusedLiveIndex
-        root._frameStep = (shown < 0 || strip.focusedLiveIndex < 0)
-            ? 0 : Math.abs(strip.focusedLiveIndex - shown)
+        root._frameShownIndex = root.focusedRowIndex
+        root._frameStep = (shown < 0 || root.focusedRowIndex < 0)
+            ? 0 : Math.abs(root.focusedRowIndex - shown)
         // The tracker waits a turn, and the ordering is why. `_syncIndicator` reads
         // `hasTarget` and `focusedRowIndex`, both of which are derived from `activeColumn`
         // and `plan`; a change handler runs as soon as its own property is notified, which
