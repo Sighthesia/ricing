@@ -767,12 +767,22 @@ Item {
 
                     objectName: "windowHintWindowRow"
                     property bool layoutReady: false
-                    Component.onCompleted: Qt.callLater(function() {
-                        contentColumn.forceLayout()
-                        windowRow.layoutReady = true
-                        root.layoutRevision++
-                        root.layoutMoved()
-                    })
+                    // Keep deferred placement owned by the row so destroying a delegate
+                    // also cancels its pending layout work.
+                    Timer {
+                        interval: 0
+                        running: true
+                        repeat: false
+                        onTriggered: {
+                            const column = windowRow.parent
+                            if (!column || typeof column.forceLayout !== "function")
+                                return
+                            column.forceLayout()
+                            windowRow.layoutReady = true
+                            root.layoutRevision++
+                            root.layoutMoved()
+                        }
+                    }
                     x: root.cellPaddingX - windowRow.rowInset
                     width: stripColumn.cardWidth
                     // The delegate owns its pitch, including the gap below the card. The
