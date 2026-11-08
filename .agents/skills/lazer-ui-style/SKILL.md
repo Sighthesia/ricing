@@ -96,6 +96,7 @@ Afloat 的视觉域：osu!lazer "sharp" 形态语言、风格权威样本（设�
 hover / focus / active / 禁用：用色块亮度、透明度、指示条切换，不走形态变化。
 
 - **hover 高亮**：表面颜色在 `<surface>` ↔ `<surface>Hover` 间用 `ColorAnimation { duration: MotionTokens.fast }` 过渡；禁止瞬时切换。
+- **hover 基色不能写 `"transparent"`**：QML 里那个字面量是 rgba(0,0,0,0)——**透明黑**，`ColorAnimation` 会连 RGB 一起插值，于是动画前段经过一段深色半透明，叠加在浅色卡片上就是"先变灰再变成主题色"（实测浅色下中途 #bda9a4，比卡片低 0.285 亮度）。基色要写成目标色本身、alpha 归零：`LazerTheme.shade(<target>, 0)`，这样只有 alpha 在动。深色主题下不明显，但同样存在。
 - **焦点/强调环**：独立 Rectangle 层（z 高于内容、`enabled: false` 不参与输入），边框 `1.5px` 的 accent 色，宽度过渡用 `fast`。
 - **点击闪烁配方（所有可点组件统一）**：透明覆盖矩形填充 `LazerTheme.textPrimary`，激活时播放 `NumberAnimation { from: MotionTokens.clickFlashOpacity; to: 0; duration: MotionTokens.clickFlashDuration; easing.type: MotionTokens.clickFlashEasing }`；通过 `restartFlash()` 触发，reducedMotion 时直接归零。参考 `resetFlashAnimation` 与 `restartResetFlash()`。
 - 共享参数固定为 `clickFlashOpacity: 0.3`、`clickFlashDuration: 800`、`clickFlashEasing: Easing.OutQuint`；闪烁层必须是非交互视觉层，不得改变命中区域或布局尺寸。
