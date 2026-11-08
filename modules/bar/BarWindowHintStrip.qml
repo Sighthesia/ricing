@@ -740,6 +740,21 @@ Item {
                 }
                 y: stripColumn.isActiveSlot ? -root.scrollOffset : 0
                 onImplicitHeightChanged: root.remeasureHeight()
+                onPositioningComplete: {
+                    if (!stripColumn.isActiveSlot)
+                        return
+                    let top = 0
+                    for (let i = 0; i < activeRowRepeater.count; i++) {
+                        const item = activeRowRepeater.itemAt(i)
+                        if (!item)
+                            continue
+                        if (item.height > 0 && Math.abs(item.y - top) < 0.5)
+                            item.layoutReady = true
+                        top += item.height
+                    }
+                    root.layoutRevision++
+                    root.layoutMoved()
+                }
 
             // Window rows: cards in the active column, plain labels either side.
             // The active model is stable so a window keeps its delegate while its slot
@@ -771,14 +786,13 @@ Item {
                     // also cancels its pending layout work.
                     Timer {
                         interval: 0
-                        running: true
+                        running: windowRow.height > 0 && !windowRow.layoutReady
                         repeat: false
                         onTriggered: {
                             const column = windowRow.parent
                             if (!column || typeof column.forceLayout !== "function")
                                 return
                             column.forceLayout()
-                            windowRow.layoutReady = true
                             root.layoutRevision++
                             root.layoutMoved()
                         }

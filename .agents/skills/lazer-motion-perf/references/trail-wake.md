@@ -186,6 +186,16 @@ _tailY += (_headY - _tailY) * trailCatchUp
   through the move; a before/after ordering with no intermediate geometry is a cut.
   Qt positioners expose a `move` transition specifically for rearrangement and
   displacement: https://doc.qt.io/qt-6/qml-qtquick-column.html#move-prop.
+- Focus change and layout travel can occur together. A live capture showed a newly
+  focused delegate at `y=0` for one frame, followed by its actual slot; treating its
+  index mismatch as layout travel disabled the focus animation and pinned both marks
+  to that zero. Closing a focused row and selecting the following row exercised the
+  same branch while selecting the preceding stationary row did not. Preserve a focus
+  transition clock independently of the card's moving destination; readiness follows
+  the positioner's completed layout, not just delegate creation or nonzero height.
+- Same-workspace refresh must preserve the active plan throughout publication. Clearing
+  the plan to null even synchronously can change the active column role to the fallback
+  workspace, destroying the inner delegates before a stable model can reconcile them.
 - Verify key contracts across the host boundary: a marker identity may include a type
   prefix while a row model stores the bare identifier. Normalize at the lookup boundary
   and verify a real delegate was found instead of silently using index geometry.

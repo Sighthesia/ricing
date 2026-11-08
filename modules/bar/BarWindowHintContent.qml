@@ -354,16 +354,128 @@ Item {
     // on time. The anchor here carries no scroll term while a row is focused, so a
     // scroll in flight cannot retarget the glide; the drawn `y` simply follows the
     // offset underneath it, the way `_barTop` already does for the indicator.
-    property real _frameAnchorY: focusedRowIndex < 0
-        ? noRowTop + strip.scrollOffset
-        : root.focusedRowTop + strip.scrollOffset
-    Behavior on _frameAnchorY {
-        enabled: !root._markerCrossing && !MotionTokens.reducedMotion
-            && !strip.rowMovingForKey(root.focusedWindowId)
-        NumberAnimation {
-            id: focusFrameGlide
-            duration: MotionTokens.settingsSidebarCollapse * debugTimeScale
-            easing.type: Easing.OutQuint
+    property string _selectionKey: ""
+    property real _selectionTop: 0
+    property real _selectionFrameFrom: 0
+    property real _selectionHeadFrom: 0
+    property real _selectionTailFrom: 0
+    property real _selectionFrameProgress: 1
+    property real _selectionHeadProgress: 1
+    property real _selectionTailProgress: 1
+    property bool _selectionPlaced: false
+    readonly property real _frameAnchorY: _selectionFrameFrom
+        + (_selectionTop - _selectionFrameFrom) * _selectionFrameProgress
+    readonly property real _selectionHead: _selectionHeadFrom
+        + (_selectionTop - _selectionHeadFrom) * _selectionHeadProgress
+    readonly property real _selectionTail: _selectionTailFrom
+        + (_selectionTop - _selectionTailFrom) * _selectionTailProgress
+
+    // Focus progress has its own clock. Its destination is the physical card, so
+    // simultaneous layout motion cannot cancel or restart the focus transition.
+    NumberAnimation {
+        id: focusFrameGlide
+        target: root
+        property: "_selectionFrameProgress"
+        to: 1
+        duration: MotionTokens.settingsSidebarCollapse * debugTimeScale
+        easing.type: Easing.OutQuint
+    }
+    NumberAnimation {
+        id: selectionHeadGlide
+        target: root
+        property: "_selectionHeadProgress"
+        to: 1
+        duration: MotionTokens.medium * debugTimeScale
+        easing.type: Easing.OutQuad
+    }
+    NumberAnimation {
+        id: selectionTailGlide
+        target: root
+        property: "_selectionTailProgress"
+        to: 1
+        duration: MotionTokens.slow * 2 * debugTimeScale
+        easing.type: Easing.OutSine
+    }
+
+    // Preserve the crossing's rendered position and wake at the ownership handoff.
+    on_MarkerCrossingChanged: {
+        focusFrameGlide.stop()
+        selectionHeadGlide.stop()
+        selectionTailGlide.stop()
+        if (root._markerCrossing) {
+            root._snapping = true
+            root._headY = root._selectionHead + root.markerOffset
+            root._tailY = root._selectionTail + root.markerOffset
+            root._snapping = false
+            root._placed = true
+        } else {
+            root._selectionPlaced = false
+            root._syncSelection()
+            root._selectionFrameFrom = root.crossingTop + strip.scrollOffset
+            root._selectionHeadFrom = root._headY - root.markerOffset
+            root._selectionTailFrom = root._tailY - root.markerOffset
+            root._selectionFrameProgress = 1
+            root._selectionHeadProgress = 0
+            root._selectionTailProgress = 0
+            if (MotionTokens.reducedMotion) {
+                root._selectionHeadProgress = 1
+                root._selectionTailProgress = 1
+            } else {
+                selectionHeadGlide.restart()
+                selectionTailGlide.restart()
+            }
+        }
+    }
+
+    Connections {
+        target: MotionTokens
+        function onReducedMotionChanged() {
+            if (!MotionTokens.reducedMotion)
+                return
+            focusFrameGlide.stop()
+            selectionHeadGlide.stop()
+            selectionTailGlide.stop()
+            root._selectionFrameProgress = 1
+            root._selectionHeadProgress = 1
+            root._selectionTailProgress = 1
+            root._syncSelection()
+        }
+    }
+
+    function _syncSelection() {
+        const key = root.focusedWindowKey
+        const top = root.hasTarget
+            ? strip.rowTopForKey(root.focusedWindowId, root.focusedRowIndex)
+                + strip.scrollOffset
+            : root.noRowTop + strip.scrollOffset
+        if (!isFinite(top))
+            return
+        if (root._selectionPlaced && key === root._selectionKey) {
+            root._selectionTop = top
+            return
+        }
+        const frame = root._frameAnchorY
+        const head = root._selectionHead
+        const tail = root._selectionTail
+        focusFrameGlide.stop()
+        selectionHeadGlide.stop()
+        selectionTailGlide.stop()
+        root._selectionTop = top
+        root._selectionKey = key
+        const animate = root._selectionPlaced && !MotionTokens.reducedMotion
+        root._selectionFrameFrom = frame
+        root._selectionHeadFrom = head
+        root._selectionTailFrom = tail
+        root._selectionFrameProgress = animate ? 0 : 1
+        root._selectionHeadProgress = animate ? 0 : 1
+        root._selectionTailProgress = animate ? 0 : 1
+        root._selectionPlaced = true
+        if (animate) {
+            focusFrameGlide.restart()
+            selectionHeadGlide.restart()
+            selectionTailGlide.restart()
+            if (root.hasTarget)
+                root._flashIndicator.restart()
         }
     }
     // The leaving frame's own height, from the row counts of the frame being held
@@ -845,13 +957,20 @@ Item {
     // so it is the arriving frame's own three columns with the active one in the
     // middle.
     function _commitHint() {
+        const rest = HintLogic.restPlan(root.hint)
+        // An ordinary snapshot is an update of the existing workspace, not a new
+        // layout session. Keep its delegates and animation owners alive throughout.
+        if (rest && root.plan && !root.swapping && !root._markerCrossing
+                && root.plan.activePosition === rest.activePosition) {
+            root.plan = rest
+            root.columns = HintLogic.stripColumns(root.hint, null, rest)
+            root.shownReady = HintLogic.ready(root.hint)
+            return
+        }
         slideRun.stop()
         root.slideProgress = 1
         root.leavingHint = null
         root.swapDirection = 0
-        root.plan = null
-        root.positionFrom = 0
-        root.positionTo = 0
         root.swapping = false
         // The marker's clock is stopped here rather than left to finish: this is a commit
         // that never showed the marker travelling, so letting it land 320ms later would
@@ -874,7 +993,6 @@ Item {
         // this is the one that says "three columns, active slot 1, centred here" -
         // the same shape the crossing's plan has, so every binding downstream can be
         // written once. See `HintLogic.restPlan`.
-        const rest = HintLogic.restPlan(root.hint)
         root.plan = rest
         // At rest the panel is centred on this workspace and both ends of the
         // crossing are that value, so a crossing started from here begins exactly
@@ -1314,8 +1432,12 @@ Item {
     // head leads and the wake trails below. `Math.min` agrees with both at a wake of zero,
     // so the direction cannot introduce a step of its own.
     readonly property real _wake: Math.abs(_headY - _tailY)
-    readonly property real _barTop: Math.min(_headY, _tailY) - strip.scrollOffset
-    readonly property real _barLength: indicatorLength + _wake
+    readonly property real _barTop: root._markerCrossing
+        ? Math.min(_headY, _tailY) - strip.scrollOffset
+        : Math.min(root._selectionHead, root._selectionTail)
+            + root.markerOffset - strip.scrollOffset
+    readonly property real _barLength: indicatorLength + (root._markerCrossing
+        ? _wake : Math.abs(root._selectionHead - root._selectionTail))
 
     readonly property bool hasTarget: focusedRowIndex >= 0
             && activeColumn
@@ -2335,147 +2457,18 @@ Item {
     // false and the frame is off the top), so the bar's own hidden state needs no
     // bookkeeping; the committed target and the identity are what the landing reads.
     function _syncIndicator() {
-        var target = root._restingY()
-        // A ListModel move gives the row a real physical y. Sample that position directly
-        // while the row is travelling; repeatedly re-aiming a Behavior at the same moving
-        // target would restart its easing every frame and recreate the old frozen marker.
-        //
-        // A drift parked before the move started is DISCARDED here, and that is the fix
-        // for the marker landing somewhere else at the end of a reorder. The parked value
-        // was read off a row that had not moved yet, and the timer that applies it waits
-        // for the trail rather than for the layout - so a move starting under a parked
-        // drift left the head pinned to the moving row while `_pendingTop` still held the
-        // old slot, and the timer then snapped the marker to that stale slot once the
-        // wake closed. A target that is a live animation is not a drift to be deferred:
-        // the row is the authority for as long as it is travelling.
-        if (!root._markerCrossing && root.hasTarget
-                && strip.rowMovingForKey(root.focusedWindowId)) {
-            root._pendingTop = -1
-            root._snapping = true
-            root._anchorY = target
-            root._headY = target
-            root._tailY = target
-            root._snapping = false
-            root._placed = true
+        if (!root._markerCrossing) {
+            root._syncSelection()
+            return
+        }
+        root._pendingTop = -1
+        root._anchorY = root._restingY()
+        root._placed = true
+        if (root._targetKey !== root.focusedWindowKey) {
             root._targetKey = root.focusedWindowKey
-            return
+            if (!MotionTokens.reducedMotion)
+                root._flashIndicator.restart()
         }
-        if (root._markerCrossing) {
-            root._pendingTop = -1
-            if (root._placed && root.focusedWindowKey !== root._targetKey) {
-                _targetKey = root.focusedWindowKey
-                _flashIndicator.restart()
-            }
-            root._anchorY = target
-            return
-        }
-        if (!root.hasTarget) {
-            // A MOMENT WITH NO TARGET IS NOT A CANCELLATION, and this is where the trail
-            // used to die.
-            //
-            // The reasoning this branch was built on is sound and is kept below: a bar
-            // that is genuinely hidden has no business stretching. What was wrong is the
-            // assumption underneath it - that "hidden" and "not travelling" are the same
-            // moment. They are not, and the gap between them is a publish: every
-            // `_commitHint` sets `plan = null` before it builds the rest plan, and
-            // `activeColumn` is `columns[plan.activeSlot]`, so that one line takes
-            // `hasTarget` false for the length of a synchronous block and puts it back.
-            // Watched through `onHasTargetChanged` on an ordinary focus change from row 1
-            // to row 3, one assignment produces three park-and-unpark round trips: no
-            // target (both ends on the off-panel coordinate), row 3 of the OLD columns
-            // (both ends snapped back), row 3 of the new columns, and then the retarget a
-            // turn later. Nothing had gone wrong at any of those instants.
-            //
-            // Invisible while the retarget follows in the same block, because no frame is
-            // rendered inside it. NOT invisible when a trail was already open - the wake
-            // that was mid-flight is snapped shut by the first of those three, and the
-            // third finds `_placed` false and snaps the next target home instead of flying
-            // to it. And not invisible when the arriving content has not resolved its
-            // focused row, which is what niri sends while a workspace is still coming up
-            // and what parks the bar for whole frames rather than for one block. Measured
-            // in the running shell, read at every `_syncIndicator`: 16.9px of wake at one
-            // call, 0.0 at the next with `head` at -34.0 - the parking coordinate - and an
-            // 8.9px trail destroyed the same way one call earlier. That is the report,
-            // 已复现切换窗口拖尾复位, and it is also the user's standing observation that
-            // anything interrupting a bar before its animation finishes goes wrong.
-            //
-            // And it is the ONLY window, which bounds the gate below as much as the report
-            // does. `onHasTargetChanged`, `onFocusedRowIndexChanged` and
-            // `onFocusedWindowKeyChanged` are all CHANGE hooks, so a publish that leaves all
-            // three exactly as they were runs nothing at all: measured, a `focusAt: -1`
-            // publish issued into an interval that was already `focusAt: -1` produced zero
-            // calls here, with the gate and without it. The park is reachable only on an
-            // edge - and while a crossing is running it is not reachable at all, because the
-            // branch above has already returned. So the state this gate guards is a state
-            // one publish creates and a later publish has to take away again.
-            //
-            // So: nothing is written. The bar keeps whatever position the mechanism
-            // already in charge has given it, keeps its committed target, keeps its
-            // identity and keeps its PLACEMENT - and the target that arrives next is
-            // re-aimed from wherever the trail had got to, which is `retargetEdges`'
-            // answer and the only one of the widget's four responses that a journey in
-            // flight can use. `_pendingTop` goes, because a same-anchor drift belongs to
-            // the target that has just gone and applying it later would be a second
-            // discontinuity.
-            //
-            // The bar is not drawn for the whole of this interval - `focusUnderline` is
-            // gated on `markerHasTarget`, which is `hasTarget || _departingRowIndex >= 0`
-            // - so nothing here is visible while it lasts. That is the answer to whether a
-            // wake should persist through a no-target interval: it cannot be seen, and
-            // what it buys is the frame after, where the bar re-appears already travelling
-            // instead of already arrived.
-            if (root._barInFlight()) {
-                root._pendingTop = -1
-                return
-            }
-            // No target and nothing travelling: the bar is hidden with no journey under
-            // it, so it must not be left mid-trail either - there is nothing left to be
-            // mid, and a bar resting at a coordinate that named a row would fly from that
-            // row when the next target arrives.
-            //
-            // Snap to the resting position for NO row rather than to
-            // `_targetYFor(-1)`. That expression is `index * rowPitch + ...`, so an
-            // index of -1 hands back a negative offset roughly one row above the
-            // panel's top: a real coordinate, which the next target's `Behavior`
-            // then animates FROM. The bar is invisible, so the flight was not
-            // visible when it happened - but it was a flight, and the tail it left
-            // behind had to walk the rest of the way before the bar looked settled.
-            // That is the flash on arriving at a workspace whose focused row is not
-            // where the previous one was.
-            //
-            // Zero is the honest "resting, nowhere" value: it is where
-            // `_snapIndicator` puts the marker before its first placement, and a
-            // bar that has no row to sit on has no business anywhere else. Retarget
-            // from here and the first real target still travels, which is the
-            // head-and-wake stretch doing its job, rather than arriving pre-stretched
-            // from a coordinate that never named a row.
-            root._pendingTop = -1
-            root._snapIndicator(root._restingY())
-            // ...and it is no longer a PLACEMENT. Zero is a coordinate that names no row,
-            // and the next real target has to arrive by snapping rather than by flying
-            // from it: `_retargetIndicator`'s genuine-switch branch animates the head and
-            // the tail from wherever they are, which from here means the bar entering on
-            // the FIRST card and sliding down to the focused one - a journey invented by
-            // the tracker's resting value, out of a state where there was nothing to
-            // travel from. Clearing `_placed` hands the next target to the first-placement
-            // branch below, which snaps.
-            //
-            // So this branch is not only "no row, park it" - it is also the statement
-            // that the marker is not currently on a row, which is what the stretch needs
-            // to know and had no way to ask. The gate above is what keeps that statement
-            // TRUE: it declines to make it while the bar is still travelling, because a
-            // target that has not resolved yet is not a target that has gone.
-            root._placed = false
-            return
-        }
-        // First placement snaps: there is nothing on screen to travel from.
-        if (!root._placed) {
-            root._placed = true
-            root._targetKey = root.focusedWindowKey
-            root._snapIndicator(target)
-            return
-        }
-        root._retargetIndicator(target, root.focusedWindowKey)
     }
 
     onFocusedRowIndexChanged: {
@@ -2501,7 +2494,7 @@ Item {
     // window, `focusedWindowKey` moves, and the one routine runs. Both hooks call it; the
     // second is a no-op when the first already ran.
     onFocusedWindowKeyChanged: Qt.callLater(_syncIndicator)
-    onHasTargetChanged: _syncIndicator()
+    onHasTargetChanged: Qt.callLater(_syncIndicator)
 
     Component.onCompleted: {
         if (root.hasTarget)
