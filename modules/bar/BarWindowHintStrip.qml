@@ -380,6 +380,44 @@ Item {
     // A row CROSSING to a new place, which is NOT the same question - see `anyReordering`.
     // Only this one means the markers have no fixed target to ease toward; a row arriving or
     // leaving changes the layout under them but leaves their target where it is.
+    // Is any row in the ACTIVE column playing its departure right now? The body asks this to
+    // tell a slot being inserted or dropped from an ordinary focus step - see the settle
+    // window there. `rowsTransitioning` cannot answer it: an ARRIVAL is also a transition,
+    // and so is a reorder.
+    // The focused row's index counted over the rows that are NOT leaving: the slot it holds
+    // once the transition ends.
+    //
+    // A departing row keeps its slot so it can dissolve in place, so it still occupies an
+    // index in the RENDERED list - and when focus lands on the row after it, that list puts
+    // the focus one low. The row itself has not moved: it took over the closing window's
+    // slot, and its resting place was where it started. The rendered index walks the markers
+    // DOWN onto the emptied slot and back up when the record is dropped, which is the
+    // reported overshoot - on the frame as much as on the bar.
+    readonly property int focusedLiveIndex: {
+        root.rowRevision
+        var list = root.activeRows
+        var live = 0
+        for (var i = 0; i < list.length; ++i) {
+            if (!list[i])
+                continue
+            if (list[i].isFocused === true)
+                return live
+            if (list[i].phase !== "exit")
+                live++
+        }
+        return -1
+    }
+
+    readonly property bool hasExitingRow: {
+        root.rowRevision
+        var list = root.activeRows
+        for (var i = 0; i < list.length; ++i) {
+            if (list[i] && list[i].phase === "exit")
+                return true
+        }
+        return false
+    }
+
     readonly property bool rowsReordering: {
         root.rowRevision
         return RowMotion.anyReordering(root.activeRows)
