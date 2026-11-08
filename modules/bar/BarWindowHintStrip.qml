@@ -369,6 +369,53 @@ Item {
     // The workspace whose rows the markers are placed against: the arriving frame's, so
     // `activeRows` is the list the focus frame and the bar are reading.
     readonly property var activeRows: root.rowsByPosition[root.activePosition] || []
+    // WHAT THE MARKERS ARE AIMED AT, as one object published by the one component that
+    // knows where the rows are.
+    //
+    // The markers used to derive this themselves - from `focusedRowIndex`, from
+    // `focusedLiveIndex`, from `liveRowTop(index)` - and every derivation was a different
+    // answer to "where is the mark supposed to be". This is the answer, and it is
+    // deliberately the only one: the strip knows which row is focused, where that row is
+    // drawn, and whether it is moving.
+    //
+    //   key      the focused WINDOW, so a marker can tell a focus change from a layout change
+    //   top      where that row is DRAWN this frame, in the strip's scrolled space
+    //   moving   the row has layout motion of its own (enter, exit, reorder)
+    //   valid    false when nothing is focused, which is not the same as a position of 0
+    //
+    // A marker that reads `moving` can choose between travelling to a fixed place and
+    // following one that is being carried; a marker that read an index could not, and every
+    // attempt to infer it from a separate flag produced a disagreement.
+    readonly property var focusedAnchor: {
+        root.rowRevision
+        var index = root.focusedRowIndex
+        if (index < 0)
+            return ({ key: "", top: root.noRowTop, moving: false, valid: false })
+        var list = root.activeRows
+        var record = list[index]
+        var phase = record && record.phase ? String(record.phase) : "live"
+        var travel = 0
+        var column = root.activeColumnItem
+        if (column && typeof column.moveOffsetAt === "function")
+            travel = column.moveOffsetAt(index)
+        return ({
+            key: root.focusedWindowKey,
+            top: root.liveRowTop(index),
+            moving: phase !== "live" || Math.abs(travel) > 0.001,
+            valid: true
+        })
+    }
+    // The focused window's identity, so the anchor can say whether the MARK has changed
+    // rather than whether its row has.
+    readonly property string focusedWindowKey: {
+        var index = root.focusedRowIndex
+        if (index < 0)
+            return ""
+        var list = root.activeRows
+        var record = list[index]
+        return record && record.key !== undefined ? String(record.key) : ""
+    }
+    readonly property real noRowTop: -root.rowHeight * 2
     // Is a row arriving or leaving anywhere in the active column? The body asks this to
     // decide whether its markers may be placed by the plain pitch or have to follow the
     // layout, and it is asked of the records because the items are the half that is

@@ -1640,6 +1640,9 @@ Item {
     }
 
     function _followCard() {
+        return   // the marker owns the position now - see `SelectionMarker`
+    }
+    function _followCardLegacy() {
         // THE CARD'S POSITION IS THE TARGET; the two `Behavior`s are still the motion.
         //
         // This goes through the same commit a focus step uses - aim the head, leave the tail
@@ -2216,6 +2219,7 @@ Item {
     // restarts the easing from the current value on every frame, which holds the mark at its
     // start; that was measured here, and it is why the per-frame subscription is gone.
     function _aimIndicator(top) {
+        return   // the marker owns the position now - see `SelectionMarker`
         if (!isFinite(top))
             return
         if (Math.abs(top - _anchorY) < 0.5)
@@ -2486,6 +2490,16 @@ Item {
     // A border-only rectangle still has a position and a height, and those are exactly
     // what says which card is lit - so the tint cannot be a second opinion about where
     // the focus is, because it is read off the same rectangle the user can see moving.
+    // THE MARK'S ONE POSITION. Both drawings below read it; nothing else writes it.
+    SelectionMarker {
+        id: marker
+        anchor: strip.focusedAnchor
+    }
+    // Read by the offscreen probes that verify this file's motion; they have no id into it.
+    readonly property alias markerPosition: marker.position
+    readonly property alias markerTail: marker.tail
+    readonly property alias markerMode: marker.mode
+
     Rectangle {
         id: focusFrame
         objectName: "windowHintFocusFrame"
@@ -2538,7 +2552,10 @@ Item {
         // placed from one value rather than from two animations that have to agree. They did
         // not: the frame glided toward the card on its own clock while the head was placed on
         // it, and the two sat a whole row apart for the length of an exit.
-        y: root._markerCrossing ? root.crossingTop : root._headY - strip.scrollOffset
+        // From the marker, which is the only thing that owns this number. `scrollOffset` is
+        // added back because the marker works in the host's own scrolled space.
+        y: root._markerCrossing ? root.crossingTop
+            : marker.position - strip.scrollOffset
         width: root._markerCrossing ? root.markerWidth : strip.activeCardWidth
         height: root.rowHeight
         // Drawn for the whole of an exit, so the outline is the thing the bar is seen to
@@ -2621,8 +2638,15 @@ Item {
         // same target. This is `_barTop` from a head that is pinned to the frame, so the
         // bar is the outline's own lower edge all the way across and the length is the
         // trail. See the indicator section at the top.
-        y: root._barTop
-        height: root._barLength
+        // The same marker, one `markerOffset` lower - the outline's lower edge and the bar
+        // are one stroke, and the trail is its length.
+        // The bar spans the two ends, whichever way round they are: the tail may be above
+        // the head on an upward move, and a rectangle drawn from `tail` alone would have a
+        // negative height there.
+        y: root._markerCrossing ? root._barTop
+            : Math.min(marker.position, marker.tail) - strip.scrollOffset
+        height: root._markerCrossing ? root._barLength
+            : root.indicatorLength + marker.trailLength
         // Drawn while the exit travels, for the reason at `markerDrawn`: the bar and the
         // outline are one mark, so they are drawn on one term and hidden on one tick.
         visible: root.markerDrawn
