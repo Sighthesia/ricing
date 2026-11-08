@@ -167,6 +167,29 @@ _tailY += (_headY - _tailY) * trailCatchUp
   before committing — found the latch in one capture. See the project's
   `regression-proof` skill, rule 4.
 
+## Stable models need stable hosts and ready geometry
+
+- A stable inner `ListModel` does not preserve delegates if an outer `Repeater`
+  still receives replacement JS arrays. Trace both creation and destruction at the
+  actual rendered row, including the outer workspace column. A live capture showed
+  hundreds of row creations/destructions while the inner model identity stayed fixed.
+- Read the actual first published target of a newly inserted delegate. Before layout,
+  its position can still be zero even after its size has started animating. Publishing
+  that coordinate commits a false focus destination; subsequent correct coordinates
+  look like same-key drift and are queued until the old trail finishes.
+- Capture the host target, drawn mark box, and target delegate box together. In a live
+  insertion capture the host target moved by roughly 60px while the head remained at
+  its first destination for roughly 400ms with pending drift set. A close/focus capture
+  showed the same mechanism with 20px of stale displacement. Shortening the tail would
+  reduce the delay without correcting the first destination.
+- Reordering model roles is not proof of a visible exchange. Capture both delegates
+  through the move; a before/after ordering with no intermediate geometry is a cut.
+  Qt positioners expose a `move` transition specifically for rearrangement and
+  displacement: https://doc.qt.io/qt-6/qml-qtquick-column.html#move-prop.
+- Verify key contracts across the host boundary: a marker identity may include a type
+  prefix while a row model stores the bare identifier. Normalize at the lookup boundary
+  and verify a real delegate was found instead of silently using index geometry.
+
 ## Judgement calls to argue rather than assume
 
 - **"Consistent with the reference widget" means the recipe, not the

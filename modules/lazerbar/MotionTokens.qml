@@ -114,9 +114,12 @@ QtObject {
     readonly property int windowHintEnter: 140
     readonly property int windowHintExit: 200
     readonly property int windowHintMove: 240
+    readonly property real windowHintInset: 10
     readonly property int workspaceIconEnter: 140
     readonly property int workspaceIconExit: 200
     readonly property int workspaceIconMove: 240
+    readonly property int motionFrame: 16
+    readonly property real motionFollowRate: 0.2
     // Per-position cascade step for a batch of tray icons.
     readonly property int trayIconStagger: 24
 

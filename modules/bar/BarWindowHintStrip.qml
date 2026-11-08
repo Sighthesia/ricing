@@ -1,6 +1,7 @@
 import QtQuick
 import "../lazerbar"
 import "./WindowHintMenuLogic.js" as HintLogic
+import "./ListModelSync.js" as ModelSync
 
 // One strip of workspace columns and nothing else: a run of consecutive
 // workspaces, left to right, the active one among them.
@@ -43,6 +44,15 @@ Item {
     // `{ position, rows, hidden }` as `WindowHintMenuLogic.stripColumns` builds
     // them. `position` is what the layout below is keyed on - a strip that did not
     // say which workspace a column was for would have nothing to place it by.
+    //
+    // The array is the DATA; the delegates are keyed on `position` through
+    // `columnsModel` below, not on this array's identity. A `Repeater` over a JS
+    // array destroys and recreates every delegate when the array is replaced, and
+    // this array is replaced twice per workspace switch (`_startSlide`, then the
+    // rest plan on landing) - which took the inner row `Repeater` of every column
+    // with it, so the active column's rows were rebuilt from scratch on the same
+    // frame the switch began. Measured on a switch: 298 row creations against 284
+    // destructions, which is a list that never kept anything.
     property var columns: []
     property int columnWidth: HintLogic.COLUMN_WIDTH
     // The active workspace's column is this much wider than a neighbour's, so every
@@ -74,6 +84,9 @@ Item {
     property int cellPaddingX: 0
     property int listSpacing: 6
     property int rowHeight: 28
+    // How far a row starts out to the left of its slot while it is entering or
+    // exiting, so both read as motion sideways as well as in size.
+    readonly property real rowEnterInset: MotionTokens.windowHintInset
     property int glyphInset: 20
     property int glyphWidth: 16
     // False while a crossing is in flight: what is under the pointer is either
@@ -310,22 +323,77 @@ Item {
         id: activeRowsModel
     }
 
+    // The columns' delegates, keyed on WORKSPACE POSITION. Only the position is a
+    // model role: the rows behind it are looked up in `_columnRows`, so a column
+    // that survives a publish keeps its delegate AND its inner row `Repeater`,
+    // which is what lets `activeRowsModel` diff the same windows instead of
+    // building a new list. See the note on `columns`.
+    ListModel {
+        id: columnsModel
+    }
+
     property int layoutRevision: 0
     property bool animateRows: true
+    property int _rowsPosition: -999
     property var desiredActiveRows: []
+    // position -> rows, rebuilt from `columns` on every publish.
+    property var _columnRows: ({})
+    // Bumped with the map so a delegate's `rows` binding re-evaluates: the map
+    // object itself is replaced, but QML tracks no dependency through an index
+    // into a `var` it does not own.
+    property int _columnsRevision: 0
 
     function currentActiveRows() {
         const column = root.columns && root.columns[root.activeSlot]
         return column && column.rows ? column.rows : []
     }
 
-    function rowIndexForKey(key) {
-        const wanted = String(key || "")
-        for (let i = 0; i < activeRowsModel.count; i++) {
-            if (String(activeRowsModel.get(i).windowId) === wanted)
-                return i
+    // What the column at `position` is showing. Read through the revision so a
+    // delegate cannot hold an answer from before the publish that changed it.
+    function rowsFor(position) {
+        root._columnsRevision
+        return root._columnRows[position] || []
+    }
+
+    // Bring `columnsModel` to the published order without replacing it: remove the
+    // positions that are gone, insert the new ones in place, move the drifted ones.
+    // A column that is on the strip before and after the publish keeps its
+    // delegate, which is the whole point - a workspace switch is three positions
+    // arriving at the edges of a run that mostly stays.
+    function syncColumns(columns) {
+        const rows = {}
+        const wanted = []
+        for (let i = 0; i < columns.length; i++) {
+            const position = Number(columns[i].position)
+            wanted.push(position)
+            rows[position] = columns[i].rows || []
         }
-        return -1
+        root._columnRows = rows
+        root._columnsRevision++
+        for (let i = columnsModel.count - 1; i >= 0; i--) {
+            if (wanted.indexOf(columnsModel.get(i).position) < 0)
+                columnsModel.remove(i, 1)
+        }
+        for (let j = 0; j < wanted.length; j++) {
+            let at = -1
+            for (let i = 0; i < columnsModel.count; i++) {
+                if (columnsModel.get(i).position === wanted[j]) {
+                    at = i
+                    break
+                }
+            }
+            if (at < 0)
+                columnsModel.insert(j, { position: wanted[j] })
+            else if (at !== j)
+                columnsModel.move(at, j, 1)
+        }
+    }
+
+    // A row's LIVE index: ghosts skipped, so it is the index every layout formula
+    // here is written against. The model's own index counts the rows that are
+    // still collapsing, and a row's neighbour is not a ghost.
+    function rowIndexForKey(key) {
+        return ModelSync.liveIndexOfKey(activeRowsModel, key, "windowId", "exiting")
     }
 
     function activeRowItemForKey(key) {
@@ -356,7 +424,15 @@ Item {
     function rowTopForKey(key, fallbackIndex) {
         const revision = root.layoutRevision
         const item = root.activeRowItemForKey(key)
-        if (item)
+        // A delegate that has just been created reports `y` 0 until the `Column`
+        // places it, and 0 is a real coordinate - the FIRST slot's. Publishing that
+        // as the focused row's top aimed the frame and the indicator at the top of
+        // the list for a frame, which is the target that then had to be corrected.
+        // The expected slot is the honest answer while the delegate is unplaced, and
+        // it cannot be confused with a moving row: nothing legitimately sits at 0
+        // that is not the first row.
+        const unplaced = item && !item.layoutReady
+        if (item && !unplaced)
             return root._cardTopInStrip(item)
         return Number(fallbackIndex) >= 0
             ? Number(fallbackIndex) * root.rowPitch - root.scrollOffset
@@ -369,9 +445,11 @@ Item {
         return !!(item && item.moving)
     }
 
+    // Drop a ghost once its exit has played. Looked up by key rather than by the
+    // index the timer captured, because the live rows around it have moved since.
     function removeActiveRow(key) {
-        const index = root.rowIndexForKey(key)
-        if (index < 0)
+        const index = ModelSync.indexOfKey(activeRowsModel, key, "windowId")
+        if (index < 0 || !activeRowsModel.get(index).exiting)
             return
         activeRowsModel.remove(index, 1)
         root.layoutRevision++
@@ -379,7 +457,7 @@ Item {
     }
 
     function openActiveRow(key) {
-        const index = root.rowIndexForKey(key)
+        const index = ModelSync.indexOfKey(activeRowsModel, key, "windowId")
         if (index >= 0 && activeRowsModel.get(index).entering)
             activeRowsModel.setProperty(index, "entering", false)
     }
@@ -391,7 +469,6 @@ Item {
         for (let i = 0; i < wanted.length; i++)
             keys[String(wanted[i].windowId)] = true
 
-        let hasExiting = false
         for (let i = activeRowsModel.count - 1; i >= 0; i--) {
             const row = activeRowsModel.get(i)
             if (keys[String(row.windowId)]) {
@@ -405,48 +482,72 @@ Item {
             }
             if (!row.exiting)
                 activeRowsModel.setProperty(i, "exiting", true)
-            hasExiting = true
         }
 
-        // Reconcile live rows while an exiting ghost remains at its old slot. Exiting
-        // rows are skipped by the key lookup and are removed by their own timer, so live
-        // rows can still move and new rows can enter in the same publish.
+        // Reconcile live rows while an exiting ghost keeps the slot it was removed
+        // from. Both the INSERT and the MOVE index are LIVE indices - the model
+        // index that puts a row at live position j once the ghosts are skipped -
+        // because the model index itself counts the ghosts.
+        //
+        // Aiming a move at the raw index is what pushed a ghost to the end of the
+        // list: every move past it drags it one slot further, so a window that was
+        // closing travelled the length of the list before it disappeared instead of
+        // collapsing where it stood.
         for (let j = 0; j < wanted.length; j++) {
             const data = wanted[j]
             const key = String(data.windowId)
-            let at = root.rowIndexForKey(key)
+            const at = ModelSync.indexOfKey(activeRowsModel, key, "windowId")
             if (at < 0) {
                 const entering = root.animateRows && !MotionTokens.reducedMotion
-                activeRowsModel.insert(j, {
-                    windowId: key,
-                    title: String(data.title || ""),
-                    appId: String(data.appId || ""),
-                    icon: String(data.icon || ""),
-                    isFocused: data.isFocused === true,
-                    entering: entering,
-                    exiting: false
-                })
+                activeRowsModel.insert(
+                    ModelSync.liveSlot(activeRowsModel, j, "exiting"), {
+                        windowId: key,
+                        title: String(data.title || ""),
+                        appId: String(data.appId || ""),
+                        icon: String(data.icon || ""),
+                        isFocused: data.isFocused === true,
+                        entering: entering,
+                        exiting: false
+                    })
                 root.layoutRevision++
                 if (entering)
                     Qt.callLater(function() { root.openActiveRow(key) })
                 continue
             }
-            if (at !== j) {
-                // Do not move a live row across an exiting ghost twice. The model's move
-                // operation is still the sole owner of the physical reorder.
-                activeRowsModel.move(at, j, 1)
+            const slot = ModelSync.liveSlot(activeRowsModel, j, "exiting")
+            let ghosts = false
+            for (let g = 0; g < activeRowsModel.count; g++)
+                ghosts = ghosts || activeRowsModel.get(g).exiting
+            if (!ghosts && slot !== at && slot < activeRowsModel.count) {
+                // The model's move is still the sole owner of the physical reorder:
+                // the `Column` places the delegate, and the delegate's own `y`
+                // `Behavior` follows it.
+                activeRowsModel.move(at, slot, 1)
             }
-            activeRowsModel.setProperty(j, "title", String(data.title || ""))
-            activeRowsModel.setProperty(j, "appId", String(data.appId || ""))
-            activeRowsModel.setProperty(j, "icon", String(data.icon || ""))
-            activeRowsModel.setProperty(j, "isFocused", data.isFocused === true)
-            activeRowsModel.setProperty(j, "exiting", false)
+            const live = ModelSync.indexOfKey(activeRowsModel, key, "windowId")
+            activeRowsModel.setProperty(live, "title", String(data.title || ""))
+            activeRowsModel.setProperty(live, "appId", String(data.appId || ""))
+            activeRowsModel.setProperty(live, "icon", String(data.icon || ""))
+            activeRowsModel.setProperty(live, "isFocused", data.isFocused === true)
+            activeRowsModel.setProperty(live, "exiting", false)
         }
         root.layoutRevision++
     }
 
     function syncCurrentActiveRows() {
+        const changedWorkspace = root._rowsPosition !== root.activePosition
+        if (changedWorkspace) {
+            root.animateRows = false
+            activeRowsModel.clear()
+            root._rowsPosition = root.activePosition
+        }
         root.syncActiveRows(root.currentActiveRows())
+        if (changedWorkspace) {
+            Qt.callLater(function() {
+                root.animateRows = true
+                root.layoutRevision++
+            })
+        }
     }
 
     // The tallest column on the strip, MEASURED rather than bound.
@@ -486,10 +587,30 @@ Item {
     }
 
     onColumnsChanged: {
+        syncColumns(root.columns)
         Qt.callLater(remeasureHeight)
         Qt.callLater(syncCurrentActiveRows)
     }
+
+    // Reduced motion can be turned on mid-animation, and a ghost that is still
+    // waiting for its exit timer would then sit in the model at zero height with
+    // nothing running to remove it. Drop the ghosts and let the live rows close up
+    // in one step, which is what "reduced motion" means for this list.
+    Connections {
+        target: MotionTokens
+        function onReducedMotionChanged() {
+            if (!MotionTokens.reducedMotion)
+                return
+            for (let i = activeRowsModel.count - 1; i >= 0; i--) {
+                if (activeRowsModel.get(i).exiting)
+                    activeRowsModel.remove(i, 1)
+            }
+            root.layoutRevision++
+            Qt.callLater(root.syncCurrentActiveRows)
+        }
+    }
     onActiveSlotChanged: Qt.callLater(syncCurrentActiveRows)
+    onActivePositionChanged: Qt.callLater(syncCurrentActiveRows)
 
     // The scroll range, not the panel height, is what decides whether an offset is still
     // legal - and it is the one that changes when a crossing brings a shorter list.
@@ -520,6 +641,9 @@ Item {
     // a row that a `Repeater` is free to destroy and rebuild, and a stale one would
     // measure a column that is no longer on the strip.
     readonly property Item activeColumnItem: {
+        root._columnsRevision
+        root.activePosition
+        columnsModel.count
         for (var i = 0; i < columnRepeater.count; ++i) {
             var column = columnRepeater.itemAt(i)
             if (column && column.isActiveSlot)
@@ -530,7 +654,15 @@ Item {
 
     Repeater {
         id: columnRepeater
-        model: root.columns
+        model: columnsModel
+        onItemAdded: Qt.callLater(function() {
+            root._columnsRevision++
+            root.remeasureHeight()
+        })
+        onItemRemoved: Qt.callLater(function() {
+            root._columnsRevision++
+            root.remeasureHeight()
+        })
 
         // A workspace column. The active slot carries the card fill and the
         // overflow line; its neighbours are plain labels. Which is which is the
@@ -548,22 +680,29 @@ Item {
         Item {
             id: stripColumn
             required property int index
-            required property var modelData
+            required property int position
+
+            // What this workspace is running. Read through the position rather than
+            // carried in the model row, so the delegate survives a publish that
+            // changed its contents - which is the point of keying on the position.
+            readonly property var rows: root.rowsFor(stripColumn.position)
 
             // Placed by the layout function. Both numbers move during a crossing
             // and neither is a transform: the column genuinely travels to a new
             // place at a new size, which is why the width change comes free here
             // instead of needing a scale or a second clock.
-            x: root.columnXFor(stripColumn.modelData.position)
-            width: root.columnWidthFor(stripColumn.modelData.position)
+            x: root.columnXFor(stripColumn.position)
+            width: root.columnWidthFor(stripColumn.position)
             y: 0
-            readonly property bool isActiveSlot: stripColumn.index === root.activeSlot
+            // By POSITION, not by slot: the model index is the delegate's order, and
+            // the question is which workspace the cards belong to.
+            readonly property bool isActiveSlot: stripColumn.position === root.activePosition
             // The viewport: the full list for a neighbour, the window's height for
             // the active column. The neighbours are capped by the logic and drawn
             // whole, which is why they need no clip.
             clip: stripColumn.isActiveSlot
             height: stripColumn.isActiveSlot
-                ? Math.min(contentColumn.implicitHeight, root.viewportHeight)
+                ? Math.min(stripColumn.contentHeight, root.viewportHeight)
                 : contentColumn.implicitHeight
             // The column's own unclamped height, for the scroll range. The outer
             // `height` is the viewport once the clamp above binds, so the range
@@ -590,7 +729,15 @@ Item {
             Column {
                 id: contentColumn
                 width: stripColumn.width
-                spacing: 0
+                spacing: stripColumn.isActiveSlot ? 0 : root.listSpacing
+                move: Transition {
+                    enabled: root.animateRows && !MotionTokens.reducedMotion
+                    NumberAnimation {
+                        properties: "y"
+                        duration: MotionTokens.windowHintMove
+                        easing.type: Easing.OutQuint
+                    }
+                }
                 y: stripColumn.isActiveSlot ? -root.scrollOffset : 0
                 onImplicitHeightChanged: root.remeasureHeight()
 
@@ -619,7 +766,14 @@ Item {
                     required property bool exiting
 
                     objectName: "windowHintWindowRow"
-                    x: root.cellPaddingX
+                    property bool layoutReady: false
+                    Component.onCompleted: Qt.callLater(function() {
+                        contentColumn.forceLayout()
+                        windowRow.layoutReady = true
+                        root.layoutRevision++
+                        root.layoutMoved()
+                    })
+                    x: root.cellPaddingX - windowRow.rowInset
                     width: stripColumn.cardWidth
                     // The delegate owns its pitch, including the gap below the card. The
                     // visual rectangle is clipped to the row height, so an exit closes its
@@ -628,8 +782,18 @@ Item {
                     radius: 6
                     clip: true
                     transformOrigin: Item.Center
-                    readonly property bool moving: Math.abs(windowRow.y
-                        - windowRow.index * root.rowPitch) > 0.5
+                    // A row arrives from beside its slot and leaves the same way, so an
+                    // insert and a close read as a row entering and withdrawing rather
+                    // than as a card growing out of nothing. The inset is inside the
+                    // column's own padding, so it never crosses the column's edge.
+                    readonly property real rowInset: windowRow.entering || windowRow.exiting
+                        ? root.rowEnterInset : 0
+                    // Is this row physically travelling? `y` against the slot its LIVE
+                    // position names - the model index counts the rows that are still
+                    // collapsing, and those occupy no height, so they are not slots.
+                    readonly property bool moving: !windowRow.exiting
+                        && Math.abs(windowRow.y - root.rowIndexForKey(windowRow.windowId)
+                            * root.rowPitch) > 0.5
                     readonly property real cardHeight: root.rowHeight
                     onYChanged: {
                         root.layoutRevision++
@@ -642,10 +806,14 @@ Item {
                         running: windowRow.exiting && !MotionTokens.reducedMotion
                         onTriggered: root.removeActiveRow(windowRow.windowId)
                     }
-                    Behavior on y {
+                    // The positioner places `y`; this follows it. The duration is the
+                    // token for a row that MOVED, so a reorder reads on the same clock
+                    // as the slot that opened or closed around it.
+                    Behavior on x {
                         enabled: root.animateRows && !MotionTokens.reducedMotion
                         NumberAnimation {
-                            duration: MotionTokens.medium
+                            duration: windowRow.exiting
+                                ? MotionTokens.windowHintExit : MotionTokens.windowHintEnter
                             easing.type: Easing.OutQuint
                         }
                     }
@@ -850,8 +1018,7 @@ Item {
             // gets no label delegates at all, so the two renderings of a workspace
             // can never be on screen together.
             Repeater {
-                model: stripColumn.modelData && !stripColumn.isActiveSlot
-                    ? stripColumn.modelData.rows : null
+                model: stripColumn.isActiveSlot ? null : stripColumn.rows
 
                 // One window label in a NEIGHBOUR column - the workspace either side
                 // of the active one.
@@ -894,8 +1061,7 @@ Item {
                 x: root.cellPaddingX
                 width: stripColumn.cardWidth
                 rowHeight: root.rowHeight
-                visible: !stripColumn.modelData
-                    || stripColumn.modelData.rows.length === 0
+                visible: stripColumn.rows.length === 0
             }
 
             } // contentColumn

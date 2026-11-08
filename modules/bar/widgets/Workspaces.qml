@@ -34,6 +34,29 @@ Item {
     // own signals without touching this.
     property int _modelsRevision: 0
     property bool _modelsReady: false
+    property bool _layoutBusy: false
+    property bool indicatorTargetMoving: false
+
+    // Settle geometry before committing a newly inserted focus target.
+    Timer {
+        interval: MotionTokens.motionFrame
+        repeat: true
+        running: root._layoutBusy
+        onTriggered: {
+            let moving = false
+            for (let i = 0; i < workspaceRepeater.count; i++) {
+                const square = workspaceRepeater.itemAt(i)
+                if (square && square.iconsMoving())
+                    moving = true
+            }
+            root.updateIndicator()
+            root.updateHighlight()
+            if (!moving) {
+                root._layoutBusy = false
+                root.updateIndicator()
+            }
+        }
+    }
     property string _windowMapSignature: ""
     // Observability: counts real content syncs so focus-only churn is verifiable.
     property int mapSwaps: 0
@@ -206,6 +229,7 @@ Item {
             return
         root._windowMapSignature = signature
         root.mapSwaps += 1
+        root._layoutBusy = root._modelsReady && !MotionTokens.reducedMotion
         root.syncWorkspaceModels(map)
     }
 
@@ -218,6 +242,13 @@ Item {
         const animateRows = root._modelsReady && !MotionTokens.reducedMotion
         const wanted = {}
         const ids = Object.keys(map)
+        // An empty workspace still owns its retiring icons until their exits complete.
+        for (const id of Object.keys(models)) {
+            if (ids.indexOf(id) < 0) {
+                map[id] = []
+                ids.push(id)
+            }
+        }
         for (let i = 0; i < ids.length; i++) {
             const wsId = String(ids[i])
             wanted[wsId] = true
@@ -267,6 +298,18 @@ Item {
             }
         }
 
+        // Keep retiring delegates in their original model slots. Live rows reorder in
+        // the remaining slots, so closing the focused item cannot push it to the edge.
+        function liveSlot(n) {
+            let live = 0
+            for (let i = 0; i < model.count; i++) {
+                if (model.get(i).retiring)
+                    continue
+                if (live++ === n)
+                    return i
+            }
+            return model.count
+        }
         for (let j = 0; j < rows.length; j++) {
             const want = String(rows[j].winId)
             const appId = String(rows[j].appId || "")
@@ -278,7 +321,7 @@ Item {
                 }
             }
             if (at < 0) {
-                model.insert(j, {
+                model.insert(liveSlot(j), {
                     winId: want,
                     appId: appId,
                     entering: !!animateRows,
@@ -296,12 +339,19 @@ Item {
                     })
                 }
             } else {
-                if (at !== j)
-                    model.move(at, j, 1)
-                if (String(model.get(j).appId) !== appId)
-                    model.setProperty(j, "appId", appId)
-                model.setProperty(j, "retiring", false)
-                model.setProperty(j, "entering", false)
+                const slot = liveSlot(j)
+                // Moving through ghosts shifts their indices too. Wait for those exits
+                // before a simultaneous genuine reorder; membership updates still apply.
+                let ghosts = false
+                for (let g = 0; g < model.count; g++)
+                    ghosts = ghosts || model.get(g).retiring
+                if (!ghosts && at !== slot) {
+                    model.move(at, slot, 1)
+                    at = slot
+                }
+                model.setProperty(at, "appId", appId)
+                model.setProperty(at, "retiring", false)
+                model.setProperty(at, "entering", false)
             }
         }
     }
@@ -314,8 +364,38 @@ Item {
             const row = model.get(i)
             if (String(row.winId) === String(winId) && row.retiring) {
                 model.remove(i, 1)
+                const current = []
+                for (let w = 0; w < Services.NiriService.windows.count; w++) {
+                    const win = Services.NiriService.windows.get(w)
+                    if (String(win.workspaceId) === String(wsId))
+                        current.push(win)
+                }
+                current.sort(root.windowOrder)
+                root.syncIconModel(model, current, !MotionTokens.reducedMotion)
+                root._layoutBusy = !MotionTokens.reducedMotion
                 return
             }
+        }
+    }
+
+    // Reduced motion also finalizes delegates already playing an exit.
+    Connections {
+        target: MotionTokens
+        function onReducedMotionChanged() {
+            if (!MotionTokens.reducedMotion)
+                return
+            for (const id of Object.keys(root.workspaceModels)) {
+                const model = root.workspaceModels[id]
+                for (let i = model.count - 1; i >= 0; i--) {
+                    if (model.get(i).retiring)
+                        model.remove(i, 1)
+                    else
+                        model.setProperty(i, "entering", false)
+                }
+            }
+            root._layoutBusy = false
+            root.indicatorTargetMoving = false
+            Qt.callLater(root.updateIndicator)
         }
     }
 
@@ -404,6 +484,10 @@ Item {
                     break
             }
         }
+        // A focused window can arrive before its model/delegate. Hold the previous
+        // mark until that exact window exists rather than aiming at a workspace center.
+        if (root.focusedWinId !== "" && focusedIndex < 0)
+            return
         const targetIndex = focusedIndex >= 0 ? focusedIndex : activeIndex
         if (targetIndex < 0 || targetIndex >= workspaceRepeater.count) {
             root.indicatorVisible = false
@@ -422,6 +506,8 @@ Item {
                 centerX = NaN
             }
         }
+        if (focusedIndex >= 0 && !isFinite(centerX))
+            return
         if (!isFinite(centerX)) {
             try {
                 centerX = targetItem.centerXInRoot()
@@ -438,6 +524,7 @@ Item {
         // of sliding in from zero.
         root.indicatorTargetKey = focusedIndex >= 0 ? "w" + root.focusedWinId
                                                     : "s" + targetIndex
+        root.indicatorTargetMoving = root._layoutBusy
         root.indicatorCenterX = centerX
         if (!root.indicatorVisible)
             root.indicatorVisible = true
@@ -522,6 +609,46 @@ Item {
                     return p.x
                 }
 
+                function iconSlotX(index) {
+                    let x = workspaceNumber.width
+                    for (let i = 0; wins && i < index && i < wins.count; i++) {
+                        if (!wins.get(i).retiring)
+                            x += root.iconSize + root.iconSpacing
+                    }
+                    return x
+                }
+
+                function placeIcons() {
+                    for (let i = 0; i < windowRepeater.count; i++) {
+                        const item = windowRepeater.itemAt(i)
+                        if (item)
+                            item.slotTargetX = workspaceSquare.iconSlotX(i)
+                    }
+                }
+
+                function iconsMoving() {
+                    workspaceSquare.placeIcons()
+                    for (let i = 0; i < windowRepeater.count; i++) {
+                        const item = windowRepeater.itemAt(i)
+                        if (item && (item.entering || item.retiring
+                            || item.widthMotion.running || item.positionMotion.running))
+                            return true
+                    }
+                    return Math.abs(width - (hasWindows
+                        ? contentRow.implicitWidth + root.cellPadding * 2
+                        : LazerTheme.barWidgetHeight)) > 0.5
+                }
+
+                function iconsWidth() {
+                    let width = workspaceNumber.width
+                    for (let i = 0; i < windowRepeater.count; i++) {
+                        const item = windowRepeater.itemAt(i)
+                        if (item)
+                            width += item.width
+                    }
+                    return width
+                }
+
                 // Center of one app icon in Workspaces coordinates; NaN when
                 // the window is not on this workspace (icons rebuilt).
                 function iconCenterXInRoot(winId) {
@@ -531,7 +658,7 @@ Item {
                         if (!item || item.winId === undefined)
                             continue
                         if (String(item.winId) === target) {
-                            const p = item.mapToItem(root, item.width / 2, 0)
+                            const p = item.mapToItem(root, root.iconSpacing + root.iconSize / 2, 0)
                             return p.x
                         }
                     }
@@ -557,13 +684,14 @@ Item {
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                 }
 
-                Row {
+                Item {
                     id: contentRow
-
                     anchors.centerIn: parent
-                    spacing: root.iconSpacing
+                    implicitWidth: workspaceSquare.iconsWidth()
+                    implicitHeight: root.iconSize
 
                     Text {
+                        id: workspaceNumber
                         anchors.verticalCenter: parent.verticalCenter
                         text: workspaceSquare.idx
                         color: workspaceSquare.isActive
@@ -579,10 +707,19 @@ Item {
                     Repeater {
                         id: windowRepeater
                         model: workspaceSquare.wins
+                        onItemAdded: Qt.callLater(function() {
+                            contentRow.implicitWidth = workspaceSquare.iconsWidth()
+                            workspaceSquare.placeIcons()
+                        })
+                        onItemRemoved: Qt.callLater(function() {
+                            contentRow.implicitWidth = workspaceSquare.iconsWidth()
+                            workspaceSquare.placeIcons()
+                        })
 
                         delegate: Item {
                             id: windowIcon
 
+                            required property int index
                             required property string winId
                             required property string appId
                             required property bool entering
@@ -604,12 +741,31 @@ Item {
                             readonly property bool isFocused: windowIcon.winId === root.focusedWinId
                             readonly property bool hovered: iconHover.hovered
 
-                            width: windowIcon.entering || windowIcon.retiring ? 0 : root.iconSize
+                            property bool placed: false
+                            property real slotTargetX: 0
+                            readonly property alias widthMotion: slotWidthMotion
+                            readonly property alias positionMotion: iconPositionMotion
+                            x: windowIcon.slotTargetX
+                            y: 0
+                            width: windowIcon.entering || windowIcon.retiring
+                                ? 0 : root.iconSize + root.iconSpacing
                             height: root.iconSize
+                            enabled: !windowIcon.retiring && !windowIcon.entering
+                            onWidthChanged: contentRow.implicitWidth = workspaceSquare.iconsWidth()
+                            Component.onCompleted: {
+                                windowIcon.slotTargetX = workspaceSquare.iconSlotX(windowIcon.index)
+                                windowIcon.placed = true
+                                Qt.callLater(root.updateIndicator)
+                            }
+                            onIndexChanged: {
+                                if (windowIcon.placed)
+                                    windowIcon.slotTargetX = workspaceSquare.iconSlotX(windowIcon.index)
+                            }
 
                             Behavior on x {
-                                enabled: windowIcon.motionEnabled
+                                enabled: windowIcon.motionEnabled && windowIcon.placed
                                 NumberAnimation {
+                                    id: iconPositionMotion
                                     duration: MotionTokens.workspaceIconMove
                                     easing.type: Easing.OutQuint
                                 }
@@ -617,6 +773,7 @@ Item {
                             Behavior on width {
                                 enabled: windowIcon.motionEnabled
                                 NumberAnimation {
+                                    id: slotWidthMotion
                                     duration: windowIcon.retiring
                                         ? MotionTokens.workspaceIconExit
                                         : MotionTokens.workspaceIconEnter
@@ -625,7 +782,9 @@ Item {
                             }
 
                             IconImage {
-                                anchors.fill: parent
+                                x: root.iconSpacing
+                                width: root.iconSize
+                                height: root.iconSize
                                 source: root.iconPathForApp(windowIcon.appId)
                                 // These tiny, persistent delegates should not
                                 // keep feeding the long-lived async icon
@@ -703,6 +862,7 @@ Item {
         markColor: LazerTheme.osuGreen
         targetCenter: root.indicatorCenterX
         targetKey: root.indicatorTargetKey
+        targetMoving: root.indicatorTargetMoving
         // Nothing to aim at until the widget has published a target, which is
         // also what keeps the first one a placement rather than a switch.
         targetValid: root.indicatorVisible

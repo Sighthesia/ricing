@@ -326,11 +326,21 @@ Item {
     // edge, where the next snapshot with windows brings it down onto the card: an arrival
     // rather than a blink.
     readonly property real noRowTop: _offTop
+    // The window id the strip's row model is keyed on, without the identity prefix
+    // below. The tracker's key is `"w" + windowId` because it has to distinguish a
+    // window from a workspace, but the model's rows are keyed on the bare id - so a
+    // lookup handed the prefixed key found nothing and every row lookup fell back to
+    // the index formula.
+    readonly property string focusedWindowId: hasTarget
+            && activeColumn
+            && focusedRowIndex < activeColumn.rows.length
+        ? String(activeColumn.rows[focusedRowIndex].windowId) : ""
+
     // During a reorder, the stable row delegate is the source of truth. Its physical
     // position is what the frame marks; the index formula remains the fallback while a
     // new row is being inserted or an old one is finishing its exit.
     readonly property real focusedRowTop: focusedRowIndex < 0 ? noRowTop
-        : strip.rowTopForKey(root.focusedWindowKey, focusedRowIndex)
+        : strip.rowTopForKey(root.focusedWindowId, focusedRowIndex)
     // The frame's glide target in UNSCROLLED list coordinates: the row's own top
     // edge, before the viewport offset is applied. The drawn `y` below subtracts
     // the scroll on the way out, so one glide covers both a focus step and the
@@ -349,7 +359,7 @@ Item {
         : root.focusedRowTop + strip.scrollOffset
     Behavior on _frameAnchorY {
         enabled: !root._markerCrossing && !MotionTokens.reducedMotion
-            && !strip.rowMovingForKey(root.focusedWindowKey)
+            && !strip.rowMovingForKey(root.focusedWindowId)
         NumberAnimation {
             id: focusFrameGlide
             duration: MotionTokens.settingsSidebarCollapse * debugTimeScale
@@ -413,6 +423,8 @@ Item {
     // `_followJourney` for the mechanism it needs instead.
     readonly property int indicatorLength: LazerTheme.barWidgetHeight - 16
 
+    readonly property bool _rowLayoutFollowing: !root._markerCrossing
+        && strip.rowMovingForKey(root.focusedWindowId)
     property real _headY: 0
     property real _tailY: 0
     property bool _snapping: false
@@ -438,7 +450,7 @@ Item {
     // not just a binding, because the change handlers below must be able to ask
     // for a target from the index that just changed - see _syncIndicator.
     function _targetYFor(index) {
-        const top = strip.rowTopForKey(root.focusedWindowKey, index) + strip.scrollOffset
+        const top = strip.rowTopForKey(root.focusedWindowId, index) + strip.scrollOffset
         return top + rowHeight / 2 - indicatorLength / 2
     }
 
@@ -464,8 +476,8 @@ Item {
     readonly property string focusedWindowKey: hasTarget
             && activeColumn
             && focusedRowIndex < activeColumn.rows.length
-            && String(activeColumn.rows[focusedRowIndex].windowId) !== ""
-        ? "w" + String(activeColumn.rows[focusedRowIndex].windowId)
+            && root.focusedWindowId !== ""
+        ? "w" + root.focusedWindowId
         : "s" + (root.plan ? root.plan.activePosition : 0)
 
     // --- the crossing displacement ---------------------------------------
@@ -1449,7 +1461,7 @@ Item {
     // is what a write inside `_snapIndicator` needs and a flag read inside `_syncIndicator`
     // would arrive a step too late for.
     Behavior on _headY {
-        enabled: root._placed && !root._markerCrossing
+        enabled: root._placed && !root._markerCrossing && !root._rowLayoutFollowing
             && !MotionTokens.reducedMotion && !root._snapping
         NumberAnimation {
             id: indicatorHeadAnimation
@@ -1467,7 +1479,7 @@ Item {
     // back at the same instant or one of them flies from a position the other has already
     // left, and the handover's write is `_reanchorHead`'s. See there.
     Behavior on _tailY {
-        enabled: root._placed && !root._markerCrossing
+        enabled: root._placed && !root._markerCrossing && !root._rowLayoutFollowing
             && !MotionTokens.reducedMotion && !root._snapping
         NumberAnimation {
             id: indicatorTailAnimation
@@ -2327,8 +2339,18 @@ Item {
         // A ListModel move gives the row a real physical y. Sample that position directly
         // while the row is travelling; repeatedly re-aiming a Behavior at the same moving
         // target would restart its easing every frame and recreate the old frozen marker.
+        //
+        // A drift parked before the move started is DISCARDED here, and that is the fix
+        // for the marker landing somewhere else at the end of a reorder. The parked value
+        // was read off a row that had not moved yet, and the timer that applies it waits
+        // for the trail rather than for the layout - so a move starting under a parked
+        // drift left the head pinned to the moving row while `_pendingTop` still held the
+        // old slot, and the timer then snapped the marker to that stale slot once the
+        // wake closed. A target that is a live animation is not a drift to be deferred:
+        // the row is the authority for as long as it is travelling.
         if (!root._markerCrossing && root.hasTarget
-                && strip.rowMovingForKey(root.focusedWindowKey)) {
+                && strip.rowMovingForKey(root.focusedWindowId)) {
+            root._pendingTop = -1
             root._snapping = true
             root._anchorY = target
             root._headY = target

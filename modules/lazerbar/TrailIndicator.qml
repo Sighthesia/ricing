@@ -78,6 +78,58 @@ Item {
 // live wake every time the content is briefly without a target, which is the
 // normal state DURING a switch.
     property bool targetValid: true
+    // Moving layout geometry is sampled without queuing an obsolete destination.
+    property bool targetMoving: false
+    property bool _following: false
+    property real _followOffset: 0
+
+    function _followTarget() {
+        if (!root.targetValid || !isFinite(root.targetCenter))
+            return
+        if (!root._following) {
+            const from = root._committed ? root._head : root._target
+            root._following = true
+            root._hasPending = false
+            root._followOffset = from - root._target
+            followArrival.restart()
+        }
+        if (root._key !== String(root.targetKey)) {
+            followArrival.stop()
+            root._followOffset = root._head - root._target
+            followArrival.restart()
+            root._key = String(root.targetKey)
+            flashAnimation.restart()
+        }
+        root._anchor = root._target
+        root._head = root._target + root._followOffset
+        root._committed = true
+    }
+
+    NumberAnimation {
+        id: followArrival
+        target: root
+        property: "_followOffset"
+        to: 0
+        duration: MotionTokens.medium
+        easing.type: Easing.OutQuad
+    }
+
+    // Follow the physical icon and close its wake after layout settles.
+    Timer {
+        interval: MotionTokens.motionFrame
+        repeat: true
+        running: root._following
+        onTriggered: {
+            root._followTarget()
+            root._tail += (root._head - root._tail) * MotionTokens.motionFollowRate
+            if (!root.targetMoving && !followArrival.running
+                    && Math.abs(root._head - root._tail) < 0.5) {
+                root._head = root._target
+                root._tail = root._target
+                root._following = false
+            }
+        }
+    }
 
     // --- Tracker ----------------------------------------------------------
 
@@ -137,11 +189,11 @@ Item {
     // Head on the widget's own curve, tail on its own slower one. Same gate on
     // both, so neither can be re-targeted a frame ahead of the other.
     Behavior on _head {
-        enabled: root._committed && !MotionTokens.reducedMotion && !root._snapping
+        enabled: root._committed && !MotionTokens.reducedMotion && !root._snapping && !root._following
         NumberAnimation { duration: MotionTokens.medium; easing.type: Easing.OutQuad }
     }
     Behavior on _tail {
-        enabled: root._committed && !MotionTokens.reducedMotion && !root._snapping
+        enabled: root._committed && !MotionTokens.reducedMotion && !root._snapping && !root._following
         NumberAnimation { duration: MotionTokens.slow * 2; easing.type: Easing.OutSine }
     }
 
@@ -176,6 +228,18 @@ Item {
 
     function _commitPending() {
         root._queued = false
+        if (MotionTokens.reducedMotion) {
+            followArrival.stop()
+            root._followOffset = 0
+            if (root.targetValid)
+                root._snapTo(root.targetCenter)
+            root._following = false
+            return
+        }
+        if (root.targetMoving || root._following) {
+            root._followTarget()
+            return
+        }
         if (!root.targetValid || !isFinite(root.targetCenter))
             return
         const center = root.targetCenter
@@ -228,12 +292,14 @@ Item {
             if (MotionTokens.reducedMotion) {
                 flashAnimation.stop()
                 root.flashOpacity = 0
+                root._schedule()
             }
         }
     }
 
     // --- Geometry changes and target changes all land here ---------------
 
+    onTargetMovingChanged: _schedule()
     onTargetCenterChanged: _schedule()
     onTargetKeyChanged: _schedule()
     onTargetValidChanged: _schedule()
