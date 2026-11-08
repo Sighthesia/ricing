@@ -420,7 +420,6 @@ Item {
             // never reports stopped, and the window then stays open with the head owned by a
             // frame that is no longer moving. The close is also driven by the follow timer,
             // which sees the frame arrive whatever path it took here.
-            onStopped: if (root._settling) root._endSettle()
         }
     }
     // The leaving frame's own height, from the row counts of the frame being held
@@ -496,60 +495,6 @@ Item {
     // So while the window is open the head is not animated at all: it is placed on the
     // frame's own current position, every tick of the frame's glide. One writer, no
     // `Behavior`, no `_pendingTop`, no `_aimIndicator`.
-    Connections {
-        target: root
-        enabled: root._settling
-        function onFrameAnchorYChanged() { root._followSettleFrame() }
-    }
-    Timer {
-        interval: 16
-        repeat: true
-        running: root._settling
-        onTriggered: root._followSettleFrame()
-    }
-    // Hand the head BACK, on the value it already has, so the handover cannot be a jump.
-    //
-    // `_anchorY` is set to where the head actually is rather than to the target the frame
-    // was heading for: the two differ by the frame's last few tenths of a pixel, and taking
-    // the target would make the `Behavior` ease that away as a second little motion after
-    // the bar had visibly stopped.
-    function _endSettle() {
-        root._settling = false
-        root._anchorY = root._headY
-    }
-
-    function _followSettleFrame() {
-        if (!root._settling)
-            return
-        // The frame's DRAWN top edge, in the same unscrolled space the tracker uses: its own
-        // `y` is `_frameAnchorY - scrollOffset`, so the scroll is added back rather than
-        // subtracted twice. `markerOffset` is the bar's standing one-offset-below rule.
-        root._pendingTop = -1
-        _snapping = true
-        _headY = root._frameAnchorY + root.markerOffset
-        // BOTH ends, every tick of the window, and the reason is what the tail is FOR.
-        //
-        // A wake is the record of a journey: the tail lags the head so the bar shows where
-        // the mark came from. During a settle there is no journey - the focused row does not
-        // change, the mark is not travelling anywhere, and the only motion is the frame
-        // arriving at a place the slot it just lost no longer occupies. A tail kept on the
-        // old target therefore describes a trip nobody took: measured, the head following the
-        // frame down to 35 while the tail still climbed toward 69, holding the bar at
-        // [44.7, 95] around a row at 34 for 300ms. That is the overshoot.
-        //
-        // So the window moves the bar as one piece, and hands the wake back when it ends.
-        _tailY = _headY
-        _snapping = false
-        // The frame has ARRIVED, so the window has done its job: the bar is on the row and
-        // the head can go back to being driven by its own `Behavior`.
-        //
-        // Asked of the glide's own RUNNING state, not of a distance: `_frameAnchorY` is the
-        // animated value, so comparing it with `focusedRowIndex * rowPitch` is true for the
-        // whole second half of every glide and closed the window while the frame was still
-        // travelling - measured, delta jumping to 8.9 mid-settle.
-        if (!focusFrameGlide.running)
-            root._endSettle()
-    }
     // Committed target, never animated. Dedupe and same-anchor drift read this,
     // because _headY is the Behavior's in-flight frame and is numerically equal to
     // _tailY until the first tick, which would make a same-frame switch look
@@ -581,6 +526,42 @@ Item {
     }
     // In the tracker's unscrolled space, which is what both ends are written in.
     readonly property real _cardTopUnscrolled: _cardTop + strip.scrollOffset
+    // The frame's DRAWN y: the card's position, glided. The frame is a 1px outline and it
+    // is the thing that reads as "the mark", so it keeps its own motion rather than being
+    // pinned to a card that jumps a whole row between two frames.
+    property real _frameCardY: _cardTop
+    // THE FRAME GLIDES ONLY WHEN ITS TARGET JUMPS. A card sliding under a settled focus is
+    // followed on the frame; a card that moves a whole row between two publishes is what the
+    // glide is for. The distinction is the size of the step, not a mode flag.
+    //
+    // A `Behavior` was tried here and it is the wrong tool for the sliding case: the target
+    // changes on every tick, so the easing restarts on every tick and the frame freezes at
+    // wherever it happened to be - measured, 42.1 for the whole of an exit while the card
+    // walked 68 -> 55.
+    function _followFrameCard(step) {
+        if (root._markerCrossing)
+            return
+        if (Math.abs(step) > root.rowPitch * 0.75) {
+            _frameGlideFrom = _frameCardY
+            _frameGlideTo = root._cardTop
+            _frameGlide.restart()
+        } else {
+            _frameCardY = root._cardTop
+        }
+    }
+    property real _frameGlideFrom: 0
+    property real _frameGlideTo: 0
+    NumberAnimation {
+        id: _frameGlide
+        target: root
+        property: "_frameCardY"
+        from: root._frameGlideFrom
+        to: root._frameGlideTo
+        duration: (root._frameStep > 1.5
+            ? MotionTokens.windowRowMove
+            : MotionTokens.settingsSidebarCollapse) * debugTimeScale
+        easing.type: root._frameStep > 1.5 ? Easing.OutCubic : Easing.OutQuint
+    }
     property bool _placed: false
     // Same-anchor drift arriving while a trail is in flight; applied as one snap
     // once the tail catches up, so a trail is never cut short. The workspace
@@ -1648,34 +1629,63 @@ Item {
     // subscription is what makes the mark follow the card frame by frame.
     Connections {
         target: strip
-        function onRowRevisionChanged() { root._followCard() }
+        function onRowRevisionChanged() {
+            // The card is being drawn somewhere new on this frame - its own `presence` and
+            // travel put it there - so the frame is there with it. No glide: the card IS the
+            // motion, and easing toward a target that moves every tick is a frame that never
+            // leaves where it started.
+            root._frameCardY = root._cardTop
+            root._followCard()
+        }
     }
 
     function _followCard() {
-        // ONLY WHILE THE LIST IS LAYING ITSELF OUT. That is when the card has a position on
-        // this frame that differs from last frame's, and the mark has to be there with it.
+        // THE CARD'S POSITION IS THE TARGET; the two `Behavior`s are still the motion.
         //
-        // An ordinary focus step is the other case and the opposite one: the rows do not
-        // move at all, the mark is the only thing that travels, and a card read here would
-        // put it on the destination in one frame. The two `Behavior`s carry that one, and
-        // `_syncIndicator` aims them.
-        if (!strip.rowsTransitioning || root._markerCrossing)
+        // This goes through the same commit a focus step uses - aim the head, leave the tail
+        // alone - so the head eases onto the card and the tail trails it on its own longer
+        // clock. What is gone is the second, INVENTED target: the index that had to be eased
+        // toward a pitch and then reconciled with the card. The card's own position is that
+        // target now, so the mark cannot end up somewhere the card is not.
+        //
+        // It used to write both ends and to bypass the `Behavior`s with `_snapping`. That is
+        // why the trail disappeared and why the frame stopped gliding: the head was
+        // teleported onto the card every tick and the tail was dragged along with it, and a
+        // `Behavior` that is restarted sixty times a second never leaves its start.
+        if (root._markerCrossing)
             return
+        var top = root._cardTopUnscrolled
+        if (!isFinite(top))
+            return
+        _pendingTop = -1
+        _anchorY = top
+        // THE HEAD IS PLACED, THE TAIL IS ANIMATED, and the asymmetry is the point.
+        //
+        // The card is already being drawn somewhere new on this frame - its own `presence`
+        // and travel put it there - so a `Behavior` on the head has nothing to add: it would
+        // be handed a new target sixty times a second and restart from wherever it had got
+        // to, which is a head frozen at its start. Placing it puts the head exactly on the
+        // card, which is what "the mark follows the card" means.
+        //
+        // The tail is NOT placed. Its `Behavior` is still the one that describes the trail:
+        // it lags the head on `slow * 2`, so the bar keeps a wake while the card slides and
+        // closes it when the card stops. Writing it here is what removed the trail.
         _snapping = true
-        _headY = root._cardTopUnscrolled
-        _tailY = _headY
+        _headY = top
+        // THE TAIL IS MOVED BY A FOLLOWER, not by a `Behavior`. A `Behavior` handed a new
+        // target on every frame restarts its easing from wherever it had got to, which is a
+        // tail that never leaves its start - measured, pinned at 36.7 while the head walked
+        // from 68 to 55. A follower closes a fixed fraction of the remaining gap on every
+        // tick, so it keeps moving and still lags.
+        _tailY += (top - _tailY) * root.trailCatchUp
         _snapping = false
     }
-    // A focus step animates ONLY when the list is still. If a slot is opening or closing
-    // under the change, the card is already being drawn somewhere new on this frame and the
-    // mark goes with it - that is the whole rule, and `_focusStepping` is narrowed to it
-    // here rather than at the hook, because the row state at the hook is one turn early.
-    readonly property bool _stepAnimates: _focusStepping && !strip.rowsTransitioning
-    // True for the duration of a genuine focus step - set where the focused window changes,
-    // cleared when the glide lands.
-    property bool _focusStepping: false
+    // The head's glide is always available. A card that is sliding gives it a target moving
+    // a pixel at a time, so the easing trails by a fraction and there is nothing to see; a
+    // card that JUMPS - an ordinary focus step, where the rows do not move at all - is the
+    // case the glide exists for.
     Behavior on _headY {
-        enabled: root._placed && !root._markerCrossing && root._stepAnimates
+        enabled: root._placed && !root._markerCrossing
             && !MotionTokens.reducedMotion && !root._snapping
         NumberAnimation {
             id: indicatorHeadAnimation
@@ -2212,8 +2222,10 @@ Item {
             return
         _pendingTop = -1
         _anchorY = top
+        // The head is aimed at the card; the TAIL IS NOT WRITTEN. Writing both is what
+        // removed the trail: a wake is the tail lagging the head, and two ends handed the
+        // same target on the same tick have nothing left to lag behind.
         _headY = top
-        _tailY = top
     }
 
     // Is a row on the ACTIVE column travelling out of a reorder right now? Asked of the
@@ -2232,8 +2244,6 @@ Item {
     // its tail shortened. This is opened by the index FALLING while the focused window is
     // unchanged - which is exactly a departing slot being removed under a settled focus -
     // and closed when the frame's own glide lands.
-    property bool _settling: false
-    property int _settleFromIndex: -1
 
     // Apply a drift that landed mid-trail, once the tail has caught up. The widget's
     // `_edgePendingCenterX` timer, and for the same reason: it waits on the TAIL rather
@@ -2523,7 +2533,12 @@ Item {
         // The card's own drawn top. Not an index eased toward a pitch: the card is already
         // animating its own position, and the mark reading it means the two cannot disagree
         // by a frame, by an easing, or by which of them decided the transition was over.
-        y: root._markerCrossing ? root.crossingTop : root._cardTop
+        // The SAME number the bar's head is on. The outline and the bar are one mark drawn
+        // twice - the frame is its outline and the bar is the stroke beside it - so they are
+        // placed from one value rather than from two animations that have to agree. They did
+        // not: the frame glided toward the card on its own clock while the head was placed on
+        // it, and the two sat a whole row apart for the length of an exit.
+        y: root._markerCrossing ? root.crossingTop : root._headY - strip.scrollOffset
         width: root._markerCrossing ? root.markerWidth : strip.activeCardWidth
         height: root.rowHeight
         // Drawn for the whole of an exit, so the outline is the thing the bar is seen to
@@ -2927,14 +2942,6 @@ Item {
         // Written BEFORE anything re-aims: the tail's `Behavior` reads it to choose its
         // duration for this step.
         root._settlingIndex = strip.rowsTransitioning
-        // THE SETTLE WINDOW opens on the EVENT, not on a flag: the rendered index fell and
-        // the focused window is the same one, which is a departing slot being removed under
-        // a settled focus and nothing else. `_settleFromIndex` remembers where it started so
-        // the close can tell the frame has arrived.
-        if (root.focusedRowIndex >= 0 && root.focusedRowIndex < root._settleFromIndex
-                && root.focusedWindowKey === root._targetKey)
-            root._settling = true
-        root._settleFromIndex = root.focusedRowIndex
         // How far the frame is being asked to travel, in rows - read by its glide to tell a
         // reorder from a focus step, and written here because this is the turn the anchor
         // moves on. See the note in the `Behavior`.
@@ -2963,19 +2970,11 @@ Item {
     // window, `focusedWindowKey` moves, and the one routine runs. Both hooks call it; the
     // second is a no-op when the first already ran.
     onFocusedWindowKeyChanged: {
-        // A REAL FOCUS STEP: the marked window changed, so the mark has somewhere to go
-        // while the card it is leaving stays where it is. This is the only motion that gets
-        // its own easing; everything else is the card's own position.
-        root._focusStepping = true
-        _focusStepEnd.restart()
+        // A real focus step: the marked window changed, so the mark has somewhere to go
+        // while the card it is leaving stays where it is. The frame's glide is armed here
+        // because this is the one motion whose target jumps rather than slides.
+        root._followFrameCard(root._cardTop - root._frameCardY)
         Qt.callLater(_syncIndicator)
-    }
-    // The step is over when its own glide would be: the flag only decides whether the
-    // `Behavior` is allowed to run, and leaving it on would ease the NEXT card motion too.
-    Timer {
-        id: _focusStepEnd
-        interval: MotionTokens.slow * 2 * debugTimeScale
-        onTriggered: root._focusStepping = false
     }
     onHasTargetChanged: _syncIndicator()
     // A ROW ARRIVING OR LEAVING MOVES THE MARK WITHOUT CHANGING ITS TARGET.
