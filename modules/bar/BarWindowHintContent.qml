@@ -336,16 +336,8 @@ Item {
     // edge, where the next snapshot with windows brings it down onto the card: an arrival
     // rather than a blink.
     readonly property real noRowTop: _offTop
-    // The focused row's top edge, for the CROSSING only - the marker's landing place on a
-    // workspace switch, where there is no transition running in the target column.
-    //
-    // Deliberately the plain pitch and not `liveRowTop`: that walks the slots' shortfalls,
-    // and reading them here closes a loop - the shortfall is driven by `presence`, which the
-    // column reports through `rowRevision`, which invalidates this binding again. The
-    // binding loop is what the shell log reported. A crossing's landing row is a settled row
-    // in a column that is not transitioning, so the correction it would apply is zero.
-    readonly property real focusedRowTop: focusedRowIndex < 0
-        ? noRowTop : focusedRowIndex * rowPitch - strip.scrollOffset
+    readonly property real focusedRowTop: focusedRowIndex < 0 ? noRowTop
+        : strip.liveRowTop(focusedRowIndex)
     // The frame's glide target in UNSCROLLED list coordinates: the row's own top
     // edge, before the viewport offset is applied. The drawn `y` below subtracts
     // the scroll on the way out, so one glide covers both a focus step and the
@@ -363,63 +355,14 @@ Item {
     // anchor, and that is the same arrangement the scroll already has: the anchor is a pure
     // function of the index, so a slot collapsing somewhere above cannot retarget the
     // glide, and the drawn position below subtracts the layout's own offset on the way out.
-    // The same rule as `focusedRowTop`, in the UNSCROLLED coordinates the glide works in:
-    // the focused row's place among the rows that are NOT leaving, plus whatever the holes
-    // above it still owe. A pure function of the LIVE index, so the glide is aimed at where
-    // the row will rest rather than at a position that counts the row being dissolved.
-    //
-    // This is the fix for the reported asymmetry: `focusedRowIndex` put focus on the NEXT
-    // window one pitch too low (`a bX c*` reads index 2 where the row rests at 1), so closing
-    // a window moved the mark down a row and then slid it back up as the hole closed. Focus
-    // landing on the PREVIOUS window was unaffected, which is exactly what was seen.
     property real _frameAnchorY: focusedRowIndex < 0
         ? noRowTop + strip.scrollOffset : focusedRowIndex * rowPitch
-    // How far the frame is being asked to travel, in row pitches: the distance from where it
-    // was DRAWN to where it now belongs. Read by the glide's own `Behavior` to decide whether
-    // this is a focus step or a reorder - see the note there.
-    // Written BEFORE the anchor moves, from the index change that moves it - the only
-    // moment the distance is knowable ahead of the `Behavior` reading it.
-    property real _frameStep: 0
-    property int _frameShownIndex: -1
     Behavior on _frameAnchorY {
         enabled: !root._markerCrossing && !MotionTokens.reducedMotion
         NumberAnimation {
             id: focusFrameGlide
-            // A REORDER carries the frame on its own clock, not the sidebar's.
-            //
-            // `settingsSidebarCollapse` (300ms) is the right weight for a focus step inside
-            // a still list, and it was what this always used. But a reorder moves the rows
-            // UNDER the frame at the same time, and two motions on one mark read as the mark
-            // skimming over cards that are still sliding - the reported "it teleports while
-            // the cards travel". Sharing `windowRowMove` makes the frame and the rows it is
-            // crossing arrive together, which is what makes it one gesture.
-            // A REORDER IS PACED FROM ITS OWN LENGTH, not from the strip's flag.
-            //
-            // `strip.rowsTransitioning` is the honest question, but it goes true on the SAME
-            // frame the index changes - and a `Behavior` reads its `duration` before that
-            // turn's bindings have settled, so the first frame of every reorder was still
-            // paced as a one-row focus step. Measured, that put the frame at 77.6 on the
-            // frame the index changed, from 102, which is the hop the user saw.
-            //
-            // How far the frame is going is known here without asking anything: `_frameStep`
-            // is the distance from where the frame was drawn to where it now belongs, in row
-            // pitches. One row is a focus step; several is a reorder.
-            duration: (root._frameStep > 1.5
-                ? MotionTokens.windowRowMove
-                : MotionTokens.settingsSidebarCollapse) * debugTimeScale
-            // `OutCubic` for the long step: `OutQuint` spends a quarter of the distance in
-            // the first frame, which for the frame's whole-list travel is a visible hop. The
-            // cards move on `OutQuint` and move a SINGLE pitch each, so the same curve is a
-            // much smaller step for them.
-            easing.type: root._frameStep > 1.5 ? Easing.OutCubic : Easing.OutQuint
-            // The settle window closes when the frame has landed - on its own clock, at the
-            // place the head was following it to. Closing on a duration would be a guess
-            // that either leaves the head owned by the frame after it stopped (so the next
-            // focus step starts from a head nobody moved) or hands it back mid-flight.
-            // Closing on `onStopped` alone is not enough: a glide that is re-aimed mid-flight
-            // never reports stopped, and the window then stays open with the head owned by a
-            // frame that is no longer moving. The close is also driven by the follow timer,
-            // which sees the frame arrive whatever path it took here.
+            duration: MotionTokens.settingsSidebarCollapse * debugTimeScale
+            easing.type: Easing.OutQuint
         }
     }
     // The leaving frame's own height, from the row counts of the frame being held
@@ -482,19 +425,6 @@ Item {
     property real _headY: 0
     property real _tailY: 0
     property bool _snapping: false
-
-    // THE SETTLE WINDOW'S ONLY HEAD WRITER.
-    //
-    // The frame and the bar mark one thing, and during a settle they must MOVE as one thing:
-    // the frame glides on `settingsSidebarCollapse`/OutCubic (300ms) and the head on
-    // `medium`/OutQuad (160ms), so even with one shared target the two are at different
-    // places for most of the step - the head arrives first, stops, and waits while the frame
-    // is still travelling. On a 1px outline that reads as a hop; on a 26px bar with a tail
-    // it reads as the bar diving past the row and coming back.
-    //
-    // So while the window is open the head is not animated at all: it is placed on the
-    // frame's own current position, every tick of the frame's glide. One writer, no
-    // `Behavior`, no `_pendingTop`, no `_aimIndicator`.
     // Committed target, never animated. Dedupe and same-anchor drift read this,
     // because _headY is the Behavior's in-flight frame and is numerically equal to
     // _tailY until the first tick, which would make a same-frame switch look
@@ -502,66 +432,6 @@ Item {
     // `Behavior`s toward this one value at rest, which is the widget's arrangement
     // and the reason a retarget cannot shorten the bar, only re-aim it.
     property real _anchorY: 0
-
-    // THE MARK FOLLOWS THE CARD IT MARKS. One expression, and it is the card's own drawn
-    // top rather than an index multiplied by a pitch.
-    //
-    // The cards are already animated: a departing slot's `presence` runs to zero and every
-    // row below it rides up on that same number, frame by frame, with no `Behavior` of its
-    // own. A marker built from an index has to INVENT that motion separately and then agree
-    // with it - which is what `_frameAnchorY`, `_restingY`, `_pendingTop`, `_snapping` and
-    // the rest of that machinery were all trying to do, each with a different easing and a
-    // different idea of when the index had settled.
-    //
-    // Reading the card means there is nothing to agree with: the mark is where the card is,
-    // on the frame the card is there. `liveRowTop` is that position - the running sum of the
-    // slots above the focused row, including a departing slot's remaining height, plus a
-    // reordering row's own travel.
-    readonly property real _cardTop: {
-        strip.rowRevision
-        var index = root.focusedRowIndex
-        if (index < 0)
-            return root.noRowTop + strip.scrollOffset
-        return strip.liveRowTop(index)
-    }
-    // In the tracker's unscrolled space, which is what both ends are written in.
-    readonly property real _cardTopUnscrolled: _cardTop + strip.scrollOffset
-    // The frame's DRAWN y: the card's position, glided. The frame is a 1px outline and it
-    // is the thing that reads as "the mark", so it keeps its own motion rather than being
-    // pinned to a card that jumps a whole row between two frames.
-    property real _frameCardY: _cardTop
-    // THE FRAME GLIDES ONLY WHEN ITS TARGET JUMPS. A card sliding under a settled focus is
-    // followed on the frame; a card that moves a whole row between two publishes is what the
-    // glide is for. The distinction is the size of the step, not a mode flag.
-    //
-    // A `Behavior` was tried here and it is the wrong tool for the sliding case: the target
-    // changes on every tick, so the easing restarts on every tick and the frame freezes at
-    // wherever it happened to be - measured, 42.1 for the whole of an exit while the card
-    // walked 68 -> 55.
-    function _followFrameCard(step) {
-        if (root._markerCrossing)
-            return
-        if (Math.abs(step) > root.rowPitch * 0.75) {
-            _frameGlideFrom = _frameCardY
-            _frameGlideTo = root._cardTop
-            _frameGlide.restart()
-        } else {
-            _frameCardY = root._cardTop
-        }
-    }
-    property real _frameGlideFrom: 0
-    property real _frameGlideTo: 0
-    NumberAnimation {
-        id: _frameGlide
-        target: root
-        property: "_frameCardY"
-        from: root._frameGlideFrom
-        to: root._frameGlideTo
-        duration: (root._frameStep > 1.5
-            ? MotionTokens.windowRowMove
-            : MotionTokens.settingsSidebarCollapse) * debugTimeScale
-        easing.type: root._frameStep > 1.5 ? Easing.OutCubic : Easing.OutQuint
-    }
     property bool _placed: false
     // Same-anchor drift arriving while a trail is in flight; applied as one snap
     // once the tail catches up, so a trail is never cut short. The workspace
@@ -1463,12 +1333,8 @@ Item {
     // is the viewport's, and `rowLift` is a slot above being shorter than its pitch while
     // it opens or closes - which is the same kind of statement, so it is the same
     // subtraction rather than a second mechanism.
-    // The tracker and the bar are both in the list's own unscrolled space, so the only
-    // offset between them is the viewport's. `rowLift` is deliberately NOT here: the tracker
-    // is aimed at `focusedRowIndex * rowPitch` - the frame's own target - and that number
-    // has no layout correction in it either. Subtracting the lift would take a closing
-    // slot's height off the bar alone and leave it floating above the frame it outlines.
-    readonly property real _barTop: Math.min(_headY, _tailY) - strip.scrollOffset
+    readonly property real _barTop: Math.min(_headY, _tailY)
+        - strip.scrollOffset - strip.rowLift
     readonly property real _barLength: indicatorLength + _wake
 
     readonly property bool hasTarget: focusedRowIndex >= 0
@@ -1613,105 +1479,12 @@ Item {
     // about the crossing, so a `Behavior` sees it at the moment the property CHANGES - which
     // is what a write inside `_snapIndicator` needs and a flag read inside `_syncIndicator`
     // would arrive a step too late for.
-    // THE HEAD'S ONE WRITER IS THE CARD. A `Behavior` is enabled ONLY for a real focus
-    // step - the focused window changing - because that is the one case where the mark has
-    // somewhere to travel to while the card it is leaving stays put.
-    //
-    // Every other motion of the mark is a motion of the CARD: a departing slot shortening,
-    // a row reordering, a scroll. In those the card is already being drawn somewhere new on
-    // this frame, and the mark simply is where the card is. Easing toward it would be a
-    // second, invented motion with its own clock, which is the arrangement that produced
-    // every disagreement reported here.
-    // Assigned, not bound: `_headY` is written by the glide too, and a permanent binding
-    // would fight it. `_syncIndicator` calls this on every tick where the card is moving.
-    // The card's own position is a plain sum over records, so nothing notifies a binding
-    // when a `presence` runs. `rowRevision` is the strip's own tick for that, and this
-    // subscription is what makes the mark follow the card frame by frame.
-    Connections {
-        target: strip
-        function onRowRevisionChanged() {
-            // The card is being drawn somewhere new on this frame - its own `presence` and
-            // travel put it there - so the frame is there with it. No glide: the card IS the
-            // motion, and easing toward a target that moves every tick is a frame that never
-            // leaves where it started.
-            root._frameCardY = root._cardTop
-            root._followCard()
-        }
-    }
-
-    function _followCard() {
-        return   // the marker owns the position now - see `SelectionMarker`
-    }
-    function _followCardLegacy() {
-        // THE CARD'S POSITION IS THE TARGET; the two `Behavior`s are still the motion.
-        //
-        // This goes through the same commit a focus step uses - aim the head, leave the tail
-        // alone - so the head eases onto the card and the tail trails it on its own longer
-        // clock. What is gone is the second, INVENTED target: the index that had to be eased
-        // toward a pitch and then reconciled with the card. The card's own position is that
-        // target now, so the mark cannot end up somewhere the card is not.
-        //
-        // It used to write both ends and to bypass the `Behavior`s with `_snapping`. That is
-        // why the trail disappeared and why the frame stopped gliding: the head was
-        // teleported onto the card every tick and the tail was dragged along with it, and a
-        // `Behavior` that is restarted sixty times a second never leaves its start.
-        if (root._markerCrossing)
-            return
-        var top = root._cardTopUnscrolled
-        if (!isFinite(top))
-            return
-        _pendingTop = -1
-        _anchorY = top
-        // THE HEAD IS PLACED, THE TAIL IS ANIMATED, and the asymmetry is the point.
-        //
-        // The card is already being drawn somewhere new on this frame - its own `presence`
-        // and travel put it there - so a `Behavior` on the head has nothing to add: it would
-        // be handed a new target sixty times a second and restart from wherever it had got
-        // to, which is a head frozen at its start. Placing it puts the head exactly on the
-        // card, which is what "the mark follows the card" means.
-        //
-        // The tail is NOT placed. Its `Behavior` is still the one that describes the trail:
-        // it lags the head on `slow * 2`, so the bar keeps a wake while the card slides and
-        // closes it when the card stops. Writing it here is what removed the trail.
-        _snapping = true
-        _headY = top
-        // THE TAIL IS MOVED BY A FOLLOWER, not by a `Behavior`. A `Behavior` handed a new
-        // target on every frame restarts its easing from wherever it had got to, which is a
-        // tail that never leaves its start - measured, pinned at 36.7 while the head walked
-        // from 68 to 55. A follower closes a fixed fraction of the remaining gap on every
-        // tick, so it keeps moving and still lags.
-        _tailY += (top - _tailY) * root.trailCatchUp
-        _snapping = false
-    }
-    // The head's glide is always available. A card that is sliding gives it a target moving
-    // a pixel at a time, so the easing trails by a fraction and there is nothing to see; a
-    // card that JUMPS - an ordinary focus step, where the rows do not move at all - is the
-    // case the glide exists for.
     Behavior on _headY {
         enabled: root._placed && !root._markerCrossing
             && !MotionTokens.reducedMotion && !root._snapping
         NumberAnimation {
             id: indicatorHeadAnimation
-            // A REORDER IS THE ROWS' GESTURE, so the head travels on the rows' clock.
-            //
-            // `medium` (160ms) is the widget's own head, and it is right for a focus step
-            // inside a still list: the bar overtakes the outline slightly and settles, which
-            // is what gives the widget its snap. During a reorder the outline and the rows
-            // are BOTH travelling, and a head twice as fast arrives at the new row while the
-            // cards are still half way there - which is the reported "the indicator
-            // teleports": it is not teleporting, it is finishing first, against a background
-            // that is still moving. Matching `windowRowMove` puts the mark and the rows it
-            // crosses on one clock, so it reads as the bar being carried by the list.
-            // A REORDER IS THE ROWS' GESTURE and the head travels on their clock. An EXIT is
-            // not: the row that is leaving dissolves in place and the focused row only
-            // changes index, which is an ordinary focus step - so it takes the ordinary
-            // duration, the same one the focus frame beside it uses. Using the reorder's
-            // clock for both made the bar arrive a full pitch behind the frame it is drawn
-            // around: measured, the frame finished 34 -> 68 -> 34 in fourteen frames while
-            // the head was still climbing at sixty-nine.
-            duration: (strip.rowsReordering
-                ? MotionTokens.windowRowMove
-                : MotionTokens.medium) * debugTimeScale
+            duration: MotionTokens.medium * debugTimeScale
             easing.type: Easing.OutQuad
         }
     }
@@ -1729,34 +1502,7 @@ Item {
             && !MotionTokens.reducedMotion && !root._snapping
         NumberAnimation {
             id: indicatorTailAnimation
-            // The tail lingers on a REORDER, because the head does.
-            //
-            // The wake's length is how far the head gets ahead before the tail closes, so it
-            // is set by the two clocks' ratio - and the two paths have different heads:
-            // `medium` (160ms) for a focus step, `windowRowMove` (320ms) during a reorder.
-            // A tail pinned at `slow * 2` therefore halves the reorder's trail for the same
-            // travel: measured, 25.8px against 37.6px, which reads as a smaller gesture than
-            // a plain focus change.
-            //
-            // A focus step keeps the widget's own 480ms, which is `slow * 2` and is what
-            // gives the at-rest wake its 55%-of-travel shape. A reorder's head takes twice
-            // as long, so its tail has to linger proportionally - the same ratio is the same
-            // length of trail.
-            //
-            // 1.9 rather than a round 2: measured on a four-row swap, 2.0 overshot to 39.7px
-            // against the focus step's 37.6, and 1.9 lands at 37.3. The number is a
-            // consequence of `windowRowMove` and `slow * 2` not being an exact 2:1 pair
-            // (320 against 480), so it is written out rather than derived from a ratio that
-            // does not exist.
-            // A STEP THAT IS ONLY THE LAYOUT SETTLING TAKES NO TRAIL, and it is the same
-            // predicate the head uses. The focused row does not change here, so a 480ms wake
-            // under it holds the bar's lower edge a full pitch below the row it marks and
-            // closes slowly - measured on the live shell, 95 against the row's 61, easing
-            // back over 300ms. That is the reported "overshoots going down".
-            duration: (strip.rowsReordering
-                ? MotionTokens.windowRowMove * 1.9
-                : (root._settlingIndex ? MotionTokens.medium : MotionTokens.slow * 2))
-                * debugTimeScale
+            duration: MotionTokens.slow * 2 * debugTimeScale
             easing.type: Easing.OutSine
         }
     }
@@ -2144,110 +1890,11 @@ Item {
         if (Math.abs(top - _anchorY) < 0.5)
             return
         if (Math.abs(_headY - _tailY) > 0.5) {
-            // A wake is still open, so this target waits for the tail - the widget's own
-            // `_edgePendingCenterX`. That is right for CONTENT CHURN: a drift that lands
-            // mid-trail should not cut the trail short, and waiting costs nothing because
-            // the place it is drifting to is not going anywhere.
-            //
-            // A ROW THAT IS TRAVELLING IS NOT THAT CASE. It is moving right now, and the
-            // target written here is where it is THIS FRAME - so holding it until the tail
-            // closes makes the bar arrive at a position the row has already left. Measured
-            // on a fast run of moves: the pending target was applied by a SNAP once the wake
-            // closed, which is the hop the user still sees at speed.
-            //
-            // Re-aimed instead, which is what the widget does when a target genuinely moves:
-            // both ends are handed the new place and continue from wherever they are, so a
-            // run of moves is one chase rather than a series of held targets and snaps.
-            // `_settlingIndex` belongs here, and its absence was the overshoot: the target
-            // really did move a whole pitch, and held in `_pendingTop` instead it waited for
-            // the tail - measured on the live shell, `head` sat at 69 while the row it marks
-            // was already at 35, and the bar's lower edge hung 34px past it.
-            if (root._rowsTravelling || root._settlingIndex || root._frameStep > 1.5) {
-                _pendingTop = -1
-                // `_aimIndicator`, NOT `_retargetIndicator` with the same key: the key this
-                // branch would hand over is the one already committed, so the call came
-                // straight back here - the recursion is silent in QML and nothing moved.
-                _aimIndicator(top)
-                return
-            }
             _pendingTop = top
             return
         }
-        // A ROW THAT IS TRAVELLING IS A MOVE, not a drift.
-        //
-        // This branch is the widget's answer to content churn: the target has not changed
-        // identity, so the bar is CUT to where it now belongs instead of flying there -
-        // right for a slot closing under a settled row, where a flight would be a second
-        // motion invented by a layout correction.
-        //
-        // A reorder is the opposite case and it arrives here, because the window that is
-        // focused is the SAME window (`focusedWindowKey` does not change) while the row it
-        // sits on travels several pitches. Cutting there is the reported "the indicator
-        // teleports during a reorder": the rows slide and the bar arrives already there.
-        // So a travelling row is handed to the animated path - the same two `Behavior`s a
-        // focus change uses, which is what puts the wake back.
-        if (root._rowsTravelling || root._settlingIndex)
-            _aimIndicator(top)
-        else
-            _snapIndicator(top)
+        _snapIndicator(top)
     }
-
-    // Re-aim both ends at `top`, animating, WITHOUT asking whether the identity changed.
-    //
-    // This is the body of `_retargetIndicator`'s switch branch, split out because that
-    // branch cannot be reached twice for one identity: `_retargetIndicator` compares the key
-    // it is handed against `_targetKey`, and a caller that passes the SAME key - which is
-    // exactly what a row travelling under a settled focus does - fell through to a line that
-    // called `_retargetIndicator` with that same key again. The recursion was silent and
-    // total: nothing moved, because the innermost call re-entered at the same point and the
-    // stack ran out before any write happened. Measured on "close the middle window, focus
-    // lands on the next one": the row travelled 68 -> 34 and the bar did not move at all.
-    // Hand both ends a new target and let the two `Behavior`s carry them, asking NOTHING
-    // about identity.
-    //
-    // Every branch that wants to MOVE the bar arrives here, and it is deliberately this
-    // small. It is separate from `_retargetIndicator` because that function is gated on the
-    // key CHANGING - the gate decides whether to blink, and the position write sits inside
-    // the same `if` - so a caller whose key is already committed cannot use it. Every attempt
-    // to do so passed `"moving:" + focusedWindowKey`, fell through the gate, and came back
-    // to the branch that had asked.
-    //
-    // It is also why this writes all three properties unconditionally rather than following
-    // the layout per frame. The target here is the frame's own - `focusedRowIndex * rowPitch`
-    // - which changes only when the index does, so the writes are discrete events a
-    // `Behavior` can ease. Re-aiming at a per-frame quantity (`liveRowTop`, `rowLift`)
-    // restarts the easing from the current value on every frame, which holds the mark at its
-    // start; that was measured here, and it is why the per-frame subscription is gone.
-    function _aimIndicator(top) {
-        return   // the marker owns the position now - see `SelectionMarker`
-        if (!isFinite(top))
-            return
-        if (Math.abs(top - _anchorY) < 0.5)
-            return
-        _pendingTop = -1
-        _anchorY = top
-        // The head is aimed at the card; the TAIL IS NOT WRITTEN. Writing both is what
-        // removed the trail: a wake is the tail lagging the head, and two ends handed the
-        // same target on the same tick have nothing left to lag behind.
-        _headY = top
-    }
-
-    // Is a row on the ACTIVE column travelling out of a reorder right now? Asked of the
-    // strip because that is where the travel lives, and asked as its own property so this
-    // file reads one flag rather than reaching into a column's items.
-    readonly property bool _rowsTravelling: strip.rowsTransitioning
-    // The rendered index just fell while a slot is still closing: the layout settling, not
-    // the mark moving. A step like that must be travelled, and it takes no trail.
-    property bool _settlingIndex: false
-    // THE SETTLE WINDOW, latched from the event rather than guessed from a flag.
-    //
-    // `_settlingIndex` asks `rowsTransitioning` at the moment the index changes, which is a
-    // different question and can answer either way depending on whether the departing
-    // record has already been dropped: false there means the step is still held in
-    // `_pendingTop` and the head sits on its old target, true means a plain focus step gets
-    // its tail shortened. This is opened by the index FALLING while the focused window is
-    // unchanged - which is exactly a departing slot being removed under a settled focus -
-    // and closed when the frame's own glide lands.
 
     // Apply a drift that landed mid-trail, once the tail has caught up. The widget's
     // `_edgePendingCenterX` timer, and for the same reason: it waits on the TAIL rather
@@ -2266,15 +1913,7 @@ Item {
                 return
             var pending = root._pendingTop
             root._pendingTop = -1
-            // A held target that belongs to a moving row is RE-AIMED, not cut. The snap is
-            // this timer's answer to content churn - a drift that arrived while a trail was
-            // open - and it is the right one there because nothing is moving any more. A
-            // reorder is the opposite: the row is still travelling, so cutting to where it
-            // was when the target was taken is a jump. See the note in `_retargetIndicator`.
-            if (root._rowsTravelling || root._frameStep > 1.5)
-                root._retargetIndicator(pending, "moving:" + root.focusedWindowKey, false)
-            else
-                root._snapIndicator(pending)
+            root._snapIndicator(pending)
         }
     }
 
@@ -2490,16 +2129,6 @@ Item {
     // A border-only rectangle still has a position and a height, and those are exactly
     // what says which card is lit - so the tint cannot be a second opinion about where
     // the focus is, because it is read off the same rectangle the user can see moving.
-    // THE MARK'S ONE POSITION. Both drawings below read it; nothing else writes it.
-    SelectionMarker {
-        id: marker
-        anchor: strip.focusedAnchor
-    }
-    // Read by the offscreen probes that verify this file's motion; they have no id into it.
-    readonly property alias markerPosition: marker.position
-    readonly property alias markerTail: marker.tail
-    readonly property alias markerMode: marker.mode
-
     Rectangle {
         id: focusFrame
         objectName: "windowHintFocusFrame"
@@ -2534,28 +2163,8 @@ Item {
         // position: anchor minus scroll, with no `Behavior` of its own. A `Behavior`
         // here would chase a target the reveal scroll rewrites every tick and pin
         // the frame until the scroll lands - see `_frameAnchorY`.
-        // The anchor minus the viewport's scroll, and NOT `rowLift`.
-        //
-        // `rowLift` is the sum of the slots ABOVE the focused row being shorter than their
-        // pitch - which is what a collapsing row does to everything below it, and it is
-        // already in the anchor's own travel: `_frameAnchorY` is a pure function of the
-        // index, and `liveRowTop` is what adds the layout's offset to it. Subtracting it
-        // here as well meant a reorder moved the frame by the travel of the rows it crossed,
-        // on top of the glide that was already carrying it - measured, a four-row swap put
-        // the frame at 77.6 on the frame the index changed instead of starting from the 102
-        // it was drawn at.
-        // The card's own drawn top. Not an index eased toward a pitch: the card is already
-        // animating its own position, and the mark reading it means the two cannot disagree
-        // by a frame, by an easing, or by which of them decided the transition was over.
-        // The SAME number the bar's head is on. The outline and the bar are one mark drawn
-        // twice - the frame is its outline and the bar is the stroke beside it - so they are
-        // placed from one value rather than from two animations that have to agree. They did
-        // not: the frame glided toward the card on its own clock while the head was placed on
-        // it, and the two sat a whole row apart for the length of an exit.
-        // From the marker, which is the only thing that owns this number. `scrollOffset` is
-        // added back because the marker works in the host's own scrolled space.
         y: root._markerCrossing ? root.crossingTop
-            : marker.position - strip.scrollOffset
+            : root._frameAnchorY - strip.scrollOffset - strip.rowLift
         width: root._markerCrossing ? root.markerWidth : strip.activeCardWidth
         height: root.rowHeight
         // Drawn for the whole of an exit, so the outline is the thing the bar is seen to
@@ -2638,15 +2247,8 @@ Item {
         // same target. This is `_barTop` from a head that is pinned to the frame, so the
         // bar is the outline's own lower edge all the way across and the length is the
         // trail. See the indicator section at the top.
-        // The same marker, one `markerOffset` lower - the outline's lower edge and the bar
-        // are one stroke, and the trail is its length.
-        // The bar spans the two ends, whichever way round they are: the tail may be above
-        // the head on an upward move, and a rectangle drawn from `tail` alone would have a
-        // negative height there.
-        y: root._markerCrossing ? root._barTop
-            : Math.min(marker.position, marker.tail) - strip.scrollOffset
-        height: root._markerCrossing ? root._barLength
-            : root.indicatorLength + marker.trailLength
+        y: root._barTop
+        height: root._barLength
         // Drawn while the exit travels, for the reason at `markerDrawn`: the bar and the
         // outline are one mark, so they are drawn on one term and hidden on one tick.
         visible: root.markerDrawn
@@ -2742,35 +2344,7 @@ Item {
     // Named rather than written out because it has more than one caller, and one of them
     // had put the marker's own landing back on a negative row.
     function _restingY() {
-        // The SAME formula the frame's anchor uses, and it has to be: the bar is the
-        // outline's own lower edge, so the two cannot be built from different indices.
-        //
-        // The live index is where the row will REST (it does not count the holes); `rowLift`
-        // is what those holes still owe, asked at the rendered index. Their sum is where the
-        // row is DRAWN - verified against `slotTopAt` at every step of an exit, 68 -> 34.
-        //
-        // `_targetYFor(index)` alone is neither: aimed at the rendered index it counted the
-        // hole as a position and put the bar a pitch low, and aimed at the live index it
-        // dropped the holes' debt and left the bar still while its row travelled.
-        // The SAME target the focus frame is aimed at: `focusedRowIndex * rowPitch`, the
-        // rendered index. The frame and the bar mark one thing, so they are handed one
-        // number and each animates to it on its own clock - the frame on `_frameAnchorY`,
-        // the bar on `_headY`/`_tailY`.
-        //
-        // That index counts a departing row's slot, so when focus lands on the row AFTER a
-        // closing window it reads one high (`a bX c*` puts focus at 2 where the row rests at
-        // 1) and comes back down when the slot is dropped. The frame has always walked that
-        // sequence - 34 -> 68 -> 34 - and it is the behaviour the user holds up as correct.
-        // Aiming the bar at the live index instead held it still through the whole of it,
-        // because focus moving to the NEXT window leaves the live index unchanged at 1.
-        //
-        // What the bar must not do is take that number every frame: `liveRowTop` walks the
-        // slots' shortfalls, so it moves while the exit runs, and re-aiming a `Behavior` at a
-        // per-frame target restarts its easing from the current value sixty times a second.
-        // The target is therefore the frame's own - discrete, changing only when the index
-        // does - and the transitions between them are the two `Behavior`s below.
-        return root.hasTarget
-            ? root._targetYFor(root.focusedRowIndex)
+        return root.hasTarget ? root._targetYFor(root.focusedRowIndex)
             : root.noRowTop + strip.scrollOffset + root.markerOffset
     }
 
@@ -2963,16 +2537,6 @@ Item {
     }
 
     onFocusedRowIndexChanged: {
-        // Written BEFORE anything re-aims: the tail's `Behavior` reads it to choose its
-        // duration for this step.
-        root._settlingIndex = strip.rowsTransitioning
-        // How far the frame is being asked to travel, in rows - read by its glide to tell a
-        // reorder from a focus step, and written here because this is the turn the anchor
-        // moves on. See the note in the `Behavior`.
-        const shown = root._frameShownIndex
-        root._frameShownIndex = root.focusedRowIndex
-        root._frameStep = (shown < 0 || root.focusedRowIndex < 0)
-            ? 0 : Math.abs(root.focusedRowIndex - shown)
         // The tracker waits a turn, and the ordering is why. `_syncIndicator` reads
         // `hasTarget` and `focusedRowIndex`, both of which are derived from `activeColumn`
         // and `plan`; a change handler runs as soon as its own property is notified, which
@@ -2993,33 +2557,8 @@ Item {
     // that changes nothing about the row is driven by the crossing's own pin. Keyed on the
     // window, `focusedWindowKey` moves, and the one routine runs. Both hooks call it; the
     // second is a no-op when the first already ran.
-    onFocusedWindowKeyChanged: {
-        // A real focus step: the marked window changed, so the mark has somewhere to go
-        // while the card it is leaving stays where it is. The frame's glide is armed here
-        // because this is the one motion whose target jumps rather than slides.
-        root._followFrameCard(root._cardTop - root._frameCardY)
-        Qt.callLater(_syncIndicator)
-    }
+    onFocusedWindowKeyChanged: Qt.callLater(_syncIndicator)
     onHasTargetChanged: _syncIndicator()
-    // A ROW ARRIVING OR LEAVING MOVES THE MARK WITHOUT CHANGING ITS TARGET.
-    //
-    // The two hooks above fire on identity, and that is not enough on its own: focus landing
-    // on the row AFTER a closing window keeps the same window key, and the only thing that
-    // moves is the rendered index - 1 -> 2 as the departing slot is inserted ahead of it,
-    // then 2 -> 1 when the slot is dropped. The frame follows both steps because it is bound
-    // to that index; the bar has to be TOLD, or it sits on a target that no longer exists.
-    //
-    // Indexed on the rendered index and NOT on the layout's per-frame `rowLift`: the index
-    // changes twice per transition and each change is a relocation the two `Behavior`s
-    // should carry. `rowLift` changes sixty times a second, and re-aiming an animation that
-    // often restarts its easing from the current value every frame - a mark frozen at its
-    // start, which is a fault already measured here once.
-    Connections {
-        target: strip
-        function onFocusedRowIndexChanged() {
-            root._syncIndicator()
-        }
-    }
 
 
     Component.onCompleted: {

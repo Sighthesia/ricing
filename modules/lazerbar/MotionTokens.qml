@@ -134,23 +134,6 @@ QtObject {
     readonly property int windowRowStagger: 24
     readonly property real windowRowExitInset: 12
 
-    // A window REORDERED inside its workspace - moved a column or a row in niri - keeps
-    // its row and travels to the new one, so the list reads as the thing that moved
-    // rather than as two rows trading titles.
-    //
-    // One duration for the whole swap, because this is a DISPLACEMENT between two rows
-    // that are both on screen: the row leaving a place and the row taking it are the same
-    // gesture, so pacing them apart would read as two events.
-    //
-    // 320, not 240, and `OutQuint` rather than `OutCubic`. The curve is what makes this
-    // read as cards moving rather than as a slightly eased cut: `OutCubic` covers a fifth
-    // of the distance in the first frame and is effectively finished by two thirds, so a
-    // four-row swap looked like every row twitching into place. `OutQuint` is the shell's
-    // own primary ease and holds its start longer while still arriving decisively, and the
-    // extra 80ms is what lets the eye follow which row went where - this is the panel's
-    // slowest list motion on purpose, because it is the only one where two rows cross.
-    readonly property int windowRowMove: 320
-
     readonly property int controlCommit: 120
     readonly property int tooltipIn: 120
     readonly property int tooltipOut: 160

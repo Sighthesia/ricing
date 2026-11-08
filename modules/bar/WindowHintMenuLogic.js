@@ -75,13 +75,7 @@ function rowsFromList(list) {
             title: _trimmed(window.title),
             appId: _trimmed(window.appId),
             icon: _trimmed(window.icon),
-            isFocused: window.isFocused === true,
-            // The window's own place in the tiling, carried so a REORDER can be told
-            // apart from a row that was replaced. This list is already in that order, so
-            // the two agree at rest - they stop agreeing on the publish that moved
-            // something, which is the one this is for.
-            colIdx: _count(window.colIdx),
-            rowIdx: _count(window.rowIdx)
+            isFocused: window.isFocused === true
         })
     }
     return rows
