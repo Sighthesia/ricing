@@ -126,10 +126,44 @@ Item {
             return normalized
         if (normalized.charAt(0) === "." || normalized.charAt(0) === "/")
             return Qt.resolvedUrl(normalized)
+
+        // Try common aliases for fcitx/rime/tray icons
+        var candidates = []
+        var seen = {}
+        function push(v) {
+            var s = String(v || "").trim()
+            if (!s || seen[s])
+                return
+            seen[s] = true
+            candidates.push(s)
+        }
+        push(normalized)
+        var lower = normalized.toLowerCase()
+        if (lower !== normalized)
+            push(lower)
+        if (normalized === "fcitx_rime_latin") {
+            push("rime-latin")
+            push("fcitx-rime-latin")
+            push("fcitx_rime")
+            push("fcitx-rime")
+        } else if (normalized === "fcitx_rime_latin_upper") {
+            push("rime-latin-symbolic")
+            push("fcitx_rime_latin")
+            push("rime-latin")
+        } else if (normalized.indexOf("fcitx_rime") === 0) {
+            push(normalized.replace(/_/g, "-"))
+            push(normalized.replace("fcitx_", ""))
+        } else if (normalized.indexOf("fcitx-") === 0) {
+            push(normalized.replace(/-/g, "_"))
+        }
         // Use unchecked icon lookup with fallback to avoid theme-check failures
         // (e.g. Papirus) leaving StatusNotifier icons blank.
-        var path = Quickshell.iconPath(normalized, "application-x-executable")
-        return String(path || "")
+        for (var i = 0; i < candidates.length; i++) {
+            var path = Quickshell.iconPath(candidates[i], "application-x-executable")
+            if (path)
+                return String(path)
+        }
+        return String(Quickshell.iconPath(normalized, "application-x-executable") || "")
     }
 
     function normalizeTrayIconSource(source) {
@@ -467,23 +501,25 @@ Item {
                         IconImage {
                             id: glyph
 
-                            property string fallbackSource: Quickshell.iconPath("application-x-executable")
+                            readonly property string requestedSource: trayIcon.iconSource
+                            readonly property string fallbackSource: Quickshell.iconPath("application-x-executable")
                             property bool useFallback: false
+                            readonly property bool showFallback: useFallback || requestedSource === ""
                             x: (LazerTheme.barWidgetHeight - LazerTheme.barGlyphSize) / 2
                             y: (LazerTheme.barWidgetHeight - LazerTheme.barGlyphSize) / 2 + trayIcon.fall
                             width: LazerTheme.barGlyphSize
                             height: LazerTheme.barGlyphSize
                             asynchronous: true
                             backer.fillMode: Image.PreserveAspectFit
-                            source: useFallback ? fallbackSource : trayIcon.iconSource
-                            onSourceChanged: useFallback = false
+                            source: showFallback ? fallbackSource : requestedSource
+                            onRequestedSourceChanged: useFallback = false
                             onStatusChanged: {
-                                if (status === Image.Error && !useFallback && source !== fallbackSource)
+                                if (status === Image.Error && !useFallback && requestedSource !== "")
                                     useFallback = true
                             }
                             // Fall back to the default theme icon on load failure
-                            // instead of leaving a blank slot.
-                            opacity: trayIcon.ink * (status === Image.Ready || useFallback ? 1 : 0)
+                            // or missing source instead of leaving a blank slot.
+                            opacity: trayIcon.ink * (status === Image.Ready ? 1 : 0)
                         }
 
                         // --- Arrival: open the box, then fade the ink in. ---
@@ -653,18 +689,31 @@ Item {
                                 root.republishHoveredAnchor()
                         }
 
+                        // Confirm an accepted tray action over the slot.
+                        ClickFlash {
+                            id: trayIconFlash
+                            anchors.fill: parent
+                            radius: 4
+                        }
+
                         TapHandler {
                             objectName: "trayActivateTap"
                             acceptedButtons: Qt.LeftButton
                             gesturePolicy: TapHandler.ReleaseWithinBounds
-                            onTapped: if (trayIcon.liveItem) trayIcon.liveItem.activate()
+                            onTapped: {
+                                trayIconFlash.restart()
+                                if (trayIcon.liveItem) trayIcon.liveItem.activate()
+                            }
                         }
 
                         TapHandler {
                             objectName: "traySecondaryTap"
                             acceptedButtons: Qt.RightButton
                             gesturePolicy: TapHandler.ReleaseWithinBounds
-                            onTapped: if (trayIcon.liveItem) trayIcon.liveItem.secondaryActivate()
+                            onTapped: {
+                                trayIconFlash.restart()
+                                if (trayIcon.liveItem) trayIcon.liveItem.secondaryActivate()
+                            }
                         }
                     }
                 }

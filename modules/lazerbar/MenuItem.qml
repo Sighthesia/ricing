@@ -8,9 +8,9 @@ Rectangle {
     property bool enabled: true
     property bool current: false
     signal triggered
-    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
-    readonly property Item flashOverlayItem: flashOverlay
-    readonly property Animation flashAnimationItem: flashAnimation
+    readonly property bool flashActive: flash.flashActive
+    readonly property Item flashOverlayItem: flash.flashOverlayItem
+    readonly property Animation flashAnimationItem: flash.flashAnimationItem
 
     implicitWidth: 220
     implicitHeight: 36
@@ -28,12 +28,8 @@ Rectangle {
         Text { id: shortcutText; anchors.verticalCenter: parent.verticalCenter; text: root.shortcut; color: root.current ? LazerTheme.textMuted : "#85818A"; font.pixelSize: 11 }
     }
     function restartFlash() {
-        if (!root.enabled || MotionTokens.reducedMotion) {
-            flashAnimation.stop()
-            flashOverlay.opacity = 0
-            return
-        }
-        flashAnimation.restart()
+        if (root.enabled)
+            flash.restart()
     }
 
     function activate() {
@@ -48,33 +44,12 @@ Rectangle {
     Keys.onSpacePressed: root.activate()
 
     // Confirm an accepted menu action without changing the row's hit target.
-    Rectangle {
-        id: flashOverlay
+    ClickFlash {
+        id: flash
+
         z: 10
         anchors.fill: parent
         radius: root.radius
-        color: "white"
-        opacity: 0
-        enabled: false
-    }
-
-    NumberAnimation {
-        id: flashAnimation
-        target: flashOverlay
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-        running: false
-    }
-
-    Connections {
-        target: MotionTokens
-        function onReducedMotionChanged() {
-            if (MotionTokens.reducedMotion)
-                root.restartFlash()
-        }
     }
 
     TapHandler { enabled: root.enabled; onTapped: root.activate() }

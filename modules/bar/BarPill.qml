@@ -12,6 +12,17 @@ Item {
     signal rightClicked
     signal middleClicked
 
+    // Published for hosts and probes that want to read the wash.
+    readonly property bool flashActive: pillFlash.flashActive
+    readonly property Item flashOverlayItem: pillFlash.flashOverlayItem
+    readonly property Animation flashAnimationItem: pillFlash.flashAnimationItem
+
+    // Confirm an accepted activation. Every bar widget is built on this
+    // surface, so the wash lives here once instead of in each of them.
+    function restartFlash() {
+        pillFlash.restart()
+    }
+
     // Opt-in hover intent publication for two-layer popup.
     property bool hoverIntentEnabled: false
     signal popupRequested(var intent)
@@ -55,6 +66,15 @@ Item {
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
+    // Click wash over the pill surface, under the widget's own content so a
+    // glyph or a readout is never tinted by it.
+    ClickFlash {
+        id: pillFlash
+        z: 1
+        anchors.fill: parent
+        radius: 0
+    }
+
     HoverHandler {
         id: hoverHandler
         objectName: "pillHoverHandler"
@@ -66,7 +86,10 @@ Item {
         objectName: "pillPrimaryTapHandler"
         acceptedButtons: Qt.LeftButton
         gesturePolicy: TapHandler.ReleaseWithinBounds
-        onTapped: root.clicked()
+        onTapped: {
+            root.restartFlash()
+            root.clicked()
+        }
     }
 
     // Side buttons stay opt-in: pills without listeners simply ignore them.
@@ -74,6 +97,7 @@ Item {
         acceptedButtons: Qt.RightButton | Qt.MiddleButton
         gesturePolicy: TapHandler.ReleaseWithinBounds
         onTapped: (eventPoint, button) => {
+            root.restartFlash()
             if (button === Qt.RightButton) root.rightClicked()
             else root.middleClicked()
         }

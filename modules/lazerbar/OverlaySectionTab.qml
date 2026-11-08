@@ -28,9 +28,9 @@ Item {
     signal activated()
     signal moveRequested(int direction)
 
-    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
-    readonly property Item flashOverlayItem: flashOverlay
-    readonly property Animation flashAnimationItem: flashAnimation
+    readonly property bool flashActive: flash.flashActive
+    readonly property Item flashOverlayItem: flash.flashOverlayItem
+    readonly property Animation flashAnimationItem: flash.flashAnimationItem
     readonly property alias labelItem: labelText
     readonly property alias indicatorItem: indicator
     readonly property alias iconItem: iconImage
@@ -103,14 +103,11 @@ Item {
     }
 
     // Click flash, the shared recipe: an inert white overlay faded back out.
-    Rectangle {
-        id: flashOverlay
+    ClickFlash {
+        id: flash
         z: 1
         anchors.fill: parent
         radius: 0
-        color: LazerTheme.textPrimary
-        opacity: 0
-        enabled: false
     }
 
     // Selected state as a lazer strip, bottom-anchored so it underlines the tab
@@ -138,12 +135,7 @@ Item {
     }
 
     function restartFlash() {
-        if (!root.interactive || MotionTokens.reducedMotion) {
-            flashAnimation.stop()
-            flashOverlay.opacity = 0
-            return
-        }
-        flashAnimation.restart()
+        flash.restart()
     }
 
     function activate() {
@@ -154,24 +146,6 @@ Item {
         root.activated()
     }
 
-    NumberAnimation {
-        id: flashAnimation
-        target: flashOverlay
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-        running: false
-    }
-
-    Connections {
-        target: MotionTokens
-        function onReducedMotionChanged() {
-            if (MotionTokens.reducedMotion)
-                root.restartFlash()
-        }
-    }
 
     Keys.onPressed: event => {
         if (!root.interactive)

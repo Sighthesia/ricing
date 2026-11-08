@@ -242,27 +242,16 @@ Item {
                 }
 
                 // Unified click flash overlay per the settings-panel recipe.
-                Rectangle {
-                    id: flashOverlay
+                ClickFlash {
+                    id: flash
                     anchors.fill: parent
                     radius: surface.radius
-                    color: LazerTheme.textPrimary
-                    opacity: 0
                 }
 
-                NumberAnimation {
-                    id: flashAnimation
-                    target: flashOverlay
-                    property: "opacity"
-                    from: MotionTokens.clickFlashOpacity
-                    to: 0
-                    duration: MotionTokens.clickFlashDuration
-                    easing.type: MotionTokens.clickFlashEasing
-                }
 
                 function selectScheme() {
                     if (!settingsObject || settingsObject.themeScheme === modelData) return
-                    flashAnimation.restart()
+                    flash.restart()
                     settingsObject.themeScheme = modelData
                     if (saveCallback) saveCallback()
                 }

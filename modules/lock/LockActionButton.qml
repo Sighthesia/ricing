@@ -123,25 +123,14 @@ Item {
     }
 
     // Shared click flash: a flat overlay that never changes the hit target.
-    Rectangle {
-        id: flashOverlay
+    // The lock surface is painted from its own snapshot palette, so the wash
+    // takes this button's label colour rather than the shell's default ink.
+    Lazer.ClickFlash {
+        id: flash
         z: 10
         anchors.fill: parent
         radius: Lazer.LazerTheme.settingsChoiceRadius
         color: root.labelColor
-        opacity: 0
-        enabled: false
-    }
-
-    NumberAnimation {
-        id: flashAnimation
-        target: flashOverlay
-        property: "opacity"
-        from: Lazer.MotionTokens.clickFlashOpacity
-        to: 0
-        duration: Lazer.MotionTokens.clickFlashDuration
-        easing.type: Lazer.MotionTokens.clickFlashEasing
-        running: false
     }
 
     // Resolve one color role from the bar's snapshot, falling back to the live
@@ -157,10 +146,7 @@ Item {
     function activate(): void {
         if (!root.interactive)
             return
-        if (!Lazer.MotionTokens.reducedMotion)
-            flashAnimation.restart()
-        else
-            flashOverlay.opacity = 0
+        flash.restart()
         root.activated(root.actionId)
     }
 

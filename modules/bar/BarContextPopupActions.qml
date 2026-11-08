@@ -350,10 +350,20 @@ Item {
                     tint: LazerTheme.textPrimary
                 }
 
+                ClickFlash {
+                    id: backFlash
+                    anchors.fill: parent
+                    anchors.margins: 2
+                    radius: 6
+                }
+
                 HoverHandler { id: backHover; blocking: false }
                 TapHandler {
                     gesturePolicy: TapHandler.ReleaseWithinBounds
-                    onTapped: root.closePage()
+                    onTapped: {
+                        backFlash.restart()
+                        root.closePage()
+                    }
                 }
             }
 
@@ -608,12 +618,22 @@ Item {
                                 maximumLineCount: 1
                             }
 
+                            // Confirm the pick over the cell's whole face.
+                            ClickFlash {
+                                id: addCellFlash
+                                anchors.fill: parent
+                                radius: 6
+                            }
+
                             // The hover catcher is the whole cell, and the tap
                             // rides it: a cell has no separate control inside.
                             HoverHandler { id: addCellHover; blocking: false }
                             TapHandler {
                                 gesturePolicy: TapHandler.ReleaseWithinBounds
-                                onTapped: root.addWidgetById(addCell.modelData.id)
+                                onTapped: {
+                                    addCellFlash.restart()
+                                    root.addWidgetById(addCell.modelData.id)
+                                }
                             }
                         }
                     }

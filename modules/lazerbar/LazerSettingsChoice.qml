@@ -27,9 +27,9 @@ Item {
     readonly property real mainControlHeight: LazerTheme.settingsChoiceHeight
     readonly property Item headerItem: headerSurface
     readonly property Item surfaceItem: headerSurface
-    readonly property bool flashActive: headerFlashAnimation.running || headerFlashOverlay.opacity > 0
-    readonly property Item flashOverlayItem: headerFlashOverlay
-    readonly property Animation flashAnimationItem: headerFlashAnimation
+    readonly property bool flashActive: headerFlash.flashActive
+    readonly property Item flashOverlayItem: headerFlash.flashOverlayItem
+    readonly property Animation flashAnimationItem: headerFlash.flashAnimationItem
     readonly property alias chevronItem: chevron
     property int preselectIndex: -1
     signal valueSelected(string value)
@@ -94,12 +94,8 @@ Item {
     }
 
     function restartHeaderFlash() {
-        if (!root.effectiveEnabled || MotionTokens.reducedMotion) {
-            headerFlashAnimation.stop()
-            headerFlashOverlay.opacity = 0
-            return
-        }
-        headerFlashAnimation.restart()
+        if (root.effectiveEnabled)
+            headerFlash.restart()
     }
 
     function closeMenu() {
@@ -185,14 +181,11 @@ Item {
         Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
 
         // Confirm opening or committing the choice without owning input.
-        Rectangle {
-            id: headerFlashOverlay
+        ClickFlash {
+            id: headerFlash
             z: 1
             anchors.fill: parent
             radius: parent.radius
-            color: LazerTheme.textPrimary
-            opacity: 0
-            enabled: false
         }
 
         // Keep the field label and selected value inside the title surface.
@@ -340,26 +333,6 @@ Item {
                     }
                 }
             }
-        }
-    }
-
-    // Match the shared osu-style click flash timing for the choice header.
-    NumberAnimation {
-        id: headerFlashAnimation
-        target: headerFlashOverlay
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-        running: false
-    }
-
-    Connections {
-        target: MotionTokens
-        function onReducedMotionChanged() {
-            if (MotionTokens.reducedMotion)
-                root.restartHeaderFlash()
         }
     }
 

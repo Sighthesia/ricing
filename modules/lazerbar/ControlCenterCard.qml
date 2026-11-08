@@ -112,7 +112,7 @@ Item {
                                              - root.textInset - root.reservedBadgeWidth)
     readonly property real textBlockHeight: titleItem.implicitHeight + root.labelGap
                                             + summaryItem.implicitHeight
-    readonly property bool flashActive: cardFlashAnimation.running || cardFlashOverlay.opacity > 0
+    readonly property bool flashActive: cardFlash.flashActive
 
     implicitWidth: 240
     implicitHeight: root.contentPadding * 2 + Math.max(root.iconSize, root.textBlockHeight)
@@ -147,15 +147,12 @@ Item {
     }
 
     // Shared click flash: a textPrimary wash over the whole card. Played only by
-    // an accepted activation, never on its own.
-    Rectangle {
-        id: cardFlashOverlay
+    // an accepted activation, never on its own. Purely visual, so it never takes
+    // a pointer event from the content.
+    ClickFlash {
+        id: cardFlash
         z: 3
         anchors.fill: parent
-        color: LazerTheme.textPrimary
-        opacity: 0
-        // Purely visual: it must never take a pointer event from the content.
-        enabled: false
     }
 
     // Focus/hover ring as its own layer above the content, so an embedded control
@@ -310,33 +307,7 @@ Item {
     }
 
     function restartFlash() {
-        if (MotionTokens.reducedMotion) {
-            cardFlashAnimation.stop()
-            cardFlashOverlay.opacity = 0
-            return
-        }
-        cardFlashAnimation.restart()
-    }
-
-    // NumberAnimation.restart() sets `from` synchronously, so flashActive reads
-    // true on the click frame and a test never has to sample mid-decay.
-    NumberAnimation {
-        id: cardFlashAnimation
-        target: cardFlashOverlay
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-        running: false
-    }
-
-    Connections {
-        target: MotionTokens
-        function onReducedMotionChanged() {
-            if (MotionTokens.reducedMotion)
-                root.restartFlash()
-        }
+        cardFlash.restart()
     }
 
     // Observe the whole card without starving an embedded control (the volume
@@ -365,8 +336,8 @@ Item {
 
     readonly property Item surfaceItem: cardSurface
     readonly property Item highlightItem: cardHighlight
-    readonly property Item flashOverlayItem: cardFlashOverlay
-    readonly property Animation flashAnimationItem: cardFlashAnimation
+    readonly property Item flashOverlayItem: cardFlash.flashOverlayItem
+    readonly property Animation flashAnimationItem: cardFlash.flashAnimationItem
     readonly property Item iconItem: cardIcon
     readonly property Item titleItem: titleItem
     readonly property Item summaryItem: summaryItem

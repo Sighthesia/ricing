@@ -35,9 +35,9 @@ Item {
                                                                : hovered ? LazerTheme.hoverFill : "transparent"
     readonly property int transformDuration: pressed ? MotionTokens.instant : MotionTokens.fast
     property bool keyboardPressed: false
-    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
-    readonly property Item flashOverlayItem: flashOverlay
-    readonly property Animation flashAnimationItem: flashAnimation
+    readonly property bool flashActive: flash.flashActive
+    readonly property Item flashOverlayItem: flash.flashOverlayItem
+    readonly property Animation flashAnimationItem: flash.flashAnimationItem
 
     signal clicked
     signal keyboardActivated
@@ -91,12 +91,8 @@ Item {
     }
 
     function restartFlash() {
-        if (!root.enabled || MotionTokens.reducedMotion) {
-            flashAnimation.stop()
-            flashOverlay.opacity = 0
-            return
-        }
-        flashAnimation.restart()
+        if (root.enabled)
+            flash.restart()
     }
 
     function activate() {
@@ -141,33 +137,11 @@ Item {
     }
 
     // Confirm an accepted icon action without changing its hit target.
-    Rectangle {
-        id: flashOverlay
+    ClickFlash {
+        id: flash
         z: 10
         anchors.fill: parent
         radius: Math.min(width, height) / 2
-        color: "white"
-        opacity: 0
-        enabled: false
-    }
-
-    NumberAnimation {
-        id: flashAnimation
-        target: flashOverlay
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-        running: false
-    }
-
-    Connections {
-        target: MotionTokens
-        function onReducedMotionChanged() {
-            if (MotionTokens.reducedMotion)
-                root.restartFlash()
-        }
     }
 
     HoverHandler {

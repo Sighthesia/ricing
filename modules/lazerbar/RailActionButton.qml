@@ -39,9 +39,9 @@ Item {
 
     readonly property alias surfaceItem: actionSurface
     readonly property alias iconItem: actionIcon
-    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
-    readonly property Item flashOverlayItem: flashOverlay
-    readonly property Animation flashAnimationItem: flashAnimation
+    readonly property bool flashActive: flash.flashActive
+    readonly property Item flashOverlayItem: flash.flashOverlayItem
+    readonly property Animation flashAnimationItem: flash.flashAnimationItem
 
     enabled: root.interactive
     activeFocusOnTab: root.interactive
@@ -66,14 +66,11 @@ Item {
     }
 
     // Confirm the action without changing its input boundary.
-    Rectangle {
-        id: flashOverlay
+    ClickFlash {
+        id: flash
         z: 1
         anchors.fill: actionSurface
         radius: actionSurface.radius
-        color: LazerTheme.textPrimary
-        opacity: 0
-        enabled: false
     }
 
     // Icon centered in the painted surface, at the settings rail's 20px size.
@@ -112,12 +109,8 @@ Item {
     // No flash when it cannot be seen: reduced motion parks the overlay at zero
     // rather than leaving it wherever the last click reached.
     function restartFlash() {
-        if (!root.interactive || MotionTokens.reducedMotion) {
-            flashAnimation.stop()
-            flashOverlay.opacity = 0
-            return
-        }
-        flashAnimation.restart()
+        if (root.interactive)
+            flash.restart()
     }
 
     function activate() {
@@ -126,24 +119,5 @@ Item {
         root.forceActiveFocus()
         root.restartFlash()
         root.activated()
-    }
-
-    NumberAnimation {
-        id: flashAnimation
-        target: flashOverlay
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-        running: false
-    }
-
-    Connections {
-        target: MotionTokens
-        function onReducedMotionChanged() {
-            if (MotionTokens.reducedMotion)
-                root.restartFlash()
-        }
     }
 }

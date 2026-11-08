@@ -16,9 +16,9 @@ Item {
     property string category: "appearance"
     signal activated
     signal moveRequested(int direction)
-    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
-    readonly property Item flashOverlayItem: flashOverlay
-    readonly property Animation flashAnimationItem: flashAnimation
+    readonly property bool flashActive: flash.flashActive
+    readonly property Item flashOverlayItem: flash.flashOverlayItem
+    readonly property Animation flashAnimationItem: flash.flashAnimationItem
 
     implicitWidth: 184
     implicitHeight: 46
@@ -38,15 +38,12 @@ Item {
     }
 
     // Confirm category activation without changing the navigation item's bounds.
-    Rectangle {
-        id: flashOverlay
+    ClickFlash {
+        id: flash
         z: 1
         anchors.fill: parent
         anchors.margins: 2
         radius: 10
-        color: LazerTheme.textPrimary
-        opacity: 0
-        enabled: false
     }
 
     readonly property Item selectionIndicatorItem: root.sharedSelectionIndicator || selectionIndicator
@@ -122,12 +119,7 @@ Item {
     }
 
     function restartFlash() {
-        if (!root.interactive || MotionTokens.reducedMotion) {
-            flashAnimation.stop()
-            flashOverlay.opacity = 0
-            return
-        }
-        flashAnimation.restart()
+        flash.restart()
     }
 
     function activate() {
@@ -138,24 +130,6 @@ Item {
         root.activated()
     }
 
-    NumberAnimation {
-        id: flashAnimation
-        target: flashOverlay
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-        running: false
-    }
-
-    Connections {
-        target: MotionTokens
-        function onReducedMotionChanged() {
-            if (MotionTokens.reducedMotion)
-                root.restartFlash()
-        }
-    }
 
     Keys.onPressed: event => {
         if (!root.interactive)

@@ -21,9 +21,9 @@ Item {
     readonly property real effectiveAvailableWidth: isFinite(Number(availableWidth)) ? Math.max(0, Number(availableWidth)) : Infinity
     readonly property Item nubItem: capsule
     readonly property bool nubMorphEnabled: false
-    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
-    readonly property Item flashOverlayItem: flashOverlay
-    readonly property Animation flashAnimationItem: flashAnimation
+    readonly property bool flashActive: flash.flashActive
+    readonly property Item flashOverlayItem: flash.flashOverlayItem
+    readonly property Animation flashAnimationItem: flash.flashAnimationItem
 
     implicitWidth: 44
     implicitHeight: 20
@@ -49,12 +49,8 @@ Item {
     }
 
     function restartFlash() {
-        if (!root.effectiveEnabled || MotionTokens.reducedMotion) {
-            flashAnimation.stop()
-            flashOverlay.opacity = 0
-            return
-        }
-        flashAnimation.restart()
+        if (root.effectiveEnabled)
+            flash.restart()
     }
 
     Keys.onSpacePressed: event => { activate(); event.accepted = true }
@@ -76,34 +72,11 @@ Item {
     }
 
     // Confirm an accepted toggle without changing the capsule's input boundary.
-    Rectangle {
-        id: flashOverlay
+    ClickFlash {
+        id: flash
         z: 1
         anchors.fill: capsule
         radius: capsule.radius
-        color: LazerTheme.textPrimary
-        opacity: 0
-        enabled: false
-    }
-
-    // Match the shared osu-style click flash timing.
-    NumberAnimation {
-        id: flashAnimation
-        target: flashOverlay
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-        running: false
-    }
-
-    Connections {
-        target: MotionTokens
-        function onReducedMotionChanged() {
-            if (MotionTokens.reducedMotion)
-                root.restartFlash()
-        }
     }
 
     // Keep hover state local to the capsule so the parent row can observe it

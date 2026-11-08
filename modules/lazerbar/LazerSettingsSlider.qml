@@ -33,7 +33,7 @@ Item {
     readonly property bool defaultMarkerVisible: defaultValue !== undefined
     readonly property bool defaultMarkerAtValue: defaultValue !== undefined
                                                  && Math.abs(displayValue - normalized(defaultValue)) < Math.max(1e-9, Math.abs(Number(stepSize)) * 0.001)
-    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
+    readonly property bool flashActive: flash.flashActive
     readonly property bool bumpActive: bumpAnimation.running || root.bumpScale > 1
     property real bumpScale: 1
     signal valueModified(real value)
@@ -102,16 +102,15 @@ Item {
 
     function restartFlash() {
         if (!root.effectiveEnabled || MotionTokens.reducedMotion) {
-            flashAnimation.stop()
             bumpAnimation.stop()
-            flashOverlay.opacity = 0
+            flash.cancel()
             root.bumpScale = 1
             return
         }
         bumpAnimation.stop()
         root.bumpScale = MotionTokens.sliderTickBumpScale
         bumpAnimation.restart()
-        flashAnimation.restart()
+        flash.restart()
     }
 
     function increase() { if (effectiveEnabled) setValue(displayValue + stepSize) }
@@ -214,33 +213,18 @@ Item {
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }
 
-    // Flash the track once when a user action lands on a new discrete step.
-    // Tinted wash in both schemes so the tick reads as brightening; the
-    // overlay only covers the saturated fill, never the pale track.
-    Rectangle {
-        id: flashOverlay
+    // Flash the travelled fill once when a user action lands on a new discrete
+    // step. The wash covers only the saturated part of the track, never the pale
+    // remainder, so it reads as the value brightening rather than the control
+    // blinking.
+    ClickFlash {
+        id: flash
         z: 2
-        anchors.left: fillRect.left
-        anchors.top: fillRect.top
-        anchors.bottom: fillRect.bottom
-        width: fillRect.width
+        followItem: fillRect
         radius: trackRect.radius
         color: LazerTheme.flashWash
-        opacity: 0
 
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-    }
-
-    // Match osu's click flash: a 0.3 white overlay fading for 800ms with OutQuint.
-    NumberAnimation {
-        id: flashAnimation
-        target: flashOverlay
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-        running: false
     }
 
     // Add a restrained center-anchored bump without changing layout geometry.
@@ -360,8 +344,8 @@ Item {
 
     readonly property Item trackItem: trackRect
     readonly property Item trackFillItem: fillRect
-    readonly property Item flashOverlayItem: flashOverlay
-    readonly property Animation flashAnimationItem: flashAnimation
+    readonly property Item flashOverlayItem: flash.flashOverlayItem
+    readonly property Animation flashAnimationItem: flash.flashAnimationItem
     readonly property Animation bumpAnimationItem: bumpAnimation
     readonly property Item defaultMarkerItem: defaultMarker
     readonly property Item thumbLightItem: defaultMarkerAtValue ? defaultMarker : null

@@ -43,9 +43,9 @@ Item {
     readonly property real reservedResetWidth: root.hasDefault ? root.revertZoneWidth : 0
     readonly property real reservedResetGap: root.hasDefault ? root.revertContentGap : 0
     readonly property real cardBodyWidth: Math.max(0, root.width - root.reservedResetWidth)
-    readonly property bool flashActive: resetFlashAnimation.running || resetFlashOverlay.opacity > 0
-    readonly property Item flashOverlayItem: resetFlashOverlay
-    readonly property Animation flashAnimationItem: resetFlashAnimation
+    readonly property bool flashActive: resetFlash.flashActive
+    readonly property Item flashOverlayItem: resetFlash.flashOverlayItem
+    readonly property Animation flashAnimationItem: resetFlash.flashAnimationItem
     readonly property real labelControlGap: 5
     default property alias control: controlHost.children
     readonly property Item controlItem: controlHost.children.length > 0 ? controlHost.children[0] : null
@@ -288,12 +288,7 @@ Item {
     }
 
     function restartResetFlash() {
-        if (MotionTokens.reducedMotion) {
-            resetFlashAnimation.stop()
-            resetFlashOverlay.opacity = 0
-            return
-        }
-        resetFlashAnimation.restart()
+        resetFlash.restart()
     }
 
     Connections {
@@ -341,17 +336,14 @@ Item {
         }
 
         // Confirm a reset while keeping the pseudo-crescent surface geometry.
-        Rectangle {
-            id: resetFlashOverlay
+        ClickFlash {
+            id: resetFlash
             z: 1
             anchors.fill: parent
             topLeftRadius: 0
             topRightRadius: root.cardRadius
             bottomRightRadius: root.cardRadius
             bottomLeftRadius: 0
-            color: LazerTheme.textPrimary
-            opacity: 0
-            enabled: false
         }
 
         Image {
@@ -375,17 +367,6 @@ Item {
             Behavior on colorizationColor { ColorAnimation { duration: MotionTokens.fast } }
         }
 
-        // Match the shared osu-style click flash timing.
-        NumberAnimation {
-            id: resetFlashAnimation
-            target: resetFlashOverlay
-            property: "opacity"
-            from: MotionTokens.clickFlashOpacity
-            to: 0
-            duration: MotionTokens.clickFlashDuration
-            easing.type: MotionTokens.clickFlashEasing
-            running: false
-        }
 
         HoverHandler {
             id: revertHover

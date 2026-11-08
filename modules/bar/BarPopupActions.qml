@@ -1578,11 +1578,20 @@ Item {
                         font.bold: true
                     }
 
+                    ClickFlash {
+                        id: dndButtonFlash
+                        anchors.fill: parent
+                        radius: dndButton.radius
+                    }
+
                     HoverHandler { id: dndHover }
                     TapHandler {
                         objectName: "notificationDndTap"
                         gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: root.handleToggleDnd()
+                        onTapped: {
+                            dndButtonFlash.restart()
+                            root.handleToggleDnd()
+                        }
                     }
                 }
 
@@ -1604,11 +1613,20 @@ Item {
                         font.bold: true
                     }
 
+                    ClickFlash {
+                        id: clearButtonFlash
+                        anchors.fill: parent
+                        radius: clearButton.radius
+                    }
+
                     HoverHandler { id: clearHover }
                     TapHandler {
                         objectName: "notificationClearTap"
                         gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: root.handleClearNotifications()
+                        onTapped: {
+                            clearButtonFlash.restart()
+                            root.handleClearNotifications()
+                        }
                     }
                 }
             }
@@ -1897,12 +1915,21 @@ Item {
                         running: active
                     }
 
+                    ClickFlash {
+                        id: btRescanButtonFlash
+                        anchors.fill: parent
+                        radius: btRescanButton.radius
+                    }
+
                     HoverHandler { id: btRescanHover }
                     TapHandler {
                         objectName: "btRescanTap"
                         gesturePolicy: TapHandler.ReleaseWithinBounds
                         enabled: !root.btScanning
-                        onTapped: root.handleBluetoothRescan()
+                        onTapped: {
+                            btRescanButtonFlash.restart()
+                            root.handleBluetoothRescan()
+                        }
                     }
                 }
             }
@@ -2334,11 +2361,20 @@ Item {
                         font.bold: true
                     }
 
+                    ClickFlash {
+                        id: wifiForgetButtonFlash
+                        anchors.fill: parent
+                        radius: wifiForgetButton.radius
+                    }
+
                     HoverHandler { id: forgetHover }
                     TapHandler {
                         objectName: "wifiForgetTap"
                         gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: root.handleForgetFailed()
+                        onTapped: {
+                            wifiForgetButtonFlash.restart()
+                            root.handleForgetFailed()
+                        }
                     }
                 }
 
@@ -2506,12 +2542,21 @@ Item {
                                 colorizationColor: LazerTheme.osuGreen
                             }
 
+                    ClickFlash {
+                        id: wifiPasswordPanelFlash
+                        anchors.fill: parent
+                        radius: wifiPasswordPanel.radius
+                    }
+
                             HoverHandler { id: connectHover; enabled: wifiPasswordConnect.enabled }
                             TapHandler {
                                 objectName: "wifiPasswordConnectTap"
                                 gesturePolicy: TapHandler.ReleaseWithinBounds
                                 enabled: wifiPasswordConnect.enabled
-                                onTapped: root.submitWifiPassword()
+                                onTapped: {
+                            wifiPasswordPanelFlash.restart()
+                            root.submitWifiPassword()
+                        }
                             }
                         }
 
@@ -2550,7 +2595,10 @@ Item {
                             TapHandler {
                                 objectName: "wifiPasswordCancelTap"
                                 gesturePolicy: TapHandler.ReleaseWithinBounds
-                                onTapped: root.cancelWifiPassword()
+                                onTapped: {
+                            wifiPasswordPanelFlash.restart()
+                            root.cancelWifiPassword()
+                        }
                             }
                         }
                     }
@@ -2697,12 +2745,21 @@ Item {
                         }
                     }
 
+                    ClickFlash {
+                        id: wifiRescanButtonFlash
+                        anchors.fill: parent
+                        radius: wifiRescanButton.radius
+                    }
+
                     HoverHandler { id: rescanHover }
                     TapHandler {
                         objectName: "wifiRescanTap"
                         gesturePolicy: TapHandler.ReleaseWithinBounds
                         enabled: !root.wifiScanning && !root.wifiConnecting
-                        onTapped: root.handleWifiRescan()
+                        onTapped: {
+                            wifiRescanButtonFlash.restart()
+                            root.handleWifiRescan()
+                        }
                     }
                 }
             }

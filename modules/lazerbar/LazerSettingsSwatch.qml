@@ -26,7 +26,7 @@ Item {
     readonly property int currentIndex: indexOf(currentValue)
     readonly property bool focusVisible: activeFocus
     readonly property bool hovered: stripHover.hovered
-    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
+    readonly property bool flashActive: flash.flashActive
     signal valueModified(string value)
 
     readonly property real chipSize: 22
@@ -83,13 +83,12 @@ Item {
     }
 
     function restartFlash() {
-        if (!root.effectiveEnabled || MotionTokens.reducedMotion) {
-            flashAnimation.stop()
-            flashOverlay.opacity = 0
+        if (!root.effectiveEnabled)
             return
-        }
-        flashOverlay.x = root.currentIndex >= 0 ? root.currentIndex * (chipSize + chipGap) : 0
-        flashAnimation.restart()
+        // The wash sits over the chip that was just chosen, so it has to move
+        // before it starts fading.
+        flash.x = root.currentIndex >= 0 ? root.currentIndex * (chipSize + chipGap) : 0
+        flash.restart()
     }
 
     Keys.onLeftPressed: event => { step(-1); event.accepted = true }
@@ -202,37 +201,14 @@ Item {
     }
 
     // Confirm an accepted pick without changing any chip's input boundary.
-    Rectangle {
-        id: flashOverlay
+    ClickFlash {
+        id: flash
 
         z: 2
         y: 0
         width: root.chipSize
         height: root.chipSize
         radius: root.chipRadius
-        color: LazerTheme.textPrimary
-        opacity: 0
-        enabled: false
-    }
-
-    // Match the shared osu-style click flash timing.
-    NumberAnimation {
-        id: flashAnimation
-        target: flashOverlay
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-        running: false
-    }
-
-    Connections {
-        target: MotionTokens
-        function onReducedMotionChanged() {
-            if (MotionTokens.reducedMotion)
-                root.restartFlash()
-        }
     }
 
     // Observe the whole strip so the host row can share the hover highlight.

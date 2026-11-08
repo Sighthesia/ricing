@@ -22,8 +22,8 @@ Rectangle {
 
     signal activated(string windowId)
 
-    readonly property alias rowFlashAnimation: rowFlash
-    readonly property alias rowFlashOverlay: rowFlashOverlay
+    readonly property Animation rowFlashAnimation: rowFlash.flashAnimationItem
+    readonly property Item rowFlashOverlay: rowFlash.flashOverlayItem
 
     radius: 6
     transformOrigin: Item.Center
@@ -107,24 +107,11 @@ Rectangle {
     }
 
     // Click flash, inert to input so it cannot swallow the tap.
-    Rectangle {
-        id: rowFlashOverlay
+    ClickFlash {
+        id: rowFlash
         objectName: "windowHintRowFlash"
         anchors.fill: parent
         radius: 6
-        color: LazerTheme.textPrimary
-        opacity: 0
-        enabled: false
-    }
-
-    NumberAnimation {
-        id: rowFlash
-        target: rowFlashOverlay
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
     }
 
     HoverHandler { id: rowHover; blocking: false }
@@ -132,10 +119,7 @@ Rectangle {
         id: rowPress
         gesturePolicy: TapHandler.ReleaseWithinBounds
         onTapped: {
-            if (MotionTokens.reducedMotion)
-                rowFlashOverlay.opacity = 0
-            else
-                rowFlash.restart()
+            rowFlash.restart()
             root.activated(root.record ? root.record.windowId : "")
         }
     }

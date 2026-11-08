@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import "../../services" as Services
 
 // Present one transient notification as a lazer-style toast. The surface is a
 // component-level 6px card over theme tokens: app-name header, summary title,
@@ -27,10 +28,15 @@ Item {
     // names fall back to the generic executable icon like WindowHintService.
     readonly property string resolvedIcon: {
         const src = root.iconSource
-        if (src === "" || src.indexOf("/") === 0 || src.indexOf(":") >= 0)
+        if (src === "")
+            return ""
+        if (src.indexOf("/") === 0 || src.indexOf(":") >= 0)
             return src
-        return Quickshell.iconPath(src, "application-x-executable")
+        return Services.WindowHintService.iconPathForApp(src)
     }
+    readonly property string fallbackIcon: Quickshell.iconPath("application-x-executable")
+    property bool iconLoadFailed: false
+    onResolvedIconChanged: iconLoadFailed = false
     property bool openState: false
     property bool closing: false
     readonly property bool reducedMotion: MotionTokens.reducedMotion
@@ -310,12 +316,16 @@ Item {
 
                 Image {
                     anchors.centerIn: parent
-                    visible: root.resolvedIcon !== ""
-                    source: root.resolvedIcon
+                    visible: root.resolvedIcon !== "" || root.iconLoadFailed
+                    source: root.iconLoadFailed ? root.fallbackIcon : root.resolvedIcon
                     width: 24
                     height: 24
                     fillMode: Image.PreserveAspectFit
                     asynchronous: true
+                    onStatusChanged: {
+                        if (status === Image.Error && !root.iconLoadFailed)
+                            root.iconLoadFailed = true
+                    }
                 }
             }
 
@@ -464,22 +474,10 @@ Item {
                             }
 
                             // Shared click-flash recipe from the settings authority.
-                            Rectangle {
+                            ClickFlash {
                                 id: actionFlash
                                 anchors.fill: parent
                                 radius: parent.radius
-                                color: LazerTheme.textPrimary
-                                opacity: 0
-                            }
-
-                            NumberAnimation {
-                                id: actionFlashAnim
-                                target: actionFlash
-                                property: "opacity"
-                                from: MotionTokens.clickFlashOpacity
-                                to: 0
-                                duration: MotionTokens.clickFlashDuration
-                                easing.type: MotionTokens.clickFlashEasing
                             }
 
                             MouseArea {
@@ -487,8 +485,7 @@ Item {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 onClicked: {
-                                    if (!root.reducedMotion)
-                                        actionFlashAnim.restart()
+                                    actionFlash.restart()
                                     root.actionRequested(actionButton.modelData.identifier)
                                     root.requestClose(true)
                                 }

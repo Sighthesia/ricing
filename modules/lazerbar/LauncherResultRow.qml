@@ -33,6 +33,7 @@ Item {
     readonly property bool hidden: slotEmpty || searchHidden || categoryHidden
 
     readonly property string iconSource: result && result.icon ? String(result.icon) : ""
+    readonly property string fallbackIconSource: Quickshell.iconPath("application-x-executable")
     property bool iconFailed: false
     property int iconReloadToken: 0
     property int iconRetryRevision: 0
@@ -132,9 +133,9 @@ Item {
     // Exposed for probes/tests to inspect thumbnail load state.
     readonly property alias thumbnailItem: thumbImage
 
-    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
-    readonly property Item flashOverlayItem: flashOverlay
-    readonly property Animation flashAnimationItem: flashAnimation
+    readonly property bool flashActive: flash.flashActive
+    readonly property Item flashOverlayItem: flash.flashOverlayItem
+    readonly property Animation flashAnimationItem: flash.flashAnimationItem
     readonly property bool closing: _closing
 
     property bool _closing: false
@@ -387,7 +388,7 @@ Item {
         // less than the stall it routes around.
         Image {
             id: iconImage
-            visible: root.iconSource.length > 0 && !root.iconFailed && !thumbImage.visible
+            visible: (root.iconSource.length > 0 || root.iconFailed) && !thumbImage.visible
             anchors.left: parent.left
             // (railWidth - iconSize) / 2 keeps the icon horizontally
             // centered inside the 40px rail block.
@@ -395,11 +396,13 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             width: 28
             height: 28
-            source: root.iconReloadToken % 2 === 0 ? root.iconSource : ""
+            source: root.iconFailed
+                    ? root.fallbackIconSource
+                    : (root.iconReloadToken % 2 === 0 ? root.iconSource : "")
             fillMode: Image.PreserveAspectFit
             asynchronous: false
             onStatusChanged: {
-                if (status === Image.Error && root.iconSource.length > 0) {
+                if (status === Image.Error && !root.iconFailed && root.iconSource.length > 0) {
                     root.iconFailed = true
                     root.iconLoadFailed(String(root.result == null ? "" : root.result.id))
                 }
@@ -491,35 +494,16 @@ Item {
         }
 
         // Click-flash overlay above content.
-        Rectangle {
-            id: flashOverlay
+        ClickFlash {
+            id: flash
             z: 2
             anchors.fill: parent
             radius: 6
-            color: LazerTheme.textPrimary
-            opacity: 0
-            enabled: false
         }
-    }
-
-    NumberAnimation {
-        id: flashAnimation
-        target: flashOverlay
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-        running: false
     }
 
     function restartFlash() {
-        if (MotionTokens.reducedMotion) {
-            flashAnimation.stop()
-            flashOverlay.opacity = 0
-            return
-        }
-        flashAnimation.restart()
+        flash.restart()
     }
 
     // Activate per the panel-exit contract: report this card's window-space

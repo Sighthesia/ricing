@@ -97,6 +97,15 @@ Item {
         }
     }
 
+    // Confirm an accepted command. Above the row's own label and glyph so the
+    // whole row answers the click, but inert so it never takes the tap.
+    ClickFlash {
+        id: flash
+        z: 2
+        anchors.fill: parent
+        radius: 6
+    }
+
     HoverHandler {
         id: rowHover
         enabled: root.enabled
@@ -106,6 +115,9 @@ Item {
     TapHandler {
         gesturePolicy: TapHandler.ReleaseWithinBounds
         enabled: root.enabled
-        onTapped: root.activated()
+        onTapped: {
+            flash.restart()
+            root.activated()
+        }
     }
 }

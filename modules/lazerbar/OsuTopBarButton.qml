@@ -17,9 +17,9 @@ Item {
     property bool forceHoverForTest: false
     property bool keyboardPressed: false
     property bool tooltipRequested: false
-    readonly property bool flashActive: flashAnimation.running || flashOverlay.opacity > 0
-    readonly property Item flashOverlayItem: flashOverlay
-    readonly property Animation flashAnimationItem: flashAnimation
+    readonly property bool flashActive: flash.flashActive
+    readonly property Item flashOverlayItem: flash.flashOverlayItem
+    readonly property Animation flashAnimationItem: flash.flashAnimationItem
 
     readonly property color backgroundColor: isActive ? LazerTheme.osuButtonActive
                                                       : hovered ? LazerTheme.osuButtonHover : "transparent"
@@ -40,12 +40,7 @@ Item {
 
     // Flash with the shared click-flash contract used across the project.
     function restartFlash() {
-        if (!root.enabled || MotionTokens.reducedMotion) {
-            flashAnimation.stop()
-            flashOverlay.opacity = 0
-            return
-        }
-        flashAnimation.restart()
+        flash.restart()
     }
     function activate() {
         if (!enabled) return
@@ -113,32 +108,11 @@ Item {
     }
 
     // Flash above all button content without replacing the button.
-    Rectangle {
-        id: flashOverlay
+    ClickFlash {
+        id: flash
         anchors.fill: parent
         z: 10
         radius: 6
-        color: "white"
-        opacity: 0
-        enabled: false
-    }
-    NumberAnimation {
-        id: flashAnimation
-        target: flashOverlay
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-        running: false
-    }
-
-    Connections {
-        target: MotionTokens
-        function onReducedMotionChanged() {
-            if (MotionTokens.reducedMotion)
-                root.restartFlash()
-        }
     }
     Timer { id: tooltipDelay; interval: 200; onTriggered: if (root.hovered && !root.isActive) root.tooltipRequested = true }
     HoverHandler { id: hoverHandler; enabled: root.enabled }
