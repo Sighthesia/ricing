@@ -113,27 +113,6 @@ QtObject {
     // Per-position cascade step for a batch of tray icons.
     readonly property int trayIconStagger: 24
 
-    // Window rows in the mod-key hint's list, entering and leaving. The SAME
-    // recipe as a tray icon's slot - a slot that opens before its ink lands and
-    // closes only once the ink is gone - because it is the same event at a
-    // different size: one identity arriving in, or leaving, a strip of peers.
-    //
-    // The slot is the row's HEIGHT, not its width: this list runs down a column,
-    // so an exiting row's slot collapses, and every row below it rides up on the
-    // collapsing height rather than being pushed by a second animation.
-    // `windowRowExitInset` is the row drawing itself inwards as it goes, the way
-    // the tray icon drops - the same "leave along its own axis" shape.
-    //
-    // The exit height is the slower of the two, and InQuad: it starts gently and
-    // commits, so the ink is already dissolving while the gap is closing and the
-    // row below never crosses a half-drawn card.
-    readonly property int windowRowEnter: 100
-    readonly property int windowRowEnterInk: 140
-    readonly property int windowRowExit: 240
-    readonly property int windowRowExitInk: 200
-    readonly property int windowRowStagger: 24
-    readonly property real windowRowExitInset: 12
-
     readonly property int controlCommit: 120
     readonly property int tooltipIn: 120
     readonly property int tooltipOut: 160

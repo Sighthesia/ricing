@@ -1,7 +1,6 @@
 import QtQuick
 import "../lazerbar"
 import "./WindowHintMenuLogic.js" as HintLogic
-import "./WindowHintRowMotion.js" as RowMotion
 
 // One strip of workspace columns and nothing else: a run of consecutive
 // workspaces, left to right, the active one among them.
@@ -341,171 +340,7 @@ Item {
             root.contentHeight = tallest
     }
 
-    // Synchronously, not deferred: the body's `focusedRowIndex` is read off `activeRows`,
-    // and a turn's worth of staleness there would place the markers against the list the
-    // previous publish left behind - which is the same one-frame lag that made the
-    // tracker read the previous row's target.
-    onColumnsChanged: {
-        root.reconcileAllRows()
-        Qt.callLater(remeasureHeight)
-    }
-
-    // --- rows entering and leaving ------------------------------------------
-    // `columns` is what the SNAPSHOT says a column holds, replaced wholesale on every
-    // publish - so a window closing is a row that simply stops being there, and there
-    // is nothing left to animate. The rows this strip actually paints are therefore
-    // kept here, one list per workspace position, and reconciled against the snapshot
-    // instead of being replaced by it: `WindowHintRowMotion` returns the union of what
-    // was on screen and what has arrived, each entry carrying the phase it is in and the
-    // values its own animation has reached. That file's header is where the reasoning
-    // for data-rather-than-item state lives, and it is a Quickshell fact rather than a
-    // preference: a `Repeater` over a JS array rebuilds every delegate when the array is
-    // reassigned.
-    //
-    // Keyed by workspace POSITION and not by column index, because a column's index on a
-    // strip mid-crossing is the slot it happens to occupy - and a crossing renumbers
-    // those. The position is what a column is FOR, so it is what its rows belong to.
-    property var rowsByPosition: ({})
-    // The workspace whose rows the markers are placed against: the arriving frame's, so
-    // `activeRows` is the list the focus frame and the bar are reading.
-    readonly property var activeRows: root.rowsByPosition[root.activePosition] || []
-    // Is a row arriving or leaving anywhere in the active column? The body asks this to
-    // decide whether its markers may be placed by the plain pitch or have to follow the
-    // layout, and it is asked of the records because the items are the half that is
-    // rebuilt.
-    readonly property bool rowsTransitioning: {
-        root.rowRevision
-        return RowMotion.anyMoving(root.activeRows)
-    }
-
-    // The strip's own columns, as objects: what is actually on the strip right now, rather
-    // than what the model says should be. Readable from outside this file because a
-    // column's rows live inside a `Repeater`, where an id is file-scoped and nothing can
-    // reach them - and "what is this column painting" is the one question a diagnostic
-    // cannot answer from the snapshot.
-    readonly property var columnItems: {
-        var items = []
-        for (var i = 0; i < columnRepeater.count; ++i) {
-            var item = columnRepeater.itemAt(i)
-            if (item)
-                items.push(item)
-        }
-        return items
-    }
-
-    function reconcileAllRows() {
-        var previous = root.rowsByPosition || ({})
-        var next = ({})
-        for (var i = 0; i < root.columns.length; ++i) {
-            var column = root.columns[i]
-            if (!column || column.position === undefined)
-                continue
-            var key = String(column.position)
-            next[key] = RowMotion.reconcileRows(previous[key], column.rows || [],
-                MotionTokens.windowRowStagger)
-        }
-        // Positions the strip no longer carries keep nothing: a workspace that left the
-        // run is not on screen, and holding its rows would be state waiting to be wrong
-        // when that position comes back into view with different windows.
-        root.rowsByPosition = next
-    }
-
-    // Drop a row whose exit has played. Called by the row itself, because the thing that
-    // knows when its own animation finished is the thing that says so.
-    function retireRow(position, rowKey) {
-        var key = String(position)
-        var list = root.rowsByPosition[key]
-        if (!list)
-            return
-        var kept = []
-        for (var i = 0; i < list.length; ++i) {
-            if (String(list[i].key) !== String(rowKey))
-                kept.push(list[i])
-        }
-        if (kept.length === list.length)
-            return
-        var next = ({})
-        for (var p in root.rowsByPosition)
-            next[p] = root.rowsByPosition[p]
-        next[key] = kept
-        root.rowsByPosition = next
-        // A row leaving changes the scroll range, and an offset past the new end would
-        // paint the list a row higher than it is.
-        if (key === String(root.activePosition))
-            root.clampScroll()
-    }
-
-    // How far the rows ABOVE `index` are short of their resting pitch, in pixels: a
-    // collapsing or opening slot changes the offset of everything below it, and the
-    // focus markers are placed against the rows, not against the pitch. Read from the
-    // records' live `presence`, so it is exact at every frame of a transition rather than
-    // only at its ends.
-    function rowLiftFor(index) {
-        return RowMotion.liftAt(root.activeRows, index, root.rowHeight, root.listSpacing)
-    }
-    // The same number for the focused row, which is what the body's markers subtract.
-    //
-    // `rowRevision` is read for its DEPENDENCY and for nothing else: `activeRows` is a JS
-    // array, and mutating a record's `presence` inside it notifies nobody - so a binding
-    // that only read the array would compute the lift once and hold it while the slots
-    // moved. Every row bumps this when it moves, which is what makes `rowLift` a live
-    // function of the layout rather than of the last publish.
-    //
-    // NOTHING ELSE LISTENS TO IT, deliberately. The body's markers subtract `rowLift` where
-    // they are DRAWN, exactly as they already subtract the viewport's scroll - so a slot
-    // closing under them moves the mark on the same frame, and the tracker is never told
-    // the layout moved. It was told, for one round: a handler on this counter re-snapped
-    // both ends of the indicator, which on a workspace switch's row transition ran every
-    // frame and closed the wake before it could open. That is the report - "the indicator
-    // teleports instead of moving, no trail" - and it was the handler, not the animation.
-    property int rowRevision: 0
-    readonly property real rowLift: {
-        root.rowRevision
-        return root.rowLiftFor(root.focusedRowIndex)
-    }
-    readonly property int focusedRowIndex: {
-        var list = root.activeRows
-        for (var i = 0; i < list.length; ++i) {
-            if (list[i] && list[i].isFocused === true)
-                return i
-        }
-        return -1
-    }
-
-    // The rendered top edge of the row at `index`, in the strip's scrolled space. ONE
-    // place the layout offset caused by mid-flight rows is added up, so the body does not
-    // re-derive it and cannot disagree with where the row is drawn.
-    function liveRowTop(index) {
-        return index * root.rowPitch - root.rowLiftFor(index) - root.scrollOffset
-    }
-
-    // Nothing needs an exit animation while the surface is off screen, and the state this
-    // leaves behind is exactly a resting panel. The hint body is a persistent object that
-    // is shown and hidden with the popup, so a row that was mid-exit when the panel closed
-    // would otherwise still be sitting in `rowsByPosition` the next time it opens.
-    function flushRows() {
-        var next = ({})
-        for (var position in root.rowsByPosition) {
-            var list = root.rowsByPosition[position]
-            var kept = []
-            for (var i = 0; i < list.length; ++i) {
-                var record = list[i]
-                if (record.phase === "exit")
-                    continue
-                record.phase = "live"
-                record.delayMs = 0
-                record.presence = 1
-                record.ink = 1
-                record.started = true
-                kept.push(record)
-            }
-            next[position] = kept
-        }
-        root.rowsByPosition = next
-        root.clampScroll()
-    }
-
-    onVisibleChanged: if (!visible) root.flushRows()
+    onColumnsChanged: Qt.callLater(remeasureHeight)
 
     // The scroll range, not the panel height, is what decides whether an offset is still
     // legal - and it is the one that changes when a crossing brings a shorter list.
@@ -516,16 +351,7 @@ Item {
     // only listened for the height would leave the list scrolled 238px past its own
     // end. It showed as two unrelated faults - a stale offset in one test, and a click
     // that landed on a row the previous test had scrolled out of the panel in another.
-    onMaxScrollOffsetChanged: {
-        // The outstanding reveal first: a range that has just grown is a new answer to the
-        // question it asked, and clamping an offset it is about to set would be work done
-        // in the wrong order.
-        if (root._revealIndex >= 0) {
-            root._applyReveal()
-            return
-        }
-        root.clampScroll()
-    }
+    onMaxScrollOffsetChanged: clampScroll()
 
     // The active column's own full height, unclamped. This is what the scroll range is
     // measured against, so it has to be the content and not the viewport.
@@ -587,12 +413,6 @@ Item {
             // the active column. The neighbours are capped by the logic and drawn
             // whole, which is why they need no clip.
             clip: stripColumn.isActiveSlot
-            // The column's height is what its slots MEASURE, which is now a continuous
-            // number rather than a row count: a slot opening or closing changes it a frame
-            // at a time, so the panel and the rows below a transition travel on the same
-            // value and there is nothing left for a second animation to catch up on. It
-            // also means the drop of a spent row does not change the height at all - a slot
-            // is already zero by the time it is removed.
             height: stripColumn.isActiveSlot
                 ? Math.min(contentColumn.implicitHeight, root.viewportHeight)
                 : contentColumn.implicitHeight
@@ -611,159 +431,258 @@ Item {
             // different widths on a frame where the column is mid-resize.
             readonly property real cardWidth: Math.max(
                 0, stripColumn.width - root.cellPaddingX * 2)
-            // The rows this column PAINTS, which is not the same list as the one the
-            // snapshot hands it: a window that closed is still here until its exit has
-            // played. Read off the strip's reconcile map, keyed by workspace position, so
-            // a crossing renumbering the slots cannot hand this column another
-            // workspace's rows.
-            readonly property var rowList: root.rowsByPosition[stripColumn.modelData.position]
-                || []
-            // The workspace this column is for, as the string the reconcile map is keyed
-            // on - and the object that holds its slots. Published for the same reason
-            // `columnItems` is: a diagnostic has to be able to ask a column what it is
-            // drawing.
-            readonly property string positionKey: String(stripColumn.modelData.position)
-            property alias columnBody: contentColumn
-
-            // Where the slot at `index` starts, in the column's own space. THE running sum,
-            // and the only one: a row's place is what every slot above it measures. Rows are
-            // then placed by their own `y` rather than by a positioner, so a height that
-            // changes on a frame moves everything below it on that same frame.
-            //
-            // `presence` is the slot's own 0-to-1, and `presence * pitch` is its height, so
-            // the sum is over exactly the numbers the animations drive.
-            function slotTopAt(index) {
-                // The revision is read for its DEPENDENCY: a record's `presence` is a field
-                // of a plain object, so a slot closing notifies nothing, and a binding that
-                // only summed the array would be evaluated once and then hold every row at
-                // the position it had on the frame it was created.
-                root.rowRevision
-                var top = 0
-                var list = stripColumn.rowList
-                for (var i = 0; i < index && i < list.length; ++i) {
-                    var presence = list[i] && list[i].presence !== undefined
-                        ? Number(list[i].presence) : 1
-                    if (!isFinite(presence))
-                        presence = 1
-                    top += (root.rowHeight + root.listSpacing) * presence
-                }
-                return top
-            }
 
             // The full list. Only this moves on scroll; the viewport above stays
             // put, which is what keeps the clip rect over the panel while the rows
             // travel under it.
-            //
-            // NO POSITIONER, and that is the whole of how a transition lays out. A row's
-            // height is a CONTINUOUS number here - that is what makes a slot open and close
-            // - and a `Column` is not the right tool for a continuous layout: it places its
-            // children from their measured heights, and a height that changes every frame
-            // asks it to re-place every sibling on every frame, which is the arrangement
-            // that left this list with every `y` at zero and `implicitHeight` at zero while
-            // its children were each 34px tall. A plain `Item` whose children place
-            // THEMSELVES from the same running sum is both correct and cheaper: the sum is
-            // one subtraction (see `HintRow.slotTopFor`), and it cannot fall a frame behind
-            // the heights it is summing because it is not a second pass over them.
-            Item {
+            Column {
                 id: contentColumn
                 width: stripColumn.width
+                spacing: root.listSpacing
                 y: stripColumn.isActiveSlot ? -root.scrollOffset : 0
-                // The block's own height: the running sum of its slots, which is what the
-                // viewport clips to and what the panel is sized from. Computed rather than
-                // measured, because the items are placed by the same expression.
-                readonly property real contentTop: {
-                    root.rowRevision
-                    return stripColumn.rowList.length === 0
-                        ? 0 : stripColumn.slotTopAt(stripColumn.rowList.length)
-                }
-                implicitHeight: stripColumn.rowList.length === 0
-                    ? root.rowHeight
-                    : contentTop - root.listSpacing
-                height: implicitHeight
                 onImplicitHeightChanged: root.remeasureHeight()
 
-            // The rows this column is painting, in order: the union of what the
-            // snapshot says and what is still leaving. One `Repeater` over that list,
-            // and each entry is a slot that carries its own arrival or departure - so a
-            // window closing is a row that collapses out of the list rather than a row
-            // that stops existing between two frames.
-            //
-            // The COLUMN's `spacing` is zero and the gap between rows rides inside each
-            // slot (see `HintRow.slotPitch`): a `Column` would leave its spacing behind
-            // when a slot collapsed to nothing, which is a dead gap exactly where a row
-            // is leaving.
+            // Window rows: cards in the active column, plain labels either side.
+            // Two Repeaters over mutually exclusive models rather than one
+            // delegate that switches, so a neighbour column instantiates no card
+            // at all - and builds no icon to decode for one.
             Repeater {
-                model: stripColumn.rowList.length
+                model: stripColumn.modelData && stripColumn.isActiveSlot
+                    ? stripColumn.modelData.rows : null
 
-                HintRow {
-                    id: rowSlot
+                // Window row: app icon and title, and the card's own surface - which
+                // is where the focus tint lives. The row does not mark ITSELF: nothing
+                // here decides what is focused, and what the frame's rectangle encloses
+                // is decided by the one shared frame above. This row only reports whether
+                // the frame is over it, so there is still exactly one thing on screen
+                // saying which window is current.
+                Rectangle {
+                    id: windowRow
+                    required property var modelData
                     required property int index
-                    // The record is taken BY INDEX rather than handed over as
-                    // `modelData`, and that is load-bearing rather than stylistic: a
-                    // `Repeater` given a JS array hands each delegate a COPY of its
-                    // element, so the slot's writes back into its own progress would land
-                    // on a throwaway object and the record the strip reconciles against
-                    // would stay frozen at whatever the publish put there - every
-                    // rebuilt delegate would then restart its animation from the start.
-                    // Indexing the live array gives the same object the map holds, which
-                    // is what makes the record the durable half of the pair.
-                    record: stripColumn.rowList[rowSlot.index]
-                    // Placed from the slots above it rather than by a positioner: see the
-                    // note on `contentColumn`. The sum is a function of the same presence
-                    // values the slot animates, so the row below a closing card is where
-                    // the closing card says it is, on every frame.
-                    y: stripColumn.slotTopAt(rowSlot.index)
+
+                    objectName: "windowHintWindowRow"
                     x: root.cellPaddingX
                     width: stripColumn.cardWidth
-                    cardWidth: stripColumn.cardWidth
-                    rowHeight: root.rowHeight
-                    listSpacing: root.listSpacing
-                    glyphInset: root.glyphInset
-                    glyphWidth: root.glyphWidth
-                    active: stripColumn.isActiveSlot
-                    interactive: root.interactive
-                    // Resolved here so an active card and a neighbour label are lit by one
-                    // copy of the intersection rather than each carrying a second answer
-                    // to the same question.
-                    maskFor: function(cardItem) { return root.frameMaskOverCard(cardItem) }
-                    maskVisible: root.frameOverCard(rowSlot)
-                    onActivated: windowId => root.windowActivated(windowId)
-                    onRowMoved: root.rowRevision++
-                    onRetireRequested: rowKey => root.retireRow(
-                        stripColumn.modelData.position, rowKey)
+                    height: root.rowHeight
+                    radius: 6
+                    transformOrigin: Item.Center
+                    // NO focus tint here, ever. This rectangle is the card's PLAIN surface
+                    // and the focus tint is the overlay below, clipped to the frame - so a card
+                    // the frame is only part way across is part way lit rather than wholly
+                    // lit. Tinting the card itself cannot express that: a colour is a
+                    // whole-surface property, and the moment the frame touched a card the
+                    // entire card changed, which is a card switching state rather than a
+                    // mark travelling across the list.
+                    //
+                    // The overlay is a CHILD, so it paints above this fill and below the
+                    // icon and title that follow it - which is the whole reason the tint is
+                    // not on this rectangle. A fill above the row's content veiled both.
+                    color: rowHover.hovered
+                        ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+                    // A Rectangle borders itself by default; this row's own tint is its
+                    // focus signal, so that default is off - the outline that marks the
+                    // focused row is the one shared element, and it has its own border.
+                    border.width: 0
+                    scale: rowPress.pressed ? MotionTokens.pressScale : 1
+                    enabled: root.interactive
+
+                    // Test seam for the shared click-flash recipe.
+                    readonly property alias rowFlashAnimation: rowFlash
+                    readonly property alias rowFlashOverlay: rowFlashOverlay
+
+                    // THE FOCUS TINT AS A MASK: the part of this card the focus frame is
+                    // over right now, and nothing else.
+                    //
+                    // Declared FIRST so it paints above this card's own fill and below the
+                    // icon and title that follow it. That ordering is the entire reason it
+                    // is an overlay rather than a colour on the card above - a colour on
+                    // the card is the tint under the content, which is right, but a colour
+                    // is also a WHOLE-SURFACE property: the moment the frame touched a card
+                    // the entire card changed. That is a card switching state, not a mark
+                    // travelling across the list, and it is the difference between this and
+                    // a card lit all at once the moment the frame arrives at its edge.
+                    //
+                    // Its geometry is read from `frameMaskOverCard` and
+                    // `frameOverCard` every frame, and carries no `Behavior`, because the
+                    // frame is a moving mark and a mark that
+                    // eases towards its position is a different mark. Nothing is lost by
+                    // that: at rest the mask covers the whole card, so the card looks
+                    // wholly tinted, exactly as it did before. The two differ only while
+                    // the frame is travelling, and there following it frame-for-frame IS
+                    // the effect.
+                    Rectangle {
+                        id: windowRowFocusMask
+                        objectName: "windowHintRowFocusMask"
+                        // Full width: the frame is placed from the ACTIVE column's geometry
+                        // and this card is too, so while the frame is over the active column
+                        // the two rects share a left edge and a width exactly. That is why a
+                        // vertical-only mask ever looked right, and it stops being true for
+                        // the first half of every journey - hence the `frameOverCard` half of
+                        // the intersection on the `visible` line below, which is the half this
+                        // rectangle cannot express through its own geometry.
+                        x: 0
+                        width: windowRow.width
+                        y: root.frameMaskOverCard(windowRow).top
+                        height: root.frameMaskOverCard(windowRow).height
+                        color: LazerTheme.settingsSelected
+                        // The card's own radius, so at rest - the mask being the whole card
+                        // - the two are the same shape and the join is invisible. Part way
+                        // through a pass it is a band with rounded ends, which reads as the
+                        // card's own surface being lit rather than as a separate object
+                        // sliding over it.
+                        radius: 6
+                        // Zero height IS the answer for "the frame is not on this card",
+                        // and saying it with height rather than with `visible` keeps the
+                        // geometry honest for anything that measures it. `visible` is the
+                        // belt to that braces, since a zero-height item still costs a
+                        // little to consider.
+                        visible: height > 0 && root.frameOverCard(windowRow)
+                        // Inert to input. It is decoration lying over the card, and a
+                        // surface that swallowed taps meant for the window would be a fault
+                        // the user only finds by missing a click.
+                        enabled: false
+                    }
+
+                    // Behaviour on `color` is now only ever about HOVER. The focus tint is
+                    // the overlay declared above, so no change to this rectangle's colour
+                    // can be caused by the frame - which is what makes the gate that used
+                    // to sit here pointless rather than merely unused. A short fade on hover
+                    // is the settings panel's own recipe and stays.
+                    Behavior on color {
+                        ColorAnimation { duration: MotionTokens.fast * debugTimeScale }
+                    }
+                    Behavior on scale {
+                        enabled: !MotionTokens.reducedMotion
+                        NumberAnimation { duration: MotionTokens.fast * debugTimeScale
+                            easing.type: Easing.OutQuint }
+                    }
+
+                    // App icon; the service resolves a themed path per window.
+                    // Its inset is a plain card padding - the indicator that used to
+                    // share this edge sits outside the card now, so there is nothing
+                    // here to make room for.
+                    Image {
+                        id: rowIcon
+                        objectName: "windowHintWindowIcon"
+                        x: root.glyphInset
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: root.glyphWidth
+                        height: root.glyphWidth
+                        source: windowRow.modelData.icon
+                        visible: windowRow.modelData.icon !== ""
+                        // Synchronous decode: the popup lives for the length of one
+                        // key hold, so an async icon would land too late to read.
+                        asynchronous: false
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                    }
+
+                    Text {
+                        objectName: "windowHintWindowTitle"
+                        anchors.left: rowIcon.visible ? rowIcon.right : parent.left
+                        anchors.leftMargin: 8
+                        anchors.right: parent.right
+                        anchors.rightMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: windowRow.modelData.title
+                        color: windowRow.modelData.isFocused ? LazerTheme.textPrimary : LazerTheme.barSubtitle
+                        font.pixelSize: 12
+                        font.bold: windowRow.modelData.isFocused
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+
+                        Behavior on color {
+                            ColorAnimation { duration: MotionTokens.fast * debugTimeScale }
+                        }
+                    }
+
+                    // Click flash, inert to input so it cannot swallow the tap.
+                    Rectangle {
+                        id: rowFlashOverlay
+                        objectName: "windowHintRowFlash"
+                        anchors.fill: parent
+                        radius: 6
+                        color: LazerTheme.textPrimary
+                        opacity: 0
+                        enabled: false
+                    }
+
+                    NumberAnimation {
+                        id: rowFlash
+                        target: rowFlashOverlay
+                        property: "opacity"
+                        from: MotionTokens.clickFlashOpacity
+                        to: 0
+                        duration: MotionTokens.clickFlashDuration * debugTimeScale
+                        easing.type: MotionTokens.clickFlashEasing
+                    }
+
+                    HoverHandler { id: rowHover; blocking: false }
+                    TapHandler {
+                        id: rowPress
+                        gesturePolicy: TapHandler.ReleaseWithinBounds
+                        onTapped: {
+                            if (MotionTokens.reducedMotion)
+                                rowFlashOverlay.opacity = 0
+                            else
+                                rowFlash.restart()
+                            root.windowActivated(windowRow.modelData.windowId)
+                        }
+                    }
                 }
             }
 
-            // The slot this column shows when its workspace has no windows. The same for
-            // the active column as for a neighbour: an empty workspace is the same fact
-            // wherever it is, and a different shape for the middle one would make the
-            // panel look as if it had a special case in it.
-            //
-            // It is a row slot like any other, so it too arrives and leaves rather than
-            // blinking: the list going from nothing to its first window is a window
-            // arriving in a column, and a placeholder that vanished on the frame the
-            // first card began to grow would be the one hard cut in the panel. Its
-            // `presence` is the same 0-to-1 the rows use, so the panel's height and the
-            // rows below it move on the same number.
+            // Neighbour rows: the same windows, stated plainly. The active column
+            // gets no label delegates at all, so the two renderings of a workspace
+            // can never be on screen together.
+            Repeater {
+                model: stripColumn.modelData && !stripColumn.isActiveSlot
+                    ? stripColumn.modelData.rows : null
+
+                // One window label in a NEIGHBOUR column - the workspace either side
+                // of the active one.
+                //
+                // Deliberately plainer than the active column's row: no card fill,
+                // no focus highlight, no indicator, a muted title. The active
+                // column is the only one that carries state, so the other two read
+                // as context for it rather than as three equal lists. Tapping a
+                // label still focuses that window, which is what makes the
+                // neighbours worth showing at all - niri moves the view to that
+                // window's workspace.
+                BarWindowHintLabel {
+                    id: neighbourLabel
+                    objectName: "windowHintNeighbourRow"
+                    x: root.cellPaddingX
+                    width: stripColumn.cardWidth
+                    // `modelData` / `index` are declared as required properties on
+                    // the label, so the delegate model fills them. Binding them here
+                    // would point each one at ITSELF.
+                    rowHeight: root.rowHeight
+                    glyphInset: root.glyphInset
+                    glyphWidth: root.glyphWidth
+                    // Resolved here so an active card and a neighbour label are lit by one
+                    // copy of the intersection rather than each carrying a second
+                    // answer to the same question.
+                    focusMaskTop: root.frameMaskOverCard(neighbourLabel).top
+                    focusMaskHeight: root.frameMaskOverCard(neighbourLabel).height
+                    focusMaskVisible: root.frameOverCard(neighbourLabel)
+                    enabled: root.interactive
+                    onActivated: windowId => root.windowActivated(windowId)
+                }
+            }
+
+            // The slot this column shows when its workspace has no windows. The
+            // same for the active column as for a neighbour: an empty workspace is
+            // the same fact wherever it is, and a different shape for the middle
+            // one would make the panel look as if it had a special case in it.
             BarWindowHintEmpty {
                 objectName: "windowHintColumnEmpty"
                 x: root.cellPaddingX
-                y: 0
                 width: stripColumn.cardWidth
-                height: root.rowHeight * emptyPresence
-                opacity: emptyPresence
                 rowHeight: root.rowHeight
-                // Not `visible` either, for the reason at `HintRow`: a positioner skips an
-                // invisible child, so the placeholder would leave the layout the moment it
-                // started to shrink instead of shrinking inside it.
-                property real emptyPresence: stripColumn.rowList.length === 0 ? 1 : 0
-                Behavior on emptyPresence {
-                    enabled: !MotionTokens.reducedMotion
-                    NumberAnimation {
-                        duration: MotionTokens.windowRowExit
-                        easing.type: Easing.InQuad
-                    }
-                }
+                visible: !stripColumn.modelData
+                    || stripColumn.modelData.rows.length === 0
             }
 
             } // contentColumn
@@ -826,42 +745,13 @@ Item {
 
     // Keep the offset inside the scrollable range without animating, and without
     // dragging the reveal into it: this is a correction, not a scroll.
-    //
-    // A RUNNING REVEAL IS NOT CANCELLED HERE, and that is the whole of why a long list
-    // could not be scrolled to its focused row. This is called from `onContentHeightChanged`
-    // and `onMaxScrollOffsetChanged`, and the range it is clamping to MOVES on every frame
-    // of a row transition - so the reveal it used to stop was being stopped by its own
-    // target changing underneath it: measured, a reveal to the twelfth row of a twelve-row
-    // workspace started at 40 toward 238 and was cancelled on the next frame by a clamp
-    // raised from a slot's `presence`. The offset stayed at 40, the focused card stayed 200
-    // pixels below the panel's bottom edge, and the panel looked as though it could not
-    // scroll at all.
-    //
-    // What a correction owes the reveal is a target inside the new range, not a halt. The
-    // animation is re-aimed when it is running and stopped when it is not, and the scroll
-    // range it is aimed at is the one measured NOW rather than the one measured when the
-    // row it is going to was published.
     function clampScroll() {
         settleAnim.stop()
         driveAnim.stop()
         edgeSettleTimer.stop()
+        revealAnim.stop()
         edgeDriving = false
-        const limit = root.maxScrollOffset
-        const clamped = Math.max(0, Math.min(limit, root.scrollOffset))
-        if (revealAnim.running) {
-            // Re-aim rather than restart: `to` is the only thing a running
-            // `NumberAnimation` reads, so the remaining curve covers the remaining
-            // distance and the reveal keeps the pace it set out with.
-            //
-            // The offset is NOT written here, and that is not tidiness either - an
-            // animation is writing it on every frame, and a correction that writes it
-            // between two of those frames is a second author for one number: measured, a
-            // reveal running 0 toward 238 was held at 4.0 by the clamp raised from the
-            // same column's resize, for the whole of its 300ms and after it.
-            revealAnim.to = Math.max(0, Math.min(limit, revealAnim.to))
-            return
-        }
-        root.scrollOffset = clamped
+        root.scrollOffset = Math.max(0, Math.min(root.maxScrollOffset, root.scrollOffset))
     }
 
     Timer {
@@ -991,63 +881,19 @@ Item {
     // Snapped rather than animated while a crossing is in flight or under reduced
     // motion - a moving target cannot be eased to, and the offset would arrive after
     // the column it belongs to.
-    //
-    // A REQUEST, not a one-shot, and that is the whole of why a long list could not be
-    // scrolled to its focused row. The range the row has to fit into is still being
-    // MEASURED on the frame this is asked for - a column's height is the running sum of its
-    // slots, so it grows while they open - and the first answer is a number computed
-    // against a list that has not finished existing. Measured on a twelve-window workspace
-    // focused on the twelfth row: the reveal was requested at a range of 0 (and dropped,
-    // because it had nowhere to go), then at a range of 4, and it ran to 4 while the
-    // focused card sat 200 pixels below the panel's bottom edge. The panel looked as though
-    // it could not scroll at all, and the wheel was the only thing that moved it.
-    //
-    // So the index is remembered and `_applyReveal` is what runs it, from here and from
-    // `onMaxScrollOffsetChanged` - which fires on every frame the range grows. Nothing
-    // polls, and the request is spent the moment the offset reaches a target computed
-    // against the range as it finally stands.
     function revealRow(index, animated) {
-        if (index < 0)
-            return
-        root._revealIndex = index
-        root._revealAnimated = animated
-        root._revealTarget = -1
-        root._applyReveal()
-    }
-
-    // The row the list owes a scroll to, and whether that scroll may be eased. Kept as a
-    // REQUEST for as long as the range it has to fit into is still being measured - see
-    // `revealRow`.
-    property int _revealIndex: -1
-    property bool _revealAnimated: false
-    // The target last written, so a range that keeps growing does not re-run the same
-    // reveal on every frame of a transition: only a target that has actually moved is a
-    // scroll worth making.
-    property real _revealTarget: -1
-
-    // Run the outstanding reveal against the range as it stands NOW. Idempotent, so the
-    // range hook can call it on every frame of a transition.
-    function _applyReveal() {
-        if (root._revealIndex < 0 || root.maxScrollOffset <= 0)
+        if (index < 0 || root.maxScrollOffset <= 0)
             return
         const target = HintLogic.revealScrollY(root.scrollOffset,
-            root._revealIndex * root.rowPitch - root.rowLiftFor(root._revealIndex),
-            root.rowHeight, root.viewportHeight, root.maxScrollOffset)
-        if (Math.abs(target - root._revealTarget) < 0.5
-                && Math.abs(target - root.scrollOffset) < 0.5) {
-            // Already where this reveal wanted to be: the request is spent.
-            root._revealIndex = -1
+            index * root.rowPitch, root.rowHeight, root.viewportHeight,
+            root.maxScrollOffset)
+        if (Math.abs(target - root.scrollOffset) < 0.5)
             return
-        }
-        root._revealTarget = target
-        if (!root._revealAnimated || MotionTokens.reducedMotion || !root.interactive) {
-            revealAnim.stop()
+        root._cancelEdge()
+        if (!animated || MotionTokens.reducedMotion || !root.interactive) {
             root.scrollOffset = target
             return
         }
-        if (revealAnim.running && Math.abs(revealAnim.to - target) < 0.5)
-            return
-        root._cancelEdge()
         revealAnim.from = root.scrollOffset
         revealAnim.to = target
         revealAnim.duration = 300 * root.debugTimeScale
@@ -1059,7 +905,5 @@ Item {
         target: root
         property: "scrollOffset"
         easing.type: Easing.OutQuint
-        onFinished: root._revealIndex = -1
     }
-
 }
