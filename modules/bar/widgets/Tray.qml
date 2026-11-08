@@ -381,7 +381,7 @@ Item {
             Rectangle {
                 anchors.fill: parent
                 radius: 0
-                color: foldButton.hovered ? LazerTheme.hoverFill : "transparent"
+                color: foldButton.hovered ? LazerTheme.hoverFill : LazerTheme.shade(LazerTheme.hoverFill, 0)
 
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
             }
@@ -490,7 +490,7 @@ Item {
                         Rectangle {
                             anchors.fill: parent
                             radius: 0
-                            color: trayIcon.hovered ? LazerTheme.hoverFill : "transparent"
+                            color: trayIcon.hovered ? LazerTheme.hoverFill : LazerTheme.shade(LazerTheme.hoverFill, 0)
 
                             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                         }

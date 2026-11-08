@@ -338,7 +338,7 @@ Item {
                     anchors.fill: parent
                     anchors.margins: 2
                     radius: 6
-                    color: backHover.hovered ? LazerTheme.settingsCardHover : "transparent"
+                    color: backHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.shade(LazerTheme.settingsCardHover, 0)
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                 }
 
@@ -591,7 +591,7 @@ Item {
                                 anchors.fill: parent
                                 radius: 6
                                 color: addCellHover.hovered ? LazerTheme.settingsCardHover
-                                                            : "transparent"
+                                                            : LazerTheme.shade(LazerTheme.settingsCardHover, 0)
                                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                             }
 

@@ -61,7 +61,10 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 0
-        color: root.hovered ? root.hoverColor : "transparent"
+        // Base on the wash itself at zero alpha, not the literal `transparent`:
+        // that literal is transparent BLACK, so a colour animation from it passes
+        // through a grey tint on its way to a light-scheme wash.
+        color: root.hovered ? root.hoverColor : LazerTheme.shade(root.hoverColor, 0)
 
         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
     }

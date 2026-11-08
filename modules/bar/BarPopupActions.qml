@@ -1563,9 +1563,9 @@ Item {
                     width: 72
                     height: 32
                     radius: 6
-                    color: root.notificationDnd ? LazerTheme.settingsSelected : (dndHover.hovered ? LazerTheme.hoverFill : "transparent")
+                    color: root.notificationDnd ? LazerTheme.settingsSelected : (dndHover.hovered ? LazerTheme.hoverFill : LazerTheme.shade(LazerTheme.hoverFill, 0))
                     border.width: root.notificationDnd ? 1.5 : 0
-                    border.color: root.notificationDnd ? LazerTheme.settingsAccent : "transparent"
+                    border.color: root.notificationDnd ? LazerTheme.settingsAccent : LazerTheme.shade(LazerTheme.settingsAccent, 0)
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                     Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
@@ -1601,7 +1601,7 @@ Item {
                     width: 72
                     height: 32
                     radius: 6
-                    color: clearHover.hovered ? LazerTheme.hoverFill : "transparent"
+                    color: clearHover.hovered ? LazerTheme.hoverFill : LazerTheme.shade(LazerTheme.hoverFill, 0)
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -1883,7 +1883,7 @@ Item {
                     height: 32
                     radius: 6
                     visible: root.btAvailable && root.btEnabled
-                    color: btRescanHover.hovered ? LazerTheme.hoverFill : "transparent"
+                    color: btRescanHover.hovered ? LazerTheme.hoverFill : LazerTheme.shade(LazerTheme.hoverFill, 0)
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -2198,7 +2198,7 @@ Item {
                                     // identity while keeping the action on this row axis.
                                     height: 32
                                     color: wiredProfileHover.hovered
-                                        ? LazerTheme.settingsCardHover : "transparent"
+                                        ? LazerTheme.settingsCardHover : LazerTheme.shade(LazerTheme.settingsCardHover, 0)
 
                                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -2211,7 +2211,7 @@ Item {
                                         width: 2
                                         height: 20
                                         color: wiredProfileRow.modelData.active
-                                            ? LazerTheme.settingsAccent : "transparent"
+                                            ? LazerTheme.settingsAccent : LazerTheme.shade(LazerTheme.settingsAccent, 0)
 
                                         Behavior on color {
                                             ColorAnimation { duration: MotionTokens.fast }
@@ -2349,7 +2349,7 @@ Item {
                     visible: root.wifiError !== "" && root.wifiErrorIsSecret
                         && root.wifiErrorNetworkSaved
                     radius: 6
-                    color: forgetHover.hovered ? LazerTheme.hoverFill : "transparent"
+                    color: forgetHover.hovered ? LazerTheme.hoverFill : LazerTheme.shade(LazerTheme.hoverFill, 0)
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -2518,7 +2518,7 @@ Item {
                             width: 32
                             height: 32
                             radius: LazerTheme.settingsChoiceRadius
-                            color: connectHover.hovered ? LazerTheme.hoverFill : "transparent"
+                            color: connectHover.hovered ? LazerTheme.hoverFill : LazerTheme.shade(LazerTheme.hoverFill, 0)
                             enabled: root.wifiPassword !== ""
                             opacity: enabled ? 1 : LazerTheme.settingsDisabledAlpha
 
@@ -2570,7 +2570,7 @@ Item {
                             width: 32
                             height: 32
                             radius: LazerTheme.settingsChoiceRadius
-                            color: cancelHover.hovered ? LazerTheme.hoverFill : "transparent"
+                            color: cancelHover.hovered ? LazerTheme.hoverFill : LazerTheme.shade(LazerTheme.hoverFill, 0)
 
                             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 
@@ -2639,7 +2639,7 @@ Item {
                         color: wifiRowHover.hovered ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
                         border.width: wifiNetRow.modelData && wifiNetRow.modelData.connected ? 1.5 : 0
                         border.color: wifiNetRow.modelData && wifiNetRow.modelData.connected
-                            ? LazerTheme.settingsAccent : "transparent"
+                            ? LazerTheme.settingsAccent : LazerTheme.shade(LazerTheme.settingsAccent, 0)
 
                         Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
                         Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
@@ -2702,7 +2702,7 @@ Item {
                     height: 32
                     radius: 6
                     visible: root.wifiEnabled
-                    color: rescanHover.hovered ? LazerTheme.hoverFill : "transparent"
+                    color: rescanHover.hovered ? LazerTheme.hoverFill : LazerTheme.shade(LazerTheme.hoverFill, 0)
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
 

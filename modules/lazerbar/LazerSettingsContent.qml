@@ -300,7 +300,7 @@ Item {
             Rectangle {
                 anchors.fill: parent
                 radius: 12
-                color: clearHover.hovered ? LazerTheme.settingsRowHover : "transparent"
+                color: clearHover.hovered ? LazerTheme.settingsRowHover : LazerTheme.shade(LazerTheme.settingsRowHover, 0)
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
             }
             Image {

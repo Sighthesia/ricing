@@ -441,7 +441,7 @@ Item {
                 radius: streamRow.radius
                 color: "transparent"
                 border.width: streamRowHover.hovered ? 1.5 : 0
-                border.color: streamRowHover.hovered ? LazerTheme.settingsAccent : "transparent"
+                border.color: streamRowHover.hovered ? LazerTheme.settingsAccent : LazerTheme.shade(LazerTheme.settingsAccent, 0)
                 enabled: false
 
                 Behavior on border.width {
