@@ -110,6 +110,13 @@ QtObject {
     // icon can never slide across a half-drawn one.
     readonly property int trayIconEnter: 140
     readonly property int trayIconExit: 200
+    // Window hint slots and workspace icons use compact list motion.
+    readonly property int windowHintEnter: 140
+    readonly property int windowHintExit: 200
+    readonly property int windowHintMove: 240
+    readonly property int workspaceIconEnter: 140
+    readonly property int workspaceIconExit: 200
+    readonly property int workspaceIconMove: 240
     // Per-position cascade step for a batch of tray icons.
     readonly property int trayIconStagger: 24
 

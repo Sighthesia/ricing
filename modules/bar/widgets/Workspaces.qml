@@ -33,6 +33,7 @@ Item {
     // wins bindings re-resolve; row-level changes flow through the models'
     // own signals without touching this.
     property int _modelsRevision: 0
+    property bool _modelsReady: false
     property string _windowMapSignature: ""
     // Observability: counts real content syncs so focus-only churn is verifiable.
     property int mapSwaps: 0
@@ -214,6 +215,7 @@ Item {
     // delegates and loaded icons.
     function syncWorkspaceModels(map) {
         const models = root.workspaceModels
+        const animateRows = root._modelsReady && !MotionTokens.reducedMotion
         const wanted = {}
         const ids = Object.keys(map)
         for (let i = 0; i < ids.length; i++) {
@@ -225,7 +227,7 @@ Item {
                 models[wsId] = model
                 root._modelsRevision++
             }
-            root.syncIconModel(model, map[ids[i]])
+            root.syncIconModel(model, map[ids[i]], animateRows)
         }
         const known = Object.keys(models)
         for (let k = 0; k < known.length; k++) {
@@ -235,25 +237,36 @@ Item {
                 root._modelsRevision++
             }
         }
+        root._modelsReady = true
     }
 
     // Reconcile one stable model with the desired ordered rows, keyed by
     // winId: remove gone rows, insert new ones in place, move drifted rows,
     // refresh changed app identities. Untouched rows (and their delegates
     // and images) are never modified.
-    function syncIconModel(model, rows) {
+    function syncIconModel(model, rows, animateRows) {
+        const wanted = {}
+        for (let n = 0; n < rows.length; n++)
+            wanted[String(rows[n].winId)] = true
+
+        // Keep a missing icon as a zero-width retiring delegate until its fade finishes.
+        // Removing it immediately would destroy the only object that still knows its old
+        // physical position, so the following icons would jump instead of travelling.
         for (let i = model.count - 1; i >= 0; i--) {
             const id = String(model.get(i).winId)
-            let keep = false
-            for (let k = 0; k < rows.length; k++) {
-                if (String(rows[k].winId) === id) {
-                    keep = true
-                    break
-                }
+            if (wanted[id]) {
+                if (model.get(i).retiring)
+                    model.setProperty(i, "retiring", false)
+                continue
             }
-            if (!keep)
+            if (animateRows) {
+                model.setProperty(i, "retiring", true)
+                model.setProperty(i, "entering", false)
+            } else {
                 model.remove(i, 1)
+            }
         }
+
         for (let j = 0; j < rows.length; j++) {
             const want = String(rows[j].winId)
             const appId = String(rows[j].appId || "")
@@ -267,13 +280,41 @@ Item {
             if (at < 0) {
                 model.insert(j, {
                     winId: want,
-                    appId: appId
+                    appId: appId,
+                    entering: !!animateRows,
+                    retiring: false
                 })
+                if (animateRows) {
+                    Qt.callLater(function() {
+                        for (let k = 0; k < model.count; k++) {
+                            if (String(model.get(k).winId) === want
+                                && !model.get(k).retiring) {
+                                model.setProperty(k, "entering", false)
+                                break
+                            }
+                        }
+                    })
+                }
             } else {
                 if (at !== j)
                     model.move(at, j, 1)
                 if (String(model.get(j).appId) !== appId)
                     model.setProperty(j, "appId", appId)
+                model.setProperty(j, "retiring", false)
+                model.setProperty(j, "entering", false)
+            }
+        }
+    }
+
+    function removeRetiredIcon(wsId, winId) {
+        const model = root.workspaceModels[String(wsId)]
+        if (!model)
+            return
+        for (let i = model.count - 1; i >= 0; i--) {
+            const row = model.get(i)
+            if (String(row.winId) === String(winId) && row.retiring) {
+                model.remove(i, 1)
+                return
             }
         }
     }
@@ -544,6 +585,18 @@ Item {
 
                             required property string winId
                             required property string appId
+                            required property bool entering
+                            required property bool retiring
+
+                            readonly property bool motionEnabled: !MotionTokens.reducedMotion
+                            Timer {
+                                id: retireTimer
+                                interval: MotionTokens.workspaceIconExit
+                                running: windowIcon.retiring && windowIcon.motionEnabled
+                                repeat: false
+                                onTriggered: root.removeRetiredIcon(
+                                    workspaceSquare.wsId, windowIcon.winId)
+                            }
 
                             // Bound to the shared focus property: focus-only
                             // events never rebuild delegates, and the role
@@ -551,8 +604,25 @@ Item {
                             readonly property bool isFocused: windowIcon.winId === root.focusedWinId
                             readonly property bool hovered: iconHover.hovered
 
-                            width: root.iconSize
+                            width: windowIcon.entering || windowIcon.retiring ? 0 : root.iconSize
                             height: root.iconSize
+
+                            Behavior on x {
+                                enabled: windowIcon.motionEnabled
+                                NumberAnimation {
+                                    duration: MotionTokens.workspaceIconMove
+                                    easing.type: Easing.OutQuint
+                                }
+                            }
+                            Behavior on width {
+                                enabled: windowIcon.motionEnabled
+                                NumberAnimation {
+                                    duration: windowIcon.retiring
+                                        ? MotionTokens.workspaceIconExit
+                                        : MotionTokens.workspaceIconEnter
+                                    easing.type: Easing.OutQuint
+                                }
+                            }
 
                             IconImage {
                                 anchors.fill: parent
@@ -563,11 +633,19 @@ Item {
                                 asynchronous: false
                                 backer.fillMode: Image.PreserveAspectFit
                                 smooth: true
-                                opacity: windowIcon.isFocused
-                                         ? 1
-                                         : windowIcon.hovered ? 0.85 : 0.55
+                                opacity: windowIcon.entering || windowIcon.retiring ? 0
+                                         : windowIcon.isFocused
+                                           ? 1
+                                           : windowIcon.hovered ? 0.85 : 0.55
 
-                                Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+                                Behavior on opacity {
+                                    enabled: windowIcon.motionEnabled
+                                    NumberAnimation {
+                                        duration: windowIcon.retiring
+                                            ? MotionTokens.workspaceIconExit
+                                            : MotionTokens.workspaceIconEnter
+                                    }
+                                }
                             }
 
                             HoverHandler {

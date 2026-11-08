@@ -326,8 +326,11 @@ Item {
     // edge, where the next snapshot with windows brings it down onto the card: an arrival
     // rather than a blink.
     readonly property real noRowTop: _offTop
+    // During a reorder, the stable row delegate is the source of truth. Its physical
+    // position is what the frame marks; the index formula remains the fallback while a
+    // new row is being inserted or an old one is finishing its exit.
     readonly property real focusedRowTop: focusedRowIndex < 0 ? noRowTop
-        : focusedRowIndex * rowPitch - strip.scrollOffset
+        : strip.rowTopForKey(root.focusedWindowKey, focusedRowIndex)
     // The frame's glide target in UNSCROLLED list coordinates: the row's own top
     // edge, before the viewport offset is applied. The drawn `y` below subtracts
     // the scroll on the way out, so one glide covers both a focus step and the
@@ -342,9 +345,11 @@ Item {
     // scroll in flight cannot retarget the glide; the drawn `y` simply follows the
     // offset underneath it, the way `_barTop` already does for the indicator.
     property real _frameAnchorY: focusedRowIndex < 0
-        ? noRowTop + strip.scrollOffset : focusedRowIndex * rowPitch
+        ? noRowTop + strip.scrollOffset
+        : root.focusedRowTop + strip.scrollOffset
     Behavior on _frameAnchorY {
         enabled: !root._markerCrossing && !MotionTokens.reducedMotion
+            && !strip.rowMovingForKey(root.focusedWindowKey)
         NumberAnimation {
             id: focusFrameGlide
             duration: MotionTokens.settingsSidebarCollapse * debugTimeScale
@@ -433,7 +438,8 @@ Item {
     // not just a binding, because the change handlers below must be able to ask
     // for a target from the index that just changed - see _syncIndicator.
     function _targetYFor(index) {
-        return index * rowPitch + rowHeight / 2 - indicatorLength / 2
+        const top = strip.rowTopForKey(root.focusedWindowKey, index) + strip.scrollOffset
+        return top + rowHeight / 2 - indicatorLength / 2
     }
 
     // THE IDENTITY the tracker is aimed at, and the thing a "genuine switch" means
@@ -1942,6 +1948,10 @@ Item {
     BarWindowHintStrip {
         id: strip
         objectName: "windowHintStrip"
+        onLayoutMoved: {
+            if (!root._markerCrossing)
+                Qt.callLater(root._syncIndicator)
+        }
         parent: root
         // Spelled as 0 rather than left implicit, because the absence IS the design.
         // This used to be the one moving object in the panel, and a reader looking
@@ -2314,6 +2324,20 @@ Item {
     // bookkeeping; the committed target and the identity are what the landing reads.
     function _syncIndicator() {
         var target = root._restingY()
+        // A ListModel move gives the row a real physical y. Sample that position directly
+        // while the row is travelling; repeatedly re-aiming a Behavior at the same moving
+        // target would restart its easing every frame and recreate the old frozen marker.
+        if (!root._markerCrossing && root.hasTarget
+                && strip.rowMovingForKey(root.focusedWindowKey)) {
+            root._snapping = true
+            root._anchorY = target
+            root._headY = target
+            root._tailY = target
+            root._snapping = false
+            root._placed = true
+            root._targetKey = root.focusedWindowKey
+            return
+        }
         if (root._markerCrossing) {
             root._pendingTop = -1
             if (root._placed && root.focusedWindowKey !== root._targetKey) {
@@ -2433,6 +2457,7 @@ Item {
     }
 
     onFocusedRowIndexChanged: {
+        Qt.callLater(root._syncIndicator)
         // The tracker waits a turn, and the ordering is why. `_syncIndicator` reads
         // `hasTarget` and `focusedRowIndex`, both of which are derived from `activeColumn`
         // and `plan`; a change handler runs as soon as its own property is notified, which

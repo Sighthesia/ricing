@@ -129,6 +129,7 @@ Item {
         viewportRows * rowPitch - listSpacing)
 
     signal windowActivated(string windowId)
+    signal layoutMoved()
 
     // Which slot is drawn as CARDS and which as plain labels. The body reads it off
     // the plan it built the strip from, so the two cannot disagree about which
@@ -304,6 +305,150 @@ Item {
             - Math.max(left, root.focusFrameLeft) > 0
     }
 
+    // Stable rows keep delegates alive while their slots open, close, or move.
+    ListModel {
+        id: activeRowsModel
+    }
+
+    property int layoutRevision: 0
+    property bool animateRows: true
+    property var desiredActiveRows: []
+
+    function currentActiveRows() {
+        const column = root.columns && root.columns[root.activeSlot]
+        return column && column.rows ? column.rows : []
+    }
+
+    function rowIndexForKey(key) {
+        const wanted = String(key || "")
+        for (let i = 0; i < activeRowsModel.count; i++) {
+            if (String(activeRowsModel.get(i).windowId) === wanted)
+                return i
+        }
+        return -1
+    }
+
+    function activeRowItemForKey(key) {
+        const wanted = String(key || "")
+        const column = root.activeColumnItem
+        if (!column)
+            return null
+        // The active row repeater is nested inside the column delegate. Walking the
+        // visual children keeps this lookup valid across Repeater rebuilds without
+        // exporting a delegate-local id into the strip's root scope.
+        function find(parent) {
+            if (!parent || !parent.children)
+                return null
+            for (let i = 0; i < parent.children.length; i++) {
+                const item = parent.children[i]
+                if (item && item.windowId !== undefined
+                        && String(item.windowId) === wanted)
+                    return item
+                const nested = find(item)
+                if (nested)
+                    return nested
+            }
+            return null
+        }
+        return find(column)
+    }
+
+    function rowTopForKey(key, fallbackIndex) {
+        const revision = root.layoutRevision
+        const item = root.activeRowItemForKey(key)
+        if (item)
+            return root._cardTopInStrip(item)
+        return Number(fallbackIndex) >= 0
+            ? Number(fallbackIndex) * root.rowPitch - root.scrollOffset
+            : -root.rowHeight
+    }
+
+    function rowMovingForKey(key) {
+        const revision = root.layoutRevision
+        const item = root.activeRowItemForKey(key)
+        return !!(item && item.moving)
+    }
+
+    function removeActiveRow(key) {
+        const index = root.rowIndexForKey(key)
+        if (index < 0)
+            return
+        activeRowsModel.remove(index, 1)
+        root.layoutRevision++
+        Qt.callLater(function() { root.syncActiveRows(root.desiredActiveRows) })
+    }
+
+    function openActiveRow(key) {
+        const index = root.rowIndexForKey(key)
+        if (index >= 0 && activeRowsModel.get(index).entering)
+            activeRowsModel.setProperty(index, "entering", false)
+    }
+
+    function syncActiveRows(rows) {
+        const wanted = rows || []
+        root.desiredActiveRows = wanted
+        const keys = {}
+        for (let i = 0; i < wanted.length; i++)
+            keys[String(wanted[i].windowId)] = true
+
+        let hasExiting = false
+        for (let i = activeRowsModel.count - 1; i >= 0; i--) {
+            const row = activeRowsModel.get(i)
+            if (keys[String(row.windowId)]) {
+                if (row.exiting)
+                    activeRowsModel.setProperty(i, "exiting", false)
+                continue
+            }
+            if (!root.animateRows || MotionTokens.reducedMotion) {
+                activeRowsModel.remove(i, 1)
+                continue
+            }
+            if (!row.exiting)
+                activeRowsModel.setProperty(i, "exiting", true)
+            hasExiting = true
+        }
+
+        // Reconcile live rows while an exiting ghost remains at its old slot. Exiting
+        // rows are skipped by the key lookup and are removed by their own timer, so live
+        // rows can still move and new rows can enter in the same publish.
+        for (let j = 0; j < wanted.length; j++) {
+            const data = wanted[j]
+            const key = String(data.windowId)
+            let at = root.rowIndexForKey(key)
+            if (at < 0) {
+                const entering = root.animateRows && !MotionTokens.reducedMotion
+                activeRowsModel.insert(j, {
+                    windowId: key,
+                    title: String(data.title || ""),
+                    appId: String(data.appId || ""),
+                    icon: String(data.icon || ""),
+                    isFocused: data.isFocused === true,
+                    entering: entering,
+                    exiting: false
+                })
+                root.layoutRevision++
+                if (entering)
+                    Qt.callLater(function() { root.openActiveRow(key) })
+                continue
+            }
+            if (at !== j) {
+                // Do not move a live row across an exiting ghost twice. The model's move
+                // operation is still the sole owner of the physical reorder.
+                activeRowsModel.move(at, j, 1)
+            }
+            activeRowsModel.setProperty(j, "title", String(data.title || ""))
+            activeRowsModel.setProperty(j, "appId", String(data.appId || ""))
+            activeRowsModel.setProperty(j, "icon", String(data.icon || ""))
+            activeRowsModel.setProperty(j, "isFocused", data.isFocused === true)
+            activeRowsModel.setProperty(j, "exiting", false)
+        }
+        root.layoutRevision++
+    }
+
+    function syncCurrentActiveRows() {
+        root.syncActiveRows(root.currentActiveRows())
+    }
+
     // The tallest column on the strip, MEASURED rather than bound.
     //
     // This was a `readonly` property whose body looped over `columnRepeater.itemAt(i)`
@@ -340,7 +485,11 @@ Item {
             root.contentHeight = tallest
     }
 
-    onColumnsChanged: Qt.callLater(remeasureHeight)
+    onColumnsChanged: {
+        Qt.callLater(remeasureHeight)
+        Qt.callLater(syncCurrentActiveRows)
+    }
+    onActiveSlotChanged: Qt.callLater(syncCurrentActiveRows)
 
     // The scroll range, not the panel height, is what decides whether an offset is still
     // legal - and it is the one that changes when a crossing brings a shorter list.
@@ -419,7 +568,10 @@ Item {
             // The column's own unclamped height, for the scroll range. The outer
             // `height` is the viewport once the clamp above binds, so the range
             // needs this rather than the height.
-            readonly property int contentHeight: contentColumn.implicitHeight
+            readonly property int contentHeight: Math.max(0,
+                contentColumn.implicitHeight
+                - (stripColumn.isActiveSlot && activeRowsModel.count > 0
+                    ? root.listSpacing : 0))
             // Announce a resize, because the strip measures its columns through
             // `itemAt` and has no binding that could see this one. See
             // `strip.remeasureHeight`.
@@ -438,17 +590,16 @@ Item {
             Column {
                 id: contentColumn
                 width: stripColumn.width
-                spacing: root.listSpacing
+                spacing: 0
                 y: stripColumn.isActiveSlot ? -root.scrollOffset : 0
                 onImplicitHeightChanged: root.remeasureHeight()
 
             // Window rows: cards in the active column, plain labels either side.
-            // Two Repeaters over mutually exclusive models rather than one
-            // delegate that switches, so a neighbour column instantiates no card
-            // at all - and builds no icon to decode for one.
+            // The active model is stable so a window keeps its delegate while its slot
+            // moves or closes; neighbour columns remain snapshot labels.
             Repeater {
-                model: stripColumn.modelData && stripColumn.isActiveSlot
-                    ? stripColumn.modelData.rows : null
+                id: activeRowRepeater
+                model: stripColumn.isActiveSlot ? activeRowsModel : null
 
                 // Window row: app icon and title, and the card's own surface - which
                 // is where the focus tint lives. The row does not mark ITSELF: nothing
@@ -458,16 +609,79 @@ Item {
                 // saying which window is current.
                 Rectangle {
                     id: windowRow
-                    required property var modelData
                     required property int index
+                    required property string windowId
+                    required property string title
+                    required property string appId
+                    required property string icon
+                    required property bool isFocused
+                    required property bool entering
+                    required property bool exiting
 
                     objectName: "windowHintWindowRow"
                     x: root.cellPaddingX
                     width: stripColumn.cardWidth
-                    height: root.rowHeight
+                    // The delegate owns its pitch, including the gap below the card. The
+                    // visual rectangle is clipped to the row height, so an exit closes its
+                    // slot completely instead of leaving Column.spacing behind.
+                    height: windowRow.entering || windowRow.exiting ? 0 : root.rowPitch
                     radius: 6
+                    clip: true
                     transformOrigin: Item.Center
-                    // NO focus tint here, ever. This rectangle is the card's PLAIN surface
+                    readonly property bool moving: Math.abs(windowRow.y
+                        - windowRow.index * root.rowPitch) > 0.5
+                    readonly property real cardHeight: root.rowHeight
+                    onYChanged: {
+                        root.layoutRevision++
+                        root.layoutMoved()
+                    }
+                    Timer {
+                        id: exitTimer
+                        interval: MotionTokens.windowHintExit
+                        repeat: false
+                        running: windowRow.exiting && !MotionTokens.reducedMotion
+                        onTriggered: root.removeActiveRow(windowRow.windowId)
+                    }
+                    Behavior on y {
+                        enabled: root.animateRows && !MotionTokens.reducedMotion
+                        NumberAnimation {
+                            duration: MotionTokens.medium
+                            easing.type: Easing.OutQuint
+                        }
+                    }
+                    Behavior on height {
+                        enabled: root.animateRows && !MotionTokens.reducedMotion
+                        NumberAnimation {
+                            duration: windowRow.exiting
+                                ? MotionTokens.windowHintExit : MotionTokens.windowHintEnter
+                            easing.type: Easing.OutQuint
+                        }
+                    }
+                    Behavior on opacity {
+                        enabled: root.animateRows && !MotionTokens.reducedMotion
+                        NumberAnimation {
+                            duration: windowRow.exiting
+                                ? MotionTokens.windowHintExit : MotionTokens.windowHintEnter
+                            easing.type: Easing.OutQuad
+                        }
+                    }
+                    opacity: windowRow.entering || windowRow.exiting ? 0 : 1
+                    // The outer item owns the animated slot; this child paints only the
+                    // visible card and leaves the pitch gap transparent.
+                    Rectangle {
+                        id: cardSurface
+                        width: parent.width
+                        height: root.rowHeight
+                        radius: 6
+                        color: rowHover.hovered
+                            ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+                        Behavior on color {
+                            ColorAnimation { duration: MotionTokens.fast * debugTimeScale }
+                        }
+                    }
+
+                    // NO focus tint here, ever. The focus tint is an overlay below the
+                    // icon and title, clipped to the frame.
                     // and the focus tint is the overlay below, clipped to the frame - so a card
                     // the frame is only part way across is part way lit rather than wholly
                     // lit. Tinting the card itself cannot express that: a colour is a
@@ -478,8 +692,7 @@ Item {
                     // The overlay is a CHILD, so it paints above this fill and below the
                     // icon and title that follow it - which is the whole reason the tint is
                     // not on this rectangle. A fill above the row's content veiled both.
-                    color: rowHover.hovered
-                        ? LazerTheme.settingsCardHover : LazerTheme.settingsCard
+                    color: "transparent"
                     // A Rectangle borders itself by default; this row's own tint is its
                     // focus signal, so that default is off - the outline that marks the
                     // focused row is the one shared element, and it has its own border.
@@ -566,11 +779,11 @@ Item {
                         id: rowIcon
                         objectName: "windowHintWindowIcon"
                         x: root.glyphInset
-                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.verticalCenter: cardSurface.verticalCenter
                         width: root.glyphWidth
                         height: root.glyphWidth
-                        source: windowRow.modelData.icon
-                        visible: windowRow.modelData.icon !== ""
+                        source: windowRow.icon
+                        visible: windowRow.icon !== ""
                         // Synchronous decode: the popup lives for the length of one
                         // key hold, so an async icon would land too late to read.
                         asynchronous: false
@@ -584,11 +797,11 @@ Item {
                         anchors.leftMargin: 8
                         anchors.right: parent.right
                         anchors.rightMargin: 8
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: windowRow.modelData.title
-                        color: windowRow.modelData.isFocused ? LazerTheme.textPrimary : LazerTheme.barSubtitle
+                        anchors.verticalCenter: cardSurface.verticalCenter
+                        text: windowRow.title
+                        color: windowRow.isFocused ? LazerTheme.textPrimary : LazerTheme.barSubtitle
                         font.pixelSize: 12
-                        font.bold: windowRow.modelData.isFocused
+                        font.bold: windowRow.isFocused
                         elide: Text.ElideRight
                         maximumLineCount: 1
 
@@ -601,7 +814,7 @@ Item {
                     Rectangle {
                         id: rowFlashOverlay
                         objectName: "windowHintRowFlash"
-                        anchors.fill: parent
+                        anchors.fill: cardSurface
                         radius: 6
                         color: LazerTheme.textPrimary
                         opacity: 0
@@ -627,7 +840,7 @@ Item {
                                 rowFlashOverlay.opacity = 0
                             else
                                 rowFlash.restart()
-                            root.windowActivated(windowRow.modelData.windowId)
+                            root.windowActivated(windowRow.windowId)
                         }
                     }
                 }
