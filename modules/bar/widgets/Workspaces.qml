@@ -363,11 +363,16 @@ Item {
         }
     }
 
+    // Retiring icons paint behind the live row, above the workspace highlight.
+    Item {
+        id: exitGhostLayer
+        anchors.fill: parent
+        z: -0.5
+        enabled: false
+    }
+
     function exitVisualHost() {
-        let host = root
-        while (host.parent)
-            host = host.parent
-        return host
+        return exitGhostLayer
     }
 
     function removeRetiredIcon(wsId, winId) {
@@ -747,7 +752,8 @@ Item {
                             readonly property bool motionEnabled: !MotionTokens.reducedMotion
                             Timer {
                                 id: retireTimer
-                                interval: MotionTokens.windowListFall + MotionTokens.workspaceIconExit
+                                interval: Math.max(MotionTokens.windowGhostExit,
+                                    MotionTokens.windowGhostSlotDelay + MotionTokens.workspaceIconExit)
                                 running: windowIcon.retiring && windowIcon.motionEnabled
                                 repeat: false
                                 onTriggered: root.removeRetiredIcon(
@@ -767,12 +773,20 @@ Item {
                             x: windowIcon.slotTargetX
                             y: 0
                             property bool ghostActive: false
+                            property bool closeSlot: false
+                            property point ghostSceneOrigin: Qt.point(0, 0)
+                            Timer {
+                                interval: MotionTokens.windowGhostSlotDelay
+                                running: windowIcon.retiring && windowIcon.motionEnabled
+                                onTriggered: windowIcon.closeSlot = true
+                            }
                             property real ghostX: 0
                             property real ghostY: 0
                             property Item ghostHost: null
                             function freezeExit() {
                                 if (windowIcon.ghostActive || !windowIcon.placed)
                                     return
+                                windowIcon.ghostSceneOrigin = windowIcon.mapToItem(null, root.iconSpacing, 0)
                                 windowIcon.ghostHost = root.exitVisualHost()
                                 const point = windowIcon.mapToItem(windowIcon.ghostHost, root.iconSpacing, 0)
                                 windowIcon.ghostX = point.x
@@ -782,10 +796,12 @@ Item {
                             onRetiringChanged: {
                                 if (windowIcon.retiring)
                                     windowIcon.freezeExit()
-                                else
+                                else {
                                     windowIcon.ghostActive = false
+                                    windowIcon.closeSlot = false
+                                }
                             }
-                            width: windowIcon.entering || windowIcon.retiring
+                            width: windowIcon.entering || windowIcon.closeSlot
                                 ? 0 : root.iconSize + root.iconSpacing
                             z: windowIcon.retiring ? 1 : 0
                             height: root.iconSize
@@ -830,14 +846,43 @@ Item {
                                 enabled: !windowIcon.ghostActive
                                 x: windowIcon.ghostActive ? windowIcon.ghostX : root.iconSpacing
                                 y: windowIcon.ghostActive ? windowIcon.ghostY : 0
-                                z: windowIcon.ghostActive ? 10 : 0
+                                z: 0
+                                Timer {
+                                    interval: MotionTokens.motionFrame
+                                    running: windowIcon.ghostActive
+                                    repeat: true
+                                    onTriggered: {
+                                        const point = windowIcon.ghostHost.mapFromItem(null,
+                                            windowIcon.ghostSceneOrigin.x, windowIcon.ghostSceneOrigin.y)
+                                        windowIcon.ghostX = point.x
+                                        windowIcon.ghostY = point.y
+                                    }
+                                }
+                                transformOrigin: Item.TopLeft
+                                scale: windowIcon.retiring ? MotionTokens.windowGhostScale : 1
+                                Behavior on scale {
+                                    enabled: windowIcon.motionEnabled
+                                    NumberAnimation {
+                                        duration: MotionTokens.windowGhostExit
+                                        easing.type: Easing.BezierSpline
+                                        easing.bezierCurve: MotionTokens.outSoft
+                                    }
+                                }
                                 transform: Translate {
-                                    y: windowIcon.ghostActive ? root.iconSize : 0
+                                    x: windowIcon.retiring ? MotionTokens.windowGhostOffset : 0
+                                    y: windowIcon.retiring ? MotionTokens.windowGhostOffset : 0
+                                    Behavior on x {
+                                        enabled: windowIcon.motionEnabled
+                                        NumberAnimation {
+                                            duration: MotionTokens.windowGhostExit
+                                            easing.type: Easing.OutQuint
+                                        }
+                                    }
                                     Behavior on y {
                                         enabled: windowIcon.motionEnabled
                                         NumberAnimation {
-                                            duration: MotionTokens.windowListFall
-                                            easing.type: MotionTokens.windowListFallEasing
+                                            duration: MotionTokens.windowGhostExit
+                                            easing.type: Easing.OutQuint
                                         }
                                     }
                                 }
@@ -859,7 +904,7 @@ Item {
                                     enabled: windowIcon.motionEnabled
                                     NumberAnimation {
                                         duration: windowIcon.retiring
-                                            ? MotionTokens.windowListFall
+                                            ? MotionTokens.windowGhostExit
                                             : MotionTokens.windowListReveal
                                         easing.type: windowIcon.retiring
                                             ? MotionTokens.windowListFadeEasing

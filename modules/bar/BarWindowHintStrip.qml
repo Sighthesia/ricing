@@ -447,11 +447,16 @@ Item {
 
     // Drop a ghost once its exit has played. Looked up by key rather than by the
     // index the timer captured, because the live rows around it have moved since.
+    // Ghosts remain above the popup background and below every live column.
+    Item {
+        id: exitGhostLayer
+        anchors.fill: parent
+        z: -1
+        enabled: false
+    }
+
     function exitVisualHost() {
-        let host = root
-        while (host.parent)
-            host = host.parent
-        return host
+        return exitGhostLayer
     }
 
     function removeActiveRow(key) {
@@ -813,17 +818,25 @@ Item {
                     // The delegate owns its pitch, including the gap below the card. The
                     // visual rectangle is clipped to the row height, so an exit closes its
                     // slot completely instead of leaving Column.spacing behind.
-                    height: windowRow.entering || windowRow.exiting ? 0 : root.rowPitch
+                    property bool closeSlot: false
+                    height: windowRow.entering || windowRow.closeSlot ? 0 : root.rowPitch
+                    Timer {
+                        interval: MotionTokens.windowGhostSlotDelay * root.debugTimeScale
+                        running: windowRow.exiting && !MotionTokens.reducedMotion
+                        onTriggered: windowRow.closeSlot = true
+                    }
                     clip: false
                     z: windowRow.exiting ? 1 : 0
                     property bool ghostActive: false
                     property real ghostX: 0
                     property real ghostY: 0
                     property real ghostWidth: 0
+                    property point ghostSceneOrigin: Qt.point(0, 0)
                     property Item ghostHost: null
                     function freezeExit() {
                         if (windowRow.ghostActive)
                             return
+                        windowRow.ghostSceneOrigin = windowRow.mapToItem(null, 0, 0)
                         windowRow.ghostHost = root.exitVisualHost()
                         const point = windowRow.mapToItem(windowRow.ghostHost, 0, 0)
                         windowRow.ghostX = point.x
@@ -836,6 +849,7 @@ Item {
                             windowRow.freezeExit()
                         } else {
                             windowRow.ghostActive = false
+                            windowRow.closeSlot = false
                         }
                     }
                     transformOrigin: Item.Center
@@ -852,7 +866,8 @@ Item {
                     }
                     Timer {
                         id: exitTimer
-                        interval: (MotionTokens.windowListFall + MotionTokens.windowHintExit)
+                        interval: Math.max(MotionTokens.windowGhostExit,
+                            MotionTokens.windowGhostSlotDelay + MotionTokens.windowHintExit)
                             * root.debugTimeScale
                         repeat: false
                         running: windowRow.exiting && !MotionTokens.reducedMotion
@@ -875,29 +890,58 @@ Item {
                         parent: windowRow.ghostActive ? windowRow.ghostHost : windowRow
                         x: windowRow.ghostActive ? windowRow.ghostX : 0
                         y: windowRow.ghostActive ? windowRow.ghostY : 0
+                        Timer {
+                            interval: MotionTokens.motionFrame
+                            running: windowRow.ghostActive
+                            repeat: true
+                            onTriggered: {
+                                const point = windowRow.ghostHost.mapFromItem(null,
+                                    windowRow.ghostSceneOrigin.x, windowRow.ghostSceneOrigin.y)
+                                windowRow.ghostX = point.x
+                                windowRow.ghostY = point.y
+                            }
+                        }
                         width: windowRow.ghostActive ? windowRow.ghostWidth : windowRow.width
                         height: root.rowHeight
-                        z: windowRow.ghostActive ? 10 : 0
+                        z: 0
                         enabled: !windowRow.ghostActive
                         opacity: windowRow.entering || windowRow.exiting ? 0 : 1
                         Behavior on opacity {
                             enabled: root.animateRows && !MotionTokens.reducedMotion
                             NumberAnimation {
                                 duration: (windowRow.exiting
-                                    ? MotionTokens.windowListFall : MotionTokens.windowListReveal)
+                                    ? MotionTokens.windowGhostExit : MotionTokens.windowListReveal)
                                     * root.debugTimeScale
                                 easing.type: windowRow.exiting
                                     ? MotionTokens.windowListFadeEasing
                                     : MotionTokens.windowListRevealEasing
                             }
                         }
+                        transformOrigin: Item.TopLeft
+                        scale: windowRow.exiting ? MotionTokens.windowGhostScale : 1
+                        Behavior on scale {
+                            enabled: !MotionTokens.reducedMotion
+                            NumberAnimation {
+                                duration: MotionTokens.windowGhostExit * root.debugTimeScale
+                                easing.type: Easing.BezierSpline
+                                easing.bezierCurve: MotionTokens.outSoft
+                            }
+                        }
                         transform: Translate {
-                            y: windowRow.exiting ? root.rowHeight : 0
+                            x: windowRow.exiting ? MotionTokens.windowGhostOffset : 0
+                            y: windowRow.exiting ? MotionTokens.windowGhostOffset : 0
+                            Behavior on x {
+                                enabled: !MotionTokens.reducedMotion
+                                NumberAnimation {
+                                    duration: MotionTokens.windowGhostExit * root.debugTimeScale
+                                    easing.type: Easing.OutQuint
+                                }
+                            }
                             Behavior on y {
                                 enabled: !MotionTokens.reducedMotion
                                 NumberAnimation {
-                                    duration: MotionTokens.windowListFall * root.debugTimeScale
-                                    easing.type: MotionTokens.windowListFallEasing
+                                    duration: MotionTokens.windowGhostExit * root.debugTimeScale
+                                    easing.type: Easing.OutQuint
                                 }
                             }
                         }

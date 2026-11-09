@@ -114,6 +114,11 @@ QtObject {
     // Match MarqueeLabel's scan reveal and removed-glyph ghost.
     readonly property int windowListReveal: 140
     readonly property int windowListFall: 200
+    // Exit uses the menu's scale/fade recipe; live slots wait before closing over it.
+    readonly property int windowGhostExit: slow
+    readonly property int windowGhostSlotDelay: fast
+    readonly property real windowGhostScale: popupFromScale
+    readonly property real windowGhostOffset: overlayFromY
     readonly property int windowListFallEasing: Easing.InQuad
     readonly property int windowListFadeEasing: Easing.Linear
     readonly property int windowListRevealEasing: Easing.OutQuad
