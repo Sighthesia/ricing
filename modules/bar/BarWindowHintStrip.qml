@@ -447,6 +447,13 @@ Item {
 
     // Drop a ghost once its exit has played. Looked up by key rather than by the
     // index the timer captured, because the live rows around it have moved since.
+    function exitVisualHost() {
+        let host = root
+        while (host.parent)
+            host = host.parent
+        return host
+    }
+
     function removeActiveRow(key) {
         const index = ModelSync.indexOfKey(activeRowsModel, key, "windowId")
         if (index < 0 || !activeRowsModel.get(index).exiting)
@@ -480,8 +487,12 @@ Item {
                 activeRowsModel.remove(i, 1)
                 continue
             }
-            if (!row.exiting)
+            if (!row.exiting) {
+                const item = root.activeRowItemForKey(row.windowId)
+                if (item)
+                    item.freezeExit()
                 activeRowsModel.setProperty(i, "exiting", true)
+            }
         }
 
         // Reconcile live rows while an exiting ghost keeps the slot it was removed
@@ -769,7 +780,7 @@ Item {
                 // is decided by the one shared frame above. This row only reports whether
                 // the frame is over it, so there is still exactly one thing on screen
                 // saying which window is current.
-                Rectangle {
+                Item {
                     id: windowRow
                     required property int index
                     required property string windowId
@@ -802,30 +813,30 @@ Item {
                     // The delegate owns its pitch, including the gap below the card. The
                     // visual rectangle is clipped to the row height, so an exit closes its
                     // slot completely instead of leaving Column.spacing behind.
-                    property bool exitVisualDone: false
-                    height: windowRow.entering || windowRow.exitVisualDone ? 0 : root.rowPitch
-                    radius: 6
+                    height: windowRow.entering || windowRow.exiting ? 0 : root.rowPitch
                     clip: false
                     z: windowRow.exiting ? 1 : 0
-                    // Reference: MarqueeLabel's removed glyph, applied to the full row.
-                    transform: Translate {
-                        y: windowRow.exiting ? root.rowHeight : 0
-                        Behavior on y {
-                            enabled: !MotionTokens.reducedMotion
-                            NumberAnimation {
-                                duration: MotionTokens.windowListFall * root.debugTimeScale
-                                easing.type: MotionTokens.windowListFallEasing
-                            }
-                        }
+                    property bool ghostActive: false
+                    property real ghostX: 0
+                    property real ghostY: 0
+                    property real ghostWidth: 0
+                    property Item ghostHost: null
+                    function freezeExit() {
+                        if (windowRow.ghostActive)
+                            return
+                        windowRow.ghostHost = root.exitVisualHost()
+                        const point = windowRow.mapToItem(windowRow.ghostHost, 0, 0)
+                        windowRow.ghostX = point.x
+                        windowRow.ghostY = point.y
+                        windowRow.ghostWidth = windowRow.width
+                        windowRow.ghostActive = true
                     }
                     onExitingChanged: {
-                        if (!windowRow.exiting)
-                            windowRow.exitVisualDone = false
-                    }
-                    Timer {
-                        interval: MotionTokens.windowListFall * root.debugTimeScale
-                        running: windowRow.exiting && !MotionTokens.reducedMotion
-                        onTriggered: windowRow.exitVisualDone = true
+                        if (windowRow.exiting) {
+                            windowRow.freezeExit()
+                        } else {
+                            windowRow.ghostActive = false
+                        }
                     }
                     transformOrigin: Item.Center
                     // Is this row physically travelling? `y` against the slot its LIVE
@@ -858,20 +869,40 @@ Item {
                             easing.type: Easing.OutQuint
                         }
                     }
-                    Behavior on opacity {
-                        enabled: root.animateRows && !MotionTokens.reducedMotion
-                        NumberAnimation {
-                            duration: (windowRow.exiting
-                                ? MotionTokens.windowListFall : MotionTokens.windowListReveal)
-                                * root.debugTimeScale
-                            easing.type: windowRow.exiting
-                                ? MotionTokens.windowListFadeEasing
-                                : MotionTokens.windowListRevealEasing
+                    // Detach only the retiring visual from the live positioner.
+                    Item {
+                        id: rowVisual
+                        parent: windowRow.ghostActive ? windowRow.ghostHost : windowRow
+                        x: windowRow.ghostActive ? windowRow.ghostX : 0
+                        y: windowRow.ghostActive ? windowRow.ghostY : 0
+                        width: windowRow.ghostActive ? windowRow.ghostWidth : windowRow.width
+                        height: root.rowHeight
+                        z: windowRow.ghostActive ? 10 : 0
+                        enabled: !windowRow.ghostActive
+                        opacity: windowRow.entering || windowRow.exiting ? 0 : 1
+                        Behavior on opacity {
+                            enabled: root.animateRows && !MotionTokens.reducedMotion
+                            NumberAnimation {
+                                duration: (windowRow.exiting
+                                    ? MotionTokens.windowListFall : MotionTokens.windowListReveal)
+                                    * root.debugTimeScale
+                                easing.type: windowRow.exiting
+                                    ? MotionTokens.windowListFadeEasing
+                                    : MotionTokens.windowListRevealEasing
+                            }
                         }
-                    }
-                    opacity: windowRow.entering || windowRow.exiting ? 0 : 1
-                    // The outer item owns the animated slot; this child paints only the
-                    // visible card and leaves the pitch gap transparent.
+                        transform: Translate {
+                            y: windowRow.exiting ? root.rowHeight : 0
+                            Behavior on y {
+                                enabled: !MotionTokens.reducedMotion
+                                NumberAnimation {
+                                    duration: MotionTokens.windowListFall * root.debugTimeScale
+                                    easing.type: MotionTokens.windowListFallEasing
+                                }
+                            }
+                        }
+
+                    // The visual keeps its full size while the slot collapses.
                     Rectangle {
                         id: cardSurface
                         width: parent.width
@@ -896,13 +927,9 @@ Item {
                     // The overlay is a CHILD, so it paints above this fill and below the
                     // icon and title that follow it - which is the whole reason the tint is
                     // not on this rectangle. A fill above the row's content veiled both.
-                    color: "transparent"
                     // A Rectangle borders itself by default; this row's own tint is its
                     // focus signal, so that default is off - the outline that marks the
                     // focused row is the one shared element, and it has its own border.
-                    border.width: 0
-                    scale: rowPress.pressed ? MotionTokens.pressScale : 1
-                    enabled: root.interactive && !windowRow.entering && !windowRow.exiting
 
                     // Test seam for the shared click-flash recipe.
                     readonly property alias rowFlashAnimation: rowFlash
@@ -966,9 +993,7 @@ Item {
                     // can be caused by the frame - which is what makes the gate that used
                     // to sit here pointless rather than merely unused. A short fade on hover
                     // is the settings panel's own recipe and stays.
-                    Behavior on color {
-                        ColorAnimation { duration: MotionTokens.fast * debugTimeScale }
-                    }
+                    scale: rowPress.pressed ? MotionTokens.pressScale : 1
                     Behavior on scale {
                         enabled: !MotionTokens.reducedMotion
                         NumberAnimation { duration: MotionTokens.fast * debugTimeScale
@@ -1035,6 +1060,9 @@ Item {
                         easing.type: MotionTokens.clickFlashEasing
                     }
 
+                    } // rowVisual
+
+                    enabled: root.interactive && !windowRow.entering && !windowRow.exiting
                     HoverHandler { id: rowHover; blocking: false }
                     TapHandler {
                         id: rowPress

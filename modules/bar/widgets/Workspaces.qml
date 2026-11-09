@@ -291,6 +291,13 @@ Item {
                 continue
             }
             if (animateRows) {
+                if (!model.get(i).retiring) {
+                    for (let w = 0; w < workspaceRepeater.count; w++) {
+                        const square = workspaceRepeater.itemAt(w)
+                        if (square && square.wins === model)
+                            square.freezeIcon(id)
+                    }
+                }
                 model.setProperty(i, "retiring", true)
                 model.setProperty(i, "entering", false)
             } else {
@@ -354,6 +361,13 @@ Item {
                 model.setProperty(at, "entering", false)
             }
         }
+    }
+
+    function exitVisualHost() {
+        let host = root
+        while (host.parent)
+            host = host.parent
+        return host
     }
 
     function removeRetiredIcon(wsId, winId) {
@@ -589,8 +603,8 @@ Item {
                 readonly property bool hasWindows: root.hasWindowsFor(wsId)
                 readonly property bool hovered: hoverHandler.hovered
 
-                width: hasWindows ? contentRow.implicitWidth + root.cellPadding * 2
-                                  : LazerTheme.barWidgetHeight
+                width: Math.max(LazerTheme.barWidgetHeight,
+                    contentRow.implicitWidth + root.cellPadding * 2)
                 height: LazerTheme.barWidgetHeight
 
                 onXChanged: {
@@ -609,21 +623,33 @@ Item {
                     return p.x
                 }
 
+                function freezeIcon(key) {
+                    for (let i = 0; i < windowRepeater.count; i++) {
+                        const item = windowRepeater.itemAt(i)
+                        if (item && item.winId === key)
+                            item.freezeExit()
+                    }
+                }
+
                 function iconSlotX(index) {
                     let x = workspaceNumber.width
-                    for (let i = 0; wins && i < index && i < wins.count; i++) {
-                        if (!wins.get(i).retiring)
-                            x += root.iconSize + root.iconSpacing
+                    for (let i = 0; i < index; i++) {
+                        const item = windowRepeater.itemAt(i)
+                        if (item)
+                            x += item.width
                     }
                     return x
                 }
 
-                function placeIcons() {
+                property bool carryingSlots: false
+                function placeIcons(carry) {
+                    workspaceSquare.carryingSlots = carry === true
                     for (let i = 0; i < windowRepeater.count; i++) {
                         const item = windowRepeater.itemAt(i)
                         if (item && !item.retiring)
                             item.slotTargetX = workspaceSquare.iconSlotX(i)
                     }
+                    workspaceSquare.carryingSlots = false
                 }
 
                 function iconsMoving() {
@@ -665,13 +691,6 @@ Item {
                     return NaN
                 }
 
-                Behavior on width {
-                    enabled: !MotionTokens.reducedMotion
-                    NumberAnimation {
-                        duration: MotionTokens.fast
-                        easing.type: Easing.OutQuad
-                    }
-                }
 
                 Rectangle {
                     anchors.fill: parent
@@ -747,22 +766,34 @@ Item {
                             readonly property alias positionMotion: iconPositionMotion
                             x: windowIcon.slotTargetX
                             y: 0
-                            property bool exitVisualDone: false
+                            property bool ghostActive: false
+                            property real ghostX: 0
+                            property real ghostY: 0
+                            property Item ghostHost: null
+                            function freezeExit() {
+                                if (windowIcon.ghostActive || !windowIcon.placed)
+                                    return
+                                windowIcon.ghostHost = root.exitVisualHost()
+                                const point = windowIcon.mapToItem(windowIcon.ghostHost, root.iconSpacing, 0)
+                                windowIcon.ghostX = point.x
+                                windowIcon.ghostY = point.y
+                                windowIcon.ghostActive = true
+                            }
                             onRetiringChanged: {
-                                if (!windowIcon.retiring)
-                                    windowIcon.exitVisualDone = false
+                                if (windowIcon.retiring)
+                                    windowIcon.freezeExit()
+                                else
+                                    windowIcon.ghostActive = false
                             }
-                            Timer {
-                                interval: MotionTokens.windowListFall
-                                running: windowIcon.retiring && windowIcon.motionEnabled
-                                onTriggered: windowIcon.exitVisualDone = true
-                            }
-                            width: windowIcon.entering || windowIcon.exitVisualDone
+                            width: windowIcon.entering || windowIcon.retiring
                                 ? 0 : root.iconSize + root.iconSpacing
                             z: windowIcon.retiring ? 1 : 0
                             height: root.iconSize
                             enabled: !windowIcon.retiring && !windowIcon.entering
-                            onWidthChanged: contentRow.implicitWidth = workspaceSquare.iconsWidth()
+                            onWidthChanged: {
+                                contentRow.implicitWidth = workspaceSquare.iconsWidth()
+                                workspaceSquare.placeIcons(true)
+                            }
                             Component.onCompleted: {
                                 windowIcon.slotTargetX = workspaceSquare.iconSlotX(windowIcon.index)
                                 windowIcon.placed = true
@@ -775,6 +806,7 @@ Item {
 
                             Behavior on x {
                                 enabled: windowIcon.motionEnabled && windowIcon.placed
+                                    && !workspaceSquare.carryingSlots
                                 NumberAnimation {
                                     id: iconPositionMotion
                                     duration: MotionTokens.workspaceIconMove
@@ -794,13 +826,19 @@ Item {
 
                             // Reference: MarqueeLabel ghost drop and scan-character reveal.
                             IconImage {
-                                x: root.iconSpacing
-                                y: windowIcon.retiring ? root.iconSize : 0
-                                Behavior on y {
-                                    enabled: windowIcon.motionEnabled
-                                    NumberAnimation {
-                                        duration: MotionTokens.windowListFall
-                                        easing.type: MotionTokens.windowListFallEasing
+                                parent: windowIcon.ghostActive ? windowIcon.ghostHost : windowIcon
+                                enabled: !windowIcon.ghostActive
+                                x: windowIcon.ghostActive ? windowIcon.ghostX : root.iconSpacing
+                                y: windowIcon.ghostActive ? windowIcon.ghostY : 0
+                                z: windowIcon.ghostActive ? 10 : 0
+                                transform: Translate {
+                                    y: windowIcon.ghostActive ? root.iconSize : 0
+                                    Behavior on y {
+                                        enabled: windowIcon.motionEnabled
+                                        NumberAnimation {
+                                            duration: MotionTokens.windowListFall
+                                            easing.type: MotionTokens.windowListFallEasing
+                                        }
                                     }
                                 }
                                 width: root.iconSize
