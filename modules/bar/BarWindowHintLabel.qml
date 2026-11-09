@@ -43,11 +43,28 @@ Item {
     width: implicitWidth
     height: rowHeight
 
+    // The row's own surface, in the same place in the paint order as the active
+    // card's. A neighbour column has to read as the same LIST as the active one -
+    // same 28px rows on the same 34px pitch - and a row with no surface read as a
+    // thinner, denser line than the card beside it. It is the active card's tone at
+    // reduced presence rather than a different surface: a neighbour is context for
+    // the workspace you are on, which is what keeps it muted.
+    Rectangle {
+        anchors.fill: parent
+        radius: 6
+        color: LazerTheme.settingsCard
+        opacity: rowHover.hovered ? 0.72 : 0.4
+        Behavior on opacity {
+            enabled: !MotionTokens.reducedMotion
+            NumberAnimation { duration: MotionTokens.fast; easing.type: Easing.OutQuint }
+        }
+    }
+
     // The focus tint, in the same place in the paint order as the active row's: above
-    // this row's own surface - of which a neighbour has none - and below the glyph and
-    // title that follow, so the text is never veiled. Same colour and radius, because
-    // it is the same mark: the focus frame's own rectangle, clipped to this card, and
-    // identical in shape to the frame's border it sits inside.
+    // this row's own surface and below the glyph and title that follow, so the text
+    // is never veiled. Same colour and radius, because it is the same mark: the focus
+    // frame's own rectangle, clipped to this card, and identical in shape to the
+    // frame's border it sits inside.
     Rectangle {
         objectName: "windowHintLabelFocusMask"
         x: 0
@@ -80,7 +97,7 @@ Item {
         }
     }
 
-    // A generous hit area: a neighbour label has no card behind it, so the
+    // A generous hit area: the surface is a wash rather than a control, so the
     // pointer needs the whole row rather than the text's own extent.
     Text {
         id: rowTitle
@@ -91,7 +108,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         text: root.modelData ? root.modelData.title : ""
         color: rowHover.hovered ? LazerTheme.textPrimary : LazerTheme.textMuted
-        font.pixelSize: 11
+        font.pixelSize: 12
         elide: Text.ElideRight
         maximumLineCount: 1
 

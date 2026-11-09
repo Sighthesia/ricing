@@ -367,8 +367,23 @@ Item {
         + (_selectionTop - _selectionFrameFrom) * _selectionFrameProgress
     readonly property real _selectionHead: _selectionHeadFrom
         + (_selectionTop - _selectionHeadFrom) * _selectionHeadProgress
+    property real _layoutTailOffset: 0
     readonly property real _selectionTail: _selectionTailFrom
         + (_selectionTop - _selectionTailFrom) * _selectionTailProgress
+        + root._layoutTailOffset
+
+    // A same-window reorder carries the head with the card while its wake follows.
+    Timer {
+        interval: MotionTokens.motionFrame
+        repeat: true
+        running: !root._markerCrossing && Math.abs(root._layoutTailOffset) > 0.01
+        onTriggered: {
+            if (MotionTokens.reducedMotion || Math.abs(root._layoutTailOffset) < 0.1)
+                root._layoutTailOffset = 0
+            else
+                root._layoutTailOffset *= 1 - MotionTokens.motionFollowRate
+        }
+    }
 
     // Focus progress has its own clock. Its destination is the physical card, so
     // simultaneous layout motion cannot cancel or restart the focus transition.
@@ -438,6 +453,7 @@ Item {
             root._selectionFrameProgress = 1
             root._selectionHeadProgress = 1
             root._selectionTailProgress = 1
+            root._layoutTailOffset = 0
             root._syncSelection()
         }
     }
@@ -451,12 +467,16 @@ Item {
         if (!isFinite(top))
             return
         if (root._selectionPlaced && key === root._selectionKey) {
+            const delta = top - root._selectionTop
+            if (!MotionTokens.reducedMotion && root.hasTarget)
+                root._layoutTailOffset -= delta * root._selectionTailProgress
             root._selectionTop = top
             return
         }
         const frame = root._frameAnchorY
         const head = root._selectionHead
         const tail = root._selectionTail
+        root._layoutTailOffset = 0
         focusFrameGlide.stop()
         selectionHeadGlide.stop()
         selectionTailGlide.stop()

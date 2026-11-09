@@ -797,21 +797,37 @@ Item {
                             root.layoutMoved()
                         }
                     }
-                    x: root.cellPaddingX - windowRow.rowInset
+                    x: root.cellPaddingX
                     width: stripColumn.cardWidth
                     // The delegate owns its pitch, including the gap below the card. The
                     // visual rectangle is clipped to the row height, so an exit closes its
                     // slot completely instead of leaving Column.spacing behind.
-                    height: windowRow.entering || windowRow.exiting ? 0 : root.rowPitch
+                    property bool exitVisualDone: false
+                    height: windowRow.entering || windowRow.exitVisualDone ? 0 : root.rowPitch
                     radius: 6
-                    clip: true
+                    clip: false
+                    z: windowRow.exiting ? 1 : 0
+                    // Reference: MarqueeLabel's removed glyph, applied to the full row.
+                    transform: Translate {
+                        y: windowRow.exiting ? root.rowHeight : 0
+                        Behavior on y {
+                            enabled: !MotionTokens.reducedMotion
+                            NumberAnimation {
+                                duration: MotionTokens.windowListFall * root.debugTimeScale
+                                easing.type: MotionTokens.windowListFallEasing
+                            }
+                        }
+                    }
+                    onExitingChanged: {
+                        if (!windowRow.exiting)
+                            windowRow.exitVisualDone = false
+                    }
+                    Timer {
+                        interval: MotionTokens.windowListFall * root.debugTimeScale
+                        running: windowRow.exiting && !MotionTokens.reducedMotion
+                        onTriggered: windowRow.exitVisualDone = true
+                    }
                     transformOrigin: Item.Center
-                    // A row arrives from beside its slot and leaves the same way, so an
-                    // insert and a close read as a row entering and withdrawing rather
-                    // than as a card growing out of nothing. The inset is inside the
-                    // column's own padding, so it never crosses the column's edge.
-                    readonly property real rowInset: windowRow.entering || windowRow.exiting
-                        ? root.rowEnterInset : 0
                     // Is this row physically travelling? `y` against the slot its LIVE
                     // position names - the model index counts the rows that are still
                     // collapsing, and those occupy no height, so they are not slots.
@@ -825,7 +841,8 @@ Item {
                     }
                     Timer {
                         id: exitTimer
-                        interval: MotionTokens.windowHintExit
+                        interval: (MotionTokens.windowListFall + MotionTokens.windowHintExit)
+                            * root.debugTimeScale
                         repeat: false
                         running: windowRow.exiting && !MotionTokens.reducedMotion
                         onTriggered: root.removeActiveRow(windowRow.windowId)
@@ -833,14 +850,6 @@ Item {
                     // The positioner places `y`; this follows it. The duration is the
                     // token for a row that MOVED, so a reorder reads on the same clock
                     // as the slot that opened or closed around it.
-                    Behavior on x {
-                        enabled: root.animateRows && !MotionTokens.reducedMotion
-                        NumberAnimation {
-                            duration: windowRow.exiting
-                                ? MotionTokens.windowHintExit : MotionTokens.windowHintEnter
-                            easing.type: Easing.OutQuint
-                        }
-                    }
                     Behavior on height {
                         enabled: root.animateRows && !MotionTokens.reducedMotion
                         NumberAnimation {
@@ -852,9 +861,12 @@ Item {
                     Behavior on opacity {
                         enabled: root.animateRows && !MotionTokens.reducedMotion
                         NumberAnimation {
-                            duration: windowRow.exiting
-                                ? MotionTokens.windowHintExit : MotionTokens.windowHintEnter
-                            easing.type: Easing.OutQuad
+                            duration: (windowRow.exiting
+                                ? MotionTokens.windowListFall : MotionTokens.windowListReveal)
+                                * root.debugTimeScale
+                            easing.type: windowRow.exiting
+                                ? MotionTokens.windowListFadeEasing
+                                : MotionTokens.windowListRevealEasing
                         }
                     }
                     opacity: windowRow.entering || windowRow.exiting ? 0 : 1
@@ -890,7 +902,7 @@ Item {
                     // focused row is the one shared element, and it has its own border.
                     border.width: 0
                     scale: rowPress.pressed ? MotionTokens.pressScale : 1
-                    enabled: root.interactive
+                    enabled: root.interactive && !windowRow.entering && !windowRow.exiting
 
                     // Test seam for the shared click-flash recipe.
                     readonly property alias rowFlashAnimation: rowFlash

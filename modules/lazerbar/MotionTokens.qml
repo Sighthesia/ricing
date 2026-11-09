@@ -111,6 +111,12 @@ QtObject {
     readonly property int trayIconEnter: 140
     readonly property int trayIconExit: 200
     // Window hint slots and workspace icons use compact list motion.
+    // Match MarqueeLabel's scan reveal and removed-glyph ghost.
+    readonly property int windowListReveal: 140
+    readonly property int windowListFall: 200
+    readonly property int windowListFallEasing: Easing.InQuad
+    readonly property int windowListFadeEasing: Easing.Linear
+    readonly property int windowListRevealEasing: Easing.OutQuad
     readonly property int windowHintEnter: 140
     readonly property int windowHintExit: 200
     readonly property int windowHintMove: 240
