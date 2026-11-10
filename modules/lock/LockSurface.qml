@@ -603,11 +603,13 @@ WlSessionLockSurface {
                 digitFontFamily: "monospace"
                 digitWeight: Font.Black
                 showSeconds: false
+                showSecondsAtHourBoundary: true
                 digitColor: root.clockColor
                 mutedDigitColor: root.clockDateColor
                 separatorColor: root.clockColor
                 hourTransitionDuration: Lazer.MotionTokens.clockHourFlip
                 minuteTransitionDuration: Lazer.MotionTokens.clockMinuteFlip
+                secondTransitionDuration: Lazer.MotionTokens.clockSecondFlip
                 transitionEasing: Lazer.MotionTokens.clockFlipEasing
             }
 

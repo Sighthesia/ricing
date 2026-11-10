@@ -10,6 +10,14 @@ Item {
 
     property date currentTime: new Date()
     property bool showSeconds: false
+    // When true, lend the seconds pair for the minute the hour turns in and
+    // the minute before it (minutes 0 and 59), the same top-of-hour window the
+    // bar clock widget uses, without keeping seconds resident all day.
+    property bool showSecondsAtHourBoundary: false
+    readonly property bool _effectiveShowSeconds: root.showSeconds
+        || (root.showSecondsAtHourBoundary
+            && (root.currentTime.getMinutes() === 0
+                || root.currentTime.getMinutes() === 59))
     property color digitColor: "white"
     property color mutedDigitColor: "white"
     property color separatorColor: "white"
@@ -55,13 +63,13 @@ Item {
     implicitHeight: Math.max(hourGroup.implicitHeight, minuteGroup.implicitHeight, secondDigits.implicitHeight)
 
     // The pair sits as the last child of the time row and slides open and shut
-    // over `showSeconds` instead of appearing and vanishing. Callers (the bar
-    // clock's top-of-hour window) toggle the pair once an hour, so a hard cut
-    // would read as the clock snapping wider. The Row places it by its animated
-    // width, so it trails the minute pair while the box opens; the ink inside is
-    // laid out at full width and wiped in by `clip`, never repositioned. The
-    // box is as tall as the row, so `clip` only ever bites on the horizontal
-    // axis it is there for.
+    // over the effective seconds visibility instead of appearing and vanishing.
+    // Callers (the bar clock's top-of-hour window) toggle the pair once an
+    // hour, so a hard cut would read as the clock snapping wider. The Row places
+    // it by its animated width, so it trails the minute pair while the box
+    // opens; the ink inside is laid out at full width and wiped in by `clip`,
+    // never repositioned. The box is as tall as the row, so `clip` only ever
+    // bites on the horizontal axis it is there for.
 
     // Ink box of the digits actually drawn, in this item's coordinates. The
     // strip a digit rolls inside is taller than the glyphs it shows (the roll
@@ -176,7 +184,7 @@ Item {
         id: secondsReveal
 
         x: minuteGroup.x + minuteGroup.width + root.digitSpacing
-        implicitWidth: root.showSeconds
+        implicitWidth: root._effectiveShowSeconds
             ? secondSeparator.implicitWidth + secondDigits.implicitWidth + root.digitSpacing
             : 0
         width: implicitWidth
