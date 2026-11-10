@@ -158,17 +158,80 @@ Singleton {
         }
     }
 
+    function iconAliasCandidates(appId) {
+        return root._iconAliasCandidates(appId)
+    }
+
+    function iconPathForApp(appId) {
+        return root._iconPathForApp(appId)
+    }
+
+    function _iconAliasCandidates(appId) {
+        const raw = String(appId || "")
+        if (!raw)
+            return []
+        const lower = raw.toLowerCase()
+        const aliases = {
+            "jlceda-pro": ["lceda-pro", "easyeda", "easyeda-pro"],
+            "lceda-pro": ["jlceda-pro", "easyeda", "easyeda-pro"],
+            "linuxqq": ["qq"],
+            "qq": ["linuxqq"]
+        }
+        const all = []
+        const seen = {}
+        function push(v) {
+            const s = String(v || "")
+            if (!s || seen[s])
+                return
+            seen[s] = true
+            all.push(s)
+        }
+        push(raw)
+        push(lower)
+        const a1 = aliases[raw] || []
+        const a2 = aliases[lower] || []
+        for (let i = 0; i < a1.length; i++) push(a1[i])
+        for (let i = 0; i < a2.length; i++) push(a2[i])
+        // Prefer aliases/lowercase over a mismatched raw app id when falling
+        // back to icon names (e.g. jlceda-pro -> lceda-pro, QQ -> qq).
+        const preferred = []
+        const preferredSeen = {}
+        function pushPreferred(v) {
+            const s = String(v || "")
+            if (!s || preferredSeen[s])
+                return
+            preferredSeen[s] = true
+            preferred.push(s)
+        }
+        if (lower !== raw)
+            pushPreferred(lower)
+        const aliasList = (aliases[raw] || []).concat(aliases[lower] || [])
+        for (let j = 0; j < aliasList.length; j++)
+            pushPreferred(aliasList[j])
+        pushPreferred(raw)
+        if (lower === raw)
+            pushPreferred(lower)
+        return { all: all, preferred: preferred }
+    }
+
     function _iconPathForApp(appId) {
-        if (!appId)
-            return Quickshell.iconPath("application-x-executable")
+        const fallback = Quickshell.iconPath("application-x-executable")
+        const groups = root._iconAliasCandidates(appId)
+        const all = groups.all || []
+        const preferred = groups.preferred || []
+        if (all.length === 0)
+            return fallback
 
-        const entry = Quickshell.desktopEntries
-            ? Quickshell.desktopEntries.byId(appId)
-            : null
-        if (entry && entry.icon)
-            return Quickshell.iconPath(entry.icon, "application-x-executable")
-
-        return Quickshell.iconPath(appId, "application-x-executable")
+        const entries = Quickshell.desktopEntries
+        for (let i = 0; i < all.length; i++) {
+            const id = all[i]
+            const entry = entries ? entries.byId(id) : null
+            if (entry && entry.icon)
+                return Quickshell.iconPath(String(entry.icon), "application-x-executable")
+        }
+        // iconPath() returns an image://icon URL even when missing; using
+        // preferred order lets known aliases (lceda-pro/qq) win over raw ids.
+        return Quickshell.iconPath(preferred[0] || all[0], "application-x-executable")
     }
 
     function _activeWorkspace() {

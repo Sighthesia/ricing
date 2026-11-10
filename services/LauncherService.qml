@@ -93,22 +93,11 @@ Singleton {
         clipboardBackend: Services.ClipboardService,
         shortcutsBackend: Services.NiriShortcutService,
         iconResolver: function(name) {
-            // `check = false` on purpose. The checked form asks Quickshell
-            // whether the name exists, and that check does not see the user's
-            // icon theme: with Papirus configured, every app whose icon ships
-            // only in Papirus came back "" (firefox, obsidian, blender, btop,
-            // inkscape, clash-verge, nvtop's neighbours…) while the handful that
-            // also exist under hicolor resolved fine — so the launcher showed an
-            // empty 40px rail for most of the list and read as a broken row.
-            //
-            // The unchecked form always hands back the `image://icon/<name>`
-            // URL, and the `image://` provider resolves it through the real
-            // theme chain, which is the only place that knows the answer. A name
-            // that genuinely has no icon now resolves to an image that fails to
-            // paint, and the row's existing `iconFailed` handling takes it from
-            // there — the decision belongs to the image loader, not to a
-            // lookup that cannot see the theme.
-            return name ? String(Quickshell.iconPath(name, false)) : ""
+            // Return an unchecked `image://icon/...` URL (not the checked
+            // iconPath form, which can miss user themes like Papirus) and add
+            // an explicit provider fallback so missing icons render the theme's
+            // default executable icon instead of a broken/black block.
+            return name ? "image://icon/" + String(name) + "?fallback=application-x-executable" : ""
         },
         appCategoryResolver: LauncherCategories.appCategoryOf,
         clipCategoryResolver: LauncherCategories.clipCategoryOf,
