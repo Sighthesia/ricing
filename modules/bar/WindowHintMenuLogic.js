@@ -215,13 +215,6 @@ function slotWidth(rel, columnWidth, activeColumnWidth) {
     return columnWidth + (activeColumnWidth - columnWidth) * share
 }
 
-// What a neighbour column says when that workspace has no windows. An i18n KEY
-// rather than a sentence (this module is Qt-free and shared), named here so
-// the label is one string rather than two literals, and so the wording is stated
-// once: it names no workspace, because a column with no number on it cannot say
-// which one it is - the position in the panel already does that.
-var NEIGHBOUR_EMPTY_LABEL = "hint.noWindows"
-
 // Index of the focused row within a list of rows, or -1. niri reports at most one
 // focused window, so this is the single row the focus marker belongs to. An index
 // past the cap is never returned: the window is real but not on screen, and a

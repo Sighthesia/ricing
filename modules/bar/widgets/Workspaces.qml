@@ -859,7 +859,8 @@ Item {
                                     }
                                 }
                                 transformOrigin: Item.TopLeft
-                                scale: windowIcon.retiring ? MotionTokens.windowGhostScale : 1
+                                scale: (windowIcon.entering || windowIcon.retiring)
+                                    ? MotionTokens.windowGhostScale : 1
                                 Behavior on scale {
                                     enabled: windowIcon.motionEnabled
                                     NumberAnimation {
@@ -869,8 +870,10 @@ Item {
                                     }
                                 }
                                 transform: Translate {
-                                    x: windowIcon.retiring ? MotionTokens.windowGhostOffset : 0
-                                    y: windowIcon.retiring ? MotionTokens.windowGhostOffset : 0
+                                    x: (windowIcon.entering || windowIcon.retiring)
+                                        ? MotionTokens.windowGhostOffset : 0
+                                    y: (windowIcon.entering || windowIcon.retiring)
+                                        ? MotionTokens.windowGhostOffset : 0
                                     Behavior on x {
                                         enabled: windowIcon.motionEnabled
                                         NumberAnimation {

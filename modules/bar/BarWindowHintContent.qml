@@ -709,16 +709,15 @@ Item {
     // Where the arrival lands: the focused card's own top edge, in the SCROLLED space
     // that `focusedRowTop` is measured in.
     //
-    // With nothing focused on the arriving side there is no card to land on, and
-    // `focusedRowTop` answers "no row" with 0 - which is the FIRST card's top edge, a
-    // perfectly real coordinate naming a row that is not there. Folding the arrival's
-    // end back onto its start makes the leg degenerate instead: the marker stays above
-    // the panel for the whole of it rather than descending onto the first card of an
-    // empty column.
-    // Degenerate rather than landing on the first card of a column with nothing in it.
-    // Both ends of that leg are off the panel on this journey's own side, so the marker
-    // is out of sight for the whole of it.
-    readonly property real crossingTo: hasTarget ? focusedRowTop : crossingFrom
+    // Frozen for the duration of a marker crossing: a within-workspace focus change
+    // can arrive mid-journey (direction 0 snapshot / niri follow-up) and replace the
+    // arriving columns, which would otherwise retarget `focusedRowTop` while
+    // `legProgress` is unchanged and teleport `crossingTop`. The journey keeps its
+    // original landing point; once the crossing ends, `_syncSelection()` glides the
+    // resting indicator to the actual focused row.
+    property real _frozenCrossingTo: 0
+    readonly property real crossingTo: _markerCrossing
+        ? _frozenCrossingTo : (hasTarget ? focusedRowTop : crossingFrom)
 
     // The marker traverses the panel in ONE clock, in two legs: down and out through
     // the bottom, then in through the top and down onto the card. The corner between
@@ -1088,6 +1087,10 @@ Item {
         root._departingRowIndex = HintLogic.focusedIndexIn(
             HintLogic.rowsFromList(root.leavingHint ? root.leavingHint.windows : null))
         root._exitFrom = root.exitFrom
+        // Freeze the arrival landing target for this new journey; a mid-crossing
+        // focus retarget animation must not fight the fresh destination.
+        crossingToRetarget.stop()
+        root._frozenCrossingTo = root.hasTarget ? root.focusedRowTop : root.crossingFrom
         root.positionFrom = plan.fromPosition
         root.positionTo = plan.toPosition
         root.slideProgress = 0
@@ -1134,6 +1137,9 @@ Item {
         // Already true on a re-aim, and deliberately not reset: the marker carries on
         // down through the second switch rather than restarting its journey.
         root._markerCrossing = true
+        // Freeze the new arrival landing target for this re-aimed journey.
+        crossingToRetarget.stop()
+        root._frozenCrossingTo = root.hasTarget ? root.focusedRowTop : root.crossingFrom
         // The tracker is not told anything here, and that is the design rather than an
         // omission: it was re-aimed by the publish that got here, because that publish
         // replaced the columns and therefore the focused window. `_retargetIndicator`
@@ -1216,6 +1222,17 @@ Item {
     // `slideRun.onFinished` narrows the strip. The arrival then has the second half to
     // itself, landing on a panel that has stopped moving rather than chasing content that
     // is still sliding. Adding the departure cost the journey no extra time at all.
+    // Smoothly retargets the frozen arrival landing point when focus moves within
+    // the arriving workspace during a marker crossing. Keeps focus frame/indicator
+    // motion continuous without restarting the workspace crossing clocks.
+    NumberAnimation {
+        id: crossingToRetarget
+        target: root
+        property: "_frozenCrossingTo"
+        duration: MotionTokens.windowHintMove * debugTimeScale
+        easing.type: Easing.OutQuint
+    }
+
     NumberAnimation {
         id: crossingRun
         target: root
@@ -2486,6 +2503,18 @@ Item {
         root._placed = true
         if (root._targetKey !== root.focusedWindowKey) {
             root._targetKey = root.focusedWindowKey
+            // Focus moved within the arriving workspace while the crossing is still in
+            // flight. Retarget the frozen landing point smoothly so the focus frame and
+            // indicator travel continuously instead of freezing on the stale row.
+            const landing = root.hasTarget ? root.focusedRowTop : root.crossingFrom
+            if (MotionTokens.reducedMotion) {
+                crossingToRetarget.stop()
+                root._frozenCrossingTo = landing
+            } else if (Math.abs(landing - root._frozenCrossingTo) > 0.5) {
+                crossingToRetarget.stop()
+                crossingToRetarget.to = landing
+                crossingToRetarget.restart()
+            }
             if (!MotionTokens.reducedMotion)
                 root._flashIndicator.restart()
         }

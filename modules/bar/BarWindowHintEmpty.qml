@@ -1,6 +1,5 @@
 import QtQuick
 import "../lazerbar"
-import "./WindowHintMenuLogic.js" as HintLogic
 import "../../services" as Services
 
 // The placeholder a column shows when its workspace has no windows.
@@ -15,8 +14,7 @@ import "../../services" as Services
 // row looks like, and a placeholder that imitates one would be a lie the user
 // has to tap to discover. An outline cannot be mistaken for a control.
 //
-// The label names no workspace. A column carries no number, so its position in
-// the panel is what says which workspace it belongs to.
+// The slot shows the workspace number so an empty column is still identifiable.
 Item {
     id: root
 
@@ -24,6 +22,17 @@ Item {
     // on one pitch whether or not any of them is empty.
     property real rowHeight: 28
     property real rowRadius: 6
+    property int workspacePosition: -1
+    readonly property string workspaceLabel: {
+        const workspaces = Services.NiriService.workspaces
+        const position = root.workspacePosition
+        if (!workspaces || position < 0 || position >= workspaces.count)
+            return ""
+        const ws = workspaces.get(position)
+        const idx = ws && ws.idx !== undefined ? ws.idx : (position + 1)
+        return String(idx)
+    }
+    readonly property bool hasWorkspaceLabel: workspaceLabel !== ""
 
     implicitWidth: 180
     implicitHeight: rowHeight
@@ -49,9 +58,9 @@ Item {
         objectName: "windowHintEmptySlotLabel"
         anchors.centerIn: parent
         width: parent.width - 16
-        text: Services.Tr.q(HintLogic.NEIGHBOUR_EMPTY_LABEL)
+        text: root.workspaceLabel
         color: LazerTheme.textMuted
-        font.pixelSize: 10
+        font.pixelSize: 11
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
         maximumLineCount: 1

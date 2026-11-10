@@ -918,7 +918,8 @@ Item {
                             }
                         }
                         transformOrigin: Item.TopLeft
-                        scale: windowRow.exiting ? MotionTokens.windowGhostScale : 1
+                        scale: (windowRow.entering || windowRow.exiting)
+                            ? MotionTokens.windowGhostScale : 1
                         Behavior on scale {
                             enabled: !MotionTokens.reducedMotion
                             NumberAnimation {
@@ -928,8 +929,10 @@ Item {
                             }
                         }
                         transform: Translate {
-                            x: windowRow.exiting ? MotionTokens.windowGhostOffset : 0
-                            y: windowRow.exiting ? MotionTokens.windowGhostOffset : 0
+                            x: (windowRow.entering || windowRow.exiting)
+                                ? MotionTokens.windowGhostOffset : 0
+                            y: (windowRow.entering || windowRow.exiting)
+                                ? MotionTokens.windowGhostOffset : 0
                             Behavior on x {
                                 enabled: !MotionTokens.reducedMotion
                                 NumberAnimation {
@@ -1160,16 +1163,16 @@ Item {
                 }
             }
 
-            // The slot this column shows when its workspace has no windows. The
-            // same for the active column as for a neighbour: an empty workspace is
-            // the same fact wherever it is, and a different shape for the middle
-            // one would make the panel look as if it had a special case in it.
+            // The slot this column shows when its workspace has no windows and a
+            // workspace number is known. Without a number there is no stable label to
+            // show, so the placeholder frame is omitted.
             BarWindowHintEmpty {
                 objectName: "windowHintColumnEmpty"
                 x: root.cellPaddingX
                 width: stripColumn.cardWidth
                 rowHeight: root.rowHeight
-                visible: stripColumn.rows.length === 0
+                workspacePosition: stripColumn.position
+                visible: stripColumn.rows.length === 0 && hasWorkspaceLabel
             }
 
             } // contentColumn
