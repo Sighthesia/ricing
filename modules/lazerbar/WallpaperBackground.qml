@@ -768,6 +768,9 @@ Variants {
                             ? 0 : seamFillets.stripHeight,
                         workingHeight: wallpaperWindow.height
                             - (Services.SettingsService.bar.floating ? 0 : seamFillets.stripHeight),
+                        // Horizontal span available to tiled windows (bar margins inset
+                        // the seam, but the bar does not consume horizontal space).
+                        workingWidth: Math.max(0, wallpaperWindow.width - seamFillets.floatingMargin * 2),
                         bandTop: seamFillets.bandTop,
                         bandBottom: seamFillets.bandBottom,
                         leftX0: seamFillets.floatingMargin,
