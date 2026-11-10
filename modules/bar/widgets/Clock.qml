@@ -26,6 +26,12 @@ Item {
     readonly property bool hovered: clockHover.hovered
 
     readonly property var defaults: WidgetSettingsRegistry.defaults("clock")
+    // Time type size shared by both renderers; the date keeps the bar's
+    // subtitle size below it.
+    readonly property int timePixelSize: 16
+    // Ink-to-ink gap between the time and date lines, aligned with the
+    // visual spacing between the active-window/media title and subtitle.
+    readonly property real clockLineGap: 4
     readonly property bool showDate: defaults.showDate !== false
     readonly property string formatParts:
         typeof defaults.timeFormat === "string" ? defaults.timeFormat : "yyyy.MM.dd|HH:mm"
@@ -95,8 +101,16 @@ Item {
     }
 
     Column {
+        id: clockColumn
+
         anchors.centerIn: parent
-        spacing: 1
+        // Stack the two lines by their ink, not their boxes: the rolling strip
+        // carries roll overscan below its glyphs and a Text box carries ascent
+        // above its glyphs, so a box-to-box spacing leaves more air than the
+        // active-window/media widgets' 1px line gap.
+        spacing: root.clockLineGap
+            - (rollingTime.height - rollingTime.digitInkBottom)
+            - (dateFont.ascent + dateInk.tightBoundingRect.top)
 
         // Time line: rolling digit strips with the flip transition, paced by
         // the ported clock flip tokens (old 300ms x 8/4/1, OutCubic).
@@ -111,7 +125,7 @@ Item {
             visible: root.useRollingDigits
             currentTime: root.now
             showSeconds: root.showSeconds
-            digitPixelSize: 14
+            digitPixelSize: root.timePixelSize
             digitFontFamily: "monospace"
             digitWeight: Font.Bold
             digitColor: LazerTheme.textPrimary
@@ -131,7 +145,7 @@ Item {
             text: root.timeText
             color: LazerTheme.textPrimary
             font.family: "monospace"
-            font.pixelSize: 14
+            font.pixelSize: root.timePixelSize
             font.bold: true
         }
 
@@ -148,6 +162,24 @@ Item {
             styleColor: LazerTheme.barSubtitleOutline
             font.family: "monospace"
             font.pixelSize: 10
+        }
+
+        FontMetrics {
+            id: dateFont
+
+            font.family: dateLabel.font.family
+            font.pixelSize: dateLabel.font.pixelSize
+            font.weight: dateLabel.font.weight
+        }
+
+        // Widest date glyph set, so the measured ink top covers every numeral.
+        TextMetrics {
+            id: dateInk
+
+            font.family: dateLabel.font.family
+            font.pixelSize: dateLabel.font.pixelSize
+            font.weight: dateLabel.font.weight
+            text: "0123456789."
         }
     }
 
