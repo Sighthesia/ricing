@@ -31,7 +31,7 @@ Item {
         var alpha = Math.max(0.05, Math.min(1, Number(settings && settings.opacity !== undefined
             ? settings.opacity : root.defaults.opacity) / 100))
         if (entry.source === "builtin")
-            return Qt.rgba(LazerTheme.barIcon.r, LazerTheme.barIcon.g, LazerTheme.barIcon.b, alpha)
+            return Qt.rgba(1, 1, 1, alpha)
         var base = entry.source === "textPrimary" ? LazerTheme.textPrimary
                 : entry.source === "textMuted" ? LazerTheme.textMuted
                 : entry.source === "osuPink" ? LazerTheme.osuPink

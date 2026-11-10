@@ -86,7 +86,7 @@ var _definitions = {
         instanceScoped: true,
         defaults: {
             color: "default",
-            opacity: 22,
+            opacity: 14,
         },
         controls: [
             { kind: "swatch", settingKey: "color", labelKey: "widgetSettings.divider.color",
