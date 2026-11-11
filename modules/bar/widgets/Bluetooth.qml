@@ -138,7 +138,7 @@ BarPill {
         width: LazerTheme.barWidgetHeight - 16
         height: LazerTheme.barIndicatorHeight
         radius: LazerTheme.barIndicatorRadius
-        color: Qt.rgba(1, 1, 1, 0.14)
+        color: LazerTheme.shade(LazerTheme.barIcon, 0.14)
         clip: true
 
         Rectangle {

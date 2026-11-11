@@ -388,7 +388,7 @@ BarPill {
             width: 3
             height: root.coverSize
             radius: 1.5
-            color: Qt.rgba(1, 1, 1, 0.14)
+            color: LazerTheme.shade(LazerTheme.barIcon, 0.14)
             clip: true
 
             // Beat flash across the whole track (reads mostly on the

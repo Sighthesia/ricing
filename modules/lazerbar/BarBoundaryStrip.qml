@@ -16,7 +16,7 @@ Item {
     property real length: LazerTheme.barGlyphSize
     // Empty room on each side of the rule, inside this item's own box.
     property real hPadding: 0
-    property color color: Qt.rgba(1, 1, 1, 0.14)
+    property color color: LazerTheme.shade(LazerTheme.barIcon, 0.14)
 
     implicitWidth: root.thickness + root.hPadding * 2
     implicitHeight: root.length
