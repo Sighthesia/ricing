@@ -39,6 +39,8 @@ function rows(registry, widgetId) {
         if (row.kind === "swatch") {
             row.options = swatchOptions(registry, control)
             row.defaultValue = String(shippedDefault !== undefined ? shippedDefault : "default")
+        } else if (row.kind === "toggle") {
+            row.defaultValue = shippedDefault === true
         } else if (row.kind === "slider") {
             row.from = Number(control.from !== undefined ? control.from : 0)
             row.to = Number(control.to !== undefined ? control.to : 100)

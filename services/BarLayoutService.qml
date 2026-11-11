@@ -232,6 +232,19 @@ QtObject {
     }
 
     // Persist the normalized layout model in the shell state directory.
+    // Seed instance-scoped widget defaults for everything the layout restores.
+    // Call once the layout file has loaded: widgets like the network traffic
+    // toggle read a settings object that must carry the shipped keys from the
+    // first frame, or a freshly added instance falls back to code-side "!=="-
+    // style defaults instead of the registry's.
+    function seedInstanceSettingDefaults() {
+        var widgets = layoutModel && layoutModel.widgets ? layoutModel.widgets : []
+        for (var i = 0; i < widgets.length; i++) {
+            if (widgets[i] && widgets[i].instanceKey)
+                SettingsService.ensureWidgetSettings(String(widgets[i].id || ""), String(widgets[i].instanceKey))
+        }
+    }
+
     property FileView layoutFile: FileView {
         id: layoutFile
 
@@ -245,12 +258,14 @@ QtObject {
                 layoutAdapter.layoutModel = normalizedLayout
                 writeAdapter()
             }
+            seedInstanceSettingDefaults()
         }
         onLoadFailed: error => {
             if (error === FileViewError.FileNotFound) {
                 layoutAdapter.layoutModel = BarLayoutModel.defaultLayoutModel()
                 writeAdapter()
             }
+            seedInstanceSettingDefaults()
         }
 
         JsonAdapter {

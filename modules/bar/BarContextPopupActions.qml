@@ -666,7 +666,8 @@ Item {
                         width: settingsPage.width
                         height: item ? item.height : 0
                         sourceComponent: modelData.kind === "slider" ? sliderRowComponent
-                            : modelData.kind === "swatch" ? swatchRowComponent : null
+                            : modelData.kind === "swatch" ? swatchRowComponent
+                            : modelData.kind === "toggle" ? toggleRowComponent : null
 
                         // The row shape travels on the item itself: the
                         // component's inner controls cannot see this Loader's
@@ -725,6 +726,34 @@ Item {
                     defaultValue: sliderRow.rowData ? sliderRow.rowData.defaultValue : undefined
                     onValueModified: function(next) {
                         root.commitSetting(sliderRow.settingKey, Math.round(Number(next)))
+                    }
+                }
+            }
+        }
+
+        // Boolean setting: the settings panel's own capsule, so an on/off row
+        // reads the same here as it does in the panel.
+        Component {
+            id: toggleRowComponent
+
+            LazerSettingsRow {
+                id: toggleRow
+
+                property var rowData: null
+
+                width: settingsPage.width
+                currentValue: root.settingValue(toggleRow.settingKey) === true
+                resetCallback: function() {
+                    root.commitSetting(toggleRow.settingKey, toggleRow.defaultValue === true)
+                }
+
+                readonly property string settingKey: rowData ? String(rowData.settingKey) : ""
+
+                LazerSettingsToggle {
+                    checked: root.settingValue(toggleRow.settingKey) === true
+                    accessibleName: toggleRow.labelText
+                    onToggled: function(value) {
+                        root.commitSetting(toggleRow.settingKey, value === true)
                     }
                 }
             }

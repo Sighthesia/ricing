@@ -64,11 +64,18 @@ var _definitions = {
         instanceScoped: true,
         defaults: {},
     },
+    // Traffic turns the square network glyph into a tall vertical stack: icon
+    // on top, then the live up/down rates running down its right side.
     "network": {
         title: "widgetSettings.network",
         panelKey: "network",
         instanceScoped: true,
-        defaults: {},
+        defaults: {
+            showTraffic: false,
+        },
+        controls: [
+            { kind: "toggle", settingKey: "showTraffic", labelKey: "widgetSettings.network.showTraffic" },
+        ],
     },
     "volume": {
         title: "widgetSettings.volume",
