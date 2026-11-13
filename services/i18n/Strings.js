@@ -165,6 +165,17 @@ var strings = {
     "settings.language.zh": { zh: "中文", en: "简体中文" },
     "settings.language.en": { zh: "English", en: "English" },
 
+    // ── Settings: bar fonts ──────────────────────────────────────────────
+    "settings.font.ui": { zh: "普通字体", en: "Interface font" },
+    "settings.font.ui.description": { zh: "顶栏标题与窗口信息的字体", en: "Font for the top bar's titles and window text" },
+    "settings.font.mono": { zh: "等宽字体", en: "Monospace font" },
+    "settings.font.mono.description": { zh: "时钟与网络速率的字体", en: "Font for the clock and the network rates" },
+    "settings.font.uiScale": { zh: "普通字号", en: "Interface font size" },
+    "settings.font.uiScale.description": { zh: "顶栏普通字体的缩放比例", en: "Scale applied to the top bar's interface font" },
+    "settings.font.monoScale": { zh: "等宽字号", en: "Monospace font size" },
+    "settings.font.monoScale.description": { zh: "顶栏等宽字体的缩放比例", en: "Scale applied to the top bar's monospace font" },
+    "settings.font.followSystem": { zh: "跟随系统", en: "Follow system" },
+
     // ── Settings: appearance rows ────────────────────────────────────────
     "settings.wallpaperPath": { zh: "壁纸路径", en: "Wallpaper path" },
     "settings.wallpaperPath.description": { zh: "留空恢复默认壁纸", en: "Leave empty to restore the default wallpaper" },

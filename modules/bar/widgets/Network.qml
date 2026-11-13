@@ -152,7 +152,7 @@ BarPill {
     // pill or nudge its neighbours.
     TextMetrics {
         id: rateProbe
-        font.family: "monospace"
+        font.family: root.monoFamily
         font.pixelSize: root.subtitlePixelSize
         text: "00.0M"
     }
@@ -449,7 +449,7 @@ BarPill {
             color: rateRow.ink
             style: Text.Outline
             styleColor: LazerTheme.barSubtitleOutline
-            font.family: "monospace"
+            font.family: root.monoFamily
             font.pixelSize: root.subtitlePixelSize
 
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
@@ -457,10 +457,14 @@ BarPill {
     }
 
     // Font metrics the two rate lines are measured against. They mirror the
-    // Media title/subtitle pair (10px subtitle, 1px gap) so this readout shares
-    // one line-spacing contract with the bar's other two-line widgets instead
-    // of declaring new sizes.
-    readonly property int subtitlePixelSize: 10
+    // Media title/subtitle pair (1px gap) so this readout shares one
+    // line-spacing contract with the bar's other two-line widgets instead
+    // of declaring new sizes. Family and size follow the monospace font
+    // setting: the readings are a fixed-width digit column, so `rateProbe`
+    // above and this metrics block have to move together.
+    readonly property string monoFamily: Services.SettingsService.monoFontFamily
+    readonly property real monoScale: Services.SettingsService.monoFontScale
+    readonly property int subtitlePixelSize: Math.round(10 * root.monoScale)
     readonly property real rateArrowSize: 8
     readonly property real lineGap: 1
     // Box-band top of the second line in a centred two-line pair — the same
@@ -472,7 +476,7 @@ BarPill {
     readonly property real subtitleLineHeight: Math.ceil(subtitleFontMetrics.height)
     FontMetrics {
         id: subtitleFontMetrics
-        font.family: "monospace"
+        font.family: root.monoFamily
         font.pixelSize: root.subtitlePixelSize
     }
 

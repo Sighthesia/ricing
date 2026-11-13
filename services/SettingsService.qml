@@ -59,7 +59,7 @@ QtObject {
         ripplePulseEnabled: true,
         transientMediaCover: false,
         fontDefault: "",
-        fontFixed: "monospace",
+        fontFixed: "",
         fontDefaultScale: 1.0,
         fontFixedScale: 1.0,
         windowHintMode: "attached-island",
@@ -99,6 +99,43 @@ QtObject {
     // Zero so the hard-edged wl_region reaches the painted arc/edge and the
     // acrylic covers the fill completely, with no un-blurred transparent rim.
     readonly property int blurRegionInset: 0
+
+    // --- Resolved bar fonts ---
+    // The persisted keys are intents (an empty family means "follow the
+    // system"); the bar reads these resolved values so a widget never has to
+    // decide what an empty string means. Scale is clamped to a range the bar
+    // can still hold two lines of.
+    readonly property real fontScaleMinimum: 0.8
+    // Derived from the bar height instead of fixed: the binding constraint is
+    // the clock's two-line stack, a 16px rolling strip (1.35x overscan for the
+    // digit roll) plus a 10px date line, which is ~34.8px at scale 1. A taller
+    // bar holds more of it, and 1.6 is the ceiling past which the single-line
+    // widgets start crowding the widget gutters.
+    readonly property real fontScaleMaximum: {
+        var live = Math.max(40, Math.min(64, Number(bar.height) || 48))
+        var widgetHeight = live - 6   // two 3px gutters, mirroring LazerTheme.barWidgetHeight
+        return Math.max(root.fontScaleMinimum, Math.min(1.6, widgetHeight / 34.8))
+    }
+    readonly property string uiFontFamily:
+        root._cleanFontFamily(appearance.fontDefault, Qt.application.font.family)
+    readonly property string monoFontFamily:
+        root._cleanFontFamily(appearance.fontFixed, "monospace")
+    readonly property real uiFontScale: root._cleanFontScale(appearance.fontDefaultScale)
+    readonly property real monoFontScale: root._cleanFontScale(appearance.fontFixedScale)
+
+    function _cleanFontFamily(value, fallback) {
+        var family = value == null ? "" : String(value).trim()
+        return family !== "" ? family : fallback
+    }
+
+    // A missing or non-numeric scale falls back to 1, and anything outside the
+    // supported range is clamped rather than trusted.
+    function _cleanFontScale(value) {
+        var number = Number(value)
+        if (value == null || value === "" || !isFinite(number) || number <= 0)
+            return 1.0
+        return Math.max(root.fontScaleMinimum, Math.min(root.fontScaleMaximum, number))
+    }
 
     // OS-reported color scheme ("dark"/"light"/"unknown"); unknown when the
     // desktop portal offers no preference, in which case auto falls back to
@@ -525,7 +562,7 @@ QtObject {
                 property bool transientMediaCover: false
                 // Font family — empty string means system default (Qt.application.font.family)
                 property string fontDefault: ""
-                property string fontFixed: "monospace"
+                property string fontFixed: ""
                 property real fontDefaultScale: 1.0
                 property real fontFixedScale: 1.0
                 // Window hint layout: "attached-island" extends from the island,

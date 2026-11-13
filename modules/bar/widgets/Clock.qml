@@ -26,14 +26,20 @@ Item {
     readonly property bool hovered: clockHover.hovered
 
     readonly property var defaults: WidgetSettingsRegistry.defaults("clock")
+    // Font family and scale come from the appearance settings, resolved by the
+    // service. The time and the date share one family: the date is digits, and
+    // a monospace grid is what lines it up under the monospace time.
+    readonly property string monoFamily: Services.SettingsService.monoFontFamily
+    readonly property real monoScale: Services.SettingsService.monoFontScale
     // Time type size shared by both renderers; the date keeps the bar's
-    // subtitle size below it.
-    readonly property int timePixelSize: 16
+    // subtitle size below it. Both follow the monospace scale.
+    readonly property int timePixelSize: Math.round(16 * root.monoScale)
+    readonly property int datePixelSize: Math.round(10 * root.monoScale)
     // Ink-to-ink gap between the time and date lines, matching Media's
     // title/subtitle pair so every two-line bar widget shares one spacing.
     readonly property real clockLineGap: 1
-    // Height of one secondary line box (the 10px subtitle), shared with the
-    // media/network second lines so their bands can be computed against it.
+    // Height of one secondary line box (the scaled subtitle size), shared with
+    // the media/network second lines so their bands can be computed against it.
     readonly property real dateLineHeight: Math.ceil(subtitleMetrics.height)
     // Box-band top of the second line in a centered two-line pair: the same
     // geometry the media pill and the network rates use (two line boxes + the
@@ -43,8 +49,8 @@ Item {
         + root.dateLineHeight + root.clockLineGap
     FontMetrics {
         id: subtitleMetrics
-        font.family: "monospace"
-        font.pixelSize: 10
+        font.family: root.monoFamily
+        font.pixelSize: root.datePixelSize
     }
     readonly property bool showDate: defaults.showDate !== false
     readonly property string formatParts:
@@ -142,7 +148,7 @@ Item {
             currentTime: root.now
             showSeconds: root.showSeconds
             digitPixelSize: root.timePixelSize
-            digitFontFamily: "monospace"
+            digitFontFamily: root.monoFamily
             digitWeight: Font.Bold
             digitColor: LazerTheme.textPrimary
             mutedDigitColor: LazerTheme.textMuted
@@ -160,7 +166,7 @@ Item {
             visible: !root.useRollingDigits
             text: root.timeText
             color: LazerTheme.textPrimary
-            font.family: "monospace"
+            font.family: root.monoFamily
             font.pixelSize: root.timePixelSize
             font.bold: true
         }
@@ -183,8 +189,8 @@ Item {
             color: LazerTheme.barSubtitle
             style: Text.Outline
             styleColor: LazerTheme.barSubtitleOutline
-            font.family: "monospace"
-            font.pixelSize: 10
+            font.family: root.monoFamily
+            font.pixelSize: root.datePixelSize
         }
 
         FontMetrics {

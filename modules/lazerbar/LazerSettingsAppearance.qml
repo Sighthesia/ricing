@@ -220,6 +220,138 @@ LazerSettingsSection {
         }
     }
 
+    // ── Bar fonts ────────────────────────────────────────────────────────
+    // These four rows only affect the top bar: the panel's own typography,
+    // the launcher, popups and the lock screen keep the application font.
+    // FontService populates itself on first reference, so the fc-list scan
+    // runs when this page loads rather than on every boot.
+
+    // Slider ceiling follows the bar height: the service derives the largest
+    // scale the widget band can hold, and the control must not offer more than
+    // that or a drag would clamp silently under the thumb.
+    readonly property int scaleSliderMaximum:
+        Math.max(100, Math.round(Services.SettingsService.fontScaleMaximum * 100))
+
+    // Replace the model's own placeholder label with the localized one, and
+    // make sure the stored value is selectable even when the list has not
+    // loaded yet or the file still holds a family this machine no longer has:
+    // a dropdown whose current value is absent shows a blank header.
+    function fontChoiceModel(choices, current) {
+        var list = choices || []
+        var stored = String(current == null ? "" : current)
+        var out = []
+        var hasStored = stored === ""
+        for (var i = 0; i < list.length; i++) {
+            if (String(list[i].value) === stored)
+                hasStored = true
+            if (i === 0 && String(list[i].value) === "")
+                out.push({ value: "", label: Services.Tr.q("settings.font.followSystem") })
+            else
+                out.push(list[i])
+        }
+        if (!hasStored)
+            out.push({ value: stored, label: stored })
+        return out
+    }
+
+    LazerSettingsRow {
+        id: fontUIRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: Services.Tr.q("settings.font.ui"); descriptionText: Services.Tr.q("settings.font.ui.description")
+        defaultValue: root.defaultOf("fontDefault")
+        currentValue: root.settingsObject && root.settingsObject.fontDefault != null ? root.settingsObject.fontDefault : ""
+        resetCallback: function() { root.resetKey("fontDefault") }
+        LazerSettingsChoice {
+            id: fontUIChoiceControl
+            model: root.fontChoiceModel(Services.FontService.availableFontList,
+                root.settingsObject ? String(root.settingsObject.fontDefault) : "")
+            currentValue: root.settingsObject && root.settingsObject.fontDefault != null ? root.settingsObject.fontDefault : ""
+            onValueSelected: function(value) {
+                if (!root.settingsObject)
+                    return
+                if (String(root.settingsObject.fontDefault) !== String(value)) {
+                    root.settingsObject.fontDefault = value
+                    root.save()
+                }
+            }
+        }
+    }
+
+    LazerSettingsRow {
+        id: fontMonoRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: Services.Tr.q("settings.font.mono"); descriptionText: Services.Tr.q("settings.font.mono.description")
+        defaultValue: root.defaultOf("fontFixed")
+        currentValue: root.settingsObject && root.settingsObject.fontFixed != null ? String(root.settingsObject.fontFixed) : ""
+        resetCallback: function() { root.resetKey("fontFixed") }
+        LazerSettingsChoice {
+            id: fontMonoChoiceControl
+            model: root.fontChoiceModel(Services.FontService.monospaceFontList,
+                root.settingsObject ? String(root.settingsObject.fontFixed) : "")
+            currentValue: root.settingsObject && root.settingsObject.fontFixed != null ? String(root.settingsObject.fontFixed) : ""
+            onValueSelected: function(value) {
+                if (!root.settingsObject)
+                    return
+                // An empty pick falls back to the monospace generic, which is
+                // exactly what the stored key already means when blank.
+                if (String(root.settingsObject.fontFixed) !== String(value)) {
+                    root.settingsObject.fontFixed = value
+                    root.save()
+                }
+            }
+        }
+    }
+
+    // Scale rows store a factor (0.8–1.4) but present whole percent, so the
+    // slider's 5-step ticks read as 5%.
+    LazerSettingsRow {
+        id: fontUIScaleRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: Services.Tr.q("settings.font.uiScale"); descriptionText: Services.Tr.q("settings.font.uiScale.description")
+        defaultValue: root.defaultOf("fontDefaultScale")
+        currentValue: root.settingsObject ? root.settingsObject.fontDefaultScale : null
+        resetCallback: function() { root.resetKey("fontDefaultScale") }
+        LazerSettingsSlider {
+            id: fontUIScaleSliderControl; from: 80; to: root.scaleSliderMaximum; stepSize: 5; suffix: "%"
+            defaultValue: root.defaultOf("fontDefaultScale") !== undefined
+                          ? Math.round(Number(root.defaultOf("fontDefaultScale")) * 100) : undefined
+            value: root.settingsObject && isFinite(Number(root.settingsObject.fontDefaultScale))
+                   ? Math.round(Number(root.settingsObject.fontDefaultScale) * 100) : 100
+            onValueModified: function(value) {
+                if (root.settingsObject) {
+                    root.settingsObject.fontDefaultScale = Math.max(80, Math.min(root.scaleSliderMaximum, Math.round(value))) / 100
+                    root.save()
+                }
+            }
+        }
+    }
+
+    LazerSettingsRow {
+        id: fontMonoScaleRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: Services.Tr.q("settings.font.monoScale"); descriptionText: Services.Tr.q("settings.font.monoScale.description")
+        defaultValue: root.defaultOf("fontFixedScale")
+        currentValue: root.settingsObject ? root.settingsObject.fontFixedScale : null
+        resetCallback: function() { root.resetKey("fontFixedScale") }
+        LazerSettingsSlider {
+            id: fontMonoScaleSliderControl; from: 80; to: root.scaleSliderMaximum; stepSize: 5; suffix: "%"
+            defaultValue: root.defaultOf("fontFixedScale") !== undefined
+                          ? Math.round(Number(root.defaultOf("fontFixedScale")) * 100) : undefined
+            value: root.settingsObject && isFinite(Number(root.settingsObject.fontFixedScale))
+                   ? Math.round(Number(root.settingsObject.fontFixedScale) * 100) : 100
+            onValueModified: function(value) {
+                if (root.settingsObject) {
+                    root.settingsObject.fontFixedScale = Math.max(80, Math.min(root.scaleSliderMaximum, Math.round(value))) / 100
+                    root.save()
+                }
+            }
+        }
+    }
+
     LazerSettingsRow {
         id: wallpaperRow
         width: parent.width - 16; x: 8

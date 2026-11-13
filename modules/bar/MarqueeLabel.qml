@@ -14,6 +14,10 @@ Item {
     property int maxWidth: 300
     property color textColor
     property int pixelSize: 12
+    // Empty means the application font, so a host that never sets this keeps
+    // its previous rendering. Both TextMetrics below read `label.font`, so the
+    // measurement follows the family without a second binding.
+    property string fontFamily: ""
     property bool bold: false
     // Optional low-contrast outline for text crossing animated backgrounds.
     // Disabled by default so existing labels keep their original rendering.
@@ -72,6 +76,7 @@ Item {
             color: root.textColor
             style: root.textStyle
             styleColor: root.textStyleColor
+            font.family: root.fontFamily !== "" ? root.fontFamily : Qt.application.font.family
             font.pixelSize: root.pixelSize
             font.bold: root.bold
             // Match the scan row's independent glyph layout at handback.
@@ -564,6 +569,10 @@ Item {
             property real fallDistance: 10
             property int delay: 0
 
+            // Ghosts carry the label's font explicitly: the family is set on
+            // the Text, not inherited, so omitting it would drop a removed
+            // glyph in the application font against a custom-font line.
+            font.family: root.fontFamily !== "" ? root.fontFamily : Qt.application.font.family
             font.pixelSize: root.pixelSize
             elide: Text.ElideNone
             style: root.textStyle
@@ -637,6 +646,7 @@ Item {
                     color: root.textColor
                     style: root.textStyle
                     styleColor: root.textStyleColor
+                    font.family: root.fontFamily !== "" ? root.fontFamily : Qt.application.font.family
                     font.pixelSize: root.pixelSize
                     font.bold: root.bold
                     font.kerning: false

@@ -131,11 +131,20 @@ Item {
     // Derived from the two pixel sizes rather than from the labels' own
     // ids: those are declared further down this file, and a binding here
     // would evaluate before they exist.
+    // Font family and scale come from the appearance settings, resolved by the
+    // service: both lines are prose (a window title, an app name), so they
+    // follow the UI font rather than the bar's monospace subtitle stack.
+    readonly property string uiFamily: Services.SettingsService.uiFontFamily
+    readonly property real uiScale: Services.SettingsService.uiFontScale
+    readonly property int titlePixelSize: Math.round(12 * root.uiScale)
+    readonly property int subtitlePixelSize: Math.round(10 * root.uiScale)
+
     TextMetrics {
         id: dropProbe
-        // The TALLER of the two lines (the 12px title), which is the line whose
+        // The TALLER of the two lines (the title), which is the line whose
         // glyph box osu would be measuring.
-        font.pixelSize: 12
+        font.family: root.uiFamily
+        font.pixelSize: root.titlePixelSize
         text: "Ag"
     }
     readonly property real lineFallDistance: Math.ceil(dropProbe.height)
@@ -147,7 +156,8 @@ Item {
     // bindings first evaluate).
     TextMetrics {
         id: subProbe
-        font.pixelSize: 10
+        font.family: root.uiFamily
+        font.pixelSize: root.subtitlePixelSize
         text: "Ag"
     }
     readonly property real subLineHeight: Math.ceil(subProbe.height)
@@ -468,7 +478,8 @@ Item {
                 fallDistanceOverride: root.lineFallDistance
                 textColor: LazerTheme.textPrimary
                 maxWidth: root.maxTitleWidth
-                pixelSize: 12
+                fontFamily: root.uiFamily
+                pixelSize: root.titlePixelSize
                 bold: true
             }
 
@@ -497,7 +508,8 @@ Item {
                 height: appNameText.lineHeight
                 maxWidth: root.maxTitleWidth
                 textColor: LazerTheme.barSubtitle
-                pixelSize: 10
+                fontFamily: root.uiFamily
+                pixelSize: root.subtitlePixelSize
                 // Same persistent secondary-line outline as Media's artist
                 // line, so every 10px bar subtitle reads with one edge
                 // contract instead of per-widget improvisation.

@@ -118,11 +118,20 @@ BarPill {
     // Derived from the two pixel sizes rather than from the labels' own
     // ids: those are declared further down this file, and a binding here
     // would evaluate before they exist.
+    // Font family and scale come from the appearance settings, resolved by the
+    // service: both lines are prose (a title, an artist), so they follow the UI
+    // font rather than the bar's monospace subtitle stack.
+    readonly property string uiFamily: Services.SettingsService.uiFontFamily
+    readonly property real uiScale: Services.SettingsService.uiFontScale
+    readonly property int titlePixelSize: Math.round(12 * root.uiScale)
+    readonly property int subtitlePixelSize: Math.round(10 * root.uiScale)
+
     TextMetrics {
         id: dropProbe
-        // The TALLER of the two lines (the 12px title), which is the line whose
+        // The TALLER of the two lines (the title), which is the line whose
         // glyph box osu would be measuring.
-        font.pixelSize: 12
+        font.family: root.uiFamily
+        font.pixelSize: root.titlePixelSize
         text: "Ag"
     }
     readonly property real lineFallDistance: Math.ceil(dropProbe.height)
@@ -130,7 +139,8 @@ BarPill {
     readonly property real lineGap: 1
     TextMetrics {
         id: subProbe
-        font.pixelSize: 10
+        font.family: root.uiFamily
+        font.pixelSize: root.subtitlePixelSize
         text: "Ag"
     }
     readonly property real subLineHeight: Math.ceil(subProbe.height)
@@ -479,7 +489,8 @@ BarPill {
                 y: 0
                 maxWidth: root.maxTextWidth
                 textColor: LazerTheme.textPrimary
-                pixelSize: 12
+                fontFamily: root.uiFamily
+                pixelSize: root.titlePixelSize
                 bold: true
             }
 
@@ -498,7 +509,8 @@ BarPill {
                 height: subtitleMarquee.lineHeight
                 maxWidth: root.maxTextWidth
                 textColor: LazerTheme.barSubtitle
-                pixelSize: 10
+                fontFamily: root.uiFamily
+                pixelSize: root.subtitlePixelSize
                 // Persistent edge separation for the 10px line: the outline
                 // no longer waits for live spectrum bars, so the subtitle
                 // reads the same over a paused pill, a wallpaper behind it,
