@@ -380,7 +380,12 @@ BarPill {
         Column {
             id: trafficRates
 
-            anchors.verticalCenter: parent.verticalCenter
+            // The down row sits on the shared second-line band (see the clock),
+            // rather than wherever centring happens to put it: the glyph and the
+            // level bar beside it can change height with the bar setting, and a
+            // centred column would then slide off the band the other two-line
+            // widgets use. Minus `contentRow.y` because this is the row's space.
+            y: root.secondLineBoxTop - contentRow.y - root.subtitleLineHeight - root.lineGap
             width: root.rateColumnWidth
             // Every row box is the subtitle's line height (the triangle is
             // smaller than it), so the boxes are already tight and the shared
@@ -458,6 +463,12 @@ BarPill {
     readonly property int subtitlePixelSize: 10
     readonly property real rateArrowSize: 8
     readonly property real lineGap: 1
+    // Box-band top of the second line in a centred two-line pair — the same
+    // figure the clock date, the media subtitle and the active-window sub-line
+    // align to, so every two-line bar widget shares one band.
+    readonly property real secondLineBoxTop:
+        (LazerTheme.barWidgetHeight - (2 * root.subtitleLineHeight + root.lineGap)) / 2
+        + root.subtitleLineHeight + root.lineGap
     readonly property real subtitleLineHeight: Math.ceil(subtitleFontMetrics.height)
     FontMetrics {
         id: subtitleFontMetrics

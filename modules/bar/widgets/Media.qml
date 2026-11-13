@@ -134,6 +134,12 @@ BarPill {
         text: "Ag"
     }
     readonly property real subLineHeight: Math.ceil(subProbe.height)
+    // Box-band top of the second line in a centred two-line pair — the same
+    // figure the clock date and the network rates align their second lines to,
+    // so all the bar's two-line widgets share one band.
+    readonly property real secondLineBoxTop:
+        (LazerTheme.barWidgetHeight - (2 * subLineHeight + lineGap)) / 2
+        + subLineHeight + lineGap
 
     implicitWidth: visible ? Math.max(root.minPillWidth, contentRow.implicitWidth + 12) : 0
     // Clip the pill to its own box. The exemption that used to be here (off
@@ -442,7 +448,17 @@ BarPill {
         Item {
             id: textColumn
 
-            anchors.verticalCenter: parent.verticalCenter
+            // The subtitle line must sit on the same second-line band the clock
+            // date and the network down rate use (LazerTheme-based, see the
+            // clock), not "wherever this column centres": the title's 12px
+            // probe height differs from the clock's strip box, so centring the
+            // column drifts this line off the shared band.
+            //
+            // Minus `contentRow.y` because this y is the ROW's coordinate space,
+            // not the widget's: the row is shorter than the pill and centred in
+            // it, so a band measured from the widget top would land low by that
+            // row offset.
+            y: root.secondLineBoxTop - contentRow.y - root.lineFallDistance - root.lineGap
             width: Math.max(titleMarquee.implicitWidth, subtitleMarquee.implicitWidth)
             // Line heights come from the shared probe, not from the labels:
             // a binding that reads a child id can evaluate before that child
@@ -561,5 +577,4 @@ BarPill {
     // Incoming lyric fades in per character and the outgoing line falls
     // away per character — the shared contract lives in MarqueeLabel and
     // runs from onPrimaryTextChanged via transitionFrom.
-
 }

@@ -151,6 +151,12 @@ Item {
         text: "Ag"
     }
     readonly property real subLineHeight: Math.ceil(subProbe.height)
+    // Box-band top of the second line in a centred two-line pair — the same
+    // figure the clock date and the network rates align their second lines to,
+    // so all the bar's two-line widgets share one band.
+    readonly property real secondLineBoxTop:
+        (LazerTheme.barWidgetHeight - (2 * subLineHeight + lineGap)) / 2
+        + subLineHeight + lineGap
 
     implicitWidth: Math.min(contentRow.implicitWidth + 8, root.maxWidth)
     implicitHeight: LazerTheme.barWidgetHeight
@@ -433,7 +439,13 @@ Item {
         Item {
             id: textColumn
 
-            anchors.verticalCenter: parent.verticalCenter
+            // The sub-line must sit on the same second-line band the clock date
+            // and the network down rate use (LazerTheme-based), not wherever
+            // this column centres — see the same note on the media widget.
+            // Minus `contentRow.y`: this y lives in the row's coordinate space
+            // and the row is shorter than the pill, so a band measured from the
+            // widget top would land low by that offset.
+            y: root.secondLineBoxTop - contentRow.y - root.lineFallDistance - root.lineGap
             width: Math.max(titleText.implicitWidth, appNameText.implicitWidth)
             // Line heights come from the shared probe, not from the labels:
             // a binding that reads a child id can evaluate before that child
