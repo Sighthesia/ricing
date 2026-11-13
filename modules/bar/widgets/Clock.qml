@@ -165,8 +165,15 @@ Item {
             font.bold: true
         }
 
-        // Date line carries the shared bar-subtitle outline so the clock's
-        // secondary line matches Media/ActiveWindow over any background.
+        // Secondary line: same size, tone and persistent outline as every other
+        // bar subtitle (Media's artist, the active-window app name, the network
+        // rates), so a two-line widget reads as one contract over any background.
+        //
+        // The family is the one deliberate difference: a date is digits, and
+        // keeping it monospace lines its digit grid up with the monospace time
+        // directly above it. Those other subtitles are prose (an artist, an app
+        // name) and use the UI font. Do not "unify" this without also deciding
+        // what happens to that alignment.
         Text {
             id: dateLabel
 
