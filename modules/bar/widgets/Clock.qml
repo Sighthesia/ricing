@@ -29,9 +29,23 @@ Item {
     // Time type size shared by both renderers; the date keeps the bar's
     // subtitle size below it.
     readonly property int timePixelSize: 16
-    // Ink-to-ink gap between the time and date lines, aligned with the
-    // visual spacing between the active-window/media title and subtitle.
-    readonly property real clockLineGap: 4
+    // Ink-to-ink gap between the time and date lines, matching Media's
+    // title/subtitle pair so every two-line bar widget shares one spacing.
+    readonly property real clockLineGap: 1
+    // Height of one secondary line box (the 10px subtitle), shared with the
+    // media/network second lines so their bands can be computed against it.
+    readonly property real dateLineHeight: Math.ceil(subtitleMetrics.height)
+    // Box-band top of the second line in a centered two-line pair: the same
+    // geometry the media pill and the network rates use (two line boxes + the
+    // shared gap, centred in the widget).
+    readonly property real secondLineBoxTop:
+        (LazerTheme.barWidgetHeight - (2 * root.dateLineHeight + root.clockLineGap)) / 2
+        + root.dateLineHeight + root.clockLineGap
+    FontMetrics {
+        id: subtitleMetrics
+        font.family: "monospace"
+        font.pixelSize: 10
+    }
     readonly property bool showDate: defaults.showDate !== false
     readonly property string formatParts:
         typeof defaults.timeFormat === "string" ? defaults.timeFormat : "yyyy.MM.dd|HH:mm"
@@ -103,14 +117,16 @@ Item {
     Column {
         id: clockColumn
 
-        anchors.centerIn: parent
-        // Stack the two lines by their ink, not their boxes: the rolling strip
-        // carries roll overscan below its glyphs and a Text box carries ascent
-        // above its glyphs, so a box-to-box spacing leaves more air than the
-        // active-window/media widgets' 1px line gap.
-        spacing: root.clockLineGap
-            - (rollingTime.height - rollingTime.digitInkBottom)
-            - (dateFont.ascent + dateInk.tightBoundingRect.top)
+        // The two line BOXES centre on the widget (the same geometry the media
+        // pill and the network rates use: two line boxes + the shared gap,
+        // centred), so the date line's box lands exactly on the neighbours'
+        // second-line band and their inks line up row for row. The spacing then
+        // only has to place the date box on that band; the rolling strip's
+        // overscan and the date's font metrics are absorbed by the strip box,
+        // which is taller than the time glyphs it shows.
+        x: (parent.width - width) / 2
+        y: (parent.height - rollingTime.height - dateLabel.height) / 2
+        spacing: root.secondLineBoxTop - y - rollingTime.height
 
         // Time line: rolling digit strips with the flip transition, paced by
         // the ported clock flip tokens (old 300ms x 8/4/1, OutCubic).
