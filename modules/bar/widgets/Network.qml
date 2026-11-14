@@ -124,37 +124,30 @@ BarPill {
         root._prevNetStamp = now
     }
 
-    // Three digits at most, with the decimal point moving to suit the
-    // magnitude: 9.99K, 35.1K, 999K, then the unit steps at 1000. The digits
-    // never reach four, and a reading never changes width mid-unit, so a poll
-    // cannot jitter the column.
+    // Two decimals always, so every reading is exactly five characters
+    // ("0.00B" .. "9.99T") and the two rows line up at BOTH ends without any
+    // space padding. That fixes the mantissa at three digits, which means the
+    // unit steps at 10 rather than 1000: there is no room for "35.10K".
     function formatSpeed(bytesPerSecond) {
         var units = ["B", "K", "M", "G", "T"]
         var value = Math.max(0, Number(bytesPerSecond) || 0)
         var unit = 0
-
-        while (unit < units.length - 1) {
-            // Pick decimals from the magnitude, not from the digit count after
-            // rounding: 99.96 must read "100" (three digits), not "100.0".
-            var text = value < 9.995 ? value.toFixed(2)
-                : (value < 99.95 ? value.toFixed(1) : String(Math.round(value)))
-            if (Number(text) < 1000)
-                return text + units[unit]
+        // 9.995 is where toFixed(2) would round up into a fourth digit.
+        while (value >= 9.995 && unit < units.length - 1) {
             value /= 1000
             unit += 1
         }
         return value.toFixed(2) + units[unit]
     }
 
-    // Every reading is at most five monospace characters ("99.9M"), so one
-    // probe measures all of them: the column is a constant width and a poll can
-    // never re-measure the pill or nudge its neighbours. Shorter readings
-    // ("999K") are right-aligned inside it by the row.
+    // Every reading is five monospace characters, so one probe measures all of
+    // them: the column is a constant width and a poll can never re-measure the
+    // pill or nudge its neighbours.
     TextMetrics {
         id: rateProbe
         font.family: root.monoFamily
         font.pixelSize: root.subtitlePixelSize
-        text: "00.0M"
+        text: "0.00M"
     }
     // Gap between the triangle and the digits, in one place: the row and the
     // measurement must agree or the column drifts a pixel per character. This
