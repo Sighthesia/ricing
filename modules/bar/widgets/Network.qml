@@ -124,20 +124,31 @@ BarPill {
         root._prevNetStamp = now
     }
 
-    // Two decimals always, so every reading is exactly five characters
-    // ("0.00B" .. "9.99T") and the two rows line up at BOTH ends without any
-    // space padding. That fixes the mantissa at three digits, which means the
-    // unit steps at 10 rather than 1000: there is no room for "35.10K".
+    // The decimal point moves with the magnitude - 1.92K, 35.1K - and the unit
+    // steps at 100 rather than 1000. That is the combination that keeps every
+    // reading exactly five characters (two decimals below 10, one decimal up to
+    // 99.9, never a three-integer-digit form), so the two rows line up at BOTH
+    // ends without any space padding, and the mantissa stays within three
+    // digits.
     function formatSpeed(bytesPerSecond) {
         var units = ["B", "K", "M", "G", "T"]
         var value = Math.max(0, Number(bytesPerSecond) || 0)
         var unit = 0
-        // 9.995 is where toFixed(2) would round up into a fourth digit.
-        while (value >= 9.995 && unit < units.length - 1) {
+
+        while (unit < units.length - 1) {
+            var text = root._rateText(value)
+            if (Number(text) < 100)
+                return text + units[unit]
             value /= 1000
             unit += 1
         }
-        return value.toFixed(2) + units[unit]
+        return root._rateText(value) + units[unit]
+    }
+
+    // Two decimals under 10, one decimal from 10 up: 9.995 is where the
+    // two-decimal form would round into an extra character.
+    function _rateText(value) {
+        return value < 9.995 ? value.toFixed(2) : value.toFixed(1)
     }
 
     // Every reading is five monospace characters, so one probe measures all of
