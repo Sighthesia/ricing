@@ -124,10 +124,11 @@ BarPill {
         root._prevNetStamp = now
     }
 
-    // Fixed-width reading: mantissa one decimal, unit stepping at 100 because
-    // that is the widest mantissa the five-character column can hold ("99.9M").
-    // Short readings are right-aligned inside that column by the row itself, so
-    // no string ever needs padding spaces to keep the width steady.
+    // Fixed-width reading: mantissa two decimals, unit stepping at 100 because
+    // that is the widest mantissa the six-character column can hold ("99.99M").
+    // Two decimals also keep a busy link's digits from jumping by a whole tenth
+    // every poll. Short readings are right-aligned inside that column by the row
+    // itself, so no string ever needs padding spaces to keep the width steady.
     function formatSpeed(bytesPerSecond) {
         var units = ["B", "K", "M", "G", "T"]
         var value = Math.max(0, Number(bytesPerSecond) || 0)
@@ -136,29 +137,32 @@ BarPill {
             value /= 1000
             unit += 1
         }
-        var mantissa = value.toFixed(1)
-        // Rounding can push 99.95 into "100.0"; step the unit instead of
+        var mantissa = value.toFixed(2)
+        // Rounding can push 99.995 into "100.00"; step the unit instead of
         // letting the reading outgrow the column.
-        if (mantissa.length > 4 && unit < units.length - 1) {
+        if (mantissa.length > 5 && unit < units.length - 1) {
             value /= 1000
             unit += 1
-            mantissa = value.toFixed(1)
+            mantissa = value.toFixed(2)
         }
         return mantissa + units[unit]
     }
 
-    // Every reading is five monospace characters, so one probe measures all of
+    // Every reading is six monospace characters, so one probe measures all of
     // them: the column is a constant width and a poll can never re-measure the
     // pill or nudge its neighbours.
     TextMetrics {
         id: rateProbe
         font.family: root.monoFamily
         font.pixelSize: root.subtitlePixelSize
-        text: "00.0M"
+        text: "00.00M"
     }
     // Gap between the triangle and the digits, in one place: the row and the
-    // measurement must agree or the column drifts a pixel per character.
-    readonly property real rateArrowGap: 2
+    // measurement must agree or the column drifts a pixel per character. This
+    // is the gap the WIDEST reading leaves - the digits are right-aligned, so
+    // a full-width reading is what closes the space up against the arrow, and
+    // at 2px it read as a collision.
+    readonly property real rateArrowGap: LazerTheme.inlineGap
     readonly property real rateColumnWidth: Math.ceil(root.rateArrowGap
         + root.rateArrowSize
         + Math.ceil(rateProbe.width))
