@@ -70,6 +70,7 @@ LauncherResultRow 1.0 LauncherResultRow.qml
 LauncherThumbScheduler 1.0 LauncherThumbScheduler.qml
 LauncherExitCard 1.0 LauncherExitCard.qml
 PowerConfirmOverlay 1.0 PowerConfirmOverlay.qml
+PowerKeyHint 1.0 PowerKeyHint.qml
 LazerSplitSurface 1.0 LazerSplitSurface.qml
 TwoLayerPopup 1.0 TwoLayerPopup.qml
 BarSeamFillets 1.0 BarSeamFillets.qml

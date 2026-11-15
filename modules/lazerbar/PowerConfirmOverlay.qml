@@ -367,15 +367,19 @@ Item {
             }
         }
 
-        // Bottom line: the keys this cover answers to.
-        Text {
+        // Bottom line: the keys this cover answers to, drawn as keys. A sentence
+        // spelled out in prose makes the reader find the key inside it; keycaps
+        // read as keys at a glance.
+        Row {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
             anchors.bottomMargin: root.footerMargin
-            text: Services.Tr.q("power.hint")
-            color: LazerTheme.textMuted
-            font.pixelSize: 12
+            spacing: 20
             opacity: root.contentReveal
+
+            PowerKeyHint { keys: ["Enter"]; caption: Services.Tr.q("common.confirm") }
+            PowerKeyHint { keys: ["Esc"]; caption: Services.Tr.q("common.cancel") }
+            PowerKeyHint { keys: ["←", "→"]; caption: Services.Tr.q("power.switch") }
         }
     }
 
@@ -385,8 +389,8 @@ Item {
         id: choice
 
         property string text: ""
-        // The confirm answer is destructive: its resting border says so before
-        // hover or focus adds anything.
+        // The confirm answer is destructive: its label says so before hover or
+        // focus adds anything.
         property bool destructive: false
         // Keyboard selection, not `Item.focus`: the cover owns the focus item
         // and every key, so the answers are marked rather than focused.
@@ -413,34 +417,31 @@ Item {
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
-        // Destructive marking, carried by the surface's own border.
-        Rectangle {
-            anchors.fill: parent
-            visible: choice.destructive
-            radius: LazerTheme.settingsChoiceRadius
-            color: "transparent"
-            border.width: 1.5
-            border.color: LazerTheme.osuPink
-        }
-
-        // Focus ring: the settings panel's separate 1.5px layer, never the hit
-        // target and never the shape.
+        // One ring, two states: a hairline that defines the surface at rest, the
+        // focus ring once the answer is selected. The destructive answer used to
+        // carry a pink ring of its own, which put two rings on the same rectangle
+        // whenever it was selected and left a second selected-looking frame
+        // whenever it was not; the danger now rides the label instead.
         Rectangle {
             anchors.fill: parent
             radius: LazerTheme.settingsChoiceRadius
             color: "transparent"
-            border.width: choice.highlighted ? 1.5 : 0
-            border.color: LazerTheme.focusRing
+            border.width: choice.highlighted ? 1.5 : 1
+            border.color: choice.highlighted ? LazerTheme.focusRing : LazerTheme.divider
             enabled: false
+
             Behavior on border.width { NumberAnimation { duration: MotionTokens.fast } }
+            Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
         Text {
             anchors.centerIn: parent
             text: choice.text
-            color: LazerTheme.textPrimary
+            color: choice.destructive ? LazerTheme.osuPink : LazerTheme.textPrimary
             font.pixelSize: 14
             font.weight: Font.DemiBold
+
+            Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
 
         // Shared click flash: a flat wash that never changes the hit target.
