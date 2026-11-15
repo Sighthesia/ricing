@@ -509,6 +509,7 @@ Variants {
         // rather than only for the frames the popup has finished opening.
         readonly property bool _pinned: popupHost.open
                 || launcherSurface.host.interactive
+                || launcherSurface.confirmActive
                 || settingsOverlay.interactive
                 || screenScope.windowHintHeld
         readonly property bool windowHintHeld: Services.WindowHintService.hintHeld
@@ -1240,15 +1241,19 @@ Variants {
             anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; left: true }
             // Offset by the same clamped height the bar actually renders at.
             margins { top: Services.SettingsService.bar.position === "top" ? screenScope.floatingMargin + screenScope.effectiveHeight : 0; bottom: Services.SettingsService.bar.position === "bottom" ? screenScope.floatingMargin + screenScope.effectiveHeight : 0 }
-            mask: Region { item: launcherSurface.host.visible ? launcherSurface.host : null }
+            // Pointer and keyboard follow the region that owns them: the wave
+            // panel's own body, or the whole window while the full-screen power
+            // cover is up.
+            mask: Region { item: launcherSurface.inputItem }
             // Take keyboard only while the launcher is up so typing reaches its
             // search field and global keys stay free when closed.
-            WlrLayershell.keyboardFocus: launcherSurface.host.interactive
+            WlrLayershell.keyboardFocus: launcherSurface.inputItem
                     ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
             LauncherSurface {
                 id: launcherSurface; anchors.fill: parent
                 coordinator: overlayCoordinator
                 session: Services.LauncherService
+                sessionService: Services.SessionService
                 startupPrewarmAllowed: root.startupPrewarmAllowed
                 // Owner edge for the control-center view: the same singletons
                 // the bar's own popups read, so the overview, its same-surface

@@ -40,6 +40,10 @@ Item {
     property var batteryService: null
     property var notificationService: null
     property var weatherService: null
+    // Session actions (log out, sleep, reboot, shut down) travel through this
+    // surface: it owns both the full-screen confirmation cover and the service
+    // call, so a destructive command never reaches the page's execute path.
+    property var sessionService: null
 
     // Exposed for owner-window mask and layer keyboard-focus bindings.
     readonly property alias host: waveHost
@@ -282,6 +286,30 @@ Item {
     // Probe/test access to the hosted page.
     property alias waveHostItem: waveHost
 
+    // The region that owns pointer and keyboard right now. While the power cover
+    // is up it is the whole window, because the cover is full-screen and has to
+    // take keys away from the wave it interrupts; otherwise it is the wave
+    // panel's own body, exactly as before.
+    readonly property Item inputItem: powerConfirm.active ? root
+            : (waveHost.visible ? waveHost : null)
+    // Pins the bar open while the cover is drawn against it.
+    readonly property bool confirmActive: powerConfirm.active
+    readonly property alias powerConfirmItem: powerConfirm
+
+    // A session command is answered above the page: the destructive ones stop at
+    // the cover, sleeping runs straight through it.
+    function handleSessionAction(actionId, requiresConfirmation) {
+        var id = String(actionId || "")
+        if (!id.length)
+            return false
+        // Sleeping asks nothing, so the panel behind the cover closes now:
+        // waking up must land on the desktop, not on an open launcher.
+        if (requiresConfirmation !== true && waveHost.phase !== "closed")
+            waveHost.close()
+        powerConfirm.open(id, requiresConfirmation === true)
+        return true
+    }
+
     Timer {
         id: prewarmArmTimer
         interval: 0
@@ -386,6 +414,8 @@ Item {
             // had before the three-band stack.
             chromeLayout: waveHost.chromeLayout
             onExitFlingRequested: spec => root.spawnExitCard(spec)
+            onSessionActionRequested: (actionId, requiresConfirmation) =>
+                    root.handleSessionAction(actionId, requiresConfirmation)
             // The control center's services reach it through this page, which is
             // where its Loader lives. Forwarded unchanged, so the overview and a
             // mounted detail sub-page can never describe two different instances
@@ -406,6 +436,34 @@ Item {
         id: ghostLayer
         anchors.fill: parent
         z: 100
+    }
+
+    // Full-screen power confirmation, painted by this surface's own window:
+    // two layer-shell surfaces in one layer cannot be ordered against each
+    // other, and this cover has to sit above the wave it interrupts.
+    PowerConfirmOverlay {
+        id: powerConfirm
+        anchors.fill: parent
+        z: 200
+        sessionService: root.sessionService
+        // The cover held the keyboard while it was up; the panel underneath is
+        // still open, so typing goes back to it rather than nowhere.
+        onClosed: {
+            if (root.session && root.session.visible)
+                root.focusActivePage()
+        }
+    }
+
+    // Sleeping is the one action that leaves the desktop alive underneath, so a
+    // request for it puts the cover away again: waking up must not land on a
+    // cover nobody asked for. Destructive actions keep theirs, because the
+    // session it belongs to is about to be gone.
+    Connections {
+        target: root.sessionService
+        function onActionFinished(actionId, success, message) {
+            if (success && powerConfirm.active && !powerConfirm.requiresConfirmation)
+                powerConfirm.close()
+        }
     }
 
     function spawnExitCard(spec) {

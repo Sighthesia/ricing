@@ -269,6 +269,10 @@ Item {
     // Bubbled from the activated result row so the owning surface can replay
     // the card's parabolic exit in a layer above the closing panel.
     signal exitFlingRequested(var spec)
+    // Bubbled when the activated row is a session command (log out, sleep,
+    // reboot, shut down). The surface answers it because the confirmation cover
+    // and the session service both live above this page, which imports neither.
+    signal sessionActionRequested(string actionId, bool requiresConfirmation)
 
     readonly property alias searchField: searchSurface
     // Chip rail handle for probes and tests (chipAt resolves one chip).
@@ -548,6 +552,11 @@ Item {
             return
         var current = service.results && service.selectedIndex >= 0
                 ? service.results[service.selectedIndex] : null
+        // A session command never runs from here directly; the cover above this
+        // page asks first, so Enter on the selected row takes the same path a
+        // click does.
+        if (root.requestSessionAction(current))
+            return
         if (current) {
             for (var i = 0; i < resultsRepeater.count; i++) {
                 var row = resultsRepeater.itemAt(i)
@@ -565,6 +574,17 @@ Item {
         }
         if (typeof service.executeSelected === "function")
             service.executeSelected()
+    }
+
+    // Session commands leave this page: the surface owns the full-screen cover
+    // and the session service behind it. Returns false for every other row so
+    // the callers fall through to the ordinary execute path.
+    function requestSessionAction(item) {
+        if (!item || item.sessionAction === undefined || item.sessionAction === "")
+            return false
+        root.sessionActionRequested(String(item.sessionAction),
+                                    item.requiresConfirmation === true)
+        return true
     }
 
     function navigateSelection(direction) {
@@ -2273,6 +2293,8 @@ Item {
                         return !!sel && !!result && String(sel.id) === String(result.id)
                     }
                     onActivated: {
+                        if (root.requestSessionAction(result))
+                            return
                         if (root.session)
                             root.session.execute(result)
                     }
