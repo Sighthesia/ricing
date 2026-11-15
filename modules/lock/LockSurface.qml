@@ -19,6 +19,10 @@ WlSessionLockSurface {
     // This surface's slot in the shared per-screen snapshot data; the shared
     // snapshot never decides which screen a surface belongs to.
     readonly property int screenIndex: SurfaceLogic.screenSlot(Quickshell.screens, root.screen)
+    readonly property string screenIdentity: root.screen
+            ? String(root.screen.name || "") + "@" + Number(root.screen.x || 0)
+                + "," + Number(root.screen.y || 0) + "," + Number(root.screen.width || 0)
+                + "x" + Number(root.screen.height || 0) : "unknown"
     readonly property string snapshotUrl: snapshot && screenIndex >= 0
             ? snapshot.snapshotUrlFor(screenIndex) : ""
     property string wallpaperPath: ""
@@ -102,7 +106,7 @@ WlSessionLockSurface {
     property date now: new Date()
     property bool inputMode: false
 
-    signal releaseRequested()
+    signal releaseRequested(string screenIdentity)
     // Emitted only after the exit desktop is ready and the closing wave has
     // actually started. The lock owner uses it to re-arm its failsafe from
     // the visible wave, rather than counting image-decode time as animation.
@@ -121,7 +125,9 @@ WlSessionLockSurface {
     property bool startupRequest: false
     property bool startupRevealAllowed: true
     property bool startupWaveStarted: false
-    signal startupWaveStartedSignal()
+    signal startupWaveStartedSignal(string screenIdentity)
+    signal startupEntryFinishedSignal(string screenIdentity)
+    property bool startupEntryFinished: false
 
     // The surface itself commits no colour; the backdrop paints its first frame
     // (the theme floor, the wallpaper and the wave) as an opaque surface.
@@ -157,6 +163,7 @@ WlSessionLockSurface {
         releaseSent = false
         exitReleaseSettleTimer.stop()
         startupWaveStarted = false
+        startupEntryFinished = false
         inputMode = false
         contentFallProgress = 0
         authControlState = SurfaceLogic.AuthControlStates.idle
@@ -213,16 +220,30 @@ WlSessionLockSurface {
         root.startupWaveStarted = true
         if (!root.reducedMotion)
             revealStartTimer.restart()
-        root.startupWaveStartedSignal()
+        else
+            root.finishStartupEntry()
+        root.startupWaveStartedSignal(root.screenIdentity)
     }
 
     // The unlock choreography runs in two beats: every content block drops back
     // through the bottom edge it arrived from, and only then does the wave close
     // over the now empty surface. The release still lands on the wave's own
     // completion.
+    function finishStartupEntry(): void {
+        if (!root.startupRequest || root.startupEntryFinished)
+            return
+        root.startupEntryFinished = true
+        root.startupEntryFinishedSignal(root.screenIdentity)
+    }
+
     function startExit(): void {
         if (exitStarted)
             return
+        // An unusually fast unlock can interrupt the startup entry before its
+        // body animation lands. The entry is no longer going to complete once
+        // exit owns the surface, so settle this gate at that real transition.
+        if (root.startupRequest && !root.startupEntryFinished)
+            root.finishStartupEntry()
         exitStarted = true
         if (reducedMotion) {
             contentFallProgress = 1
@@ -257,7 +278,7 @@ WlSessionLockSurface {
         if (releaseSent || !LockLogic.shouldReleaseLock("exiting", true))
             return
         releaseSent = true
-        releaseRequested()
+        releaseRequested(root.screenIdentity)
     }
 
     function allAnimations(): var {
@@ -906,6 +927,7 @@ WlSessionLockSurface {
         to: 1
         duration: Lazer.MotionTokens.waveEnter
         easing.type: Easing.OutQuint
+        onFinished: root.finishStartupEntry()
     }
 
     // Unlock reverses the same curtain on osu's hide easing (InSine); release

@@ -18,6 +18,18 @@ Variants {
     id: root
     model: Quickshell.screens
 
+    readonly property bool _perfTraceEnabled: (Quickshell.env("AFLOAT_PERF_TRACE") || "").trim() === "1"
+    property double _perfStartedAt: 0
+    function _perf(label, values) {
+        if (!root._perfTraceEnabled)
+            return
+        var suffix = ""
+        var fields = values || ({})
+        for (var key in fields)
+            suffix += " " + key + "=" + String(fields[key])
+        console.log("[afloat:perf] wallpaper." + label + " t=" + Date.now() + suffix)
+    }
+
     // True once every screen currently present has reported its first wallpaper
     // outcome. This surface stays the shell's bootstrap layer, so the rest of
     // the shell waits behind this flag instead of racing the wallpaper.
@@ -109,12 +121,18 @@ Variants {
     function reportBootFinished(screenKey) {
         root.finishedBootScreens = BootLogic.markFinished(root.finishedBootScreens, screenKey)
         root.refreshBootReady()
+        root._perf("ready", {
+            screens: root.finishedBootScreens.length,
+            ms: root._perfStartedAt > 0 ? Date.now() - root._perfStartedAt : -1
+        })
     }
 
     function reportBootStarted() {
         if (root.bootStarted)
             return
         root.bootStarted = true
+        root._perfStartedAt = Date.now()
+        root._perf("started", { screens: Quickshell.screens.length })
     }
 
     // A session-start lock has claimed the screens. Its surface covers every

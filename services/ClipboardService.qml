@@ -8,6 +8,29 @@ import "launcher/LauncherAdapters.js" as LauncherAdapters
 Singleton {
     id: root
 
+    readonly property bool _perfTraceEnabled: (Quickshell.env("AFLOAT_PERF_TRACE") || "").trim() === "1"
+    property double _perfProbeStartedAt: 0
+    property double _perfListStartedAt: 0
+    property double _perfParseStartedAt: 0
+
+    function _perf(label, values) {
+        if (!root._perfTraceEnabled)
+            return
+        var suffix = ""
+        var fields = values || ({})
+        for (var key in fields)
+            suffix += " " + key + "=" + String(fields[key])
+        console.log("[afloat:perf] clipboard." + label + " t=" + Date.now() + suffix)
+    }
+
+    function _perfUtf8Bytes(text) {
+        try {
+            return unescape(encodeURIComponent(String(text))).length
+        } catch (error) {
+            return String(text).length
+        }
+    }
+
     readonly property string _userCacheRoot: (Quickshell.env("XDG_CACHE_HOME") || ((Quickshell.env("HOME") || "") + "/.cache"))
     readonly property string _cacheDir: root._userCacheRoot + "/afloat"
     readonly property string _firstSeenCachePath: root._cacheDir + "/clipboard-first-seen.json"
@@ -184,6 +207,13 @@ Singleton {
         onExited: code => {
             root.probeFinished = true
             root.available = (code === 0)
+            root._perf("probe.exit", {
+                code: code,
+                available: root.available,
+                ms: root._perfProbeStartedAt > 0
+                    ? Date.now() - root._perfProbeStartedAt : -1
+            })
+            root._perfProbeStartedAt = 0
             // Pre-fetch history immediately so the first panel open is not blank.
             if (root.available) root.list()
         }
@@ -200,13 +230,31 @@ Singleton {
         property bool listing: false
         onListingChanged: root.listing = listing
         onRunningChanged: listing = running
+        onExited: code => {
+            root._perf("list.exit", {
+                code: code,
+                ms: root._perfListStartedAt > 0
+                    ? Date.now() - root._perfListStartedAt : -1
+            })
+            root._perfListStartedAt = 0
+        }
 
         stdout: StdioCollector {
             // Everything expensive about a list lands here, so it hands the
             // output to the slice pump instead of parsing it inline: the first
             // slice is published in this same turn and the rest follows one
             // turn at a time.
-            onStreamFinished: root._beginListParse(this.text)
+            onStreamFinished: {
+                if (root._perfTraceEnabled) {
+                    var output = String(this.text)
+                    var trimmed = output.trim()
+                    root._perf("list.output", {
+                        bytes: root._perfUtf8Bytes(output),
+                        lines: trimmed.length ? trimmed.split("\n").length : 0
+                    })
+                }
+                root._beginListParse(this.text)
+            }
         }
     }
 
@@ -227,6 +275,7 @@ Singleton {
     function _beginListParse(text) {
         // A fetch that arrives mid-parse replaces the pending one: same
         // last-fetch-wins rule the single-turn parse had.
+        root._perfParseStartedAt = Date.now()
         root._parseLines = text.trim().split("\n")
         root._parseRows = []
         root._parseIndex = 0
@@ -240,12 +289,15 @@ Singleton {
         if (!root._parseRunning)
             return
         var lines = root._parseLines
-        var limit = root._parsePublished ? root._parseSliceRows : root._parseFirstSliceRows
+        var wasPublished = root._parsePublished
+        var limit = wasPublished ? root._parseSliceRows : root._parseFirstSliceRows
         var end = Math.min(lines.length, root._parseIndex + limit)
         for (var index = root._parseIndex; index < end; index++)
             root._appendListRow(lines[index], index)
         root._parseIndex = end
         root._publishParsedRows()
+        if (!wasPublished)
+            root._perf("parse.first", { rows: root.items.length, lines: lines.length })
         if (root._parseIndex < lines.length) {
             root._parseTimer.restart()
             return
@@ -322,6 +374,12 @@ Singleton {
         root._parseRunning = false
         root._parseLines = []
         root.revision++
+        root._perf("parse.complete", {
+            rows: root.items.length,
+            revision: root.revision,
+            ms: root._perfParseStartedAt > 0
+                ? Date.now() - root._perfParseStartedAt : -1
+        })
         root._startMetadataQueue()
         if (!root._firstListLoaded) {
             root._firstListLoaded = true
@@ -349,6 +407,11 @@ Singleton {
         root._listUnchangedSinceLastPublish = false
         root._rememberPublishedIds()
         root.listCompleted()
+        root._perf("commit", {
+            rows: root.items.length,
+            changed: true,
+            revision: root.revision
+        })
         return true
     }
 
@@ -583,6 +646,8 @@ Singleton {
 
     function list() {
         if (!root.available || !root._firstSeenCacheReady || listProc.running) return
+        root._perfListStartedAt = Date.now()
+        root._perf("list.start", { revision: root.revision })
         listProc.running = true
     }
 
@@ -632,6 +697,9 @@ Singleton {
         // dates and order; signature recovery then only confirms silently.
         root._firstSeenById = split.ids
         root._firstSeenCacheReady = true
+        root._perf("cache.firstSeen.ready", {
+            entries: Object.keys(root._firstSeenById).length
+        })
         root._maybeStartClipboardProbe()
     }
 
@@ -640,6 +708,9 @@ Singleton {
             return
         root._metadataCacheById = metadataMap || ({})
         root._metadataCacheReady = true
+        root._perf("cache.metadata.ready", {
+            entries: Object.keys(root._metadataCacheById).length
+        })
         root._maybeStartClipboardProbe()
     }
 
@@ -648,6 +719,8 @@ Singleton {
             return
         if (root.probeFinished || _checkProc.running)
             return
+        root._perfProbeStartedAt = Date.now()
+        root._perf("probe.start", {})
         _checkProc.running = true
     }
 

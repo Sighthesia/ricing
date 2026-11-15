@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import "../../services/LauncherLogic.js" as LauncherLogic
 import "../../services" as Services
 

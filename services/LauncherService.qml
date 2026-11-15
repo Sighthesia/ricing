@@ -14,6 +14,18 @@ import "launcher/LauncherCategories.js" as LauncherCategories
 Singleton {
     id: root
 
+    readonly property bool _perfTraceEnabled: (Quickshell.env("AFLOAT_PERF_TRACE") || "").trim() === "1"
+
+    function _perf(label, values) {
+        if (!root._perfTraceEnabled)
+            return
+        var suffix = ""
+        var fields = values || ({})
+        for (var key in fields)
+            suffix += " " + key + "=" + String(fields[key])
+        console.log("[afloat:perf] " + label + " t=" + Date.now() + suffix)
+    }
+
     // Gap between result batches. Short enough that the tail of a 750-row
     // history lands within a few frames of the head, long enough that the
     // list actually paints between batches instead of growing behind a
@@ -158,6 +170,7 @@ Singleton {
         id: session
         _adapters: root._adapters
         clipboardService: Services.ClipboardService
+        perfTrace: function(label, values) { root._perf("launcher." + label, values) }
     }
 
     // Observable session state.
@@ -201,17 +214,29 @@ Singleton {
     // Completion callback of the most recently started shortcut action.
     property var _shortcutDone: null
 
-    function open() { return session.open() }
+    function open() {
+        root._perf("launcher.open.request", { visible: session.visible })
+        return session.open()
+    }
     function close() { return session.close() }
-    function toggle() { return session.toggle() }
+    function toggle() {
+        root._perf("launcher.toggle.request", { visible: session.visible })
+        return session.toggle()
+    }
     function refresh() { return session.refresh() }
     function selectNext() { return session.selectNext() }
     function selectPrevious() { return session.selectPrevious() }
     function executeSelected() { return session.executeSelected() }
     function execute(item) { return session.execute(item) }
-    function openClipboard() { return session.openClipboard() }
+    function openClipboard() {
+        root._perf("launcher.openClipboard.request", { visible: session.visible })
+        return session.openClipboard()
+    }
     function openShortcuts() { return session.openShortcuts() }
     function primeApps() { return session.primeApps() }
+    function perfTrace(label, values) {
+        root._perf("launcher." + label, values)
+    }
 
     // Runs one shortcut-action command at a time through a dedicated process
     // and reports its exit outcome; overlapping runs are rejected so outcomes
@@ -312,8 +337,14 @@ Singleton {
     // IPC surface for the launcher entry and niri keybind integration.
     IpcHandler {
         target: "launcher"
-        function toggle() { root.toggle() }
-        function openClipboard() { root.openClipboard() }
+        function toggle() {
+            root._perf("launcher.ipc.toggle", {})
+            root.toggle()
+        }
+        function openClipboard() {
+            root._perf("launcher.ipc.openClipboard", {})
+            root.openClipboard()
+        }
         function openShortcuts() { root.openShortcuts() }
         function chrome() { root.toggleChrome() }
         // On-demand pool health probe for the disappearing-icons class:

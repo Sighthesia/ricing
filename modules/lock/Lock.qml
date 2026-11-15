@@ -16,6 +16,18 @@ import "../lazerbar/StartupRevealLogic.js" as StartupRevealLogic
 Scope {
     id: root
 
+    readonly property bool _perfTraceEnabled: (Quickshell.env("AFLOAT_PERF_TRACE") || "").trim() === "1"
+    property double _perfStartupAt: 0
+    function _perf(label, values) {
+        if (!root._perfTraceEnabled)
+            return
+        var suffix = ""
+        var fields = values || ({})
+        for (var key in fields)
+            suffix += " " + key + "=" + String(fields[key])
+        console.log("[afloat:perf] lock." + label + " t=" + Date.now() + suffix)
+    }
+
     readonly property bool locked: sessionLock.locked
     readonly property bool preparing: _state === LockLogic.States.preparing
     // The desktop is owned by a lock from the moment a request is accepted until
@@ -32,7 +44,7 @@ Scope {
     property string _state: LockLogic.States.idle
     property int _requestGeneration: -1
     property bool _exitFailsafeArmed: false
-    property int _exitSurfaceCount: 0
+    property var _exitExpectedScreens: []
     property var _exitFinishedScreens: ({})
     property bool _startupLockArmed: true
     // The startup auto-lock is a per-compositor-session event, not a per-shell
@@ -48,6 +60,82 @@ Scope {
     property bool startupWallpaperReady: false
     property bool startupChromeReady: false
     property bool _startupWaveEmitted: false
+    property bool _startupEntryComplete: false
+    property var _startupExpectedScreens: []
+    property var _startupEntryFinishedScreens: ({})
+    // True once every startup entry surface finished, or once this session has
+    // conclusively established that no startup surface will exist.
+    readonly property bool startupEntrySettled: root._startupEntryComplete
+            || (!root.startupLockExpected && !root.startupRequest)
+    signal startupEntryFinished()
+
+    function _screenIdentity(screen): string {
+        if (!screen)
+            return "unknown"
+        return String(screen.name || "") + "@" + Number(screen.x || 0)
+                + "," + Number(screen.y || 0) + "," + Number(screen.width || 0)
+                + "x" + Number(screen.height || 0)
+    }
+
+    function _currentScreenIdentities(): var {
+        var identities = []
+        for (var index = 0; index < Quickshell.screens.length; index++)
+            identities.push(root._screenIdentity(Quickshell.screens[index]))
+        return identities
+    }
+
+    function _reconcileSurfaceSets(): void {
+        var current = root._currentScreenIdentities()
+        if (root.startupRequest && !root._startupEntryComplete) {
+            var startupExpected = root._startupExpectedScreens.slice()
+            for (var added = 0; added < current.length; added++) {
+                if (startupExpected.indexOf(current[added]) < 0)
+                    startupExpected.push(current[added])
+            }
+            var startupKept = []
+            for (var s = 0; s < startupExpected.length; s++) {
+                if (current.indexOf(startupExpected[s]) >= 0)
+                    startupKept.push(startupExpected[s])
+            }
+            root._startupExpectedScreens = startupKept
+            root._finishStartupEntryIfReady()
+        }
+        if (_state === LockLogic.States.exiting) {
+            var exitExpected = root._exitExpectedScreens.slice()
+            for (var addedExit = 0; addedExit < current.length; addedExit++) {
+                if (exitExpected.indexOf(current[addedExit]) < 0)
+                    exitExpected.push(current[addedExit])
+            }
+            var exitKept = []
+            for (var e = 0; e < exitExpected.length; e++) {
+                if (current.indexOf(exitExpected[e]) >= 0)
+                    exitKept.push(exitExpected[e])
+            }
+            root._exitExpectedScreens = exitKept
+            root._finishExitIfReady()
+        }
+    }
+
+    function _finishStartupEntryIfReady(): void {
+        if (!root.startupRequest || root._startupEntryComplete)
+            return
+        var expected = root._startupExpectedScreens
+        for (var index = 0; index < expected.length; index++)
+            if (root._startupEntryFinishedScreens[expected[index]] !== true)
+                return
+        root._startupEntryComplete = true
+        root.startupEntryFinished()
+    }
+
+    function _finishExitIfReady(): void {
+        if (_state !== LockLogic.States.exiting)
+            return
+        var expected = root._exitExpectedScreens
+        for (var index = 0; index < expected.length; index++)
+            if (root._exitFinishedScreens[expected[index]] !== true)
+                return
+        root._finishRelease()
+    }
     // A startup request has been accepted and its surface is on the way. The
     // wallpaper surfaces are covered from here until the user unlocks, so the
     // root hands them this claim instead of letting them animate a boot reveal
@@ -167,6 +255,9 @@ Scope {
     function lock(startup: bool): bool {
         if (!Controller.canLock(_state))
             return false
+        root._perf("accepted", { startup: startup === true, screens: Quickshell.screens.length })
+        if (startup === true)
+            root._perfStartupAt = Date.now()
         backgroundMode = StartupLockLogic.backgroundModeFor(
             configuredBackgroundMode, startup === true)
         // Explicit bool: only a literal startup request arms the wave gate;
@@ -177,7 +268,10 @@ Scope {
         if (startupRequest)
             root.startupLockEngaged()
         _startupWaveEmitted = false
-        _exitSurfaceCount = Math.max(1, Quickshell.screens.length)
+        _startupEntryComplete = false
+        _startupExpectedScreens = root._currentScreenIdentities()
+        _startupEntryFinishedScreens = ({})
+        _exitExpectedScreens = root._currentScreenIdentities()
         _exitFinishedScreens = ({})
         lockContext.reset()
         for (const image of root._snapshotImages)
@@ -230,6 +324,11 @@ Scope {
     // exists, so there is no finished desktop to capture. The lock surface
     // unveils the wallpaper itself instead.
     function startupLock(): bool {
+        root._perf("attempt", {
+            markerResolved: _startupGateResolved,
+            armed: _startupLockArmed,
+            screens: Quickshell.screens.length
+        })
         if (_startupSessionKey.length > 0 && !_startupGateResolved) {
             startupLockTimer.restart()
             return false
@@ -255,8 +354,34 @@ Scope {
 
     // Adopt the persisted marker: a matching key means this session already
     // spent its one automatic lock, so disarm before any request is made.
+    // Mark the no-surface startup path settled. A degraded watchdog fallback may
+    // pass force=true when a surface never reports; this only releases the low-
+    // priority prewarm gate and never unlocks, cancels, or changes ownership.
+    function settleStartupEntry(force): void {
+        if ((!force && root.startupRequest) || root._startupEntryComplete)
+            return
+        root._startupEntryComplete = true
+        root.startupEntryFinished()
+    }
+
+    function _surfaceStartupEntryFinished(identity): void {
+        if (!root.startupRequest || root._startupEntryComplete)
+            return
+        const key = String(identity || "unknown")
+        if (root._startupEntryFinishedScreens[key] === true)
+            return
+        var finished = Object.assign({}, root._startupEntryFinishedScreens)
+        finished[key] = true
+        root._startupEntryFinishedScreens = finished
+        root._finishStartupEntryIfReady()
+    }
+
     function _resolveStartupGate(markerText: string): void {
         _startupGateResolved = true
+        root._perf("marker.resolved", {
+            matched: StartupLockLogic.markerMatches(markerText, _startupSessionKey),
+            keyPresent: _startupSessionKey.length > 0
+        })
         if (_startupSessionKey.length === 0)
             return
         if (StartupLockLogic.markerMatches(markerText, _startupSessionKey))
@@ -305,6 +430,10 @@ Scope {
         const next = Controller.commitState(_state)
         if (next === null)
             return
+        root._perf("committed", {
+            startup: root.startupRequest,
+            ms: root._perfStartupAt > 0 ? Date.now() - root._perfStartupAt : -1
+        })
         _prepareFailsafe.stop()
         _state = next
         sessionLock.locked = true
@@ -334,6 +463,10 @@ Scope {
 
     function _cancelPreparation(): void {
         _prepareFailsafe.stop()
+        if (root.startupRequest && !root._startupEntryComplete) {
+            root._startupEntryComplete = true
+            root.startupEntryFinished()
+        }
         _state = LockLogic.States.idle
         _requestGeneration = -1
         // No lock ever reached the screen, so nothing is holding it any more.
@@ -357,17 +490,16 @@ Scope {
     // WlSessionLock creates one LockSurface per output. Do not release the
     // compositor lock when the first output finishes: that destroys the other
     // surfaces while their closing waves are still travelling downward.
-    function _surfaceExitFinished(screenIndex): void {
+    function _surfaceExitFinished(identity): void {
         if (_state !== LockLogic.States.exiting)
             return
-        const key = Number(screenIndex) >= 0 ? String(screenIndex) : "unknown"
+        const key = String(identity || "unknown")
         if (_exitFinishedScreens[key] === true)
             return
         const finished = Object.assign({}, _exitFinishedScreens)
         finished[key] = true
         _exitFinishedScreens = finished
-        if (Object.keys(finished).length >= _exitSurfaceCount)
-            _finishRelease()
+        root._finishExitIfReady()
     }
 
     // Self-test release: bypasses PAM strictly while the startup test is
@@ -446,18 +578,28 @@ Scope {
                     || StartupRevealLogic.waveAllowed(true,
                                                       root.startupWallpaperReady,
                                                       root.startupChromeReady)
-            onReleaseRequested: root._surfaceExitFinished(root.screenIndex)
+            onReleaseRequested: identity => root._surfaceExitFinished(identity)
             onExitWaveStarted: root._exitFailsafe.restart()
             // One surface exists per screen and each waves in turn; only the
             // first startup wave notifies the root coordinator (Task 5), and
             // manual waves never do.
-            onStartupWaveStartedSignal: {
+            onStartupWaveStartedSignal: identity => {
                 if (!root.startupRequest || root._startupWaveEmitted)
                     return
                 root._startupWaveEmitted = true
+                root._perf("wave.started", {
+                    ms: root._perfStartupAt > 0 ? Date.now() - root._perfStartupAt : -1
+                })
+                root._perfStartupAt = 0
                 root.startupWaveStarted()
             }
+            onStartupEntryFinishedSignal: identity => root._surfaceStartupEntryFinished(identity)
         }
+    }
+
+    Connections {
+        target: Quickshell
+        function onScreensChanged() { root._reconcileSurfaceSets() }
     }
 
     // Password conversation shared by every lock surface.
@@ -483,6 +625,7 @@ Scope {
             if (next === null)
                 return
             root._state = next
+            root._reconcileSurfaceSets()
             // A stalled exit animation must never hold the compositor lock
             // forever, so successful authentication bounds it with a timer.
             if (Controller.armExitFailsafe(previous, next)) {

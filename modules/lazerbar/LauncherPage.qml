@@ -51,6 +51,68 @@ Item {
     // existing delegates instead of constructing the whole 96-row tree in the
     // opening frame.
     property bool prewarmSlots: false
+    // Startup prewarm uses a ListModel so appending slots preserves existing
+    // delegate identities. QQuickRepeater clears a numeric model when its value
+    // changes, so the fixed row/deep-search contract must not grow a number model.
+    // Qt 6.11 source: https://github.com/qt/qtdeclarative/blob/v6.11.0/src/quick/items/qquickrepeater.cpp
+    property bool _rowWindowMaterialized: false
+    property double _perfBornAt: Date.now()
+    ListModel { id: resultSlotModel }
+    Timer {
+        id: resultSlotSyncTimer
+        interval: 16
+        repeat: false
+        onTriggered: root._syncResultSlotModel()
+    }
+
+    function _desiredSlotCount() {
+        var current = resultSlotModel.count
+        if (root.prewarmSlots)
+            return Math.max(current, _resultWindowLimit)
+        if (windowedResults.length > 0)
+            return Math.max(current, _resultWindowLimit)
+        return root._rowWindowMaterialized ? Math.max(current, root.resultWindowBase) : 0
+    }
+
+    function _scheduleResultSlotSync() {
+        if (!resultSlotSyncTimer.running)
+            resultSlotSyncTimer.restart()
+    }
+
+    function _syncResultSlotModel() {
+        var startedAt = Date.now()
+        var target = Math.max(0, Number(root._desiredSlotCount()) || 0)
+        var current = resultSlotModel.count
+        if (current > 0)
+            root._rowWindowMaterialized = true
+        if (current < target) {
+            // Keep each GUI turn short. One append is always made so a busy
+            // foreground cannot starve the prewarm forever; after that first
+            // row, stop at the small budget and yield to rendering/input.
+            var busy = root.thumbnailsActive === false
+                    || (root.session && root.session.foregroundBusy === true)
+            var budgetMs = busy ? 0 : 4
+            var appended = 0
+            while (current + appended < target) {
+                if (appended > 0 && Date.now() - startedAt >= budgetMs)
+                    break
+                resultSlotModel.append({})
+                appended++
+            }
+            if (current + appended < target)
+                resultSlotSyncTimer.restart()
+        } else if (current > target) {
+            resultSlotModel.remove(target, current - target)
+        }
+        if (root.session && root.session.perfTrace)
+            root.session.perfTrace("page.slotSync", {
+                ms: Date.now() - startedAt, count: resultSlotModel.count,
+                target: target
+            })
+    }
+
+    onPrewarmSlotsChanged: root._scheduleResultSlotSync()
+    on_ResultWindowLimitChanged: root._scheduleResultSlotSync()
 
     // Fallback keyboard owner: click-away can strand the surface with no
     // focused item, and then Escape would reach no handler at all. While
@@ -270,13 +332,22 @@ Item {
 
     LauncherSession { id: embeddedSession }
 
-    Component.onCompleted: root.adoptSessionFocus()
+    Component.onCompleted: {
+        root.adoptSessionFocus()
+        root._scheduleResultSlotSync()
+        if (root.session && root.session.perfTrace)
+            root.session.perfTrace("page.ctor", { ms: Date.now() - root._perfBornAt })
+    }
 
-    onSessionChanged: root.adoptSessionFocus()
+    onSessionChanged: {
+        root.adoptSessionFocus()
+        root._scheduleResultSlotSync()
+    }
 
     Connections {
         target: root.session
         function onVisibleChanged() {
+            root._scheduleResultSlotSync()
             if (root.session.visible) {
                 // Launched rows hide instantly for their fling exit; the
                 // count-model Repeater reuses those delegates on reopen, so
@@ -291,6 +362,7 @@ Item {
                             row.releaseInstantly()
                     }
                 }
+                root._scheduleResultSlotSync()
                 root.focusSearch()
                 // The full entrance wave is for a genuinely first paint; when
                 // reopening onto already-materialized rows it would fold the
@@ -341,6 +413,7 @@ Item {
             Qt.callLater(root._scheduleRowsCommit)
         }
         function onDisplayPoolChanged() {
+            root._scheduleResultSlotSync()
             Qt.callLater(resultsView.normalizeViewport)
             root._syncWindowToMatches()
             // Delegates exist synchronously after the model assignment, so
@@ -1152,8 +1225,7 @@ Item {
     // through on a clipboard open, both of them right after the open and both
     // visible as the list twitching as it fills. A slot with no result yet is
     // collapsed and inert (see LauncherResultRow.slotEmpty).
-    readonly property int rowSlotCount: windowedResults.length > 0 || root.prewarmSlots
-            ? _resultWindowLimit : 0
+    readonly property int rowSlotCount: resultSlotModel.count
     // Stretch the materialized window past the base slice only when a query
     // actually matches rows beyond it. This runs in two phases: the query
     // first folds the current window in place (persisted delegates glide,
@@ -1226,7 +1298,10 @@ Item {
     // Window growth materializes rows below the fold and the query/category
     // re-ranks fold the ones in it, so both re-derive the decode queue's
     // served order on the next tick.
-    onWindowedResultsChanged: thumbQueue.wake()
+    onWindowedResultsChanged: {
+        root._scheduleResultSlotSync()
+        thumbQueue.wake()
+    }
 
     // Clipboard thumbnail cache: one decode per entry id, owned here so
     // rows and the preview pane share the exact same proven path.
@@ -2174,7 +2249,7 @@ Item {
             // survivors from newcomers by id (see _holdAndScheduleReleases).
             Repeater {
                 id: resultsRepeater
-                model: root.rowSlotCount
+                model: resultSlotModel
 
                 delegate: LauncherResultRow {
                     required property int index

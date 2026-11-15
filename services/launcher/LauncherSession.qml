@@ -63,6 +63,15 @@ QtObject {
     // Clipboard service seam for thumbnail decoding; injected by the
     // production service, stubbed (or null) in tests.
     property var clipboardService: null
+    // Optional diagnostic sink injected by LauncherService; production behavior
+    // is unchanged when no sink is supplied.
+    property var perfTrace: null
+    property double _perfBatchStartedAt: 0
+
+    function _perf(label, values) {
+        if (typeof root.perfTrace === "function")
+            root.perfTrace(label, values || ({}))
+    }
 
     function decodeThumbnail(id, mime, callback) {
         if (clipboardService)
@@ -126,6 +135,8 @@ QtObject {
     // fingers, so a tail that lands during input waits for it to settle.
     property bool _inputActive: false
     property var _heldBatches: []
+    property var _tailBatches: []
+    property int _tailBatchToken: 0
     readonly property int _inputSettleMs: 140
     property double _inputDeadline: 0
     property bool _inputWatchScheduled: false
@@ -210,6 +221,11 @@ QtObject {
         for (var index = 0; index < held.length; index++)
             root._applyBatch(held[index][0], held[index][1], held[index][2],
                              held[index][3], held[index][4])
+    }
+
+    function _clearTailBatches() {
+        root._tailBatches = []
+        root._tailBatchToken = 0
     }
 
     // Monotonic guard: only the newest dispatched refresh, or the session
@@ -380,6 +396,7 @@ QtObject {
     function open() {
         if (root.visible)
             return
+        root._perf("open", { mode: root.mode, pooled: root.displayPool.length > 0 })
         root.visible = true
         // Publish visibility before pulling the first result pool so the
         // surface can claim keyboard focus in the same event-loop turn.
@@ -387,6 +404,7 @@ QtObject {
         Qt.callLater(function() {
             if (openToken !== root._refreshToken || !root.visible)
                 return
+            root._perf("open.refresh", { mode: root.mode })
             root.refresh()
         })
     }
@@ -427,6 +445,7 @@ QtObject {
         root.loadingMore = false
         root._streamActive = false
         root._heldBatches = []
+        root._clearTailBatches()
         root._staleRefresh = false
         root._staleRefreshItems = []
         root._inputActive = false
@@ -474,6 +493,7 @@ QtObject {
 
     function openClipboard() {
         var servingPooled = root._pooledMode === "clipboard" && root.displayPool.length > 0
+        root._perf("openClipboard", { pooled: servingPooled, pool: root.displayPool.length })
         query = ">clip "
         root.open()
         if (!servingPooled)
@@ -505,6 +525,8 @@ QtObject {
         if (!root.visible)
             return
         var parsed = LauncherLogic.parseQuery(query)
+        root._perf("refresh", { mode: parsed.mode, force: forcePull === true,
+                                 pool: root.displayPool.length })
 
         // Text-only edits inside a pooled mode never re-hit the data source;
         // the pool already holds the full sorted set for this open session.
@@ -539,6 +561,7 @@ QtObject {
         root.loadingMore = false
         root._streamActive = false
         root._heldBatches = []
+        root._clearTailBatches()
         root._staleRefresh = hasStaleRows
         root._staleRefreshItems = []
         if (hasStaleRows) {
@@ -558,6 +581,13 @@ QtObject {
     function _applyBatch(token, outcome, complete, pooledMode, requestText) {
         if (token !== _refreshToken)
             return
+        var commitStartedAt = Date.now()
+        if (!root._streamActive || (root._staleRefresh && root._staleRefreshItems.length === 0)
+                || complete)
+            root._perf(complete ? "batch.complete" : "batch.first",
+                       { mode: pooledMode,
+                         count: outcome && Array.isArray(outcome) ? outcome.length : 0,
+                         complete: complete, pool: root.displayPool.length })
         // A stale clipboard pool is already useful content. Collect the fresh
         // stream off to the side and commit it only once it is complete, so a
         // small head never replaces a full visible history during an open.
@@ -590,16 +620,37 @@ QtObject {
             return
         }
         if (outcome && !Array.isArray(outcome)) {
-            // A failure is terminal whatever the adapter claimed about the
-            // rest of the stream.
+            // Errors must settle immediately even while the tail is held: a
+            // failed stream cannot be hidden behind an opening transition.
             root._streamActive = false
             root.loadingMore = false
             root.loading = false
             root.error = _messageOr(outcome.error, "data source failed")
+            root._clearTailBatches()
             return
         }
         var batch = outcome || []
         var appending = root._streamActive
+        // The first batch is the visible answer. Accumulate later batches until
+        // the adapter reports completion, so one refresh causes one tail
+        // result/filter/layout pass instead of one pass per streamed slice.
+        // The token and mode travel with every deferred batch; close/query/mode
+        // invalidation clears the queue before any stale result can commit.
+        if (appending && !complete) {
+            if (root._tailBatchToken === 0)
+                root._tailBatchToken = token
+            if (root._tailBatchToken === token)
+                root._tailBatches.push([token, batch, complete, pooledMode, requestText])
+            return
+        }
+        if (appending && complete && root._tailBatches.length) {
+            var pending = root._tailBatches
+            root._clearTailBatches()
+            var combined = []
+            for (var tailIndex = 0; tailIndex < pending.length; tailIndex++)
+                combined = combined.concat(pending[tailIndex][1] || [])
+            batch = combined.concat(batch)
+        }
         root._streamActive = !complete
         root.loadingMore = !complete
         // Any batch means data arrived: the full loading state only covers
@@ -642,6 +693,10 @@ QtObject {
         root.tallyCategorySummary(batch)
         if (!appending || complete)
             root.publishCategorySummary(complete === true)
+        root._perf(complete ? "batch.commit.complete" : "batch.commit.first",
+                   { mode: pooledMode, count: batch.length,
+                     ms: Date.now() - commitStartedAt,
+                     pool: root.displayPool.length })
     }
 
     // Background revalidation for change announcers (desktop-entry rescans,

@@ -20,6 +20,34 @@ import "services" as Services
 ShellRoot {
     id: root
 
+    readonly property bool perfTraceEnabled: (Quickshell.env("AFLOAT_PERF_TRACE") || "").trim() === "1"
+    property double perfLastTickAt: 0
+    function perf(label, values) {
+        if (!root.perfTraceEnabled)
+            return
+        var suffix = ""
+        var fields = values || ({})
+        for (var key in fields)
+            suffix += " " + key + "=" + String(fields[key])
+        console.log("[afloat:perf] startup." + label + " t=" + Date.now() + suffix)
+    }
+
+    Timer {
+        id: perfEventLoopTimer
+        interval: 50
+        repeat: true
+        running: root.perfTraceEnabled
+        onTriggered: {
+            var now = Date.now()
+            if (root.perfLastTickAt > 0) {
+                var gap = now - root.perfLastTickAt
+                if (gap >= 100)
+                    root.perf("eventLoop.gap", { ms: gap })
+            }
+            root.perfLastTickAt = now
+        }
+    }
+
     // ---- Startup stage coordination -------------------------------------
     //
     // One-way ladder, owned by the root because the root is the only object
@@ -37,6 +65,13 @@ ShellRoot {
     property bool startupChromeReady: false
     property bool startupQuietReady: false
     property bool startupWorkFinished: false
+    // Route/delegate prewarm is allowed only after the actual wallpaper has
+    // settled and the startup lock entry has finished (or was conclusively
+    // skipped). `startupWorkFinished` alone is the wave-scheduled signal and
+    // is intentionally insufficient for this cold path.
+    readonly property bool startupPrewarmAllowed: root.startupWorkFinished
+            && root.startupWallpaperReady
+            && lockModule.startupEntrySettled
     // The bar's arrival waits for the lock to leave the screen. Behind the lock
     // the slide plays unseen, and the desktop would then appear with the bar
     // already at rest — the pop-in the arrival exists to remove. Two terms,
@@ -96,6 +131,7 @@ ShellRoot {
         if (root._chromeMounted)
             return
         root._chromeMounted = true
+        root.perf("chrome.mount", { stage: root.startupStage })
         chromeLoader.active = true
         root.advanceStartup(StartupReveal.Events.chromeMounted)
     }
@@ -114,6 +150,10 @@ ShellRoot {
     // case; the guard is what keeps it one-way when a screen re-key re-reads
     // the live `bootReady` binding.
     function markWallpaperReady() {
+        root.perf("wallpaper.gate", {
+            stage: root.startupStage,
+            ms: root.perfLastTickAt > 0 ? Date.now() - root.perfLastTickAt : -1
+        })
         if (!root.startupWallpaperReady) {
             root.startupWallpaperReady = true
             root.advanceStartup(StartupReveal.Events.wallpaperReady)
@@ -129,6 +169,7 @@ ShellRoot {
     function markChromeStaged() {
         if (root.startupChromeReady)
             return
+        root.perf("chrome.gate", { stage: root.startupStage })
         root.startupChromeReady = true
         root.advanceStartup(StartupReveal.Events.chromeReady)
     }
@@ -141,6 +182,11 @@ ShellRoot {
     // timer, and a fallback firing after quiet-ready would only add a log line
     // about a session that already came up.
     function markStartupWaveStarted() {
+        root.perf("wave.gate", {
+            stage: root.startupStage,
+            wallpaperReady: root.startupWallpaperReady,
+            chromeReady: root.startupChromeReady
+        })
         // The lock refuses to wave before both gates open, so this branch is
         // unreachable in a wired shell. It exists so an impossible wave still
         // leaves the ladder coherent instead of stranding quiet-ready.
@@ -190,6 +236,7 @@ ShellRoot {
         // markWallpaperReady and its surface waves as soon as it is created.
         root.advanceStartup(StartupReveal.Events.waveStarted)
         root.startupQuietReady = true
+        lockModule.settleStartupEntry(true)
         // The events above re-armed this watchdog on their way through; a
         // fallback that has already run must not leave a second one pending.
         startupFallbackTimer.stop()
@@ -236,6 +283,7 @@ ShellRoot {
         }
         root.advanceStartup(StartupReveal.Events.waveStarted)
         root.startupQuietReady = true
+        lockModule.settleStartupEntry()
     }
 
     // ---- Deferred background work ------------------------------------------
@@ -349,6 +397,7 @@ ShellRoot {
     // timeline so the notification card and the bar cannot drift apart, but the
     // sweep length belongs to the motion tokens.
     Component.onCompleted: {
+        root.perf("begin", { screens: Quickshell.screens.length })
         LazerBar.LazerTheme.settingsService = Services.SettingsService
         LazerBar.LazerTheme.colorService = Services.Color
         Services.RipplePulseService.duration = LazerBar.MotionTokens.glowSweep
@@ -688,7 +737,7 @@ ShellRoot {
             Bar.TopBar {
                 id: topBar
                 startupStaging: true
-                startupPrewarmAllowed: root.startupWorkFinished
+                startupPrewarmAllowed: root.startupPrewarmAllowed
                 arrivalAllowed: root.barArrivalAllowed
             }
 

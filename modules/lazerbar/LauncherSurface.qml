@@ -216,6 +216,8 @@ Item {
     Component.onCompleted: root.syncRailFromSession()
     onSessionChanged: root.syncRailFromSession()
 
+    property double _hostBornAt: Date.now()
+
     Connections {
         target: waveHost
         function onRailExpandedChanged() {
@@ -223,6 +225,17 @@ Item {
                 return
             if (root.session.railExpanded !== waveHost.railExpanded)
                 root.session.railExpanded = waveHost.railExpanded
+        }
+    }
+
+    Connections {
+        target: waveHost
+        function onPhaseChanged() {
+            if (root.session && typeof root.session.perfTrace === "function")
+                root.session.perfTrace("host.phase", {
+                    phase: String(waveHost.phase),
+                    ms: Date.now() - root._hostBornAt
+                })
         }
     }
 
