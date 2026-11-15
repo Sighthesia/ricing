@@ -45,6 +45,13 @@ Item {
     // call, so a destructive command never reaches the page's execute path.
     property var sessionService: null
 
+    // Room the owning window added above/below this surface for the full-screen
+    // power cover. The wave host keeps the geometry it had before that happened,
+    // so the panel behind the curtain cannot jump as the cover arrives; the cover
+    // itself fills the whole window.
+    property int insetTop: 0
+    property int insetBottom: 0
+
     // Exposed for owner-window mask and layer keyboard-focus bindings.
     readonly property alias host: waveHost
     // Exit-card layer above the host, exposed for tests.
@@ -328,6 +335,8 @@ Item {
     WaveSurfaceHost {
         id: waveHost
         anchors.fill: parent
+        anchors.topMargin: root.insetTop
+        anchors.bottomMargin: root.insetBottom
         // Chrome is read from the active route page through the shared page
         // contract, so a route renders its own header without the host knowing
         // anything about it. With the control center folded into the launcher

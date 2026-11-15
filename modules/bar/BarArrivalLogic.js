@@ -30,10 +30,16 @@ function clamp01(value) {
 
 // The single source of truth for how far the bar sits out of view: 0 collapsed,
 // 1 at rest. A product rather than a minimum, an `or`, or an average, because
-// each of those lets the two mechanisms half-cancel into a bar parked in the
-// middle of the screen. With a product, either one holding at 0 collapses it.
-function slideProgress(autoRevealProgress, arrivalProgress) {
-    return clamp01(autoRevealProgress) * clamp01(arrivalProgress)
+// each of those lets the mechanisms half-cancel into a bar parked in the middle
+// of the screen. With a product, either one holding at 0 collapses it.
+//
+// `coverProgress` is the launcher's full-screen power cover taking the screen
+// for itself: that surface owns every edge while it is up, so the bar leaves
+// with the same slide it uses for a lock's stand-down rather than growing a
+// second offset that could disagree with this one. Omitting it means "no cover".
+function slideProgress(autoRevealProgress, arrivalProgress, coverProgress) {
+    const cover = coverProgress === undefined ? 1 : clamp01(coverProgress)
+    return clamp01(autoRevealProgress) * clamp01(arrivalProgress) * cover
 }
 
 // Whether the arrival may play. Two independent conditions, both required: this
@@ -48,6 +54,9 @@ function shouldArrive(staged, arrivalAllowed) {
 // auto-hide machine owns that decision alone; while it is arriving, and once it
 // is standing down for a lock, the bar keeps the same thin strip a collapsed bar
 // claims, so an invisible bar cannot silently eat clicks along the screen edge.
-function claimsFullRegion(revealed, arrivalClaimed) {
-    return revealed === true && arrivalClaimed === true
+// The same holds while a cover has taken the screen: a slid-out bar that still
+// claimed its region would eat clicks meant for the cover above it.
+function claimsFullRegion(revealed, arrivalClaimed, coverProgress) {
+    const cover = coverProgress === undefined ? 1 : clamp01(coverProgress)
+    return revealed === true && arrivalClaimed === true && cover >= 1
 }

@@ -83,6 +83,11 @@ Variants {
                 ? Math.max(0, Math.min(24, Number(Services.SettingsService.bar.floatingMargin) || 0)) : 0
         readonly property int effectiveHeight:
             Math.max(40, Math.min(64, Number(Services.SettingsService.bar.height) || 48))
+        // The strip this bar reserves on its own edge, which every window
+        // anchored below it steps over. Published so the launcher can give the
+        // same number back while its full-screen cover is up, and hand its wave
+        // host the offset that keeps the panel behind the cover from jumping.
+        readonly property int barReservation: screenScope.floatingMargin + screenScope.effectiveHeight
         // Where this bar's free edge currently sits, in screen coordinates, for
         // the desktop layer that paints the seam fillets. It is published rather
         // than derived because the painted bar travels on its own arrival and
@@ -191,7 +196,31 @@ Variants {
         property bool arrivalClaimed: false
         // The only value the slide geometry reads.
         readonly property real slideProgress: ArrivalLogic.slideProgress(
-            screenScope.revealProgress, screenScope.arrivalProgress)
+            screenScope.revealProgress, screenScope.arrivalProgress, screenScope.coverProgress)
+
+        // The launcher's power cover is a full-screen surface of its own, so the
+        // bar leaves for it and returns once the cover is gone. Driven as a third
+        // factor of the one slide scalar (see BarArrivalLogic) instead of an
+        // offset of its own, so nothing here and the auto-hide can fight over the
+        // same pixels; it starts at rest because a session has no cover up.
+        property real coverProgress: 1
+        readonly property bool coverHeld: launcherSurface !== null
+                && launcherSurface.confirmActive === true
+        onCoverHeldChanged: {
+            coverMotion.stop()
+            coverMotion.duration = MotionTokens.reducedMotion ? 0 : MotionTokens.slow
+            // Same direction rule as the reveal above: leaving spends its whole
+            // duration visibly in motion, arriving front-loads the travel.
+            coverMotion.easing.type = coverHeld ? Easing.InOutQuad : Easing.OutCubic
+            coverMotion.to = coverHeld ? 0 : 1
+            coverMotion.restart()
+        }
+        NumberAnimation {
+            id: coverMotion
+            target: screenScope
+            property: "coverProgress"
+            running: false
+        }
         // Same motion contract as the auto-hide reveal above — an explicit
         // NumberAnimation rather than a Behavior, because a Behavior cannot vary
         // easing by direction and the arrival and the stand-down do not share a
@@ -1132,7 +1161,8 @@ Variants {
                 id: revealProbe
                 width: barSlide.width
                 height: ArrivalLogic.claimsFullRegion(screenScope.revealed,
-                                                       screenScope.arrivalClaimed)
+                                                       screenScope.arrivalClaimed,
+                                                       screenScope.coverProgress)
                         ? barSlide.height : RevealLogic.revealStripHeight
                 y: screenScope.atTop ? 0 : barSlide.height - height
             }
@@ -1154,6 +1184,7 @@ Variants {
                 // of an already auto-hidden bar read as one motion.
                 opacity: (1 - screenScope.revealProgress)
                         * screenScope.arrivalProgress
+                        * screenScope.coverProgress
                         * Math.max(0.35, Math.min(1, Services.SettingsService.panelSurfaceOpacity)) * 0.7
 
                 Behavior on opacity { NumberAnimation { duration: MotionTokens.medium } }
@@ -1239,8 +1270,15 @@ Variants {
             implicitWidth: screenScope.modelData.width; implicitHeight: screenScope.modelData.height
             exclusionMode: ExclusionMode.Ignore
             anchors { top: Services.SettingsService.bar.position === "top"; bottom: Services.SettingsService.bar.position === "bottom"; left: true }
-            // Offset by the same clamped height the bar actually renders at.
-            margins { top: Services.SettingsService.bar.position === "top" ? screenScope.floatingMargin + screenScope.effectiveHeight : 0; bottom: Services.SettingsService.bar.position === "bottom" ? screenScope.floatingMargin + screenScope.effectiveHeight : 0 }
+            // Offset by the same clamped height the bar actually renders at —
+            // except while the launcher's power cover is up, which takes the
+            // whole output including the bar's own strip.
+            margins {
+                top: screenScope.atTop && !launcherSurface.confirmActive
+                        ? screenScope.barReservation : 0
+                bottom: !screenScope.atTop && !launcherSurface.confirmActive
+                        ? screenScope.barReservation : 0
+            }
             // Pointer and keyboard follow the region that owns them: the wave
             // panel's own body, or the whole window while the full-screen power
             // cover is up.
@@ -1255,6 +1293,13 @@ Variants {
                 session: Services.LauncherService
                 sessionService: Services.SessionService
                 startupPrewarmAllowed: root.startupPrewarmAllowed
+                // The window grew by the bar's strip for the cover; the wave host
+                // keeps its own geometry so the panel behind the curtain does not
+                // shift up as the cover arrives.
+                insetTop: launcherSurface.confirmActive && screenScope.atTop
+                        ? screenScope.barReservation : 0
+                insetBottom: launcherSurface.confirmActive && !screenScope.atTop
+                        ? screenScope.barReservation : 0
                 // Owner edge for the control-center view: the same singletons
                 // the bar's own popups read, so the overview, its same-surface
                 // sub-pages and the bar can never disagree about one service
