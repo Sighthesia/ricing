@@ -105,11 +105,19 @@ Singleton {
         clipboardBackend: Services.ClipboardService,
         shortcutsBackend: Services.NiriShortcutService,
         iconResolver: function(name) {
+            var iconName = String(name || "")
+            if (!iconName)
+                return ""
+            // "afloat:<glyph>" names one of the shell's own SVGs, so the
+            // builtin command rows do not depend on the user's icon theme
+            // carrying a power/suspend glyph at all.
+            if (iconName.indexOf("afloat:") === 0)
+                return Qt.resolvedUrl("../modules/lazerbar/icons/" + iconName.slice(7) + ".svg")
             // Return an unchecked `image://icon/...` URL (not the checked
             // iconPath form, which can miss user themes like Papirus) and add
             // an explicit provider fallback so missing icons render the theme's
             // default executable icon instead of a broken/black block.
-            return name ? "image://icon/" + String(name) + "?fallback=application-x-executable" : ""
+            return "image://icon/" + iconName + "?fallback=application-x-executable"
         },
         appCategoryResolver: LauncherCategories.appCategoryOf,
         clipCategoryResolver: LauncherCategories.clipCategoryOf,

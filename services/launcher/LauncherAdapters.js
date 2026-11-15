@@ -267,23 +267,65 @@ function appItem(entry, launchCounts, iconResolver, categoryResolver) {
 // ---- Built-in shell commands ----
 
 // Shell-managed actions surfaced beside applications so they are reachable
-// from plain queries without memorizing IPC targets. Execution reuses the
-// managed-bind seam: actionArgv routes actionId "shell.<target>.<fn>" through
-// the afloat IPC helper.
+// from plain queries without memorizing IPC targets. Two execution seams ride
+// these rows: `actionId` runs straight through the afloat IPC helper, while a
+// `sessionAction` is routed to the launcher's full-screen confirmation cover
+// and never executed here.
 function builtinCommands() {
     // `label`/`description` are i18n KEYS, not sentences: this module is pure
     // data shared with non-QML callers, and a baked-in language would pin the
     // builtin list to whatever locale it was written in. The launcher resolves
     // them through Services.Tr when it renders a row. `keywords` stays raw text
     // in every language on purpose - a user may search in either.
+    //
+    // Power rows carry `sessionAction`/`requiresConfirmation` and deliberately
+    // no `actionId`: a destructive action must not be reachable as a plain IPC
+    // call, so the surface owns the confirmation step (suspend is reversible
+    // and asks nothing; the other three ask).
     return [{
         id: "cmd-lock",
         label: "launcher.cmd.lock",
         description: "launcher.cmd.lock.description",
         keywords: "lock lockscreen 锁屏 锁定 锁定屏幕",
-        icon: "lock",
+        icon: "afloat:lock",
         category: "system",
         actionId: "shell.lock.lock"
+    }, {
+        id: "cmd-suspend",
+        label: "launcher.cmd.suspend",
+        description: "launcher.cmd.suspend.description",
+        keywords: "suspend sleep 睡眠 挂起 休眠",
+        icon: "afloat:suspend",
+        category: "system",
+        sessionAction: "suspend",
+        requiresConfirmation: false
+    }, {
+        id: "cmd-reboot",
+        label: "launcher.cmd.reboot",
+        description: "launcher.cmd.reboot.description",
+        keywords: "reboot restart 重启 重新启动",
+        icon: "afloat:reboot",
+        category: "system",
+        sessionAction: "reboot",
+        requiresConfirmation: true
+    }, {
+        id: "cmd-shutdown",
+        label: "launcher.cmd.shutdown",
+        description: "launcher.cmd.shutdown.description",
+        keywords: "shutdown poweroff power-off 关机 关闭电源",
+        icon: "afloat:power",
+        category: "system",
+        sessionAction: "shutdown",
+        requiresConfirmation: true
+    }, {
+        id: "cmd-logout",
+        label: "launcher.cmd.logout",
+        description: "launcher.cmd.logout.description",
+        keywords: "logout log-out 注销 退出登录 登出",
+        icon: "afloat:logout",
+        category: "system",
+        sessionAction: "logout",
+        requiresConfirmation: true
     }]
 }
 
@@ -315,6 +357,10 @@ function commandItem(command, index, iconResolver) {
                               || rawIcon.indexOf(":") > 0 ? rawIcon : ""),
         actionId: command.actionId == null ? "" : String(command.actionId),
         managedByShell: true,
+        // Session rows leave the adapter without an actionId: the surface reads
+        // these two fields and hands the action to the confirmation cover.
+        sessionAction: command.sessionAction == null ? "" : String(command.sessionAction),
+        requiresConfirmation: command.requiresConfirmation === true,
         // Built-in commands declare their own chip bucket so they ride the
         // same category lens as desktop entries.
         category: command.category == null ? "other" : String(command.category),
@@ -456,6 +502,13 @@ function createAppsAdapter(config) {
                 return
             // Built-in commands execute through the managed-bind seam.
             if (item && item.kind === "command") {
+                // A session row must never reach the IPC helper: the surface is
+                // the only path allowed to run it, so a missed hand-off fails
+                // loudly here instead of suspending or shutting down the box.
+                if (item.sessionAction != null && String(item.sessionAction) !== "") {
+                    done({ ok: false, error: "session action routed through the confirmation surface" })
+                    return
+                }
                 if (!actionRunner) {
                     done({ ok: false, error: "command actions unavailable" })
                     return
