@@ -538,7 +538,6 @@ var strings = {
     "lock.action.shutdown": { zh: "关机", en: "Shut down" },
     "lock.confirm": { zh: "确认{action}？", en: "Confirm {action}?" },
     "lock.confirmAgain": { zh: "再次选择以确认", en: "Select again to confirm" },
-    "power.switch": { zh: "切换", en: "Switch" },
     "media.shuffle": { zh: "随机播放", en: "Shuffle" },
     "media.playlist": { zh: "播放列表", en: "Playlist" },
     "popup.network.title": { zh: "Wi-Fi", en: "Wi-Fi" },
