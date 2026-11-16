@@ -30,8 +30,13 @@ Item {
     signal closed()
 
     // ---- Geometry ------------------------------------------------------
-    readonly property int glyphSize: 64
-    readonly property int actionTileSize: 168
+    // The plate is the launcher's boxed loading ring: that plate is 44px with
+    // CornerRadius = edge/4 (LazerLoadingRingLogic.BOX_RADIUS_RATIO), and this
+    // tile uses the same two numbers so the two round rectangles read as one
+    // shape family. The glyph keeps that ring's own 0.6 scale on the plate.
+    readonly property int actionTileSize: 44
+    readonly property real actionTileRadius: actionTileSize * 0.25
+    readonly property int glyphSize: Math.round(actionTileSize * 0.6)
     readonly property int contentMaxWidth: 640
     readonly property int contentMargin: 32
     readonly property int contentSpacing: 20
@@ -259,26 +264,34 @@ Item {
             // to choose between, so nothing here needs a selection state.
             Item {
                 width: contentColumn.width
-                height: root.actionTileSize + root.contentSpacing + labelText.implicitHeight
+                height: actionTile.height + root.contentSpacing + labelText.implicitHeight
 
+                // The pointer target is deliberately larger than the plate: the
+                // plate is the loading ring's size, but a 44px click target would
+                // punish anything but a dead-centre press. The extra ring is
+                // invisible and changes no geometry.
                 Item {
                     id: actionTile
 
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: root.actionTileSize
-                    height: root.actionTileSize
+                    width: root.actionTileSize * 2
+                    height: root.actionTileSize * 2
                     enabled: !root.actionRunning
                     opacity: root.actionRunning ? MotionTokens.disabledOpacity : 1
 
                     Accessible.role: Accessible.Button
                     Accessible.name: root.actionLabel
 
-                    // The one deliberately round large control in the shell: the
-                    // tile is a keycap at button scale, which is what makes it
-                    // read as "press this" rather than as another settings row.
+                    // The plate: the launcher loading ring's rounded rectangle at
+                    // the same size and corner ratio, so the cover's control and
+                    // the shell's spinner read as one shape.
                     Rectangle {
-                        anchors.fill: parent
-                        radius: 12
+                        id: plate
+
+                        anchors.centerIn: parent
+                        width: root.actionTileSize
+                        height: root.actionTileSize
+                        radius: root.actionTileRadius
                         color: tileHover.hovered ? LazerTheme.hoverFill
                                                  : LazerTheme.settingsControlSurface
                         border.width: 1
@@ -292,7 +305,7 @@ Item {
                     // Tinted so the white stroke set reads on either scheme.
                     Image {
                         id: glyph
-                        anchors.centerIn: parent
+                        anchors.centerIn: plate
                         width: root.glyphSize
                         height: root.glyphSize
                         source: root.glyphSource
@@ -308,12 +321,12 @@ Item {
                     }
 
                     // Shared click flash: a flat wash that never changes the hit
-                    // target.
+                    // target, drawn on the plate rather than the invisible target.
                     ClickFlash {
                         id: flash
                         z: 10
-                        anchors.fill: parent
-                        radius: 12
+                        anchors.fill: plate
+                        radius: root.actionTileRadius
                     }
 
                     HoverHandler { id: tileHover }
@@ -338,7 +351,7 @@ Item {
                     anchors.topMargin: root.contentSpacing
                     text: root.headline
                     color: LazerTheme.textPrimary
-                    font.pixelSize: 24
+                    font.pixelSize: 20
                     font.weight: Font.DemiBold
                 }
             }
