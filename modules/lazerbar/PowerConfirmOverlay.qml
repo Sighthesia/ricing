@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Effects
+import QtQuick.Window
 import "../../services" as Services
 
 // Full-screen confirmation cover for the launcher's session commands.
@@ -34,9 +35,17 @@ Item {
     // CornerRadius = edge/4 (LazerLoadingRingLogic.BOX_RADIUS_RATIO), and this
     // tile uses the same two numbers so the two round rectangles read as one
     // shape family. The glyph keeps that ring's own 0.6 scale on the plate.
-    readonly property int actionTileSize: 44
+    readonly property int actionTileSize: 160
     readonly property real actionTileRadius: actionTileSize * 0.25
     readonly property int glyphSize: Math.round(actionTileSize * 0.6)
+    // The gap under the plate is its own number, not the column's: a name that
+    // floats a full row-spacing below the tile reads as a caption of the screen
+    // rather than as this tile's name.
+    readonly property int labelGap: 12
+    // Rasterise the glyph at the size it is actually painted at, on this
+    // display's ratio. A vector icon loaded at its own 24px default and scaled
+    // up to 96 is a 4x upscale, which is what made it soft at this size.
+    readonly property real glyphRasterSize: root.glyphSize * Math.max(1, Screen.devicePixelRatio)
     readonly property int contentMaxWidth: 640
     readonly property int contentMargin: 32
     readonly property int contentSpacing: 20
@@ -93,6 +102,9 @@ Item {
         return ""
     }
     // The action's own glyph, out of the shell's stroke set.
+    // The shell's own glyph set, not a second icon library: this cover is a
+    // screen of the bar's shell, so its marks are the same white-stroke SVGs the
+    // bar and the lock surface draw.
     readonly property url glyphSource: {
         switch (root.actionId) {
         case "suspend": return Qt.resolvedUrl("icons/suspend.svg")
@@ -139,6 +151,11 @@ Item {
             root.waveProgress = 0
             root.backdropProgress = 0
         }
+        // Drop any composition the search editor was holding: this cover takes
+        // the keyboard away from it, and an input method left mid-composition
+        // replays the abandoned preedit into the editor when focus comes back —
+        // which arrives as an Escape the launcher then reads as "close".
+        Qt.inputMethod.reset()
         root.phase = "opening"
         openBackdrop.restart()
         openBody.restart()
@@ -175,6 +192,9 @@ Item {
     }
 
     function finishClose() {
+        // The same reset on the way out, before the editor takes the keyboard
+        // back: the cover never left a half-typed composition behind it.
+        Qt.inputMethod.reset()
         root.phase = "closed"
         root.bodyProgress = 0
         root.waveProgress = 0
@@ -264,70 +284,77 @@ Item {
             // to choose between, so nothing here needs a selection state.
             Item {
                 width: contentColumn.width
-                height: actionTile.height + root.contentSpacing + labelText.implicitHeight
+                height: plate.height + root.labelGap + labelText.implicitHeight
 
-                // The pointer target is deliberately larger than the plate: the
-                // plate is the loading ring's size, but a 44px click target would
-                // punish anything but a dead-centre press. The extra ring is
-                // invisible and changes no geometry.
-                Item {
-                    id: actionTile
+                // The plate: the launcher loading ring's rounded rectangle at the
+                // same size and corner ratio, so the cover's control and the
+                // shell's spinner read as one shape. It is the layout element, so
+                // the name below it sits this close and no closer.
+                Rectangle {
+                    id: plate
 
                     anchors.horizontalCenter: parent.horizontalCenter
+                    width: root.actionTileSize
+                    height: root.actionTileSize
+                    opacity: root.actionRunning ? MotionTokens.disabledOpacity : 1
+                    radius: root.actionTileRadius
+                    // `settingsSection`, not `settingsControlSurface`: the
+                    // control rung sits within a hair of the curtain in the
+                    // dark scheme, so the plate read as its own outline. This
+                    // is the same one-step lift a section takes inside a panel.
+                    color: tileHover.hovered ? LazerTheme.settingsCardHover
+                                             : LazerTheme.settingsSection
+                    border.width: 1
+                    border.color: tileHover.hovered ? LazerTheme.focusRing
+                                                    : LazerTheme.divider
+
+                    Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
+                    Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
+                }
+
+                // Tinted so the white stroke set reads on either scheme.
+                Image {
+                    id: glyph
+                    anchors.centerIn: plate
+                    width: root.glyphSize
+                    height: root.glyphSize
+                    sourceSize.width: root.glyphRasterSize
+                    sourceSize.height: root.glyphRasterSize
+                    source: root.glyphSource
+                    fillMode: Image.PreserveAspectFit
+                    visible: false
+                }
+
+                MultiEffect {
+                    anchors.fill: glyph
+                    source: glyph
+                    colorization: 1
+                    colorizationColor: LazerTheme.osuPink
+                }
+
+                // Shared click flash: a flat wash that never changes the hit
+                // target, drawn on the plate rather than the invisible target.
+                ClickFlash {
+                    id: flash
+                    z: 10
+                    anchors.fill: plate
+                    radius: root.actionTileRadius
+                }
+
+                // The pointer target is deliberately larger than the plate, and
+                // invisible: a target the size of the plate punishes every press
+                // that is not dead centre. It is centred on the plate and takes no
+                // part in the layout, so it cannot push the name away.
+                Item {
+                    id: actionTarget
+
+                    anchors.centerIn: plate
                     width: root.actionTileSize * 2
                     height: root.actionTileSize * 2
                     enabled: !root.actionRunning
-                    opacity: root.actionRunning ? MotionTokens.disabledOpacity : 1
 
                     Accessible.role: Accessible.Button
                     Accessible.name: root.actionLabel
-
-                    // The plate: the launcher loading ring's rounded rectangle at
-                    // the same size and corner ratio, so the cover's control and
-                    // the shell's spinner read as one shape.
-                    Rectangle {
-                        id: plate
-
-                        anchors.centerIn: parent
-                        width: root.actionTileSize
-                        height: root.actionTileSize
-                        radius: root.actionTileRadius
-                        color: tileHover.hovered ? LazerTheme.hoverFill
-                                                 : LazerTheme.settingsControlSurface
-                        border.width: 1
-                        border.color: tileHover.hovered ? LazerTheme.focusRing
-                                                        : LazerTheme.divider
-
-                        Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
-                        Behavior on border.color { ColorAnimation { duration: MotionTokens.fast } }
-                    }
-
-                    // Tinted so the white stroke set reads on either scheme.
-                    Image {
-                        id: glyph
-                        anchors.centerIn: plate
-                        width: root.glyphSize
-                        height: root.glyphSize
-                        source: root.glyphSource
-                        fillMode: Image.PreserveAspectFit
-                        visible: false
-                    }
-
-                    MultiEffect {
-                        anchors.fill: glyph
-                        source: glyph
-                        colorization: 1
-                        colorizationColor: LazerTheme.osuPink
-                    }
-
-                    // Shared click flash: a flat wash that never changes the hit
-                    // target, drawn on the plate rather than the invisible target.
-                    ClickFlash {
-                        id: flash
-                        z: 10
-                        anchors.fill: plate
-                        radius: root.actionTileRadius
-                    }
 
                     HoverHandler { id: tileHover }
 
@@ -335,7 +362,7 @@ Item {
                     // press that opened the cover cannot confirm it either.
                     TapHandler {
                         onTapped: {
-                            if (!actionTile.enabled || !root.armed)
+                            if (!actionTarget.enabled || !root.armed)
                                 return
                             flash.restart()
                             root.confirm()
@@ -343,15 +370,15 @@ Item {
                     }
                 }
 
-                // The action's name under the tile.
+                // The action's name under the plate.
                 Text {
                     id: labelText
                     anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: actionTile.bottom
-                    anchors.topMargin: root.contentSpacing
+                    anchors.top: plate.bottom
+                    anchors.topMargin: root.labelGap
                     text: root.headline
                     color: LazerTheme.textPrimary
-                    font.pixelSize: 20
+                    font.pixelSize: 24
                     font.weight: Font.DemiBold
                 }
             }
