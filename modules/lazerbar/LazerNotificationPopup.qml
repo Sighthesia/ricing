@@ -549,6 +549,15 @@ Item {
                     duration: root.reducedMotion ? 0 : 2000
                     easing.type: Easing.OutQuart
                 }
+
+                // Light the entry throws off the card while it lands. Rides the
+                // flash's own fade, so the halo releases with the wash.
+                GlowBleed {
+                    anchors.fill: parent
+                    glowColor: LazerTheme.notificationFlash
+                    spread: 12
+                    surfaceRadius: root.cardRadius
+                }
             }
 
             // The shell's glow pulse, hosted on the card: the same heavy ring

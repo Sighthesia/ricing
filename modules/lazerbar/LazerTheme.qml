@@ -149,6 +149,13 @@ QtObject {
     // white blend holds 0.78+ contrast on every measured seed while
     // staying bright. Unbranched so dark, light and fallback agree.
     readonly property color notificationFlash: mix(paperWhite, accentColor, 0.5)
+    // Click-flash halo: the light a flash throws outside its own surface.
+    // Light schemes take the accent (paper white on a light card is invisible),
+    // dark schemes blend almost all the way to paper white so the halo reads as
+    // light rather than as a second accent colour.
+    readonly property color flashGlow: lightScheme
+        ? accentColor
+        : mix(paperWhite, accentColor, 0.35)
     readonly property color divider: adapt && colorService ? shade(colorService.mOutline, 0.28) : "#2E2C32"
     readonly property color popupBackground: adapt && colorService ? shade(colorService.mSurface, 0xF2 / 255) : "#F21D1C22"
     readonly property color popupBorder: "#24FFFFFF"

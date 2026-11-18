@@ -37,6 +37,15 @@ Rectangle {
     anchors.fill: followItem
     visible: followItem === null || followItem.visible
 
+    // Halo around the wash: light leaving the host surface, so a click still
+    // reads on a control too small or too dark to show the wash itself.
+    property bool glow: true
+    property color glowColor: LazerTheme.flashGlow
+    property real glowSpread: 8
+    // Follows this layer's own radius, so a caller that set one gets a halo that
+    // wraps its corners without having to pass the radius a second time.
+    property real glowRadius: root.radius
+
     // True while a wash is visible, including the frame it was started on.
     readonly property bool flashActive: flashAnimation.running || root.opacity > 0
     // Published for hosts that forward the seam to a test.
@@ -58,6 +67,17 @@ Rectangle {
     function cancel() {
         flashAnimation.stop()
         root.opacity = 0
+    }
+
+    // The wash's own halo, painted outside this layer's bounds. It inherits
+    // `opacity`, so the single 800ms fade carries the light out with the wash
+    // and there is no second animation to keep in step.
+    GlowBleed {
+        anchors.fill: parent
+        visible: root.glow && root.opacity > 0.001
+        glowColor: root.glowColor
+        spread: root.glowSpread
+        surfaceRadius: root.glowRadius
     }
 
     NumberAnimation {

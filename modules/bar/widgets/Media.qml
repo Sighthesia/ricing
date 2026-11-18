@@ -405,7 +405,9 @@ BarPill {
             height: root.coverSize
             radius: 1.5
             color: LazerTheme.shade(LazerTheme.barIcon, 0.14)
-            clip: true
+            // Open, so the fill's halo can leave the 3px track. The fill is
+            // never wider or taller than the track, so nothing else spills.
+            clip: false
 
             // Beat flash across the whole track (reads mostly on the
             // unplayed remainder); sits under the played fill overlay.
@@ -428,6 +430,22 @@ BarPill {
                 height: parent.height * Services.MediaControlService.progress
                 radius: 1.5
                 color: LazerTheme.accentColor
+
+                // Halo thrown by the same beat that lights the fill; the bottom
+                // edge sits on the track's end and has nowhere to spill to.
+                GlowBleed {
+                    anchors.fill: parent
+                    glowColor: LazerTheme.flashWash
+                    spread: 5
+                    surfaceRadius: 1.5
+                    bleedBottom: false
+                    opacity: MotionTokens.reducedMotion
+                        ? 0
+                        : Math.min(1, Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity * 2.2)
+                    visible: opacity > 0.01
+
+                    Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
+                }
 
                 // Beat flash: brightness pulse riding the shared beatPulse
                 // decay, so the bar blinks once per detected beat.
