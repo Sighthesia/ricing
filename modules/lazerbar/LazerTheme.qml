@@ -169,11 +169,17 @@ QtObject {
     // screen, a halo authored at 0.6 landed at roughly half its intended contrast
     // once the flash's own layer opacity and the panel edges had taken their cut.
     readonly property real flashGlowEdge: lightScheme ? 1 : 0.6
-    // Peak alpha of the light the spectrum's beat front throws. It sits under the
-    // bars rather than over them, so it has to be strong enough to read in the
-    // gaps without turning the bars into silhouettes; the light scheme gets more
-    // for the reason above.
+    // Peak alpha of the light a spectrum bar throws while the beat front is on
+    // it. It has to read against the bar's own colour without swallowing the bar,
+    // and the light scheme gets more for the reason above.
     readonly property real spectrumGlowAlpha: lightScheme ? 0.55 : 0.35
+    // The spectrum bar halo's own tone. On a light surface the bar is itself a
+    // tint of the accent, so a halo of that same tint merges into it and reads
+    // as a wider bar; it takes a deeper step of the hue there, which is the only
+    // thing that can stand out against paper (nothing can be brighter).
+    readonly property color spectrumGlowColor: lightScheme
+        ? mix(accentColor, textPrimary, 0.45)
+        : flashGlow
     // Click-flash tint. A light surface needs the theme colour to read as a
     // blink: a text-coloured veil over it reads as the control dimming.
     readonly property color clickFlashWash: lightScheme ? accentColor : textPrimary

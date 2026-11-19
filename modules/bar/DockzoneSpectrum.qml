@@ -24,16 +24,15 @@ Item {
     property int waveDuration: MotionTokens.beatWave
     // How far ahead of the front the brightness bump reaches.
     readonly property real waveWidth: Math.max(20, root.width * 0.16)
-    // The light the front throws. Same scheme correction as the click flashes
-    // (LazerTheme states it once), because a light surface can only be darkened:
-    // a white band there would be worth nothing.
-    property color glowColor: LazerTheme.flashGlow
-    // Thin on purpose: this is light behind the bars, not a second wash over
-    // them - the bars already brighten under the front.
+    // The light a bar throws while the beat front is on it. Same scheme
+    // correction as the click flashes (LazerTheme states it once), because a
+    // light surface can only be darkened: a white glow there is worth nothing.
+    property color glowColor: LazerTheme.spectrumGlowColor
+    // How far the light reaches outside a bar, and the peak alpha it reaches.
+    // Bars are thin and sit close together, so the reach has to stay smaller
+    // than the gap between them or the whole spectrum lights up as a block.
+    readonly property real glowSpread: 5
     readonly property real glowAlpha: LazerTheme.spectrumGlowAlpha
-    // How wide the light spreads either side of the front, as a fraction of the
-    // boost window, so the two read as one event.
-    readonly property real glowReach: root.waveWidth * 1.2
 
     // Sweep-front position in root coordinates; parked far left when idle so
     // no bar ever sees a boost from it.
@@ -67,33 +66,12 @@ Item {
         easing.type: Easing.OutQuad
     }
 
-    // The beat's own light, painted behind the bars: a soft band travelling with
-    // the front, so the flash reads as light crossing the spectrum rather than
-    // only as bars brightening. Five stops instead of a triangle, whose centre
-    // would show as a crease.
-    Rectangle {
-        id: waveGlow
-
-        visible: root.waveActive && root.glowAlpha > 0.01
-        x: root.waveX - width / 2
-        y: 0
-        width: Math.max(1, 2 * root.glowReach)
-        height: root.height
-
-        gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, 0) }
-            GradientStop { position: 0.25; color: LazerTheme.shade(root.glowColor, root.glowAlpha * 0.35) }
-            GradientStop { position: 0.5; color: LazerTheme.shade(root.glowColor, root.glowAlpha) }
-            GradientStop { position: 0.75; color: LazerTheme.shade(root.glowColor, root.glowAlpha * 0.35) }
-            GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, 0) }
-        }
-    }
-
     Repeater {
         model: root.totalBars
 
         Rectangle {
+            id: waveRoot
+
             readonly property int mirroredIndex: index < root.valuesCount ? root.valuesCount - 1 - index : index - root.valuesCount
             readonly property real amplitude: (root.values && root.values[mirroredIndex] !== undefined) ? root.values[mirroredIndex] : 0
             readonly property real emphasis: {
@@ -130,6 +108,21 @@ Item {
                     Math.min(1, root.barColor.a * emphasis + waveBoost * 0.85))
             }
             visible: height > 0.5 && root.visible
+
+            // The beat front's light, thrown by the bar it has actually reached:
+            // a halo hugging that bar, not a wash across the spectrum. Only the
+            // few bars under the front carry one, so the spectrum reads as a
+            // wave of light moving through it.
+            GlowBleed {
+                anchors.fill: parent
+                visible: waveRoot.visible && root.waveActive && waveRoot.waveBoost > 0.02
+                glowColor: root.glowColor
+                spread: root.glowSpread
+                // Scheme correction on the layer, never on the edge alpha: a
+                // value above 1 there would clip the ramp flat at its inner end.
+                edgeAlpha: root.glowAlpha
+                opacity: Math.min(1, waveRoot.waveBoost * LazerTheme.flashGlowGain)
+            }
         }
     }
 }

@@ -148,10 +148,15 @@ Item {
             cache: false
             sourceSize.width: Math.max(1, Math.round(patch.width))
             sourceSize.height: Math.max(1, Math.round(patch.height))
-            source: "data:image/svg+xml;utf8,"
-                + encodeURIComponent(Glow.cornerSvg(patch.width, root.arc,
+            // A halo that is not painting holds no decoded patch. The spectrum
+            // mounts one of these per bar and only the few under the beat front
+            // are ever lit, so an always-decoded patch would be paid for 48 times
+            // over to draw nothing. Clearing the source releases the texture.
+            source: (root.visible && root.opacity > 0.001)
+                ? "data:image/svg+xml;utf8," + encodeURIComponent(Glow.cornerSvg(patch.width, root.arc,
                                                     root.glowColor, root.edgeAlpha,
                                                     patch.corner))
+                : ""
         }
     }
 }
