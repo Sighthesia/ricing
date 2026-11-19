@@ -169,6 +169,11 @@ QtObject {
     // screen, a halo authored at 0.6 landed at roughly half its intended contrast
     // once the flash's own layer opacity and the panel edges had taken their cut.
     readonly property real flashGlowEdge: lightScheme ? 1 : 0.6
+    // Peak alpha of the light the spectrum's beat front throws. It sits under the
+    // bars rather than over them, so it has to be strong enough to read in the
+    // gaps without turning the bars into silhouettes; the light scheme gets more
+    // for the reason above.
+    readonly property real spectrumGlowAlpha: lightScheme ? 0.55 : 0.35
     // Click-flash tint. A light surface needs the theme colour to read as a
     // blink: a text-coloured veil over it reads as the control dimming.
     readonly property color clickFlashWash: lightScheme ? accentColor : textPrimary

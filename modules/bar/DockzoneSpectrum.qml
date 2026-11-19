@@ -24,6 +24,16 @@ Item {
     property int waveDuration: MotionTokens.beatWave
     // How far ahead of the front the brightness bump reaches.
     readonly property real waveWidth: Math.max(20, root.width * 0.16)
+    // The light the front throws. Same scheme correction as the click flashes
+    // (LazerTheme states it once), because a light surface can only be darkened:
+    // a white band there would be worth nothing.
+    property color glowColor: LazerTheme.flashGlow
+    // Thin on purpose: this is light behind the bars, not a second wash over
+    // them - the bars already brighten under the front.
+    readonly property real glowAlpha: LazerTheme.spectrumGlowAlpha
+    // How wide the light spreads either side of the front, as a fraction of the
+    // boost window, so the two read as one event.
+    readonly property real glowReach: root.waveWidth * 1.2
 
     // Sweep-front position in root coordinates; parked far left when idle so
     // no bar ever sees a boost from it.
@@ -55,6 +65,29 @@ Item {
         to: root.width + root.waveWidth
         duration: root.waveDuration > 0 ? root.waveDuration : MotionTokens.beatWave
         easing.type: Easing.OutQuad
+    }
+
+    // The beat's own light, painted behind the bars: a soft band travelling with
+    // the front, so the flash reads as light crossing the spectrum rather than
+    // only as bars brightening. Five stops instead of a triangle, whose centre
+    // would show as a crease.
+    Rectangle {
+        id: waveGlow
+
+        visible: root.waveActive && root.glowAlpha > 0.01
+        x: root.waveX - width / 2
+        y: 0
+        width: Math.max(1, 2 * root.glowReach)
+        height: root.height
+
+        gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, 0) }
+            GradientStop { position: 0.25; color: LazerTheme.shade(root.glowColor, root.glowAlpha * 0.35) }
+            GradientStop { position: 0.5; color: LazerTheme.shade(root.glowColor, root.glowAlpha) }
+            GradientStop { position: 0.75; color: LazerTheme.shade(root.glowColor, root.glowAlpha * 0.35) }
+            GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, 0) }
+        }
     }
 
     Repeater {
