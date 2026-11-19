@@ -164,6 +164,11 @@ QtObject {
     // worth nothing at all there (+1% over paper). So the light scheme scales the
     // halo up, and the dark one is left exactly as it was.
     readonly property real flashGlowGain: lightScheme ? 3 : 1
+    // Peak alpha the halo may paint with. The light scheme has to reach the whole
+    // way to 1 for the correction above to survive compositing: measured on
+    // screen, a halo authored at 0.6 landed at roughly half its intended contrast
+    // once the flash's own layer opacity and the panel edges had taken their cut.
+    readonly property real flashGlowEdge: lightScheme ? 1 : 0.6
     // Click-flash tint. A light surface needs the theme colour to read as a
     // blink: a text-coloured veil over it reads as the control dimming.
     readonly property color clickFlashWash: lightScheme ? accentColor : textPrimary

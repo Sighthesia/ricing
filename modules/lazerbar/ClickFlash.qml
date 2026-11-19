@@ -47,6 +47,13 @@ Rectangle {
     // Follows this layer's own radius, so a caller that set one gets a halo that
     // wraps its corners without having to pass the radius a second time.
     property real glowRadius: root.radius
+    // The alpha the halo reaches on its first frame. It is stated as a peak in
+    // its own right, not as a multiple of the wash: this layer's opacity tops out
+    // at clickFlashOpacity (0.3), so a halo parented inside it could never
+    // out-read the wash, and the light would be capped at a tenth of the contrast
+    // it needs on a light surface.
+    readonly property real glowPeak: Math.min(1, MotionTokens.clickFlashOpacity
+                                                * LazerTheme.flashGlowGain)
 
     // True while a wash is visible, including the frame it was started on.
     readonly property bool flashActive: flashAnimation.running || root.opacity > 0
@@ -58,30 +65,55 @@ Rectangle {
     // instead of travelling, and a disabled host never flashes at all.
     function restart() {
         if (MotionTokens.reducedMotion) {
-            flashAnimation.stop()
-            root.opacity = 0
+            cancel()
             return
         }
         flashAnimation.restart()
+        haloAnimation.restart()
     }
 
     // Stop the wash without waiting for it to fade.
     function cancel() {
         flashAnimation.stop()
+        haloAnimation.stop()
         root.opacity = 0
+        halo.opacity = 0
     }
 
-    // The wash's own halo, painted outside this layer's bounds. It follows the
-    // same fade, so there is no second animation to keep in step, and the
-    // scheme's correction rides the layer's opacity rather than the panel alphas
-    // (a factor above 1 in those would clip the ramp flat).
+    // The wash's own halo. It is a sibling of this layer rather than a child on
+    // purpose: a child would inherit the wash's peak opacity and be held to a
+    // fraction of the contrast a halo needs, so it would only ever read as a
+    // slightly darker edge (measured: a 9% dip on a light surface). Laid over the
+    // same rectangle and faded on the same clock, it reaches its own peak while
+    // the wash reaches its own.
     GlowBleed {
-        anchors.fill: parent
-        visible: root.glow && root.opacity > 0.001
-        opacity: Math.min(1, root.opacity * LazerTheme.flashGlowGain)
+        id: halo
+
+        parent: root.parent
+        x: root.x
+        y: root.y
+        width: root.width
+        height: root.height
+        // Above its siblings, so the corner patches wrap this control's own
+        // rounded corners instead of disappearing under a neighbour.
+        z: root.z + 1
+        visible: root.glow && root.parent !== null && haloAnimation.running
         glowColor: root.glowColor
         spread: root.glowSpread
         surfaceRadius: root.glowRadius
+        edgeAlpha: LazerTheme.flashGlowEdge
+
+        // Same restart, duration and easing as the wash, so the two can never
+        // drift apart: both are driven from the one `restart()` call.
+        NumberAnimation on opacity {
+            id: haloAnimation
+
+            from: root.glowPeak
+            to: 0
+            duration: MotionTokens.clickFlashDuration
+            easing.type: MotionTokens.clickFlashEasing
+            running: false
+        }
     }
 
     NumberAnimation {
