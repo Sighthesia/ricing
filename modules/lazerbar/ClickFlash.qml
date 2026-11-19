@@ -18,8 +18,10 @@ Rectangle {
     id: root
 
     // Callers that paint their wash over a lifted surface pass
-    // `LazerTheme.textPrimary`; the rest leave the default.
-    color: LazerTheme.textPrimary
+    // `LazerTheme.textPrimary`; the rest leave the default, which follows the
+    // scheme: a light surface takes the theme colour so the blink reads as colour
+    // instead of as the control dimming.
+    color: LazerTheme.clickFlashWash
     // A wash that confirms a discrete value change follows the part of the
     // control that carries it (a slider's travelled fill), not the whole
     // control. Those callers leave `followItem` set and keep their own
@@ -69,12 +71,14 @@ Rectangle {
         root.opacity = 0
     }
 
-    // The wash's own halo, painted outside this layer's bounds. It inherits
-    // `opacity`, so the single 800ms fade carries the light out with the wash
-    // and there is no second animation to keep in step.
+    // The wash's own halo, painted outside this layer's bounds. It follows the
+    // same fade, so there is no second animation to keep in step, and the
+    // scheme's correction rides the layer's opacity rather than the panel alphas
+    // (a factor above 1 in those would clip the ramp flat).
     GlowBleed {
         anchors.fill: parent
         visible: root.glow && root.opacity > 0.001
+        opacity: Math.min(1, root.opacity * LazerTheme.flashGlowGain)
         glowColor: root.glowColor
         spread: root.glowSpread
         surfaceRadius: root.glowRadius

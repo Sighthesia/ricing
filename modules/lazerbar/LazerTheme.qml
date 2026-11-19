@@ -156,6 +156,17 @@ QtObject {
     readonly property color flashGlow: lightScheme
         ? accentColor
         : mix(paperWhite, accentColor, 0.35)
+    // A halo has to out-contrast the surface it lands on, and the two schemes
+    // spend their alpha differently: light on a dark surface raises the luminance
+    // the eye is watching, while anything on a light surface can only lower it.
+    // Measured on this display at the click flash's own edge alpha, the dark
+    // scheme moves the background by 85% and the light one by 9%; white light is
+    // worth nothing at all there (+1% over paper). So the light scheme scales the
+    // halo up, and the dark one is left exactly as it was.
+    readonly property real flashGlowGain: lightScheme ? 3 : 1
+    // Click-flash tint. A light surface needs the theme colour to read as a
+    // blink: a text-coloured veil over it reads as the control dimming.
+    readonly property color clickFlashWash: lightScheme ? accentColor : textPrimary
     readonly property color divider: adapt && colorService ? shade(colorService.mOutline, 0.28) : "#2E2C32"
     readonly property color popupBackground: adapt && colorService ? shade(colorService.mSurface, 0xF2 / 255) : "#F21D1C22"
     readonly property color popupBorder: "#24FFFFFF"

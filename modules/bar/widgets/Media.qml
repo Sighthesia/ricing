@@ -441,7 +441,8 @@ BarPill {
                     bleedBottom: false
                     opacity: MotionTokens.reducedMotion
                         ? 0
-                        : Math.min(1, Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity * 2.2)
+                        : Math.min(1, Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity
+                                            * 2.2 * LazerTheme.flashGlowGain)
                     visible: opacity > 0.01
 
                     Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }

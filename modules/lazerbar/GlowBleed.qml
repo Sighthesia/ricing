@@ -31,8 +31,10 @@ Item {
     property color glowColor: LazerTheme.flashGlow
     // How far the light reaches outside the host, in pixels.
     property real spread: 8
-    // Alpha on the host's boundary. The host's own opacity multiplies it again,
-    // so a fading flash takes its halo down with it.
+    // Alpha on the host's boundary. The host's layer opacity multiplies it
+    // again, so a fading flash takes its halo down with it. Never fold a scheme
+    // correction into this number: anything above 1 would clip the ramp flat at
+    // its inner end, so the correction belongs on the layer's opacity.
     property real edgeAlpha: 0.6
     // The host surface's corner radius. It decides where a band hands over to a
     // corner patch, and it is also how far a patch reaches inside the host's
