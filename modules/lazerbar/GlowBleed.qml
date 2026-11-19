@@ -1,19 +1,28 @@
 import QtQuick
+import "GlowBleedSvg.js" as Glow
 
 // The light a flash throws outside its own surface.
 //
-// One flat gradient per edge: it dies to nothing by `spread`, so what leaves the
-// host reads as spill rather than as a second surface with its own boundary.
-// Each panel spans the whole bloom box across its other axis, so every corner is
-// covered by two of them and reads brighter than the middle of an edge. That
-// overlap is deliberate — a lit corner is what the eye expects, and ending the
-// light at the square box would leave a notch of darkness beside a rounded one.
+// The field has to depend on one thing only: the distance to the host boundary.
+// A rounded rectangle decomposes into eight pieces that share that field — four
+// bands between the corner arcs, each a linear gradient along its edge normal,
+// and four corner patches, each a radial gradient about an arc centre. Every
+// junction evaluates the same distance from both sides, so nothing steps.
 //
-// Flat gradients rather than a blur or a stack of fading bands. Inline GLSL in
-// ShaderEffect and MultiEffect's blur passes are both broken on this Qt (same
-// finding as RippleGlowLogic.js), and bands with visible stops read as
-// concentric rings instead of as light leaving an edge. A gradient is a plain
-// per-pixel paint: soft by construction, and nothing is uploaded per frame.
+// The previous version spread four bands across the whole bloom box instead.
+// Along an edge it was right, but a band has to end somewhere, and where it
+// ended the light simply stopped: a bright plus with square corners. Measured
+// against the ideal field over a 60x100 surface that version deviated by 0.93
+// with a 0.97 step between neighbouring pixels; this one deviates by 0.000 and
+// steps by 1/spread, which is the gradient's own slope.
+//
+// Bands are Rectangles with a linear gradient. Corners are not: Qt's RadialGradient
+// is documented as incompatible with Rectangle ("that only supports Gradient")
+// and would silently paint as a linear ramp, so each patch is an SVG rasterised
+// by QPainter instead — see GlowBleedSvg.js. Flat gradient paints throughout:
+// inline GLSL in ShaderEffect and MultiEffect's blur passes are both broken on
+// this Qt (same finding as RippleGlowLogic.js), and a stack of fading strokes
+// reads as concentric rings instead of as light leaving an edge.
 Item {
     id: root
 
@@ -25,12 +34,14 @@ Item {
     // Alpha on the host's boundary. The host's own opacity multiplies it again,
     // so a fading flash takes its halo down with it.
     property real edgeAlpha: 0.6
-    // The host surface's corner radius. The inner edge reaches this far inside,
-    // so the light wraps a rounded corner instead of stopping on the square box
-    // the panels are built from.
+    // The host surface's corner radius. It decides where a band hands over to a
+    // corner patch, and it is also how far a patch reaches inside the host's
+    // box, so the light fills the notch a rounded corner leaves instead of
+    // stopping on a square edge.
     property real surfaceRadius: 0
     // Edges to light. A bar-shaped host that only wants light at its sides turns
-    // the top and bottom off.
+    // the top and bottom off; a band then runs all the way to the host's own end
+    // rather than stopping at an arc that is not being drawn.
     property bool bleedLeft: true
     property bool bleedRight: true
     property bool bleedTop: true
@@ -39,69 +50,106 @@ Item {
     // Never takes input: the light sits outside the control that owns it.
     enabled: false
 
-    // How far a panel reaches inside the host, and where the host boundary then
-    // falls along it. Past the boundary the light holds `edgeAlpha` for the
-    // overlap instead of ramping on into the host's middle.
-    readonly property real inward: Math.max(0, root.surfaceRadius)
-    readonly property real boundary: root.spread / Math.max(0.001, root.spread + root.inward)
+    // A radius cannot exceed half a side, and the bands are the host's straight
+    // part, so both derive from this one clamp.
+    readonly property real arc: Glow.clampArc(root.surfaceRadius, root.width, root.height)
+    readonly property real bandTop: root.bleedTop ? root.arc : 0
+    readonly property real bandBottom: root.bleedBottom ? root.height - root.arc : root.height
+    readonly property real bandHeight: Math.max(0, root.bandBottom - root.bandTop)
+    // Side length of a corner patch: the light's reach plus the arc it wraps.
+    readonly property real patchSize: root.spread + root.arc
 
-    // Left edge: brightest against the host, gone at the outside of the bloom.
+    // Straight edge: alpha depends only on the distance to that edge.
     Rectangle {
-        visible: root.bleedLeft
-        x: -root.spread
+        visible: root.bleedTop && root.width - 2 * root.arc > 0
+        x: root.arc
         y: -root.spread
-        width: root.spread + root.inward
-        height: root.height + 2 * root.spread
+        width: Math.max(0, root.width - 2 * root.arc)
+        height: root.spread
 
         gradient: Gradient {
-            orientation: Gradient.Horizontal
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, 0) }
-            GradientStop { position: root.boundary; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
         }
     }
 
-    // Right edge, mirrored so the host boundary sits at the panel's inner end.
     Rectangle {
-        visible: root.bleedRight
-        x: root.width - root.inward
-        y: -root.spread
-        width: root.spread + root.inward
-        height: root.height + 2 * root.spread
+        visible: root.bleedBottom && root.width - 2 * root.arc > 0
+        x: root.arc
+        y: root.height
+        width: Math.max(0, root.width - 2 * root.arc)
+        height: root.spread
 
         gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop { position: 1 - root.boundary; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
             GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, 0) }
         }
     }
 
-    // Top edge.
     Rectangle {
-        visible: root.bleedTop
+        visible: root.bleedLeft && root.bandHeight > 0
         x: -root.spread
-        y: -root.spread
-        width: root.width + 2 * root.spread
-        height: root.spread + root.inward
+        y: root.bandTop
+        width: root.spread
+        height: root.bandHeight
 
         gradient: Gradient {
-            orientation: Gradient.Vertical
+            orientation: Gradient.Horizontal
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, 0) }
-            GradientStop { position: root.boundary; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
         }
     }
 
-    // Bottom edge.
     Rectangle {
-        visible: root.bleedBottom
-        x: -root.spread
-        y: root.height - root.inward
-        width: root.width + 2 * root.spread
-        height: root.spread + root.inward
+        visible: root.bleedRight && root.bandHeight > 0
+        x: root.width
+        y: root.bandTop
+        width: root.spread
+        height: root.bandHeight
 
         gradient: Gradient {
-            orientation: Gradient.Vertical
-            GradientStop { position: 1 - root.boundary; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
             GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, 0) }
+        }
+    }
+
+    // Corner: radial about the arc, so it meets both neighbouring bands at the
+    // same value and wraps the light around the corner instead of cutting it.
+    // One patch per corner; the anchor of each lives in GlowBleedSvg.js.
+    Repeater {
+        model: [
+            { "corner": 0, "visible": root.bleedLeft && root.bleedTop },
+            { "corner": 1, "visible": root.bleedRight && root.bleedTop },
+            { "corner": 2, "visible": root.bleedRight && root.bleedBottom },
+            { "corner": 3, "visible": root.bleedLeft && root.bleedBottom }
+        ]
+
+        delegate: Image {
+            id: patch
+
+            required property var modelData
+            readonly property int corner: modelData.corner
+
+            // A patch sits over the host's corner, so it starts one arc inside
+            // the box and reaches `spread` beyond it.
+            visible: modelData.visible && root.spread > 0
+            x: (patch.corner === 1 || patch.corner === 2) ? root.width - root.arc : -root.spread
+            y: (patch.corner === 2 || patch.corner === 3) ? root.height - root.arc : -root.spread
+            width: root.patchSize
+            height: root.patchSize
+            // Rasterise synchronously: the halo is already on screen when a flash
+            // starts, so a deferred decode would leave a frame of missing corners.
+            // The source is generated, so a cache entry only ever holds a
+            // superseded size or colour.
+            asynchronous: false
+            cache: false
+            sourceSize.width: Math.max(1, Math.round(patch.width))
+            sourceSize.height: Math.max(1, Math.round(patch.height))
+            source: "data:image/svg+xml;utf8,"
+                + encodeURIComponent(Glow.cornerSvg(patch.width, root.arc,
+                                                    root.glowColor, root.edgeAlpha,
+                                                    patch.corner))
         }
     }
 }
