@@ -13,8 +13,9 @@ Singleton {
     property var values: []
     property bool isIdle: true
 
-    // Beat tracking (aubio bridge over the default monitor), mirroring
-    // caelestia's approach: pass aubio's own get_bpm straight through.
+    // Beat tracking (aubio bridge over the default monitor). The bridge derives
+    // the displayed tempo from the beat intervals and locks it with hysteresis,
+    // because aubio's own candidate tempo hops between metrical neighbours.
     readonly property real bpm: _reportedBpm
     // Decaying 0..1 beat pulse for visual accents; spikes to 1 on each beat.
     readonly property real beatPulse: _reportedPulse
@@ -153,7 +154,8 @@ Singleton {
         root.values = buffer
     }
 
-    // One line per aubio-detected beat: {"t": seconds, "bpm": estimate}.
+    // One line per aubio-detected beat: {"t": seconds, "bpm": readout}.
+    // `bpm` is 0 until the bridge has locked a tempo from enough beats.
     function _onBeatLine(data) {
         const text = String(data || "").trim()
         if (!text.startsWith("{"))
@@ -176,7 +178,8 @@ Singleton {
         if (root.isIdle)
             return
 
-        // Caelestia-style passthrough: trust aubio's own tempo estimate.
+        // The bridge already folded this against the beat intervals; a 0 means
+        // it has not locked yet, and the previous readout stands.
         const bpm = Number(payload.bpm)
         root._beatCrashCount = 0
         root._reportedBpm = isFinite(bpm) && bpm > 0 ? bpm : root._reportedBpm

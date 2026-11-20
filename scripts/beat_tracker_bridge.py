@@ -4,11 +4,11 @@
 Spawns `pw-record` against the default sink monitor, feeds the raw PCM to
 aubio's tempo tracker, and prints one line per detected beat:
 
-    {"t": 12.3456, "bpm": 142.1}
+    {"t": 12.3456, "bpm": 142.1, "conf": 0.31, "raw": 142.1}
 
-`t` is the stream timestamp in seconds; `bpm` is the tracker's current tempo
-estimate. Lines are flushed immediately so the shell can pulse visuals on
-each beat.
+`t` is the stream timestamp in seconds. `raw` is aubio's own candidate tempo
+and `conf` its confidence; `bpm` is the stabilised readout described below.
+Lines are flushed immediately so the shell can pulse visuals on each beat.
 
 Capture is re-opened when `pw-record` ends: a Bluetooth sink that drops (or a
 suspend) closes the monitor stream, and the tracker must survive that instead
@@ -39,6 +39,26 @@ BUF_SIZE = 1024
 # up to the cap keeps a permanently broken audio graph from spinning.
 RECONNECT_MIN_S = 1.0
 RECONNECT_MAX_S = 5.0
+
+# Tempo readout stabilisation.
+#
+# aubio's `get_bpm()` is not a BPM reading: it is the comb filter bank's
+# current candidate, and it hops between metrical neighbours whenever the music
+# stops having a firm pulse. Measured on this machine over 120s per track: a
+# track with a clear kick stayed inside 125.7-128.2 BPM, while a beatless
+# ambient track flipped 135.8 <-> 107 at least six times. The detected beat
+# *positions* are good in both cases, so the displayed number is derived from
+# the beats themselves and locked with hysteresis, while aubio's beats continue
+# to drive the visual pulse.
+TEMPO_WINDOW = 12            # inter-beat intervals kept for the median
+TEMPO_MIN_INTERVALS = 4      # intervals required before any tempo is shown
+TEMPO_TOLERANCE = 0.03       # within 3% counts as the same tempo
+TEMPO_SWITCH_BEATS = 8       # consecutive beats on a new tempo before switching
+TEMPO_MIN_BPM = 70.0         # the readout is folded into this range, which
+TEMPO_MAX_BPM = 180.0        # keeps octave errors off the display
+TEMPO_MIN_CONFIDENCE = 0.20  # below this aubio is guessing (beatless music
+                             # measured 0.09-0.15, a firm kick 0.31)
+TEMPO_MAX_INTERVAL_S = 2.0   # a longer gap means playback stopped
 
 _stopping = threading.Event()
 # Set when PipeWire's default sink changes; the capture must move to the new
@@ -107,11 +127,114 @@ def _record_command() -> list[str]:
     ]
 
 
+def _fold_octave(bpm: float) -> float:
+    """Move a tempo into the display range by whole octaves only."""
+    while bpm < TEMPO_MIN_BPM:
+        bpm *= 2.0
+    while bpm > TEMPO_MAX_BPM:
+        bpm /= 2.0
+    return bpm
+
+
+class TempoStabilizer:
+    """Turn aubio's per-beat candidate tempo into a number that holds still.
+
+    Runs once per detected beat (2-3 Hz) and never per hop, so it adds nothing
+    measurable to the tracker's own per-hop cost.
+    """
+
+    def __init__(self) -> None:
+        self._intervals: list[float] = []
+        self._last_t: float | None = None
+        self._locked = 0.0
+        self._candidate = 0.0
+        self._candidate_beats = 0
+
+    def _median_interval(self) -> float:
+        intervals = self._intervals
+        return sorted(intervals)[len(intervals) // 2]
+
+    def _estimate(self, confidence: float) -> float:
+        """Median-interval tempo, folded into range; 0.0 until it is earned.
+
+        An unsure tracker has to earn its first lock over the whole window: the
+        readout then starts on a median of twelve beats instead of four.
+        """
+        needed = TEMPO_MIN_INTERVALS if confidence >= TEMPO_MIN_CONFIDENCE else TEMPO_WINDOW
+        if len(self._intervals) < needed:
+            return 0.0
+        return _fold_octave(60.0 / self._median_interval())
+
+    def _drop_candidate(self) -> None:
+        self._candidate = 0.0
+        self._candidate_beats = 0
+
+    def push(self, t: float, confidence: float) -> float:
+        """Feed one detected beat; return the BPM to show (0.0 = nothing yet)."""
+        if self._last_t is not None:
+            interval = t - self._last_t
+            if interval > TEMPO_MAX_INTERVAL_S:
+                # Playback stopped or the capture stalled: these intervals
+                # describe music that is no longer playing.
+                self._intervals.clear()
+                self._drop_candidate()
+            elif interval > 0.0:
+                # A single skipped beat doubles the interval, so reject one
+                # that lands far outside the window's own median.
+                if self._intervals:
+                    median = self._median_interval()
+                    if not 0.5 * median <= interval <= 2.0 * median:
+                        interval = 0.0
+                if interval > 0.0:
+                    self._intervals.append(interval)
+                    if len(self._intervals) > TEMPO_WINDOW:
+                        del self._intervals[0]
+        # The rejected beat is still the anchor for the next interval.
+        self._last_t = t
+
+        estimate = self._estimate(confidence)
+        if estimate <= 0.0:
+            return self._locked
+
+        if self._locked <= 0.0:
+            # The first lock is a guess by construction, but a locked guess is
+            # still better than a readout that repaints itself every beat: the
+            # confidence gate below protects it from here on.
+            self._locked = estimate
+            return self._locked
+
+        deviation = estimate - self._locked
+        if abs(deviation) <= TEMPO_TOLERANCE * self._locked:
+            # Same tempo: follow it slowly so the readout converges on the
+            # median instead of freezing on whichever beat locked it first.
+            self._locked += 0.25 * deviation
+            self._drop_candidate()
+            return self._locked
+
+        if confidence < TEMPO_MIN_CONFIDENCE:
+            # An unsure beat is not evidence for a new tempo; drop the streak
+            # instead of letting it creep over the line.
+            self._drop_candidate()
+            return self._locked
+
+        # A real tempo change is accepted only after a run of beats lands on
+        # the same new value; a stray plateau must not repaint the readout.
+        if self._candidate > 0.0 and abs(estimate - self._candidate) <= 0.02 * self._candidate:
+            self._candidate_beats += 1
+        else:
+            self._candidate = estimate
+            self._candidate_beats = 1
+        if self._candidate_beats >= TEMPO_SWITCH_BEATS:
+            self._locked = self._candidate
+            self._drop_candidate()
+        return self._locked
+
+
 def _report_error(message: str) -> None:
     print(json.dumps({"error": message}), file=sys.stderr, flush=True)
 
 
-def _stream_once(recorder: subprocess.Popen, tempo) -> None:
+def _stream_once(recorder: subprocess.Popen, tempo, stabilizer: TempoStabilizer) -> None:
     """Feed every captured hop to the tracker until the recorder stops."""
     bytes_per_hop = HOP_SIZE * 4  # f32le mono
 
@@ -147,10 +270,13 @@ def _stream_once(recorder: subprocess.Popen, tempo) -> None:
         samples = aubio.fvec(struct.unpack(f"<{HOP_SIZE}f", chunk))
         is_beat = tempo(samples)
         if is_beat:
+            last_s = float(tempo.get_last_s())
+            confidence = float(tempo.get_confidence())
             payload = {
-                "t": round(float(tempo.get_last_s()), 6),
-                "bpm": round(float(tempo.get_bpm()), 2),
-                "conf": round(float(tempo.get_confidence()), 4),
+                "t": round(last_s, 6),
+                "bpm": round(stabilizer.push(last_s, confidence), 2),
+                "conf": round(confidence, 4),
+                "raw": round(float(tempo.get_bpm()), 2),
             }
             print(json.dumps(payload), flush=True)
 
@@ -188,8 +314,9 @@ def main() -> int:
         # A fresh tracker per capture session: after a long gap the old
         # tracker would keep reporting its stale tempo into the new audio.
         tempo = aubio.tempo("default", BUF_SIZE, HOP_SIZE, SAMPLE_RATE)
+        stabilizer = TempoStabilizer()
         session_start = time.monotonic()
-        _stream_once(recorder, tempo)
+        _stream_once(recorder, tempo, stabilizer)
 
         recorder.terminate()
         try:
