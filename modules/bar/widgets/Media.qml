@@ -590,10 +590,10 @@ BarPill {
             waveColor: LazerTheme.flashWash
             waveStrength: LazerTheme.lightScheme ? 1.0 : 0.55
             // One sweep per beat interval, so the front hits the far edge just
-            // as the next beat fires the next wave. Timed from the measured
-            // beat gap, never from the displayed BPM: the readout is locked and
-            // smoothed, so a sweep derived from it overruns and is cut off
-            // mid-flight by the next beat.
+            // as the next beat fires the next wave. Timed from the median of the
+            // recent measured beat gaps, never from the displayed BPM: aubio's
+            // individual beat times swing by ±50%, so a single gap is not a
+            // usable sweep length.
             waveDuration: Services.SpectrumService.beatIntervalMs > 0
                 ? Services.SpectrumService.beatIntervalMs
                 : MotionTokens.beatWave

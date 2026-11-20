@@ -32,6 +32,10 @@ Singleton {
     property real _reportedPulse: 0
     property int _beatIntervalMs: 0
     property real _lastBeatAt: -1
+    // Recent accepted beat gaps, in ms. aubio's own beat times are jittery -
+    // on a steady 128 BPM track the gaps run 323..1077ms with a 454ms median -
+    // so a single gap is not a usable period; the median of a few is.
+    property var _beatIntervals: []
     // Consecutive bridge exits without a single beat in between; a crash loop
     // must stop retrying, but a device change must not disable BPM for the
     // rest of the session.
@@ -194,15 +198,29 @@ Singleton {
         // Beat-to-beat interval for the wave front. The timestamps are aubio's
         // own stream times, so the difference is sample-accurate; a value
         // outside 240-1200 ms is a gap (pause, sink change, tracker restart)
-        // and is dropped rather than turned into a sweep length.
+        // and is dropped rather than turned into a sweep length. A gap that
+        // disagrees with the window is dropped too: aubio skips beats (which
+        // doubles the gap) and sometimes lands early, and either one turned
+        // into a sweep length makes the front stall or get cut off.
         if (root._lastBeatAt >= 0) {
             const interval = Math.round((timestamp - root._lastBeatAt) * 1000)
-            if (isFinite(interval) && interval >= 240 && interval <= 1200)
-                root._beatIntervalMs = interval
+            const intervals = root._beatIntervals
+            const median = intervals.length >= 3
+                ? intervals.slice().sort((a, b) => a - b)[Math.floor(intervals.length / 2)] : 0
+            const agrees = median <= 0 || (interval >= 0.7 * median && interval <= 1.5 * median)
+            if (isFinite(interval) && interval >= 240 && interval <= 1200 && agrees) {
+                intervals.push(interval)
+                if (intervals.length > 6)
+                    intervals.shift()
+                root._beatIntervalMs = intervals.slice().sort((a, b) => a - b)[Math.floor(intervals.length / 2)]
+            }
         }
         root._lastBeatAt = timestamp
         root._beatCrashCount = 0
-        root._reportedBpm = isFinite(bpm) && bpm > 0 ? bpm : root._reportedBpm
+        // Whole BPM only: the stabiliser follows the median continuously, and
+        // passing that creep on re-evaluates every consumer twice a second for
+        // a digit nobody reads.
+        root._reportedBpm = isFinite(bpm) && bpm > 0 ? Math.round(bpm) : root._reportedBpm
         root._reportedPulse = 1
         root.beat()
     }
@@ -217,6 +235,7 @@ Singleton {
         if (root._shouldRun && !beatProcess.running) {
             root._reportedBpm = 0
             root._beatIntervalMs = 0
+            root._beatIntervals = []
             root._lastBeatAt = -1
             root._beatCrashCount = 0
             beatProcess.running = true
