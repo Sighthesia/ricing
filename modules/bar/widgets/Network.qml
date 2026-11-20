@@ -282,7 +282,9 @@ BarPill {
         height: LazerTheme.barIndicatorHeight
         radius: LazerTheme.barIndicatorRadius
         color: LazerTheme.shade(LazerTheme.barIcon, 0.14)
-        clip: true
+        // Open, so the fill's halo can leave the track; the fill
+        // never exceeds it, so nothing else spills.
+        clip: false
         visible: !root.showTraffic
 
         Rectangle {
@@ -306,6 +308,9 @@ BarPill {
             id: levelFlash
             followItem: networkFill
             radius: LazerTheme.barIndicatorRadius
+            // A 3px bar reads as a blob under the default reach; this keeps the
+            // light a rim on the bar's own edge.
+            glowSpread: 4
             color: LazerTheme.flashWash
 
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
@@ -347,7 +352,9 @@ BarPill {
             height: trafficIcon.height + 8
             radius: 1.5
             color: LazerTheme.shade(LazerTheme.barIcon, 0.14)
-            clip: true
+            // Open, so the fill's halo can leave the track; the fill never exceeds
+            // it, so nothing else spills.
+            clip: false
 
             Rectangle {
                 id: trafficFill

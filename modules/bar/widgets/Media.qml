@@ -431,14 +431,16 @@ BarPill {
                 radius: 1.5
                 color: LazerTheme.accentColor
 
-                // Halo thrown by the same beat that lights the fill; the bottom
-                // edge sits on the track's end and has nowhere to spill to.
+                // Halo thrown by the same beat that lights the fill. Its reach is
+                // bounded by the pill's own clip: the track is centred in the pill,
+                // so half the difference between the two is all the room the light
+                // has above and below before the pill cuts it off. A fixed reach
+                // wider than that showed a flat edge where the light stopped.
                 GlowBleed {
                     anchors.fill: parent
                     glowColor: LazerTheme.flashWash
-                    spread: 5
+                    spread: Math.max(0, (LazerTheme.barWidgetHeight - root.coverSize) / 2)
                     surfaceRadius: 1.5
-                    bleedBottom: false
                     opacity: MotionTokens.reducedMotion
                         ? 0
                         : Math.min(1, Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity
