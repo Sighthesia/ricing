@@ -107,10 +107,19 @@ Variants {
             // extra fly-out reserve stays transparent on the fling side.
             LazerNotificationStack {
                 id: notificationStack
+                // Inset from whichever edge this stack hugs, by the reach of a
+                // card's entry halo. Anchored flush, that halo falls outside the
+                // layer surface and the compositor cuts it: the light along that
+                // one side does not exist, which reads as a card lit on three
+                // sides only.
                 anchors.top: Services.NotificationService.notificationTop ? parent.top : undefined
                 anchors.bottom: Services.NotificationService.notificationBottom ? parent.bottom : undefined
                 anchors.right: Services.NotificationService.notificationRight ? parent.right : undefined
                 anchors.left: Services.NotificationService.notificationLeft ? parent.left : undefined
+                anchors.topMargin: Services.NotificationService.notificationTop ? notificationStack.popupGlowInset : 0
+                anchors.bottomMargin: Services.NotificationService.notificationBottom ? notificationStack.popupGlowInset : 0
+                anchors.rightMargin: Services.NotificationService.notificationRight ? notificationStack.popupGlowInset : 0
+                anchors.leftMargin: Services.NotificationService.notificationLeft ? notificationStack.popupGlowInset : 0
                 stackAtTop: Services.NotificationService.notificationTop
                 popupModel: Services.NotificationService.popupList
                 // One glow for the whole shell: the card triggers the shared

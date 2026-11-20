@@ -7,6 +7,11 @@ Item {
     property bool stackAtTop: true
     // osu DragContainer pads 3px vertically per card, giving a 6px gap.
     readonly property int spacing: 6
+    // How far a card's entry halo reaches outside it. The host insets this stack
+    // by the same number, because a card anchored flush to the layer surface has
+    // its halo cut off there by the compositor - the light on that one side
+    // simply does not exist.
+    readonly property real popupGlowInset: 12
     signal popupDismissRequested(var notifId)
     signal popupActionRequested(var notifId, string identifier)
     implicitWidth: 360
@@ -106,6 +111,7 @@ Item {
             actionsText: model.actionsJson ?? ""
             glowPulse: root.glowPulse
             glowEnabled: root.glowEnabled
+            glowSpread: root.popupGlowInset
             glowScreenWidth: root.screenWidth
             glowScreenHeight: root.screenHeight
             glowStackScreenX: root.selfScreenX

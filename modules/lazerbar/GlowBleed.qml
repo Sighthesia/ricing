@@ -81,6 +81,7 @@ Item {
         gradient: Gradient {
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, 0) }
             GradientStop { position: root.bandStop; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
         }
     }
 
@@ -93,7 +94,8 @@ Item {
 
         gradient: Gradient {
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
-            GradientStop { position: 1 - root.bandStop; color: LazerTheme.shade(root.glowColor, 0) }
+            GradientStop { position: 1 - root.bandStop; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, 0) }
         }
     }
 
@@ -108,6 +110,7 @@ Item {
             orientation: Gradient.Horizontal
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, 0) }
             GradientStop { position: root.bandStop; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
         }
     }
 
@@ -121,7 +124,8 @@ Item {
         gradient: Gradient {
             orientation: Gradient.Horizontal
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
-            GradientStop { position: 1 - root.bandStop; color: LazerTheme.shade(root.glowColor, 0) }
+            GradientStop { position: 1 - root.bandStop; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, 0) }
         }
     }
 

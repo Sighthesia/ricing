@@ -46,6 +46,10 @@ Item {
     property var glowPulse: null
     // Master switch for the pulse on this surface.
     property bool glowEnabled: true
+    // How far the entry flash's halo reaches outside the card. The host insets
+    // this card's stack by the same distance, so the light is not cut off by the
+    // edge of the layer surface it sits on.
+    property real glowSpread: 12
     // The output the ring is defined against, so the card masks the same ring
     // the bar shows rather than fitting one to its own box, and where the stack
     // this card sits in stands on it.
@@ -555,7 +559,7 @@ Item {
                 GlowBleed {
                     anchors.fill: parent
                     glowColor: LazerTheme.notificationFlash
-                    spread: 12
+                    spread: root.glowSpread
                     surfaceRadius: root.cardRadius
                 }
             }
