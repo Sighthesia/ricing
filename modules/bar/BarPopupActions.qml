@@ -593,7 +593,15 @@ Item {
             return payload.spectrumValues
         return []
     }
+    // Sweep length for the media popup's own spectrum: the measured beat gap
+    // when the bridge provides one, otherwise the displayed BPM (still the only
+    // figure a stub payload has to offer).
     readonly property int mediaSpectrumWaveDuration: {
+        var interval = 0
+        if (root.mediaSpectrumService && root.mediaSpectrumService.beatIntervalMs !== undefined)
+            interval = Number(root.mediaSpectrumService.beatIntervalMs)
+        if (isFinite(interval) && interval > 0)
+            return Math.round(Math.max(240, Math.min(1200, interval)))
         var bpm = 0
         if (root.mediaSpectrumService && root.mediaSpectrumService.bpm !== undefined)
             bpm = Number(root.mediaSpectrumService.bpm)

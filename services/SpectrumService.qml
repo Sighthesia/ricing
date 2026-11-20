@@ -17,12 +17,21 @@ Singleton {
     // the displayed tempo from the beat intervals and locks it with hysteresis,
     // because aubio's own candidate tempo hops between metrical neighbours.
     readonly property real bpm: _reportedBpm
+    // Measured gap between the last two detected beats, in ms.
+    //
+    // Kept apart from `bpm` on purpose: the readout is smoothed and locked, so
+    // it does NOT follow the beat. Anything that has to finish exactly when the
+    // next beat fires (the spectrum's wave front) has to be timed from the beats
+    // themselves, or it overruns and is cut off by the next trigger.
+    readonly property int beatIntervalMs: _beatIntervalMs
     // Decaying 0..1 beat pulse for visual accents; spikes to 1 on each beat.
     readonly property real beatPulse: _reportedPulse
     signal beat()
 
     property real _reportedBpm: 0
     property real _reportedPulse: 0
+    property int _beatIntervalMs: 0
+    property real _lastBeatAt: -1
     // Consecutive bridge exits without a single beat in between; a crash loop
     // must stop retrying, but a device change must not disable BPM for the
     // rest of the session.
@@ -181,6 +190,17 @@ Singleton {
         // The bridge already folded this against the beat intervals; a 0 means
         // it has not locked yet, and the previous readout stands.
         const bpm = Number(payload.bpm)
+
+        // Beat-to-beat interval for the wave front. The timestamps are aubio's
+        // own stream times, so the difference is sample-accurate; a value
+        // outside 240-1200 ms is a gap (pause, sink change, tracker restart)
+        // and is dropped rather than turned into a sweep length.
+        if (root._lastBeatAt >= 0) {
+            const interval = Math.round((timestamp - root._lastBeatAt) * 1000)
+            if (isFinite(interval) && interval >= 240 && interval <= 1200)
+                root._beatIntervalMs = interval
+        }
+        root._lastBeatAt = timestamp
         root._beatCrashCount = 0
         root._reportedBpm = isFinite(bpm) && bpm > 0 ? bpm : root._reportedBpm
         root._reportedPulse = 1
@@ -196,6 +216,8 @@ Singleton {
 
         if (root._shouldRun && !beatProcess.running) {
             root._reportedBpm = 0
+            root._beatIntervalMs = 0
+            root._lastBeatAt = -1
             root._beatCrashCount = 0
             beatProcess.running = true
         } else if (!root._shouldRun && beatProcess.running) {

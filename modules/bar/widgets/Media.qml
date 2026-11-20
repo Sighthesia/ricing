@@ -589,10 +589,13 @@ BarPill {
             // dark softens the sweep so the 2x glow core doesn't blow out.
             waveColor: LazerTheme.flashWash
             waveStrength: LazerTheme.lightScheme ? 1.0 : 0.55
-            // One sweep per beat interval: the front hits the far edge just
-            // as the next beat fires the next wave.
-            waveDuration: Services.SpectrumService.bpm > 0
-                ? Math.round(Math.max(240, Math.min(1200, 60000 / Services.SpectrumService.bpm)))
+            // One sweep per beat interval, so the front hits the far edge just
+            // as the next beat fires the next wave. Timed from the measured
+            // beat gap, never from the displayed BPM: the readout is locked and
+            // smoothed, so a sweep derived from it overruns and is cut off
+            // mid-flight by the next beat.
+            waveDuration: Services.SpectrumService.beatIntervalMs > 0
+                ? Services.SpectrumService.beatIntervalMs
                 : MotionTokens.beatWave
         }
     }
