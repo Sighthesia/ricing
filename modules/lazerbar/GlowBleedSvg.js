@@ -46,9 +46,21 @@ var ARC_CORNER = [[1, 1], [0, 1], [0, 0], [1, 0]]
 
 // One corner patch, `side` pixels square, with `arc` of that square eaten by the
 // host's own corner radius.
-function cornerSvg(side, arc, color, edgeAlpha, corner) {
+//
+// The host's rounded corner is punched out of the patch with a mask. Without it
+// the radial's flat top paints over the corner the card itself occupies, and the
+// light shows there as a bright square — invisible when the halo belongs to a
+// wash of the same colour, obvious when it does not (a notification card taking
+// a tinted entry flash). The disc being punched is centred on the arc and has
+// radius `arc`, which keeps it entirely inside the patch square, so cutting the
+// whole circle is the same as cutting the corner it stands for.
+function cornerSvg(side, arc, color, edgeAlpha, corner, overlap) {
     const size = Math.max(1, Number(side) || 0)
     const radius = Math.max(0, Math.min(Number(arc) || 0, size))
+    // The corner it cuts is pulled in by the host's own edge overlap, so the
+    // light continues under that edge instead of stopping on the geometric
+    // boundary and leaving a dark hairline there.
+    const cut = Math.max(0, radius - (Number(overlap) || 0))
     // Where the host boundary falls along the gradient: full strength up to the
     // arc, then a straight ramp out to nothing at the patch's far corner.
     const boundary = clamp01(radius / size)
@@ -60,10 +72,19 @@ function cornerSvg(side, arc, color, edgeAlpha, corner) {
     const stops = '<stop offset="0" stop-color="' + fill + '" stop-opacity="' + alpha + '"/>'
         + '<stop offset="' + boundary + '" stop-color="' + fill + '" stop-opacity="' + alpha + '"/>'
         + '<stop offset="1" stop-color="' + fill + '" stop-opacity="0"/>'
+    const mask = cut > 0
+        ? '<mask id="c" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse"'
+            + ' x="0" y="0" width="' + size + '" height="' + size + '">'
+            + '<rect x="0" y="0" width="' + size + '" height="' + size + '" fill="white"/>'
+            + '<circle cx="' + cx + '" cy="' + cy + '" r="' + cut + '" fill="black"/>'
+            + '</mask>'
+        : ''
     return '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + size
         + '" viewBox="0 0 ' + size + ' ' + size + '">'
         + '<defs><radialGradient id="g" gradientUnits="userSpaceOnUse"'
-        + ' cx="' + cx + '" cy="' + cy + '" r="' + size + '">' + stops + '</radialGradient></defs>'
-        + '<rect x="0" y="0" width="' + size + '" height="' + size + '" fill="url(#g)"/>'
+        + ' cx="' + cx + '" cy="' + cy + '" r="' + size + '">' + stops + '</radialGradient>'
+        + mask + '</defs>'
+        + '<rect x="0" y="0" width="' + size + '" height="' + size + '" fill="url(#g)"'
+        + (cut > 0 ? ' mask="url(#c)"' : '') + '/>'
         + '</svg>'
 }

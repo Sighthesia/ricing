@@ -60,6 +60,15 @@ Item {
     readonly property real bandHeight: Math.max(0, root.bandBottom - root.bandTop)
     // Side length of a corner patch: the light's reach plus the arc it wraps.
     readonly property real patchSize: root.spread + root.arc
+    // How far the light continues under the host's own edge. The host's border
+    // pixel is a blend of the host and whatever is behind it, and if the light
+    // stops exactly on the geometric edge that pixel blends with the untouched
+    // background instead - a dark hairline tracing every edge it should be
+    // lighting. One pixel of overlap puts the light under that edge.
+    readonly property real overlap: 0.75
+    // Where the ramp ends once the overlap is added: beyond it the edge alpha
+    // holds, so the extra pixel does not stretch the falloff.
+    readonly property real bandStop: root.spread / Math.max(0.001, root.spread + root.overlap)
 
     // Straight edge: alpha depends only on the distance to that edge.
     Rectangle {
@@ -67,24 +76,24 @@ Item {
         x: root.arc
         y: -root.spread
         width: Math.max(0, root.width - 2 * root.arc)
-        height: root.spread
+        height: root.spread + root.overlap
 
         gradient: Gradient {
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, 0) }
-            GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            GradientStop { position: root.bandStop; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
         }
     }
 
     Rectangle {
         visible: root.bleedBottom && root.width - 2 * root.arc > 0
         x: root.arc
-        y: root.height
+        y: root.height - root.overlap
         width: Math.max(0, root.width - 2 * root.arc)
-        height: root.spread
+        height: root.spread + root.overlap
 
         gradient: Gradient {
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
-            GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, 0) }
+            GradientStop { position: 1 - root.bandStop; color: LazerTheme.shade(root.glowColor, 0) }
         }
     }
 
@@ -92,27 +101,27 @@ Item {
         visible: root.bleedLeft && root.bandHeight > 0
         x: -root.spread
         y: root.bandTop
-        width: root.spread
+        width: root.spread + root.overlap
         height: root.bandHeight
 
         gradient: Gradient {
             orientation: Gradient.Horizontal
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, 0) }
-            GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            GradientStop { position: root.bandStop; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
         }
     }
 
     Rectangle {
         visible: root.bleedRight && root.bandHeight > 0
-        x: root.width
+        x: root.width - root.overlap
         y: root.bandTop
-        width: root.spread
+        width: root.spread + root.overlap
         height: root.bandHeight
 
         gradient: Gradient {
             orientation: Gradient.Horizontal
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
-            GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, 0) }
+            GradientStop { position: 1 - root.bandStop; color: LazerTheme.shade(root.glowColor, 0) }
         }
     }
 
@@ -155,7 +164,7 @@ Item {
             source: (root.visible && root.opacity > 0.001)
                 ? "data:image/svg+xml;utf8," + encodeURIComponent(Glow.cornerSvg(patch.width, root.arc,
                                                     root.glowColor, root.edgeAlpha,
-                                                    patch.corner))
+                                                    patch.corner, root.overlap))
                 : ""
         }
     }
