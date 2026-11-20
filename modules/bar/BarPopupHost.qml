@@ -1292,6 +1292,27 @@ PanelWindow {
         root.retargetGeometry(intentObj, immediate === true || !root.open)
     }
 
+    // A width that changed on its own is retargeted one event-loop turn later.
+    //
+    // `popupContentWidth` reads `targetWidth` (the tray branch reserves the
+    // surface's own width), and this handler is what writes `targetWidth` - so a
+    // synchronous retarget re-enters the very binding whose change notification
+    // is running. Qt reports "Binding loop detected for property
+    // popupContentWidth" and drops that binding, which leaves the tray input
+    // canvas at a stale width for the rest of the popup's life. Deferring the
+    // write breaks the cycle without changing what is measured.
+    property bool _widthRetargetQueued: false
+
+    function scheduleWidthRetarget() {
+        if (root._widthRetargetQueued)
+            return
+        root._widthRetargetQueued = true
+        Qt.callLater(function() {
+            root._widthRetargetQueued = false
+            root.updateTargetGeometry(root.currentIntent)
+        })
+    }
+
     function commitRevealDistance() {
         var needed = Math.max(root.targetHeight, root.displayHeight, 1)
         if (popup.revealProgress < 0.01)
@@ -2035,7 +2056,7 @@ PanelWindow {
                                 root.noteMeasuredHeight()
                                 root.updateTargetGeometry(root.currentIntent)
                             }
-                            onImplicitWidthChanged: root.updateTargetGeometry(root.currentIntent)
+                            onImplicitWidthChanged: root.scheduleWidthRetarget()
 
                             // The bodies themselves are ids of THIS scope, which the
                             // enclosing file cannot see, so they are republished for
