@@ -495,7 +495,7 @@ Item {
             selectionHeadGlide.restart()
             selectionTailGlide.restart()
             if (root.hasTarget)
-                root._flashIndicator.restart()
+                _flashIndicator.restart()
         }
     }
     // The leaving frame's own height, from the row counts of the frame being held
@@ -2516,7 +2516,7 @@ Item {
                 crossingToRetarget.restart()
             }
             if (!MotionTokens.reducedMotion)
-                root._flashIndicator.restart()
+                _flashIndicator.restart()
         }
     }
 
