@@ -1306,6 +1306,12 @@ PanelWindow {
     function scheduleWidthRetarget() {
         if (root._widthRetargetQueued)
             return
+        // A queued retarget that lands after the close would take the
+        // `!root.open` branch inside retargetGeometry and assign displayX /
+        // displayWidth outright, snapping the panel horizontally while it is
+        // still animating out.
+        if (!root.open)
+            return
         root._widthRetargetQueued = true
         Qt.callLater(function() {
             root._widthRetargetQueued = false
