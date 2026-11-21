@@ -466,7 +466,7 @@ BarPill {
                 }
 
                 // Beat flash: brightness pulse riding the shared beatPulse
-                // decay, so the bar blinks once per detected beat.
+                // decay, so the bar blinks once per visual beat tick.
                 //
                 // On a light surface this is the part that actually reads. The
                 // paper around the bar sits 13 levels below white, so no halo
@@ -611,18 +611,18 @@ BarPill {
             // dark softens the sweep so the 2x glow core doesn't blow out.
             waveColor: LazerTheme.flashWash
             waveStrength: LazerTheme.lightScheme ? 1.0 : 0.55
-            // One sweep per beat interval, so the front hits the far edge just
-            // as the next beat fires the next wave. Timed from the median of the
-            // recent measured beat gaps, never from the displayed BPM: aubio's
-            // individual beat times swing by ±50%, so a single gap is not a
-            // usable sweep length.
+            // One sweep per visual tick, so the front hits the far edge just as
+            // the next wave is fired. Timed from the service's confirmed period
+            // (the most frequent recent gap), never from the displayed BPM:
+            // aubio's individual beat times swing by ±50%, so a single gap is
+            // not a usable sweep length.
             waveDuration: Services.SpectrumService.visualBeatIntervalMs > 0
                 ? Services.SpectrumService.visualBeatIntervalMs
                 : MotionTokens.beatWave
         }
     }
 
-    // Each detected beat launches a highlight front sweeping the spectrum
+    // Each visual beat tick launches a highlight front sweeping the spectrum
     // from its left edge, like a sound wave travelling through the bars.
     Connections {
         target: Services.SpectrumService

@@ -5,7 +5,8 @@ import "../lazerbar"
 // Sharp rectangular bars (radius 0) follow the osu!lazer sharp language:
 // large surfaces stay rectangular; only small control details use rounding.
 // A beat wave — a rectangular highlight front sweeping from the left edge —
-// brightens bars as it passes, driven by triggerWave() on each detected beat.
+// brightens bars as it passes, driven by triggerWave() on each visual beat tick
+// (the service's clock, not aubio's own beat grid - see SpectrumService).
 Item {
     id: root
 

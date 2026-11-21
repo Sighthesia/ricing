@@ -1535,7 +1535,7 @@ Item {
                 }
             }
 
-            // Beat-driven wavefront sweeps the popup spectrum like the pill.
+            // Beat-clock wavefront sweeps the popup spectrum like the pill.
             Connections {
                 target: root.mediaSpectrumService
                 ignoreUnknownSignals: true
