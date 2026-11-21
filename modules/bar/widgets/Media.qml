@@ -594,8 +594,8 @@ BarPill {
             // recent measured beat gaps, never from the displayed BPM: aubio's
             // individual beat times swing by ±50%, so a single gap is not a
             // usable sweep length.
-            waveDuration: Services.SpectrumService.beatIntervalMs > 0
-                ? Services.SpectrumService.beatIntervalMs
+            waveDuration: Services.SpectrumService.visualBeatIntervalMs > 0
+                ? Services.SpectrumService.visualBeatIntervalMs
                 : MotionTokens.beatWave
         }
     }
