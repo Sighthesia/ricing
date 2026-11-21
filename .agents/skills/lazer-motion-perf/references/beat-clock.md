@@ -45,7 +45,11 @@
 - **在线**：临时在 `visualClock.onTriggered`、锁定/切换处打 `console.warn`，`scripts/check-shell.sh` 之外的日志里按时间戳算 tick 间隔分布。**tick 间隔在单段内应当是一个值（±几 ms）**；出现 255–847ms 这种分布就说明有东西在重启定时器。
 - Qt 6.11 实测：运行中的 `NumberAnimation` 改 `duration`/`from`/`to` **不会**重启或截断动画（离屏 `qml6` 验证），所以“参数变化打断动画”不是可用假设——时长在启动瞬间就被读取。
 
-## 后记：这条链路已整体撤回
+## 后记：试过两条替代路线，都回到 aubio
 
-aubio 桥（`scripts/beat_tracker_bridge.py`）与 `visualClock` / `visualBeatIntervalMs` 已在本次回退中整体删除（回退本身尚未提交，故不记哈希），视觉重新走 `services/spectrum/BeatDetect.js` 的 cava 启发式（低频 onset + 包络自相关估 BPM），sweep 时长回到从 `bpm` 派生。
-本文其余测量数据作为历史证据保留：它记录的是 aubio 桥的问题，以及任何“用检测到的拍去驱动视觉”的方案会踩的坑。
+这段历史值得留着，因为它说明了「换掉 aubio 也解决不了」：
+
+1. 先试了「用拍间隔自己算周期 + 迟滞锁定 + 独立 Timer 时钟驱动视觉」。视觉闪烁确实消失了（tick 间隔从 255–847ms 变成单一值），但**读数与段落配器仍然对不上**，而且长窗口（64 间隔众数 + 12 秒确认）在真实段落变化时会把过期周期多保持 12 秒。
+2. 再字面回退到 aubio 之前的 `services/spectrum/BeatDetect.js`（cava 低频 onset + 8 秒包络自相关）。它靠 24 根 cava 柱、30fps 的数据，分辨率更粗，配器一换同样漂。
+
+结论：在这类「节拍权重随配器变化」的素材上，**便宜的实时检测器都不稳定**，这是素材与数据带宽的限制，不是参数问题。现状已回到 aubio 桥（`scripts/beat_tracker_bridge.py`）+ `get_bpm()` 直通，视觉每拍触发、时长按 `60000/bpm` 派生。要真正解决，只有两条路：换成对这些素材更鲁棒的模型（madmom/BeatThis 一类，代价是 py3.14 不可用或需要 torch），或者干脆不呈现 BPM 数字、只保留随频谱走的视觉。

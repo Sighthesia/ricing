@@ -5,7 +5,7 @@ import "../lazerbar"
 // Sharp rectangular bars (radius 0) follow the osu!lazer sharp language:
 // large surfaces stay rectangular; only small control details use rounding.
 // A beat wave — a rectangular highlight front sweeping from the left edge —
-// brightens bars as it passes, driven by triggerWave() on each beat signal.
+// brightens bars as it passes, driven by triggerWave() on each detected beat.
 Item {
     id: root
 
@@ -47,39 +47,12 @@ Item {
     readonly property real floorInset: 3
     readonly property real usableHeight: Math.max(0, root.height - root.floorInset)
 
-    // How far short of the next beat the front aims to finish. The sweep is
-    // timed from a measured beat period, but the beat that ends it is an actual
-    // detection with its own jitter, so a front timed to land exactly on it is
-    // cut off about as often as it lands in time. Banking a few percent turns
-    // "interrupted mid-flight" into "arrived just before".
-    readonly property real waveAnticipation: 0.05
-
     // Kick off one left-to-right highlight sweep; safe to retrigger mid-sweep
     // (the front restarts from the left edge, matching the new beat).
     function triggerWave() {
         if (MotionTokens.reducedMotion || !root.visible || root.width <= 0)
             return
-        // A front that is still travelling is not thrown away mid-flight: being
-        // cut in half is exactly what reads as unnatural, and the beat that ends
-        // this sweep is a detection while the period its duration came from is
-        // an estimate that keeps moving, so a mismatch is normal rather than
-        // exceptional. A beat that lands while the front is still short of
-        // the edge is dropped; the front finishes, and the wave re-arms on the
-        // next beat - at most one beat late, and never cut.
-        // Near the edge it does restart, so a slightly overestimated period
-        // cannot halve the wave's rate by dropping every other beat.
-        const travel = root.width + root.waveWidth * 2
-        const progress = travel > 0 ? (root.waveX + root.waveWidth) / travel : 1
-        if (waveSweep.running && progress < 0.85)
-            return
-        // Sampled here, not bound: a running NumberAnimation keeps the duration
-        // it started with, so a binding that re-evaluates mid-flight changes
-        // nothing until the next sweep anyway - it only makes the number this
-        // sweep is running on harder to read from the code.
-        const base = root.waveDuration > 0 ? root.waveDuration : MotionTokens.beatWave
-        const duration = Math.max(160, Math.round(base * (1 - root.waveAnticipation)))
         waveSweep.stop()
-        waveSweep.duration = duration
         root.waveX = -root.waveWidth
         waveSweep.restart()
     }
@@ -91,8 +64,7 @@ Item {
         property: "waveX"
         from: -root.waveWidth
         to: root.width + root.waveWidth
-        // Assigned per sweep by triggerWave(); this is only the fallback.
-        duration: MotionTokens.beatWave
+        duration: root.waveDuration > 0 ? root.waveDuration : MotionTokens.beatWave
         easing.type: Easing.OutQuad
     }
 
