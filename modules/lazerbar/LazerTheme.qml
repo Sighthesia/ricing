@@ -205,8 +205,8 @@ QtObject {
     // click flash shares its layer with the wash and so is capped by it; a beat
     // has no wash to share and reaches further; an entry flash fades for longer
     // than any of them and paints at full strength.
-    readonly property real glowPeakClick: Math.min(1, clickFlashOpacity * flashGlowGain)
-    readonly property real glowPeakBeat: Math.min(1, clickFlashOpacity * 2.2 * flashGlowGain)
+    readonly property real glowPeakClick: Math.min(1, MotionTokens.clickFlashOpacity * flashGlowGain)
+    readonly property real glowPeakBeat: Math.min(1, MotionTokens.clickFlashOpacity * 2.2 * flashGlowGain)
     readonly property real glowPeakSweep: Math.min(1, flashGlowGain)
     readonly property real glowPeakEntry: 1
     // Click-flash tint. A light surface needs the theme colour to read as a
