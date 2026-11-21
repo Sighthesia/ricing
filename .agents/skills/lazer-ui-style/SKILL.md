@@ -98,8 +98,13 @@ hover / focus / active / 禁用：用色块亮度、透明度、指示条切换�
 - **hover 高亮**：表面颜色在 `<surface>` ↔ `<surface>Hover` 间用 `ColorAnimation { duration: MotionTokens.fast }` 过渡；禁止瞬时切换。
 - **hover 基色不能写 `"transparent"`**：QML 里那个字面量是 rgba(0,0,0,0)——**透明黑**，`ColorAnimation` 会连 RGB 一起插值，于是动画前段经过一段深色半透明，叠加在浅色卡片上就是"先变灰再变成主题色"（实测浅色下中途 #bda9a4，比卡片低 0.285 亮度）。基色要写成目标色本身、alpha 归零：`LazerTheme.shade(<target>, 0)`，这样只有 alpha 在动。深色主题下不明显，但同样存在。
 - **焦点/强调环**：独立 Rectangle 层（z 高于内容、`enabled: false` 不参与输入），边框 `1.5px` 的 accent 色，宽度过渡用 `fast`。
-- **点击闪烁配方（所有可点组件统一）**：透明覆盖矩形填充 `LazerTheme.textPrimary`，激活时播放 `NumberAnimation { from: MotionTokens.clickFlashOpacity; to: 0; duration: MotionTokens.clickFlashDuration; easing.type: MotionTokens.clickFlashEasing }`；通过 `restartFlash()` 触发，reducedMotion 时直接归零。参考 `resetFlashAnimation` 与 `restartResetFlash()`。
-- 共享参数固定为 `clickFlashOpacity: 0.3`、`clickFlashDuration: 800`、`clickFlashEasing: Easing.OutQuint`；闪烁层必须是非交互视觉层，不得改变命中区域或布局尺寸。
+- **点击闪烁只有一个实现：`modules/lazerbar/ClickFlash.qml`**。不要在新宿主编写 `NumberAnimation` + 半透明覆盖层；指示条、电平条、行、卡片、按钮、密码格子全部复用它。用 `restart()` 触发（reducedMotion 内部已处理），用 `cancel()` 中止。
+  - `followItem`：由填充条承载的闪烁（滑条、电平条、进度条）传填充元素，光只覆盖走过的部分，不覆盖空轨道。
+  - `surfaceColor`：宿主知道光晕落在哪个表面时**必须**传（bar 传 `LazerTheme.barSurface`，设置面板传 `settingsRail`/`settingsSection`，通知卡传 `settingsCard`），否则光晕会读成浮在有色表面上的一块白漆。
+  - `durationScale`：只有带调试慢放（`debugTimeScale`）的宿主才传，让这一处与其他动画同步。
+- **光晕**由 `GlowBleed` 绘制。取色一律走 `LazerTheme.glowFor(闪烁色, 落点表面)`——它是唯一入口，也是总开关 `flashGlowEnabled` 的作用点（关闭时返回透明）。边缘 alpha 用 `flashGlowEdge`，峰值用事件表：`glowPeakClick`（0.55，频繁事件）/ `glowPeakBeat` / `glowPeakSweep` / `glowPeakEntry`，不要再把方案增益乘进峰值。`spread` 由宿主可用空间决定，细条可用不对称的 `spreadX`/`spreadY`。
+- **禁止保留第二套闪烁时钟**：`TrailIndicator`、电平条、窗口提示指示器原先各自手写 `flashOpacity` + `NumberAnimation`，已全部并入 `ClickFlash`；新增地方若又出现手写闪烁，就是回归。
+- 共享参数固定为 `clickFlashOpacity: 0.3`、`clickFlashDuration: 800`、`clickFlashEasing: Easing.OutQuint`；闪烁与光晕都是非交互视觉层，不得改变命中区域或布局尺寸。
 
 ### 双层覆盖几何（矩形月牙）
 
