@@ -423,7 +423,7 @@ BarPill {
                 color: LazerTheme.flashGlow
                 opacity: MotionTokens.reducedMotion
                     ? 0
-                    : Math.min(1, Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity * 1.6)
+                    : Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity * 1.6
                 visible: opacity > 0.01
 
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
@@ -458,8 +458,7 @@ BarPill {
                     edgeAlpha: LazerTheme.flashGlowEdge
                     opacity: MotionTokens.reducedMotion
                         ? 0
-                        : Math.min(1, Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity
-                                            * 2.2 * LazerTheme.flashGlowGain)
+                        : Services.SpectrumService.beatPulse * LazerTheme.glowPeakBeat
                     visible: opacity > 0.01
 
                     Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }

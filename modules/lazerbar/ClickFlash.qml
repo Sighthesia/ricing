@@ -57,9 +57,8 @@ Rectangle {
     // its own right, not as a multiple of the wash: this layer's opacity tops out
     // at clickFlashOpacity (0.3), so a halo parented inside it could never
     // out-read the wash, and the light would be capped at a tenth of the contrast
-    // it needs on a light surface.
-    readonly property real glowPeak: Math.min(1, MotionTokens.clickFlashOpacity
-                                                * LazerTheme.flashGlowGain)
+    // it needs on a light surface. LazerTheme states every event's peak together.
+    readonly property real glowPeak: LazerTheme.glowPeakClick
 
     // True while a wash is visible, including the frame it was started on.
     readonly property bool flashActive: flashAnimation.running || root.opacity > 0

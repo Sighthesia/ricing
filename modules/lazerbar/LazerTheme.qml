@@ -196,9 +196,19 @@ QtObject {
     // screen, a halo authored below that landed at roughly half its intended
     // light once the flash's own layer opacity had taken its cut.
     readonly property real flashGlowEdge: lightScheme ? 1 : 0.7
-    // Peak alpha of the light a spectrum bar throws while the beat front is on
-    // it. It has to read against the bar's own colour without swallowing the bar.
-    readonly property real spectrumGlowAlpha: lightScheme ? 0.8 : 0.35
+    // Peak opacity of each kind of flash light, stated here once so the four
+    // events cannot drift apart. Every host multiplies one of these by its own
+    // 0..1 driver - the wash's fade, the beat's decay, the sweep's front - and the
+    // scheme correction lives in the number rather than in each call site.
+    //
+    // They differ only by how much of the layer's strength that event spends: a
+    // click flash shares its layer with the wash and so is capped by it; a beat
+    // has no wash to share and reaches further; an entry flash fades for longer
+    // than any of them and paints at full strength.
+    readonly property real glowPeakClick: Math.min(1, clickFlashOpacity * flashGlowGain)
+    readonly property real glowPeakBeat: Math.min(1, clickFlashOpacity * 2.2 * flashGlowGain)
+    readonly property real glowPeakSweep: Math.min(1, flashGlowGain)
+    readonly property real glowPeakEntry: 1
     // Click-flash tint. A light surface needs the theme colour to read as a
     // blink: a text-coloured veil over it reads as the control dimming.
     readonly property color clickFlashWash: lightScheme ? accentColor : textPrimary

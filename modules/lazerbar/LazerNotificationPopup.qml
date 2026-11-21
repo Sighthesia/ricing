@@ -558,9 +558,13 @@ Item {
                 // flash's own fade, so the halo releases with the wash.
                 GlowBleed {
                     anchors.fill: parent
-                    glowColor: LazerTheme.glowFor(LazerTheme.notificationFlash)
+                    glowColor: LazerTheme.glowFor(LazerTheme.notificationFlash,
+                                                  LazerTheme.settingsCard)
                     spread: root.glowSpread
                     surfaceRadius: root.cardRadius
+                    edgeAlpha: LazerTheme.flashGlowEdge
+                    // No opacity of its own: it rides the flash's fade, which is
+                    // full strength - glowPeakEntry - at the moment the card lands.
                 }
             }
 

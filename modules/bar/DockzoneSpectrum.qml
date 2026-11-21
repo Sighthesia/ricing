@@ -35,7 +35,7 @@ Item {
     // Bars are thin and sit close together, so the reach has to stay smaller
     // than the gap between them or the whole spectrum lights up as a block.
     readonly property real glowSpread: 5
-    readonly property real glowAlpha: LazerTheme.spectrumGlowAlpha
+    readonly property real glowAlpha: LazerTheme.flashGlowEdge
 
     // Sweep-front position in root coordinates; parked far left when idle so
     // no bar ever sees a boost from it.
@@ -152,7 +152,7 @@ Item {
                 // Scheme correction on the layer, never on the edge alpha: a
                 // value above 1 there would clip the ramp flat at its inner end.
                 edgeAlpha: root.glowAlpha
-                opacity: Math.min(1, waveRoot.waveBoost * LazerTheme.flashGlowGain)
+                opacity: waveRoot.waveBoost * LazerTheme.glowPeakSweep
             }
         }
     }
