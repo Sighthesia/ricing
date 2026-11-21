@@ -233,6 +233,9 @@ QtObject {
     // The palette's error step, for a refused action. The shell has had no red of
     // its own until now; a failure that only shakes reads as motion, not as no.
     readonly property color errorColor: adapt && colorService ? colorService.mError : "#DA4D27"
+    // Its flash tint, built the way the success tint is: half paper, half hue, so
+    // an entry flash of either kind carries the same luminosity.
+    readonly property color errorFlash: mix(paperWhite, errorColor, 0.5)
     readonly property color divider: adapt && colorService ? shade(colorService.mOutline, 0.28) : "#2E2C32"
     readonly property color popupBackground: adapt && colorService ? shade(colorService.mSurface, 0xF2 / 255) : "#F21D1C22"
     readonly property color popupBorder: "#24FFFFFF"

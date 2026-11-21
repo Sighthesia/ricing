@@ -39,6 +39,15 @@ Rectangle {
     anchors.fill: followItem
     visible: followItem === null || followItem.visible
 
+    // The wash and its light are two tiers of one event. A click confirms a press
+    // and gets out of the way; an entry (a card landing, an unlock accepted) is
+    // the event itself and holds. The defaults are the click tier, so every
+    // existing host is unchanged; a host that wants the entry tier passes these.
+    property real washPeak: MotionTokens.clickFlashOpacity
+    property int flashDuration: MotionTokens.clickFlashDuration
+    property int flashEasing: MotionTokens.clickFlashEasing
+    property real haloPeak: LazerTheme.glowPeakClick
+
     // Halo around the wash: light leaving the host surface, so a click still
     // reads on a control too small or too dark to show the wash itself.
     property bool glow: true
@@ -53,12 +62,6 @@ Rectangle {
     // Follows this layer's own radius, so a caller that set one gets a halo that
     // wraps its corners without having to pass the radius a second time.
     property real glowRadius: root.radius
-    // The alpha the halo reaches on its first frame. It is stated as a peak in
-    // its own right, not as a multiple of the wash: this layer's opacity tops out
-    // at clickFlashOpacity (0.3), so a halo parented inside it could never
-    // out-read the wash, and the light would be capped at a tenth of the contrast
-    // it needs on a light surface. LazerTheme states every event's peak together.
-    readonly property real glowPeak: LazerTheme.glowPeakClick
 
     // True while a wash is visible, including the frame it was started on.
     readonly property bool flashActive: flashAnimation.running || root.opacity > 0
@@ -118,10 +121,10 @@ Rectangle {
         NumberAnimation on opacity {
             id: haloAnimation
 
-            from: root.glowPeak
+            from: root.haloPeak
             to: 0
-            duration: MotionTokens.clickFlashDuration * root.durationScale
-            easing.type: MotionTokens.clickFlashEasing
+            duration: root.flashDuration * root.durationScale
+            easing.type: root.flashEasing
             running: false
         }
     }
@@ -131,10 +134,10 @@ Rectangle {
 
         target: root
         property: "opacity"
-        from: MotionTokens.clickFlashOpacity
+        from: root.washPeak
         to: 0
-        duration: MotionTokens.clickFlashDuration * root.durationScale
-        easing.type: MotionTokens.clickFlashEasing
+        duration: root.flashDuration * root.durationScale
+        easing.type: root.flashEasing
         running: false
     }
 

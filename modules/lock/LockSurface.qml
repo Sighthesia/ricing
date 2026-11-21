@@ -421,12 +421,8 @@ WlSessionLockSurface {
     // Put light on the field a rejected password was typed into. The shake moves
     // the control; this is the halo that says the field itself was refused.
     function flashFailureGlow(): void {
-        if (root.reducedMotion) {
-            failureGlowAnimation.stop()
-            failureGlow.opacity = 0
-            return
-        }
-        failureGlowAnimation.restart()
+        // The component handles reduced motion by not playing at all.
+        failureFlash.restart()
     }
 
     function showUnlockFeedback(): void {
@@ -866,36 +862,26 @@ WlSessionLockSurface {
                 z: 2
             }
 
-            // Failure halo: the rejected field throws the same kind of light every
+            // Failure flash: the rejected field throws the same kind of light every
             // other acknowledged event does, so a wrong password reads before the
             // status line under it. It wraps the field itself - the rounded
             // rectangle the password was typed into - not the run of cells inside
             // it, which would light a band across the middle of the control.
-            Lazer.GlowBleed {
-                id: failureGlow
+            Lazer.ClickFlash {
+                id: failureFlash
 
                 anchors.fill: parent
+                radius: parent.radius
+                // The entry tier again: a refusal is an event, not a press, and the
+                // field has to stay lit long enough to be read as one.
+                color: Lazer.LazerTheme.errorFlash
+                washPeak: 1
+                flashDuration: Lazer.MotionTokens.entryFlashDuration
+                flashEasing: Lazer.MotionTokens.entryFlashEasing
+                haloPeak: Lazer.LazerTheme.glowPeakEntry
+                surfaceColor: root.authControlColor
+                glowSpread: 8
                 z: 3
-                // A collapsed field has no light to throw.
-                visible: failureGlowAnimation.running && root.inputMode
-                // The field is lit in the palette's error step, which is the one
-                // colour on this surface that means a refusal; everything else
-                // here is ink on the themed field.
-                glowColor: Lazer.LazerTheme.glowFor(Lazer.LazerTheme.errorColor,
-                                                    root.authControlColor)
-                spread: 8
-                surfaceRadius: Lazer.LazerTheme.settingsChoiceRadius
-                edgeAlpha: Lazer.LazerTheme.flashGlowEdge
-
-                NumberAnimation on opacity {
-                    id: failureGlowAnimation
-
-                    from: Lazer.LazerTheme.glowPeakClick
-                    to: 0
-                    duration: Lazer.MotionTokens.clickFlashDuration
-                    easing.type: Lazer.MotionTokens.clickFlashEasing
-                    running: false
-                }
             }
 
             // Shake the unchanged input region when authentication fails.
@@ -948,7 +934,15 @@ WlSessionLockSurface {
 
                 anchors.fill: parent
                 radius: parent.radius
-                color: root.authTextColor
+                // The entry tier: the whole field is flooded, and the flash is
+                // still readable a second later. On a field that sits at 90% of
+                // white the rim can only add a few levels, so the surface wash and
+                // how long it holds are what carry the event.
+                color: Lazer.LazerTheme.notificationFlash
+                washPeak: 1
+                flashDuration: Lazer.MotionTokens.entryFlashDuration
+                flashEasing: Lazer.MotionTokens.entryFlashEasing
+                haloPeak: Lazer.LazerTheme.glowPeakEntry
                 surfaceColor: root.authControlColor
                 glowSpread: 10
             }

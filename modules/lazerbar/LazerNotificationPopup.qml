@@ -151,10 +151,9 @@ Item {
                 root.glowPulse.trigger("", origin.x, origin.y)
             }
         })
-        if (!root.reducedMotion) {
+        if (!root.reducedMotion)
             slideInAnim.restart()
-            flashFade.restart()
-        }
+        entryFlash.restart()
     }
 
     // osu LoadComplete FadeInFromZero(200).
@@ -534,38 +533,23 @@ Item {
                 }
             }
 
-            // Entry flash from osu LoadComplete: the whole card (icon and
-            // text included) takes the luminous primary tint for a beat
-            // while it slides in, then releases.
-            Rectangle {
-                id: flash
+            // Entry flash from osu LoadComplete: the whole card (icon and text
+            // included) takes the luminous primary tint for a beat while it slides
+            // in, then releases. The shell's shared click flash on its entry tier,
+            // so this card and the lock field's accepted password are one gesture
+            // rather than two implementations of one.
+            ClickFlash {
+                id: entryFlash
+
                 anchors.fill: parent
                 radius: root.cardRadius
                 color: LazerTheme.notificationFlash
-                opacity: 0
-
-                NumberAnimation {
-                    id: flashFade
-                    target: flash
-                    property: "opacity"
-                    from: 1
-                    to: 0
-                    duration: root.reducedMotion ? 0 : 2000
-                    easing.type: Easing.OutQuart
-                }
-
-                // Light the entry throws off the card while it lands. Rides the
-                // flash's own fade, so the halo releases with the wash.
-                GlowBleed {
-                    anchors.fill: parent
-                    glowColor: LazerTheme.glowFor(LazerTheme.notificationFlash,
-                                                  LazerTheme.settingsCard)
-                    spread: root.glowSpread
-                    surfaceRadius: root.cardRadius
-                    edgeAlpha: LazerTheme.flashGlowEdge
-                    // No opacity of its own: it rides the flash's fade, which is
-                    // full strength - glowPeakEntry - at the moment the card lands.
-                }
+                washPeak: 1
+                flashDuration: MotionTokens.entryFlashDuration
+                flashEasing: MotionTokens.entryFlashEasing
+                haloPeak: LazerTheme.glowPeakEntry
+                surfaceColor: LazerTheme.settingsCard
+                glowSpread: root.glowSpread
             }
 
             // The shell's glow pulse, hosted on the card: the same heavy ring

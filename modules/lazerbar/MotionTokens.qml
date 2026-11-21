@@ -89,6 +89,13 @@ QtObject {
     readonly property int sliderNubMove: 250
     readonly property int sliderTickBumpReturn: 220
     readonly property int clickFlashDuration: 800
+    // The slower of the two flash clocks. A click confirms a press and gets out
+    // of the way; an entry - a card landing, an unlock accepted - is the event
+    // itself and stays on screen long enough to be read as one. The area under
+    // this fade is three times the click's, which is what makes an entry flash
+    // read as strong without raising any alpha above 1.
+    readonly property int entryFlashDuration: 2000
+    readonly property int entryFlashEasing: Easing.OutQuart
     readonly property int clickFlashEasing: Easing.OutQuint
     // Spectrum beat-wave sweep across its host surface.
     readonly property int beatWave: 400
