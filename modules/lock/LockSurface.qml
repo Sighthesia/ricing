@@ -868,18 +868,16 @@ WlSessionLockSurface {
 
             // Failure halo: the rejected field throws the same kind of light every
             // other acknowledged event does, so a wrong password reads before the
-            // status line under it. Anchored to the cell run rather than to the
-            // whole control, because that is the part the password went into.
+            // status line under it. It wraps the field itself - the rounded
+            // rectangle the password was typed into - not the run of cells inside
+            // it, which would light a band across the middle of the control.
             Lazer.GlowBleed {
                 id: failureGlow
 
-                x: passwordRow.x
-                y: passwordRow.y
-                width: passwordRow.width
-                height: passwordRow.height
+                anchors.fill: parent
                 z: 3
                 // A collapsed field has no light to throw.
-                visible: failureGlowAnimation.running && passwordRow.width > 0
+                visible: failureGlowAnimation.running && root.inputMode
                 // The field is lit in the palette's error step, which is the one
                 // colour on this surface that means a refusal; everything else
                 // here is ink on the themed field.
