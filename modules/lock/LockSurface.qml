@@ -101,8 +101,6 @@ WlSessionLockSurface {
     // Scales with the time so a larger size never collapses the two lines onto
     // each other: 0.33 of 72px is 24px of real air between the ink boxes.
     readonly property real clockLineGap: Math.round(clockTime.digitPixelSize * 0.33)
-    readonly property bool authFailureVisible: root.lockContext
-            ? root.lockContext.showFailure : false
     property date now: new Date()
     property bool inputMode: false
 
@@ -442,6 +440,9 @@ WlSessionLockSurface {
     function collapseUnlockFeedback(): void {
         inputMode = false
         unlockCollapseTimer.restart()
+        // The field folding away is the moment the password was accepted, so it
+        // takes the same flash and light every other accepted action takes.
+        successFlash.restart()
     }
 
     LockBackdrop {
@@ -688,10 +689,12 @@ WlSessionLockSurface {
             height: root.authControlHeight
             radius: Lazer.LazerTheme.settingsChoiceRadius
             color: root.authControlColor
-            border.width: root.authFailureVisible ? 2 : 1
-            border.color: root.authFailureVisible ? root.authIconColor
-                : (root.themeSnapshotReady ? root.lockThemeSnapshot.divider
-                                            : Lazer.LazerTheme.divider)
+            // Steady in both states: a refusal is one flash (see failureGlow)
+            // plus the shake, and a border that stayed lit read as a mode the
+            // field had entered rather than as an event that had happened.
+            border.width: 1
+            border.color: root.themeSnapshotReady ? root.lockThemeSnapshot.divider
+                                                  : Lazer.LazerTheme.divider
             property real failureOffset: 0
 
             Behavior on width {
@@ -936,6 +939,20 @@ WlSessionLockSurface {
             TapHandler {
                 enabled: !root.inputMode
                 onTapped: root.enterInputMode()
+            }
+
+            // Accepted-password flash: the same wash-and-light contract as every
+            // other accepted action, over the field that is folding away. Drawn
+            // last so it washes the glyph and the cells too, and anchored rather
+            // than fixed so the collapse carries it.
+            Lazer.ClickFlash {
+                id: successFlash
+
+                anchors.fill: parent
+                radius: parent.radius
+                color: root.authTextColor
+                surfaceColor: root.authControlColor
+                glowSpread: 10
             }
         }
 
