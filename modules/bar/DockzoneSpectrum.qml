@@ -25,10 +25,12 @@ Item {
     property int waveDuration: MotionTokens.beatWave
     // How far ahead of the front the brightness bump reaches.
     readonly property real waveWidth: Math.max(20, root.width * 0.16)
-    // The light a bar throws while the beat front is on it. Same scheme
-    // correction as the click flashes (LazerTheme states it once), because a
-    // light surface can only be darkened: a white glow there is worth nothing.
-    property color glowColor: LazerTheme.spectrumGlowColor
+    // The light a bar throws while the beat front is on it: the accent's own hue,
+    // pulled toward the surface the spectrum sits on, so it reads as that surface
+    // brightening rather than as a band of its own.
+    property color glowColor: LazerTheme.glowFor(LazerTheme.accentColor, root.glowSurface)
+    // What the light lands on, so it reads as that surface brightening.
+    property color glowSurface: "transparent"
     // How far the light reaches outside a bar, and the peak alpha it reaches.
     // Bars are thin and sit close together, so the reach has to stay smaller
     // than the gap between them or the whole spectrum lights up as a block.

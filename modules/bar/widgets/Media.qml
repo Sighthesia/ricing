@@ -452,7 +452,7 @@ BarPill {
                     anchors.fill: parent
                     // The light of the fill's own colour, so the bar and its halo
                     // are one event.
-                    glowColor: LazerTheme.glowFor(LazerTheme.accentColor)
+                    glowColor: LazerTheme.glowFor(LazerTheme.accentColor, LazerTheme.barSurface)
                     spread: Math.max(0, (LazerTheme.barWidgetHeight - root.coverSize) / 2)
                     surfaceRadius: 1.5
                     edgeAlpha: LazerTheme.flashGlowEdge
@@ -610,6 +610,7 @@ BarPill {
             // The wavefront mixes bars toward the flash wash in both schemes;
             // dark softens the sweep so the 2x glow core doesn't blow out.
             waveColor: LazerTheme.flashWash
+            glowSurface: LazerTheme.barSurface
             waveStrength: LazerTheme.lightScheme ? 1.0 : 0.55
             // One sweep per visual tick, so the front hits the far edge just as
             // the next wave is fired. Timed from the service's confirmed period

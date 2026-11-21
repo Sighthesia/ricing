@@ -42,9 +42,13 @@ Rectangle {
     // Halo around the wash: light leaving the host surface, so a click still
     // reads on a control too small or too dark to show the wash itself.
     property bool glow: true
+    // The surface this flash lands on, when the host knows it. A bar widget's
+    // light lands on the bar's tinted field, not on paper, and a halo that ignores
+    // that reads as a white ring floating over it.
+    property color surfaceColor: "transparent"
     // Derived from this layer's own tint, so the light and the wash it belongs to
     // can never be two different colours.
-    property color glowColor: LazerTheme.glowFor(root.color)
+    property color glowColor: LazerTheme.glowFor(root.color, root.surfaceColor)
     property real glowSpread: 8
     // Follows this layer's own radius, so a caller that set one gets a halo that
     // wraps its corners without having to pass the radius a second time.

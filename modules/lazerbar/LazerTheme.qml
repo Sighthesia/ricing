@@ -164,11 +164,22 @@ QtObject {
     // at all. Lifting the wash toward paper keeps the hue and is the only
     // direction with headroom over a surface that is already light, so both
     // schemes use the same rule at different distances.
-    function glowFor(baseColor) {
-        return lightScheme ? mix(baseColor, paperWhite, 0.94)
-                           : mix(baseColor, paperWhite, 0.65)
+    // `surfaceColor` is what the light lands on. A halo is translucent paint over
+    // that surface, so a colour chosen without it reads as a band of its own
+    // floating above the surface - on a tinted bar a near-white ring is exactly
+    // that. Given the surface, the halo is pulled most of the way toward it, and
+    // the light then reads as the surface brightening rather than as white paint.
+    function glowFor(baseColor, surfaceColor) {
+        const lit = lightScheme ? mix(baseColor, paperWhite, 0.94)
+                                : mix(baseColor, paperWhite, 0.65)
+        if (!surfaceColor)
+            return lit
+        return mix(surfaceColor, lit, lightScheme ? 0.45 : 0.85)
     }
     readonly property color flashGlow: glowFor(clickFlashWash)
+    // The surface a bar widget's light lands on: the bar's own field, which is
+    // the wallpaper-extracted surface rather than paper.
+    readonly property color barSurface: lightScheme ? bgLight : bgDark
     // The scheme correction, kept for the hosts that scale their halo layer by it.
     // It no longer buys contrast in the light scheme - white saturates against
     // paper and further alpha cannot brighten a surface that is already white -
@@ -179,13 +190,10 @@ QtObject {
     // 1 because what it is doing there is closing the gap to white: measured on
     // screen, a halo authored below that landed at roughly half its intended
     // light once the flash's own layer opacity had taken its cut.
-    readonly property real flashGlowEdge: lightScheme ? 1 : 0.6
+    readonly property real flashGlowEdge: lightScheme ? 1 : 0.7
     // Peak alpha of the light a spectrum bar throws while the beat front is on
     // it. It has to read against the bar's own colour without swallowing the bar.
     readonly property real spectrumGlowAlpha: lightScheme ? 0.8 : 0.35
-    // The spectrum bar's halo follows the bar's own colour, for the same reason a
-    // click flash's does.
-    readonly property color spectrumGlowColor: glowFor(accentColor)
     // Click-flash tint. A light surface needs the theme colour to read as a
     // blink: a text-coloured veil over it reads as the control dimming.
     readonly property color clickFlashWash: lightScheme ? accentColor : textPrimary

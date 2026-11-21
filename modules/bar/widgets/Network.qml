@@ -311,6 +311,7 @@ BarPill {
             // A 3px bar reads as a blob under the default reach; this keeps the
             // light a rim on the bar's own edge.
             glowSpread: 4
+            surfaceColor: LazerTheme.barSurface
             color: LazerTheme.flashWash
 
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
@@ -377,6 +378,7 @@ BarPill {
                 id: trafficLevelFlash
                 followItem: trafficFill
                 radius: 1.5
+                surfaceColor: LazerTheme.barSurface
                 color: LazerTheme.flashWash
 
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
