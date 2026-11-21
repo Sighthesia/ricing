@@ -411,12 +411,19 @@ BarPill {
 
             // Beat flash across the whole track (reads mostly on the
             // unplayed remainder); sits under the played fill overlay.
+            //
+            // Light thrown by a beat, not a second accent wash: the accent's
+            // lighter tint is still 104 levels below the bar surface on a light
+            // palette, so washing the track with it darkened the remainder instead
+            // of flashing it. Paper white is the only direction with headroom, and
+            // covering the whole column is what makes the beat read at the size of
+            // the bar rather than as a rim on three pixels.
             Rectangle {
                 anchors.fill: parent
-                color: LazerTheme.flashWash
+                color: LazerTheme.flashGlow
                 opacity: MotionTokens.reducedMotion
                     ? 0
-                    : Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity * 0.5
+                    : Math.min(1, Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity * 1.6)
                 visible: opacity > 0.01
 
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
@@ -431,16 +438,22 @@ BarPill {
                 radius: 1.5
                 color: LazerTheme.accentColor
 
-                // Halo thrown by the same beat that lights the fill. Its reach is
-                // bounded by the pill's own clip: the track is centred in the pill,
-                // so half the difference between the two is all the room the light
-                // has above and below before the pill cuts it off. A fixed reach
-                // wider than that showed a flat edge where the light stopped.
+                // Halo thrown by the same beat that lights the fill. Every other
+                // halo in the shell takes `flashGlow`, and this one took a wash
+                // token instead: over a light pill that wash is *darker* than the
+                // surface, so the beat looked like a smudge beside the bar while
+                // the spectrum's own sweep, which uses `flashGlow`, read as light.
+                //
+                // Its reach is bounded by the pill's own clip: the track is
+                // centred in the pill, so half the difference between the two is
+                // all the room the light has above and below before the pill cuts
+                // it off.
                 GlowBleed {
                     anchors.fill: parent
-                    glowColor: LazerTheme.flashWash
+                    glowColor: LazerTheme.flashGlow
                     spread: Math.max(0, (LazerTheme.barWidgetHeight - root.coverSize) / 2)
                     surfaceRadius: 1.5
+                    edgeAlpha: LazerTheme.flashGlowEdge
                     opacity: MotionTokens.reducedMotion
                         ? 0
                         : Math.min(1, Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity
@@ -452,10 +465,17 @@ BarPill {
 
                 // Beat flash: brightness pulse riding the shared beatPulse
                 // decay, so the bar blinks once per detected beat.
+                //
+                // On a light surface this is the part that actually reads. The
+                // paper around the bar sits 13 levels below white, so no halo
+                // there can be brighter than that; the bar itself starts at the
+                // accent and has the whole range to climb, which is also why the
+                // spectrum's sweep is clear. It climbs to paper white, not to the
+                // accent's lighter tint, for the same reason.
                 Rectangle {
                     anchors.fill: parent
                     radius: 1.5
-                    color: LazerTheme.flashWash
+                    color: LazerTheme.lightScheme ? LazerTheme.paperWhite : LazerTheme.flashWash
                     opacity: MotionTokens.reducedMotion
                         ? 0
                         : Math.min(1, Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity * 1.8)
