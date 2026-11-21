@@ -15,6 +15,9 @@ Item {
     property real cellWidth: 9
     property real cellHeight: 18
     property color dotColor: "white"
+    // The field this cell sits on. The halo is light landing on that field, so it
+    // has to be told what is underneath or it reads as paint floating above it.
+    property color surfaceColor: Lazer.LazerTheme.settingsControlSurface
 
     readonly property bool reducedMotion: Lazer.MotionTokens.reducedMotion
     // cellWidth is half an em, so 0.8 of it is the 0.4em capsule width.
@@ -50,6 +53,36 @@ Item {
             color: dot.dotColor
             height: 0
             opacity: 0
+        }
+
+        // The light a landed cell throws onto the field behind it. Sized to the
+        // capsule rather than to the cell: the cell box also holds the empty
+        // margin, and a halo around that would show its square edge.
+        Lazer.GlowBleed {
+            id: cellGlow
+
+            x: capsule.x
+            y: capsule.y
+            width: capsule.width
+            height: capsule.height
+            // A flash holds no decoded corner patches while it is not painting.
+            visible: cellGlowAnimation.running
+            glowColor: Lazer.LazerTheme.glowFor(dot.dotColor, dot.surfaceColor)
+            spread: 4
+            surfaceRadius: 4
+            edgeAlpha: Lazer.LazerTheme.flashGlowEdge
+
+            // The same clock every other halo in the shell leaves on, so a
+            // keystroke and a click read as one kind of event.
+            NumberAnimation on opacity {
+                id: cellGlowAnimation
+
+                from: Lazer.LazerTheme.glowPeakClick
+                to: 0
+                duration: Lazer.MotionTokens.clickFlashDuration
+                easing.type: Lazer.MotionTokens.clickFlashEasing
+                running: false
+            }
         }
     }
 
@@ -112,11 +145,30 @@ Item {
     function fallNow() {
         growAnimation.stop()
         fallAnimation.stop()
+        // The light belongs to the capsule, so it leaves with it.
+        cancelGlow()
         if (reducedMotion) {
             resetEmpty()
             return
         }
         fallAnimation.start()
+    }
+
+    // Light the cell as its capsule lands. Reduced motion keeps it dark rather
+    // than leaving a halo behind to fade on its own.
+    function flashGlow() {
+        if (reducedMotion) {
+            cancelGlow()
+            return
+        }
+        cellGlowAnimation.restart()
+    }
+
+    // Stop the halo without waiting for it to fade, the way a click flash is
+    // cancelled when the surface it belongs to goes away.
+    function cancelGlow() {
+        cellGlowAnimation.stop()
+        cellGlow.opacity = 0
     }
 
     function resetEmpty() {
@@ -128,16 +180,20 @@ Item {
     onFilledChanged: {
         if (!animationsArmed)
             return
-        if (filled)
+        if (filled) {
             growNow()
-        else
+            flashGlow()
+        } else {
             fallNow()
+        }
     }
 
     // A reduced-motion change mid-flight snaps to the matching end state.
     onReducedMotionChanged: {
         if (!animationsArmed)
             return
+        if (reducedMotion)
+            cancelGlow()
         if (filled)
             growNow()
         else

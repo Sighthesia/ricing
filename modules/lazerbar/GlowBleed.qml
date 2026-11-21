@@ -139,45 +139,105 @@ Item {
     // Corner: radial about the arc, so it meets both neighbouring bands at the
     // same value and wraps the light around the corner instead of cutting it.
     // One patch per corner; the anchor of each lives in GlowBleedSvg.js.
-    Repeater {
-        model: [
-            { "corner": 0, "visible": root.bleedLeft && root.bleedTop },
-            { "corner": 1, "visible": root.bleedRight && root.bleedTop },
-            { "corner": 2, "visible": root.bleedRight && root.bleedBottom },
-            { "corner": 3, "visible": root.bleedLeft && root.bleedBottom }
-        ]
+    //
+    // Written as four static Images rather than one Repeater: a Repeater delegate
+    // never reaches the screen inside WlSessionLockSurface, so the lock screen's
+    // halos would lose all four corners and read as bands that stop short. Every
+    // host shares this component, so what it is built from has to be static.
+    //
+    // A patch sits over the host's corner, so it starts one arc inside the box
+    // and reaches the reach of that axis beyond it.
+    //
+    // Rasterise synchronously: the halo is already on screen when a flash starts,
+    // so a deferred decode would leave a frame of missing corners. The source is
+    // generated, so a cache entry only ever holds a superseded size or colour.
+    //
+    // A halo that is not painting holds no decoded patch. The spectrum mounts one
+    // of these per bar and only the few under the beat front are ever lit, so an
+    // always-decoded patch would be paid for 48 times over to draw nothing.
+    // Clearing the source releases the texture, and a transparent tone (the
+    // master glow switch) has nothing to draw.
+    Image {
+        id: patchTopLeft
 
-        delegate: Image {
-            id: patch
+        readonly property int corner: 0
 
-            required property var modelData
-            readonly property int corner: modelData.corner
+        visible: root.bleedLeft && root.bleedTop && root.spreadX > 0 && root.spreadY > 0
+        x: -root.spreadX
+        y: -root.spreadY
+        width: root.patchWidth
+        height: root.patchHeight
+        asynchronous: false
+        cache: false
+        sourceSize.width: Math.max(1, Math.round(width))
+        sourceSize.height: Math.max(1, Math.round(height))
+        source: (root.visible && root.opacity > 0.001 && root.glowColor.a > 0)
+            ? "data:image/svg+xml;utf8," + encodeURIComponent(Glow.cornerSvg(width, height,
+                                                root.arc, root.glowColor, root.edgeAlpha,
+                                                corner, root.overlap))
+            : ""
+    }
 
-            // A patch sits over the host's corner, so it starts one arc inside
-            // the box and reaches the reach of that axis beyond it.
-            visible: modelData.visible && root.spreadX > 0 && root.spreadY > 0
-            x: (patch.corner === 1 || patch.corner === 2) ? root.width - root.arc : -root.spreadX
-            y: (patch.corner === 2 || patch.corner === 3) ? root.height - root.arc : -root.spreadY
-            width: root.patchWidth
-            height: root.patchHeight
-            // Rasterise synchronously: the halo is already on screen when a flash
-            // starts, so a deferred decode would leave a frame of missing corners.
-            // The source is generated, so a cache entry only ever holds a
-            // superseded size or colour.
-            asynchronous: false
-            cache: false
-            sourceSize.width: Math.max(1, Math.round(patch.width))
-            sourceSize.height: Math.max(1, Math.round(patch.height))
-            // A halo that is not painting holds no decoded patch. The spectrum
-            // mounts one of these per bar and only the few under the beat front
-            // are ever lit, so an always-decoded patch would be paid for 48 times
-            // over to draw nothing. Clearing the source releases the texture, and
-            // a transparent tone (the master glow switch) has nothing to draw.
-            source: (root.visible && root.opacity > 0.001 && root.glowColor.a > 0)
-                ? "data:image/svg+xml;utf8," + encodeURIComponent(Glow.cornerSvg(patch.width, patch.height,
-                                                    root.arc, root.glowColor, root.edgeAlpha,
-                                                    patch.corner, root.overlap))
-                : ""
-        }
+    Image {
+        id: patchTopRight
+
+        readonly property int corner: 1
+
+        visible: root.bleedRight && root.bleedTop && root.spreadX > 0 && root.spreadY > 0
+        x: root.width - root.arc
+        y: -root.spreadY
+        width: root.patchWidth
+        height: root.patchHeight
+        asynchronous: false
+        cache: false
+        sourceSize.width: Math.max(1, Math.round(width))
+        sourceSize.height: Math.max(1, Math.round(height))
+        source: (root.visible && root.opacity > 0.001 && root.glowColor.a > 0)
+            ? "data:image/svg+xml;utf8," + encodeURIComponent(Glow.cornerSvg(width, height,
+                                                root.arc, root.glowColor, root.edgeAlpha,
+                                                corner, root.overlap))
+            : ""
+    }
+
+    Image {
+        id: patchBottomRight
+
+        readonly property int corner: 2
+
+        visible: root.bleedRight && root.bleedBottom && root.spreadX > 0 && root.spreadY > 0
+        x: root.width - root.arc
+        y: root.height - root.arc
+        width: root.patchWidth
+        height: root.patchHeight
+        asynchronous: false
+        cache: false
+        sourceSize.width: Math.max(1, Math.round(width))
+        sourceSize.height: Math.max(1, Math.round(height))
+        source: (root.visible && root.opacity > 0.001 && root.glowColor.a > 0)
+            ? "data:image/svg+xml;utf8," + encodeURIComponent(Glow.cornerSvg(width, height,
+                                                root.arc, root.glowColor, root.edgeAlpha,
+                                                corner, root.overlap))
+            : ""
+    }
+
+    Image {
+        id: patchBottomLeft
+
+        readonly property int corner: 3
+
+        visible: root.bleedLeft && root.bleedBottom && root.spreadX > 0 && root.spreadY > 0
+        x: -root.spreadX
+        y: root.height - root.arc
+        width: root.patchWidth
+        height: root.patchHeight
+        asynchronous: false
+        cache: false
+        sourceSize.width: Math.max(1, Math.round(width))
+        sourceSize.height: Math.max(1, Math.round(height))
+        source: (root.visible && root.opacity > 0.001 && root.glowColor.a > 0)
+            ? "data:image/svg+xml;utf8," + encodeURIComponent(Glow.cornerSvg(width, height,
+                                                root.arc, root.glowColor, root.edgeAlpha,
+                                                corner, root.overlap))
+            : ""
     }
 }

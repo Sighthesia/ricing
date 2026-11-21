@@ -230,6 +230,9 @@ QtObject {
     // Click-flash tint. A light surface needs the theme colour to read as a
     // blink: a text-coloured veil over it reads as the control dimming.
     readonly property color clickFlashWash: lightScheme ? accentColor : textPrimary
+    // The palette's error step, for a refused action. The shell has had no red of
+    // its own until now; a failure that only shakes reads as motion, not as no.
+    readonly property color errorColor: adapt && colorService ? colorService.mError : "#DA4D27"
     readonly property color divider: adapt && colorService ? shade(colorService.mOutline, 0.28) : "#2E2C32"
     readonly property color popupBackground: adapt && colorService ? shade(colorService.mSurface, 0xF2 / 255) : "#F21D1C22"
     readonly property color popupBorder: "#24FFFFFF"
