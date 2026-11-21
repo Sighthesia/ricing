@@ -458,7 +458,7 @@ BarPill {
                     // across it there is room to spare. A vertical light needs the
                     // second the more, so the two axes are stated separately.
                     spreadY: Math.max(0, (LazerTheme.barWidgetHeight - root.coverSize) / 2)
-                    spreadX: LazerTheme.coverSize / 3
+                    spreadX: root.coverSize / 3
                     surfaceRadius: 1.5
                     edgeAlpha: LazerTheme.flashGlowEdge
                     opacity: MotionTokens.reducedMotion
