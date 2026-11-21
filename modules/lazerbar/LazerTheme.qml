@@ -156,9 +156,19 @@ QtObject {
     // leaning to paper. Over a light surface only one direction exists - toward
     // white - and any tint at all goes the wrong way: the accent at 82% white is
     // still darker than #FDF7EE, so an accent halo there reads as a shadow.
-    readonly property color flashGlow: lightScheme
-        ? paperWhite
-        : mix(paperWhite, accentColor, 0.35)
+    // The light a flash of `baseColor` throws outside its own surface.
+    //
+    // Derived from the wash rather than given its own palette: a flash and the
+    // light it throws are one event, and two independently chosen colours read as
+    // two - a saturated accent wash under a paper-white halo has no hue in common
+    // at all. Lifting the wash toward paper keeps the hue and is the only
+    // direction with headroom over a surface that is already light, so both
+    // schemes use the same rule at different distances.
+    function glowFor(baseColor) {
+        return lightScheme ? mix(baseColor, paperWhite, 0.94)
+                           : mix(baseColor, paperWhite, 0.65)
+    }
+    readonly property color flashGlow: glowFor(clickFlashWash)
     // The scheme correction, kept for the hosts that scale their halo layer by it.
     // It no longer buys contrast in the light scheme - white saturates against
     // paper and further alpha cannot brighten a surface that is already white -
@@ -173,12 +183,9 @@ QtObject {
     // Peak alpha of the light a spectrum bar throws while the beat front is on
     // it. It has to read against the bar's own colour without swallowing the bar.
     readonly property real spectrumGlowAlpha: lightScheme ? 0.8 : 0.35
-    // The spectrum bar halo's tone. The bar is itself a tint of the accent, so a
-    // halo of that same tint merges into it and reads as a wider bar; over a light
-    // surface the halo goes the only direction that exists there - toward white -
-    // which also puts it at the opposite end from the bar and lets the bar read as
-    // the dark thing with light around it.
-    readonly property color spectrumGlowColor: flashGlow
+    // The spectrum bar's halo follows the bar's own colour, for the same reason a
+    // click flash's does.
+    readonly property color spectrumGlowColor: glowFor(accentColor)
     // Click-flash tint. A light surface needs the theme colour to read as a
     // blink: a text-coloured veil over it reads as the control dimming.
     readonly property color clickFlashWash: lightScheme ? accentColor : textPrimary

@@ -450,7 +450,9 @@ BarPill {
                 // it off.
                 GlowBleed {
                     anchors.fill: parent
-                    glowColor: LazerTheme.flashGlow
+                    // The light of the fill's own colour, so the bar and its halo
+                    // are one event.
+                    glowColor: LazerTheme.glowFor(LazerTheme.accentColor)
                     spread: Math.max(0, (LazerTheme.barWidgetHeight - root.coverSize) / 2)
                     surfaceRadius: 1.5
                     edgeAlpha: LazerTheme.flashGlowEdge

@@ -42,7 +42,9 @@ Rectangle {
     // Halo around the wash: light leaving the host surface, so a click still
     // reads on a control too small or too dark to show the wash itself.
     property bool glow: true
-    property color glowColor: LazerTheme.flashGlow
+    // Derived from this layer's own tint, so the light and the wash it belongs to
+    // can never be two different colours.
+    property color glowColor: LazerTheme.glowFor(root.color)
     property real glowSpread: 8
     // Follows this layer's own radius, so a caller that set one gets a halo that
     // wraps its corners without having to pass the radius a second time.
