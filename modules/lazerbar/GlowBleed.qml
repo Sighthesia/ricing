@@ -29,8 +29,13 @@ Item {
     // Halo tone; a scheme-aware token, since white light on a white card shows
     // nothing.
     property color glowColor: LazerTheme.flashGlow
-    // How far the light reaches outside the host, in pixels.
+    // How far the light reaches outside the host, in pixels. `spread` is the
+    // reach on both axes; a host that is a thin bar can reach further along its
+    // short axis than across its length, and a host boxed in by a clipping
+    // parent can reach further on the axis that has room.
     property real spread: 8
+    property real spreadX: root.spread
+    property real spreadY: root.spread
     // Alpha on the host's boundary. The host's layer opacity multiplies it
     // again, so a fading flash takes its halo down with it. Never fold a scheme
     // correction into this number: anything above 1 would clip the ramp flat at
@@ -58,8 +63,9 @@ Item {
     readonly property real bandTop: root.bleedTop ? root.arc : 0
     readonly property real bandBottom: root.bleedBottom ? root.height - root.arc : root.height
     readonly property real bandHeight: Math.max(0, root.bandBottom - root.bandTop)
-    // Side length of a corner patch: the light's reach plus the arc it wraps.
-    readonly property real patchSize: root.spread + root.arc
+    // Corner patch size: the reach on each axis plus the arc it wraps.
+    readonly property real patchWidth: root.spreadX + root.arc
+    readonly property real patchHeight: root.spreadY + root.arc
     // How far the light continues under the host's own edge. The host's border
     // pixel is a blend of the host and whatever is behind it, and if the light
     // stops exactly on the geometric edge that pixel blends with the untouched
@@ -68,63 +74,64 @@ Item {
     readonly property real overlap: 0.75
     // Where the ramp ends once the overlap is added: beyond it the edge alpha
     // holds, so the extra pixel does not stretch the falloff.
-    readonly property real bandStop: root.spread / Math.max(0.001, root.spread + root.overlap)
+    readonly property real bandStopX: root.spreadX / Math.max(0.001, root.spreadX + root.overlap)
+    readonly property real bandStopY: root.spreadY / Math.max(0.001, root.spreadY + root.overlap)
 
     // Straight edge: alpha depends only on the distance to that edge.
     Rectangle {
-        visible: root.bleedTop && root.width - 2 * root.arc > 0
+        visible: root.bleedTop && root.width - 2 * root.arc > 0 && root.spreadY > 0
         x: root.arc
-        y: -root.spread
+        y: -root.spreadY
         width: Math.max(0, root.width - 2 * root.arc)
-        height: root.spread + root.overlap
+        height: root.spreadY + root.overlap
 
         gradient: Gradient {
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, 0) }
-            GradientStop { position: root.bandStop; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            GradientStop { position: root.bandStopY; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
             GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
         }
     }
 
     Rectangle {
-        visible: root.bleedBottom && root.width - 2 * root.arc > 0
+        visible: root.bleedBottom && root.width - 2 * root.arc > 0 && root.spreadY > 0
         x: root.arc
         y: root.height - root.overlap
         width: Math.max(0, root.width - 2 * root.arc)
-        height: root.spread + root.overlap
+        height: root.spreadY + root.overlap
 
         gradient: Gradient {
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
-            GradientStop { position: 1 - root.bandStop; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            GradientStop { position: 1 - root.bandStopY; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
             GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, 0) }
         }
     }
 
     Rectangle {
-        visible: root.bleedLeft && root.bandHeight > 0
-        x: -root.spread
+        visible: root.bleedLeft && root.bandHeight > 0 && root.spreadX > 0
+        x: -root.spreadX
         y: root.bandTop
-        width: root.spread + root.overlap
+        width: root.spreadX + root.overlap
         height: root.bandHeight
 
         gradient: Gradient {
             orientation: Gradient.Horizontal
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, 0) }
-            GradientStop { position: root.bandStop; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            GradientStop { position: root.bandStopX; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
             GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
         }
     }
 
     Rectangle {
-        visible: root.bleedRight && root.bandHeight > 0
+        visible: root.bleedRight && root.bandHeight > 0 && root.spreadX > 0
         x: root.width - root.overlap
         y: root.bandTop
-        width: root.spread + root.overlap
+        width: root.spreadX + root.overlap
         height: root.bandHeight
 
         gradient: Gradient {
             orientation: Gradient.Horizontal
             GradientStop { position: 0; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
-            GradientStop { position: 1 - root.bandStop; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
+            GradientStop { position: 1 - root.bandStopX; color: LazerTheme.shade(root.glowColor, root.edgeAlpha) }
             GradientStop { position: 1; color: LazerTheme.shade(root.glowColor, 0) }
         }
     }
@@ -147,12 +154,12 @@ Item {
             readonly property int corner: modelData.corner
 
             // A patch sits over the host's corner, so it starts one arc inside
-            // the box and reaches `spread` beyond it.
-            visible: modelData.visible && root.spread > 0
-            x: (patch.corner === 1 || patch.corner === 2) ? root.width - root.arc : -root.spread
-            y: (patch.corner === 2 || patch.corner === 3) ? root.height - root.arc : -root.spread
-            width: root.patchSize
-            height: root.patchSize
+            // the box and reaches the reach of that axis beyond it.
+            visible: modelData.visible && root.spreadX > 0 && root.spreadY > 0
+            x: (patch.corner === 1 || patch.corner === 2) ? root.width - root.arc : -root.spreadX
+            y: (patch.corner === 2 || patch.corner === 3) ? root.height - root.arc : -root.spreadY
+            width: root.patchWidth
+            height: root.patchHeight
             // Rasterise synchronously: the halo is already on screen when a flash
             // starts, so a deferred decode would leave a frame of missing corners.
             // The source is generated, so a cache entry only ever holds a
@@ -166,8 +173,8 @@ Item {
             // are ever lit, so an always-decoded patch would be paid for 48 times
             // over to draw nothing. Clearing the source releases the texture.
             source: (root.visible && root.opacity > 0.001)
-                ? "data:image/svg+xml;utf8," + encodeURIComponent(Glow.cornerSvg(patch.width, root.arc,
-                                                    root.glowColor, root.edgeAlpha,
+                ? "data:image/svg+xml;utf8," + encodeURIComponent(Glow.cornerSvg(patch.width, patch.height,
+                                                    root.arc, root.glowColor, root.edgeAlpha,
                                                     patch.corner, root.overlap))
                 : ""
         }

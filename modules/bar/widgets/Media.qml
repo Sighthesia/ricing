@@ -453,7 +453,12 @@ BarPill {
                     // The light of the fill's own colour, so the bar and its halo
                     // are one event.
                     glowColor: LazerTheme.glowFor(LazerTheme.accentColor, LazerTheme.barSurface)
-                    spread: Math.max(0, (LazerTheme.barWidgetHeight - root.coverSize) / 2)
+                    // The bar is 3px wide and the pill clips it: up and down the
+                    // reach is whatever room the track leaves in the pill, and
+                    // across it there is room to spare. A vertical light needs the
+                    // second the more, so the two axes are stated separately.
+                    spreadY: Math.max(0, (LazerTheme.barWidgetHeight - root.coverSize) / 2)
+                    spreadX: LazerTheme.coverSize / 3
                     surfaceRadius: 1.5
                     edgeAlpha: LazerTheme.flashGlowEdge
                     opacity: MotionTokens.reducedMotion

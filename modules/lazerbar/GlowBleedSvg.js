@@ -12,10 +12,11 @@
 // antialiased edges on this Qt; an SVG patch has no ring and its own alpha
 // reaches zero on every side.
 //
-// Each patch is square, sized spread + arc, and its gradient is anchored on the
-// corner's arc centre — the point the distance field is measured from, and the
-// same point the neighbouring bands measure against, so the two agree along
-// their shared edge.
+// Each patch is `width` by `height` and its gradient is anchored on the corner's
+// arc centre - the point the distance field is measured from, and the same point
+// the neighbouring bands measure against, so the two agree along their shared
+// edge. The two axes can have different reaches, so the gradient is elliptical:
+// a unit circle scaled to (radiusX, radiusY) about that centre.
 
 // A radius can never exceed half of either side, and both the bands and the
 // patches derive their hand-over from this one number.
@@ -44,47 +45,53 @@ function rgbString(color) {
 //   0 top-left, 1 top-right, 2 bottom-right, 3 bottom-left
 var ARC_CORNER = [[1, 1], [0, 1], [0, 0], [1, 0]]
 
-// One corner patch, `side` pixels square, with `arc` of that square eaten by the
-// host's own corner radius.
+// One corner patch, `width` by `height`, with `arc` of it eaten by the host's own
+// corner radius.
 //
 // The host's rounded corner is punched out of the patch with a mask. Without it
-// the radial's flat top paints over the corner the card itself occupies, and the
-// light shows there as a bright square — invisible when the halo belongs to a
-// wash of the same colour, obvious when it does not (a notification card taking
-// a tinted entry flash). The disc being punched is centred on the arc and has
-// radius `arc`, which keeps it entirely inside the patch square, so cutting the
-// whole circle is the same as cutting the corner it stands for.
-function cornerSvg(side, arc, color, edgeAlpha, corner, overlap) {
-    const size = Math.max(1, Number(side) || 0)
-    const radius = Math.max(0, Math.min(Number(arc) || 0, size))
+// the gradient's flat top paints over the corner the surface itself occupies, and
+// the light shows there as a bright square - invisible when the halo belongs to a
+// wash of the same colour, obvious when it does not (a notification card taking a
+// tinted entry flash). The disc being punched is centred on the arc and has
+// radius `arc` minus the host's own edge overlap, which keeps it inside the patch
+// square, so cutting the whole circle is the same as cutting the corner it stands
+// for.
+function cornerSvg(width, height, arc, color, edgeAlpha, corner, overlap) {
+    const w = Math.max(1, Number(width) || 0)
+    const h = Math.max(1, Number(height) || 0)
+    const radius = Math.max(0, Math.min(Number(arc) || 0, Math.min(w, h)))
     // The corner it cuts is pulled in by the host's own edge overlap, so the
     // light continues under that edge instead of stopping on the geometric
     // boundary and leaving a dark hairline there.
     const cut = Math.max(0, radius - (Number(overlap) || 0))
-    // Where the host boundary falls along the gradient: full strength up to the
-    // arc, then a straight ramp out to nothing at the patch's far corner.
-    const boundary = clamp01(radius / size)
-    const alpha = clamp01(edgeAlpha)
     const fill = rgbString(color)
+    const alpha = clamp01(edgeAlpha)
     const anchor = ARC_CORNER[corner] || ARC_CORNER[0]
-    const cx = anchor[0] * size
-    const cy = anchor[1] * size
+    const cx = anchor[0] * w
+    const cy = anchor[1] * h
+    // Where the host boundary falls along the gradient. The boundary is a circular
+    // arc while the gradient is elliptical, so the two only agree exactly when the
+    // reaches match; taking the mean keeps the seam inside a pixel for the modest
+    // ratios a bar uses.
+    const boundary = clamp01(2 * radius / Math.max(0.001, w + h))
     const stops = '<stop offset="0" stop-color="' + fill + '" stop-opacity="' + alpha + '"/>'
         + '<stop offset="' + boundary + '" stop-color="' + fill + '" stop-opacity="' + alpha + '"/>'
         + '<stop offset="1" stop-color="' + fill + '" stop-opacity="0"/>'
     const mask = cut > 0
         ? '<mask id="c" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse"'
-            + ' x="0" y="0" width="' + size + '" height="' + size + '">'
-            + '<rect x="0" y="0" width="' + size + '" height="' + size + '" fill="white"/>'
+            + ' x="0" y="0" width="' + w + '" height="' + h + '">'
+            + '<rect x="0" y="0" width="' + w + '" height="' + h + '" fill="white"/>'
             + '<circle cx="' + cx + '" cy="' + cy + '" r="' + cut + '" fill="black"/>'
             + '</mask>'
         : ''
-    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + size
-        + '" viewBox="0 0 ' + size + ' ' + size + '">'
-        + '<defs><radialGradient id="g" gradientUnits="userSpaceOnUse"'
-        + ' cx="' + cx + '" cy="' + cy + '" r="' + size + '">' + stops + '</radialGradient>'
+    // A unit circle scaled to the patch's two reaches about the arc centre.
+    const transform = 'translate(' + cx + ' ' + cy + ') scale(' + w + ' ' + h + ')'
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h
+        + '" viewBox="0 0 ' + w + ' ' + h + '">'
+        + '<defs><radialGradient id="g" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="1"'
+        + ' gradientTransform="' + transform + '">' + stops + '</radialGradient>'
         + mask + '</defs>'
-        + '<rect x="0" y="0" width="' + size + '" height="' + size + '" fill="url(#g)"'
+        + '<rect x="0" y="0" width="' + w + '" height="' + h + '" fill="url(#g)"'
         + (cut > 0 ? ' mask="url(#c)"' : '') + '/>'
         + '</svg>'
 }
