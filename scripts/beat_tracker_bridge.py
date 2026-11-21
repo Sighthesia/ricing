@@ -33,7 +33,20 @@ import aubio
 
 SAMPLE_RATE = 44100
 HOP_SIZE = 512
-BUF_SIZE = 1024
+# Analysis window for the tempo tracker: four hops, not aubio's usual two.
+# Measured over three minutes of three tracks, doubling it halved the readout's
+# beat-to-beat jumps (14 -> 9, 11 -> 5) at the cost of 23ms more latency.
+BUF_SIZE = 2048
+# Onset detection function feeding the tempo tracker. aubio's default is an
+# odd/even spectral difference; "complex" measures phase plus magnitude and was
+# the only method that cut the number of 15s windows whose median BPM disagreed
+# with the track's own median by more than 5% (2/19 -> 0/19 on one track, 3/11 ->
+# 1/11 on another) without regressing material that has a clear kick. The other
+# methods were measured and rejected: "mkl" reports the wrong tempo outright
+# (129 vs 143 BPM, 5/19 windows off), "specflux" is identical to the default, and
+# gating beats on the tracker's own confidence throws away 668 of 680 beats -
+# that number is ~0.1 on this material and unusable as a threshold.
+TEMPO_METHOD = "complex"
 
 # Re-open the capture after this long when the monitor stream ends; doubling
 # up to the cap keeps a permanently broken audio graph from spinning.
@@ -187,7 +200,7 @@ def main() -> int:
 
         # A fresh tracker per capture session: after a long gap the old
         # tracker would keep reporting its stale tempo into the new audio.
-        tempo = aubio.tempo("default", BUF_SIZE, HOP_SIZE, SAMPLE_RATE)
+        tempo = aubio.tempo(TEMPO_METHOD, BUF_SIZE, HOP_SIZE, SAMPLE_RATE)
         session_start = time.monotonic()
         _stream_once(recorder, tempo)
 
