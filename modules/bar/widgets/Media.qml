@@ -468,19 +468,22 @@ BarPill {
                 // Beat flash: brightness pulse riding the shared beatPulse
                 // decay, so the bar blinks once per visual beat tick.
                 //
-                // On a light surface this is the part that actually reads. The
-                // paper around the bar sits 13 levels below white, so no halo
-                // there can be brighter than that; the bar itself starts at the
-                // accent and has the whole range to climb, which is also why the
-                // spectrum's sweep is clear. It climbs to paper white, not to the
-                // accent's lighter tint, for the same reason.
+                // On a light surface this is the part that actually reads, and it
+                // has to reach past the surface: the field around the bar sits at
+                // 88% of white, so a halo there can add only a few levels, while
+                // the bar itself starts at the accent and has the whole range to
+                // climb. Reaching paper white means the beat peak is the brightest
+                // thing on that part of the bar - the same relationship a bright
+                // bar has to a dark field - and the halo then has something lit to
+                // spill from.
                 Rectangle {
                     anchors.fill: parent
                     radius: 1.5
-                    color: LazerTheme.lightScheme ? LazerTheme.paperWhite : LazerTheme.flashWash
+                    color: LazerTheme.barTickWash
                     opacity: MotionTokens.reducedMotion
                         ? 0
-                        : Math.min(1, Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity * 1.8)
+                        : Math.min(1, Services.SpectrumService.beatPulse * MotionTokens.clickFlashOpacity
+                                            * 1.8 * LazerTheme.flashGlowGain)
                     visible: opacity > 0.01
 
                     Behavior on color { ColorAnimation { duration: MotionTokens.fast } }

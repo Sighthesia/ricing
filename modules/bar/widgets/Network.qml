@@ -309,10 +309,11 @@ BarPill {
             followItem: networkFill
             radius: LazerTheme.barIndicatorRadius
             // A 3px bar reads as a blob under the default reach; this keeps the
-            // light a rim on the bar's own edge.
-            glowSpread: 4
+            // light a rim on the bar while still giving it width - on a light
+            // field the area is what makes a faint light perceptible.
+            glowSpread: 7
             surfaceColor: LazerTheme.barSurface
-            color: LazerTheme.flashWash
+            color: LazerTheme.barTickWash
 
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
@@ -379,7 +380,7 @@ BarPill {
                 followItem: trafficFill
                 radius: 1.5
                 surfaceColor: LazerTheme.barSurface
-                color: LazerTheme.flashWash
+                color: LazerTheme.barTickWash
 
                 Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
             }

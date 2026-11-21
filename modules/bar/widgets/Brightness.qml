@@ -139,7 +139,7 @@ BarPill {
             id: levelFlash
             anchors.fill: brightnessFill
             radius: LazerTheme.barIndicatorRadius
-            color: LazerTheme.flashWash
+            color: LazerTheme.barTickWash
             opacity: 0
 
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }

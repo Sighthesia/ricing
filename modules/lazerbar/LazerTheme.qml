@@ -174,12 +174,17 @@ QtObject {
                                 : mix(baseColor, paperWhite, 0.65)
         if (!surfaceColor)
             return lit
-        return mix(surfaceColor, lit, lightScheme ? 0.45 : 0.85)
+        return mix(surfaceColor, lit, lightScheme ? 0.35 : 0.85)
     }
     readonly property color flashGlow: glowFor(clickFlashWash)
     // The surface a bar widget's light lands on: the bar's own field, which is
     // the wallpaper-extracted surface rather than paper.
     readonly property color barSurface: lightScheme ? bgLight : bgDark
+    // What a bar widget's tick flash pushes its fill toward. On a light field the
+    // fill has to climb past the field itself to read as lit - the accent's lighter
+    // tint is still far below it - so the light scheme tints toward paper and the
+    // dark scheme keeps the accent's luminous tint.
+    readonly property color barTickWash: lightScheme ? paperWhite : flashWash
     // The scheme correction, kept for the hosts that scale their halo layer by it.
     // It no longer buys contrast in the light scheme - white saturates against
     // paper and further alpha cannot brighten a surface that is already white -

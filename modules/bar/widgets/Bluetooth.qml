@@ -162,7 +162,7 @@ BarPill {
             id: levelFlash
             anchors.fill: bluetoothFill
             radius: LazerTheme.barIndicatorRadius
-            color: LazerTheme.flashWash
+            color: LazerTheme.barTickWash
             opacity: 0
 
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
