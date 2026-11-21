@@ -198,16 +198,16 @@ QtObject {
     readonly property real flashGlowEdge: lightScheme ? 1 : 0.7
     // Peak opacity of each kind of flash light, stated here once so the four
     // events cannot drift apart. Every host multiplies one of these by its own
-    // 0..1 driver - the wash's fade, the beat's decay, the sweep's front - and the
-    // scheme correction lives in the number rather than in each call site.
+    // 0..1 driver - the wash's fade, the beat's decay, the sweep's front.
     //
-    // They differ only by how much of the layer's strength that event spends: a
-    // click flash shares its layer with the wash and so is capped by it; a beat
-    // has no wash to share and reaches further; an entry flash fades for longer
-    // than any of them and paints at full strength.
-    readonly property real glowPeakClick: Math.min(1, MotionTokens.clickFlashOpacity * flashGlowGain)
-    readonly property real glowPeakBeat: Math.min(1, MotionTokens.clickFlashOpacity * 2.2 * flashGlowGain)
-    readonly property real glowPeakSweep: Math.min(1, flashGlowGain)
+    // These are event semantics and nothing else: no scheme factor, because the
+    // scheme is already answered by the colour and by flashGlowEdge, and folding
+    // it in here made the same event paint at 0.9 in one scheme and 0.3 in the
+    // other. A click is deliberately the quiet one - it fires constantly, where a
+    // beat, a sweep and a card landing are events.
+    readonly property real glowPeakClick: 0.55
+    readonly property real glowPeakBeat: 1
+    readonly property real glowPeakSweep: 1
     readonly property real glowPeakEntry: 1
     // A beat's light, from its pulse. The pulse spends most of its life below 0.5
     // - it spikes and decays - so tracking it directly made the halo half strength
