@@ -209,6 +209,14 @@ QtObject {
     readonly property real glowPeakBeat: Math.min(1, MotionTokens.clickFlashOpacity * 2.2 * flashGlowGain)
     readonly property real glowPeakSweep: Math.min(1, flashGlowGain)
     readonly property real glowPeakEntry: 1
+    // A beat's light, from its pulse. The pulse spends most of its life below 0.5
+    // - it spikes and decays - so tracking it directly made the halo half strength
+    // for the whole decay. Held at full through the first half and released after,
+    // the light reads as the beat settling instead of as a flicker.
+    function beatGlow(pulse) {
+        const p = Math.max(0, Math.min(1, Number(pulse) || 0))
+        return Math.min(1, p * 2) * glowPeakBeat
+    }
     // Click-flash tint. A light surface needs the theme colour to read as a
     // blink: a text-coloured veil over it reads as the control dimming.
     readonly property color clickFlashWash: lightScheme ? accentColor : textPrimary

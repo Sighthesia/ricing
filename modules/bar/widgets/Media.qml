@@ -458,7 +458,7 @@ BarPill {
                     edgeAlpha: LazerTheme.flashGlowEdge
                     opacity: MotionTokens.reducedMotion
                         ? 0
-                        : Services.SpectrumService.beatPulse * LazerTheme.glowPeakBeat
+                        : LazerTheme.beatGlow(Services.SpectrumService.beatPulse)
                     visible: opacity > 0.01
 
                     Behavior on opacity { NumberAnimation { duration: MotionTokens.fast } }
