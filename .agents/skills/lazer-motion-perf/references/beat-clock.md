@@ -44,3 +44,8 @@
 - **离线**：`ffmpeg -f f32le -ac 1 -ar 44100` 解码整曲 → `aubio.tempo("default",1024,512,44100)` 逐 hop，收集 `get_last_s()`，再用候选估计器重放比较（取值数 / 变化次数 / 偏离真值比例）。这能一眼分清“估计器问题”还是“QML 接线问题”。
 - **在线**：临时在 `visualClock.onTriggered`、锁定/切换处打 `console.warn`，`scripts/check-shell.sh` 之外的日志里按时间戳算 tick 间隔分布。**tick 间隔在单段内应当是一个值（±几 ms）**；出现 255–847ms 这种分布就说明有东西在重启定时器。
 - Qt 6.11 实测：运行中的 `NumberAnimation` 改 `duration`/`from`/`to` **不会**重启或截断动画（离屏 `qml6` 验证），所以“参数变化打断动画”不是可用假设——时长在启动瞬间就被读取。
+
+## 后记：这条链路已整体撤回
+
+aubio 桥（`scripts/beat_tracker_bridge.py`）与 `visualClock` / `visualBeatIntervalMs` 已在本次回退中整体删除（回退本身尚未提交，故不记哈希），视觉重新走 `services/spectrum/BeatDetect.js` 的 cava 启发式（低频 onset + 包络自相关估 BPM），sweep 时长回到从 `bpm` 派生。
+本文其余测量数据作为历史证据保留：它记录的是 aubio 桥的问题，以及任何“用检测到的拍去驱动视觉”的方案会踩的坑。

@@ -5,8 +5,7 @@ import "../lazerbar"
 // Sharp rectangular bars (radius 0) follow the osu!lazer sharp language:
 // large surfaces stay rectangular; only small control details use rounding.
 // A beat wave — a rectangular highlight front sweeping from the left edge —
-// brightens bars as it passes, driven by triggerWave() on each visual beat tick
-// (the service's clock, not aubio's own beat grid - see SpectrumService).
+// brightens bars as it passes, driven by triggerWave() on each beat signal.
 Item {
     id: root
 
@@ -62,11 +61,11 @@ Item {
             return
         // A front that is still travelling is not thrown away mid-flight: being
         // cut in half is exactly what reads as unnatural, and the beat that ends
-        // this sweep is a detection whose period aubio keeps revising (measured
-        // on one steady track: 628 -> 291ms, in step changes), so a mismatch is
-        // normal rather than exceptional. A beat that lands while the front is
-        // still short of the edge is dropped; the front finishes, and the wave
-        // re-arms on the next beat - at most one beat late, and never cut.
+        // this sweep is a detection while the period its duration came from is
+        // an estimate that keeps moving, so a mismatch is normal rather than
+        // exceptional. A beat that lands while the front is still short of
+        // the edge is dropped; the front finishes, and the wave re-arms on the
+        // next beat - at most one beat late, and never cut.
         // Near the edge it does restart, so a slightly overestimated period
         // cannot halve the wave's rate by dropping every other beat.
         const travel = root.width + root.waveWidth * 2
