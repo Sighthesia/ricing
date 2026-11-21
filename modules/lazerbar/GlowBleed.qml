@@ -33,7 +33,7 @@ Item {
     // reach on both axes; a host that is a thin bar can reach further along its
     // short axis than across its length, and a host boxed in by a clipping
     // parent can reach further on the axis that has room.
-    property real spread: 8
+    property real spread: LazerTheme.glowReach
     property real spreadX: root.spread
     property real spreadY: root.spread
     // Alpha on the host's boundary. The host's layer opacity multiplies it

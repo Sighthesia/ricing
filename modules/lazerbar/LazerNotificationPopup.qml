@@ -49,7 +49,7 @@ Item {
     // How far the entry flash's halo reaches outside the card. The host insets
     // this card's stack by the same distance, so the light is not cut off by the
     // edge of the layer surface it sits on.
-    property real glowSpread: 12
+    property real glowSpread: LazerTheme.glowReachWide
     // The output the ring is defined against, so the card masks the same ring
     // the bar shows rather than fitting one to its own box, and where the stack
     // this card sits in stands on it.

@@ -187,6 +187,13 @@ QtObject {
         ? settingsService.appearance.flashGlowEnabled !== false
         : true
     readonly property color flashGlow: glowFor(clickFlashWash)
+    // How far a halo reaches past its host, in pixels. A host picks a tier by how
+    // much room it has, not by taste: a thin bar inside a pill is boxed in, a card
+    // has room to spare. The number is the reach on both axes unless the host
+    // states the two separately.
+    readonly property real glowReachNarrow: 5
+    readonly property real glowReach: 8
+    readonly property real glowReachWide: 12
     // The surface a bar widget's light lands on: the bar's own field, which is
     // the wallpaper-extracted surface rather than paper.
     readonly property color barSurface: lightScheme ? bgLight : bgDark

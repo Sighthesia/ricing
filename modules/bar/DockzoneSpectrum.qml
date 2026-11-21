@@ -33,7 +33,7 @@ Item {
     // How far the light reaches outside a bar, and the peak alpha it reaches.
     // Bars are thin and sit close together, so the reach has to stay smaller
     // than the gap between them or the whole spectrum lights up as a block.
-    readonly property real glowSpread: 5
+    readonly property real glowSpread: LazerTheme.glowReachNarrow
     readonly property real glowAlpha: LazerTheme.flashGlowEdge
 
     // Sweep-front position in root coordinates; parked far left when idle so

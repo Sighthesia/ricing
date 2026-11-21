@@ -457,8 +457,11 @@ BarPill {
                     // reach is whatever room the track leaves in the pill, and
                     // across it there is room to spare. A vertical light needs the
                     // second the more, so the two axes are stated separately.
+                    // The narrow tier across, and whatever room the pill leaves up
+                    // and down: a 3px column reads as a band under a wide bloom, and
+                    // anything past the pill's own margin would be cut square.
+                    spreadX: LazerTheme.glowReachNarrow
                     spreadY: Math.max(0, (LazerTheme.barWidgetHeight - root.coverSize) / 2)
-                    spreadX: root.coverSize / 3
                     surfaceRadius: 1.5
                     edgeAlpha: LazerTheme.flashGlowEdge
                     opacity: MotionTokens.reducedMotion
