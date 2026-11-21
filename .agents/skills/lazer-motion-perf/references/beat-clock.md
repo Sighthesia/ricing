@@ -27,9 +27,11 @@
 
 ## 正确的结构：时钟归时钟，拍只用来估周期
 
-- `services/SpectrumService.qml` 里 `visualBeatIntervalMs` 由 `bucketMode()`（众数，12ms 桶，取桶内均值避免 ±6ms 偏置）+ `noteVisualPeriod()`（新值需持续 12s 才切换）算出；首次锁定要求 ≥16 个间隔（约 7 秒）。
-- 脉冲与 `beat()` 由 `visualClock`（`Timer`，interval = 该周期）驱动，**不由拍驱动**；wave 的 `triggerWave()` 也跟这个 `beat()`。
+- 脉冲与 `beat()` 由 `visualClock`（`Timer`，interval = `visualBeatIntervalMs`）驱动，**不由拍驱动**；wave 的 `triggerWave()` 也跟这个 `beat()`。这是整套改动里唯一真正解决了闪烁的部分。
+- `visualBeatIntervalMs` 取最近 6 个间隔的中位数（≥3 个才开始），按整八度折到 280–1000ms。窗口短、跟着音乐走。
 - `bpm` 读数与视觉彻底解耦：读数可以继续平滑/锁定，视觉不许从它派生时长。
+
+**长窗口没有用（试过并回退）**：众数直方图（64 间隔、12ms 桶）+ 新值需持续 12 秒，纸面上能把周期变化从 134 次降到 0–1 次，但实测下来问题是**不同配器的段落本来就会给出不同结果**——长窗口并不能修正这个，只会在真实段落变化时把一个过期的周期多保持最多 12 秒。素材的节拍权重随配器变化时，那 12 秒几乎是常态。
 
 ## 三个必须避开的坑
 

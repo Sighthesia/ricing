@@ -24,10 +24,9 @@ Singleton {
     // while a track plays (measured on one steady 143 BPM track: three 7-8s
     // stretches at 1.27x and 0.74x, with no musical ratio between them), and its
     // individual beat times carry their own jitter. Deriving a period from that
-    // directly puts every one of those decisions on screen as irregular
-    // flicker, so the period is taken from the most frequent recent gap and has
-    // to persist before it may change, and the accents run off a clock at that
-    // period rather than off the beats themselves.
+    // directly put every one of those decisions on screen as irregular flicker,
+    // so the accents run off a clock at this period rather than off the beats
+    // themselves. The period itself is allowed to follow the music.
     readonly property int visualBeatIntervalMs: _visualIntervalMs
     // Decaying 0..1 beat pulse for visual accents; spikes to 1 on each beat.
     readonly property real beatPulse: _reportedPulse
@@ -37,13 +36,8 @@ Singleton {
     property real _reportedPulse: 0
     property int _beatIntervalMs: 0
     property int _visualIntervalMs: 0
-    property int _visualCandidateMs: 0
-    property double _visualCandidateSince: -1
     // Consecutive gaps rejected by the window's own median; see _onBeatLine.
     property int _beatRejected: 0
-    // Set when the gap window had to be thrown away, so the next period it
-    // settles on is taken immediately instead of waiting out the confirm delay.
-    property bool _visualRelearn: false
     // Wall clock of the last arriving beat, for the clock's watchdog.
     property double _lastBeatWallAt: -1
     // Wall clock of the last cava frame. The pulse decay lives in _parseFrame, so
@@ -200,84 +194,18 @@ Singleton {
         return Math.round(folded)
     }
 
-    // The most frequent recent gap, in 12ms buckets, refined to the mean of the
-    // gaps in the winning bucket.
+    // The period the accents run at, from the median of the last few gaps.
     //
-    // The median of a short window follows a tracker excursion within a few
-    // beats, which is exactly the flicker to remove. The most frequent value
-    // does not: measured over one track's 679 gaps, the median of six took 31
-    // distinct values and changed 134 times per 622 beats, while this took 2
-    // and changed once. The bucket is only a vote - reporting the bucket centre
-    // instead of the bucket would bias the period by up to 6ms, which accumulates
-    // into a phase correction every ~15s.
-    function bucketMode(gaps) {
-        // Sixteen gaps (about seven seconds of music) before the first lock: the
-        // mode of a handful of gaps is a coin toss, and the persistence rule
-        // below would then hold that coin toss for twelve seconds. Measured on a
-        // live session where the lock was taken after four gaps: it locked at
-        // 567ms on music whose grid was 413ms.
-        if (!gaps || gaps.length < 16)
-            return 0
-        var counts = ({})
-        var best = 0
-        var bestCount = 0
-        for (var i = 0; i < gaps.length; i++) {
-            var bucket = Math.round(gaps[i] / 12) * 12
-            counts[bucket] = (counts[bucket] || 0) + 1
-            if (counts[bucket] > bestCount) {
-                bestCount = counts[bucket]
-                best = bucket
-            }
-        }
-        var sum = 0
-        var n = 0
-        for (var j = 0; j < gaps.length; j++) {
-            if (Math.round(gaps[j] / 12) * 12 === best) {
-                sum += gaps[j]
-                n += 1
-            }
-        }
-        return n > 0 ? Math.round(sum / n) : best
-    }
-
-    // Accept a new visual period only once it has held for long enough that a
-    // tracker excursion cannot produce it. Measured excursions on real tracks
-    // last 6-8s; a tempo change lasts the rest of the track.
-    function noteVisualPeriod(periodMs) {
+    // A longer, mode-voting window was tried here and did not pay for itself: it
+    // held a stale period through a real change of arrangement for up to twelve
+    // seconds, which on material whose beat weighting changes with the
+    // instrumentation is most of the time. The window is short and follows, and
+    // the accents no longer inherit aubio's jitter because they run off a clock
+    // at this period instead of off the beats.
+    function setVisualPeriod(periodMs) {
         var folded = root.foldVisualInterval(periodMs)
-        if (folded <= 0)
-            return
-        if (root._visualIntervalMs <= 0) {
+        if (folded > 0)
             root._visualIntervalMs = folded
-            return
-        }
-        // The window was just rebuilt around a different tempo: take what it
-        // says rather than making it wait out the confirm delay on top of the
-        // seven seconds it already spent filling.
-        if (root._visualRelearn) {
-            root._visualRelearn = false
-            root._visualIntervalMs = folded
-            root._visualCandidateMs = 0
-            root._visualCandidateSince = -1
-            return
-        }
-        var now = Date.now() / 1000
-        if (Math.abs(folded - root._visualIntervalMs) <= 0.12 * root._visualIntervalMs) {
-            root._visualCandidateMs = 0
-            root._visualCandidateSince = -1
-            return
-        }
-        if (root._visualCandidateMs > 0
-                && Math.abs(folded - root._visualCandidateMs) <= 0.12 * root._visualCandidateMs) {
-            if (now - root._visualCandidateSince >= 12.0) {
-                root._visualIntervalMs = root._visualCandidateMs
-                root._visualCandidateMs = 0
-                root._visualCandidateSince = -1
-            }
-            return
-        }
-        root._visualCandidateMs = folded
-        root._visualCandidateSince = now
     }
 
     function stopVisualClock() {
@@ -348,11 +276,16 @@ Singleton {
             const agrees = median <= 0 || (interval >= 0.7 * median && interval <= 1.5 * median)
             if (isFinite(interval) && interval >= 240 && interval <= 1200 && agrees) {
                 intervals.push(interval)
-                if (intervals.length > 64)
+                if (intervals.length > 6)
                     intervals.shift()
                 root._beatRejected = 0
-                root._beatIntervalMs = bucketMode(intervals)
-                root.noteVisualPeriod(root._beatIntervalMs)
+                var sorted = intervals.slice().sort((a, b) => a - b)
+                root._beatIntervalMs = sorted[Math.floor(sorted.length / 2)]
+                // Three gaps before the accents may be re-timed: one gap is not
+                // a period, and a wrong first lock is now followed immediately
+                // rather than confirmed.
+                if (intervals.length >= 3)
+                    root.setVisualPeriod(root._beatIntervalMs)
             } else {
                 // A run of disagreements is a different tune, not a run of skipped
                 // beats. Without giving up on the window, it could only ever
@@ -362,9 +295,6 @@ Singleton {
                 if (root._beatRejected >= 8) {
                     root._beatRejected = 0
                     root._beatIntervals = []
-                    root._visualCandidateMs = 0
-                    root._visualCandidateSince = -1
-                    root._visualRelearn = true
                 }
             }
         }
@@ -409,10 +339,7 @@ Singleton {
             root._reportedBpm = 0
             root._beatIntervalMs = 0
             root._visualIntervalMs = 0
-            root._visualCandidateMs = 0
-            root._visualCandidateSince = -1
             root._beatRejected = 0
-            root._visualRelearn = false
             root._beatIntervals = []
             root._lastBeatAt = -1
             root._lastBeatWallAt = -1
