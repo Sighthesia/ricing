@@ -18,6 +18,7 @@ of exiting and leaving the shell with a silent, dead bridge.
 from __future__ import annotations
 
 import json
+import math
 import os
 import queue
 import re
@@ -129,6 +130,8 @@ def _record_command() -> list[str]:
 
 def _fold_octave(bpm: float) -> float:
     """Move a tempo into the display range by whole octaves only."""
+    if not math.isfinite(bpm) or bpm <= 0.0:
+        return 0.0
     while bpm < TEMPO_MIN_BPM:
         bpm *= 2.0
     while bpm > TEMPO_MAX_BPM:
@@ -149,6 +152,7 @@ class TempoStabilizer:
         self._locked = 0.0
         self._candidate = 0.0
         self._candidate_beats = 0
+        self._rejected = 0
 
     def _median_interval(self) -> float:
         intervals = self._intervals
@@ -158,7 +162,7 @@ class TempoStabilizer:
         """Median-interval tempo, folded into range; 0.0 until it is earned.
 
         An unsure tracker has to earn its first lock over the whole window: the
-        readout then starts on a median of twelve beats instead of four.
+        readout then starts on a median of twelve intervals instead of four.
         """
         needed = TEMPO_MIN_INTERVALS if confidence >= TEMPO_MIN_CONFIDENCE else TEMPO_WINDOW
         if len(self._intervals) < needed:
@@ -180,11 +184,21 @@ class TempoStabilizer:
                 self._drop_candidate()
             elif interval > 0.0:
                 # A single skipped beat doubles the interval, so reject one
-                # that lands far outside the window's own median.
+                # that lands far outside the window's own median. A run of them
+                # is a different tune, not a run of skipped beats: without this
+                # the window could only ever describe the tempo it was built on,
+                # since every new interval would keep being rejected.
                 if self._intervals:
                     median = self._median_interval()
                     if not 0.5 * median <= interval <= 2.0 * median:
                         interval = 0.0
+                        self._rejected += 1
+                        if self._rejected >= max(TEMPO_MIN_INTERVALS + 2, TEMPO_WINDOW // 2):
+                            self._intervals.clear()
+                            self._drop_candidate()
+                            self._rejected = 0
+                    else:
+                        self._rejected = 0
                 if interval > 0.0:
                     self._intervals.append(interval)
                     if len(self._intervals) > TEMPO_WINDOW:

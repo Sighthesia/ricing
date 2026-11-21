@@ -17,13 +17,6 @@ Singleton {
     // the displayed tempo from the beat intervals and locks it with hysteresis,
     // because aubio's own candidate tempo hops between metrical neighbours.
     readonly property real bpm: _reportedBpm
-    // Measured gap between the last two detected beats, in ms.
-    //
-    // Kept apart from `bpm` on purpose: the readout is smoothed and locked, so
-    // it does NOT follow the beat. Anything that has to finish exactly when the
-    // next beat fires (the spectrum's wave front) has to be timed from the beats
-    // themselves, or it overruns and is cut off by the next trigger.
-    readonly property int beatIntervalMs: _beatIntervalMs
     // The period the visuals run on, in ms, and the one thing on this side that
     // is allowed to drive an animation.
     //
@@ -46,9 +39,17 @@ Singleton {
     property int _visualIntervalMs: 0
     property int _visualCandidateMs: 0
     property double _visualCandidateSince: -1
-    // Wall-clock time of the last clock tick, for the phase check below.
-    property double _lastTickAt: -1
+    // Consecutive gaps rejected by the window's own median; see _onBeatLine.
+    property int _beatRejected: 0
+    // Set when the gap window had to be thrown away, so the next period it
+    // settles on is taken immediately instead of waiting out the confirm delay.
+    property bool _visualRelearn: false
+    // Wall clock of the last arriving beat, for the clock's watchdog.
     property double _lastBeatWallAt: -1
+    // Wall clock of the last cava frame. The pulse decay lives in _parseFrame, so
+    // a dead cava would otherwise leave the pulse latched at 1 with the highlight
+    // burning until the shell restarts.
+    property double _lastFrameAt: -1
     property real _lastBeatAt: -1
     // Recent accepted beat gaps, in ms (most recent last).
     property var _beatIntervals: []
@@ -122,6 +123,7 @@ Singleton {
     }
 
     function _parseFrame(data) {
+        root._lastFrameAt = Date.now()
         const buffer = root._bufToggle ? root._buf0 : root._buf1
         let index = 0
         let number = 0
@@ -188,7 +190,7 @@ Singleton {
     // Move a period into the range the visuals run on by whole octaves only, so
     // a metrical flip changes which beats are accented, not how fast they are.
     function foldVisualInterval(ms) {
-        if (!(ms > 0))
+        if (!isFinite(ms) || !(ms > 0))
             return 0
         var folded = ms
         while (folded < 280)
@@ -249,6 +251,16 @@ Singleton {
             root._visualIntervalMs = folded
             return
         }
+        // The window was just rebuilt around a different tempo: take what it
+        // says rather than making it wait out the confirm delay on top of the
+        // seven seconds it already spent filling.
+        if (root._visualRelearn) {
+            root._visualRelearn = false
+            root._visualIntervalMs = folded
+            root._visualCandidateMs = 0
+            root._visualCandidateSince = -1
+            return
+        }
         var now = Date.now() / 1000
         if (Math.abs(folded - root._visualIntervalMs) <= 0.12 * root._visualIntervalMs) {
             root._visualCandidateMs = 0
@@ -270,7 +282,6 @@ Singleton {
 
     function stopVisualClock() {
         visualClock.running = false
-        root._lastTickAt = -1
         root._reportedPulse = 0
     }
 
@@ -284,14 +295,15 @@ Singleton {
         repeat: true
         interval: root._visualIntervalMs > 0 ? root._visualIntervalMs : 500
         onTriggered: {
-            // The accent cadence belongs to the tracker: when beats stop
-            // arriving, the bars must not keep pulsing into silence.
-            if (root._lastBeatWallAt > 0
-                    && Date.now() - root._lastBeatWallAt > 3 * interval) {
+            // The accent cadence belongs to the tracker and to the spectrum: when
+            // either stops, the bars must not keep pulsing into silence, and the
+            // pulse must not stay latched (its decay runs in _parseFrame).
+            const now = Date.now()
+            if ((root._lastBeatWallAt > 0 && now - root._lastBeatWallAt > 3 * interval)
+                    || (root._lastFrameAt > 0 && now - root._lastFrameAt > 2000)) {
                 root.stopVisualClock()
                 return
             }
-            root._lastTickAt = Date.now()
             root._reportedPulse = 1
             root.beat()
         }
@@ -338,8 +350,22 @@ Singleton {
                 intervals.push(interval)
                 if (intervals.length > 64)
                     intervals.shift()
+                root._beatRejected = 0
                 root._beatIntervalMs = bucketMode(intervals)
                 root.noteVisualPeriod(root._beatIntervalMs)
+            } else {
+                // A run of disagreements is a different tune, not a run of skipped
+                // beats. Without giving up on the window, it could only ever
+                // describe the tempo it was built on: every later gap would keep
+                // being rejected against it, for the rest of the session.
+                root._beatRejected += 1
+                if (root._beatRejected >= 8) {
+                    root._beatRejected = 0
+                    root._beatIntervals = []
+                    root._visualCandidateMs = 0
+                    root._visualCandidateSince = -1
+                    root._visualRelearn = true
+                }
             }
         }
         root._lastBeatAt = timestamp
@@ -351,10 +377,15 @@ Singleton {
         // a digit nobody reads.
         root._reportedBpm = isFinite(bpm) && bpm > 0 ? Math.round(bpm) : root._reportedBpm
 
-        if (root._visualIntervalMs <= 0)
+        if (root._visualIntervalMs <= 0) {
+            // No period yet - the first seven seconds of a track, or a window
+            // that was just thrown away. Accent the beat itself, or the spectrum
+            // sits silent instead of merely unsteady.
+            root._reportedPulse = 1
+            root.beat()
             return
+        }
         if (!visualClock.running) {
-            root._lastTickAt = root._lastBeatWallAt
             visualClock.start()
             root._reportedPulse = 1
             root.beat()
@@ -380,15 +411,19 @@ Singleton {
             root._visualIntervalMs = 0
             root._visualCandidateMs = 0
             root._visualCandidateSince = -1
+            root._beatRejected = 0
+            root._visualRelearn = false
             root._beatIntervals = []
             root._lastBeatAt = -1
             root._lastBeatWallAt = -1
+            root._lastFrameAt = -1
             root._beatCrashCount = 0
             beatProcess.running = true
         } else if (!root._shouldRun && beatProcess.running) {
             beatProcess.running = false
-            root.stopVisualClock()
         }
+        if (!root._shouldRun)
+            root.stopVisualClock()
     }
 
     Component.onCompleted: root._resetValues()
