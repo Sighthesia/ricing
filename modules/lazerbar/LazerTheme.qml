@@ -150,36 +150,35 @@ QtObject {
     // staying bright. Unbranched so dark, light and fallback agree.
     readonly property color notificationFlash: mix(paperWhite, accentColor, 0.5)
     // Click-flash halo: the light a flash throws outside its own surface.
-    // Light schemes take the accent (paper white on a light card is invisible),
-    // dark schemes blend almost all the way to paper white so the halo reads as
-    // light rather than as a second accent colour.
+    //
+    // Which direction it can travel is decided by what is underneath. A halo over
+    // a dark surface raises the luminance the eye is watching, so it takes a blend
+    // leaning to paper. Over a light surface only one direction exists - toward
+    // white - and any tint at all goes the wrong way: the accent at 82% white is
+    // still darker than #FDF7EE, so an accent halo there reads as a shadow.
     readonly property color flashGlow: lightScheme
-        ? accentColor
+        ? paperWhite
         : mix(paperWhite, accentColor, 0.35)
-    // A halo has to out-contrast the surface it lands on, and the two schemes
-    // spend their alpha differently: light on a dark surface raises the luminance
-    // the eye is watching, while anything on a light surface can only lower it.
-    // Measured on this display at the click flash's own edge alpha, the dark
-    // scheme moves the background by 85% and the light one by 9%; white light is
-    // worth nothing at all there (+1% over paper). So the light scheme scales the
-    // halo up, and the dark one is left exactly as it was.
+    // The scheme correction, kept for the hosts that scale their halo layer by it.
+    // It no longer buys contrast in the light scheme - white saturates against
+    // paper and further alpha cannot brighten a surface that is already white -
+    // but a light surface that is not white (a pill, a card, the wallpaper) has
+    // headroom above it, and the halo fills that headroom.
     readonly property real flashGlowGain: lightScheme ? 3 : 1
-    // Peak alpha the halo may paint with. The light scheme has to reach the whole
-    // way to 1 for the correction above to survive compositing: measured on
-    // screen, a halo authored at 0.6 landed at roughly half its intended contrast
-    // once the flash's own layer opacity and the panel edges had taken their cut.
+    // Peak alpha the halo may paint with. The light scheme reaches all the way to
+    // 1 because what it is doing there is closing the gap to white: measured on
+    // screen, a halo authored below that landed at roughly half its intended
+    // light once the flash's own layer opacity had taken its cut.
     readonly property real flashGlowEdge: lightScheme ? 1 : 0.6
     // Peak alpha of the light a spectrum bar throws while the beat front is on
-    // it. It has to read against the bar's own colour without swallowing the bar,
-    // and the light scheme gets more for the reason above.
-    readonly property real spectrumGlowAlpha: lightScheme ? 0.55 : 0.35
-    // The spectrum bar halo's own tone. On a light surface the bar is itself a
-    // tint of the accent, so a halo of that same tint merges into it and reads
-    // as a wider bar; it takes a deeper step of the hue there, which is the only
-    // thing that can stand out against paper (nothing can be brighter).
-    readonly property color spectrumGlowColor: lightScheme
-        ? mix(accentColor, textPrimary, 0.45)
-        : flashGlow
+    // it. It has to read against the bar's own colour without swallowing the bar.
+    readonly property real spectrumGlowAlpha: lightScheme ? 0.8 : 0.35
+    // The spectrum bar halo's tone. The bar is itself a tint of the accent, so a
+    // halo of that same tint merges into it and reads as a wider bar; over a light
+    // surface the halo goes the only direction that exists there - toward white -
+    // which also puts it at the opposite end from the bar and lets the bar read as
+    // the dark thing with light around it.
+    readonly property color spectrumGlowColor: flashGlow
     // Click-flash tint. A light surface needs the theme colour to read as a
     // blink: a text-coloured veil over it reads as the control dimming.
     readonly property color clickFlashWash: lightScheme ? accentColor : textPrimary
