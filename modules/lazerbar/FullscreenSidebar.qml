@@ -55,6 +55,7 @@ Rectangle {
         markThickness: 4
         markRadius: 2
         markColor: LazerTheme.settingsAccent
+        flashSurface: LazerTheme.settingsRail
         // One strip, two bands: whichever owns the selection places it, and the
         // anchor is a real y rather than a row number so a footer selection
         // does not inherit the primary column's top-down arithmetic. A CENTRE,

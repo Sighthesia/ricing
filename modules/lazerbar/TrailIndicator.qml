@@ -34,8 +34,8 @@ import QtQuick
 // has to bound the DRAWN strip while the mark stays anchored to the head, and
 // that is a design decision rather than a bug fix.
 //
-// A selection change is one blink (the shared click-flash contract, 1.8x peak)
-// plus the wake; layout churn is neither. That split is the widget's, and it is
+// A selection change is one blink on the shell's shared click flash plus the
+// wake; layout churn is neither. That split is the widget's, and it is
 // why this takes a `targetKey` at all.
 Item {
     id: root
@@ -50,6 +50,9 @@ Item {
     property real markThickness: 4
     property int markRadius: 2
     property color markColor: "transparent"
+    // The surface the switch blink's light lands on; a host that knows its own
+    // field passes it so the halo reads as that field brightening.
+    property color flashSurface: "transparent"
     // Where the host wants the strip ACROSS its axis — a rail's left margin, a
     // bar's baseline. The travel axis is the component's own and is NOT a host
     // property, because the leading edge there is `start`, which is half the
@@ -98,7 +101,7 @@ Item {
             root._followOffset = root._head - root._target
             followArrival.restart()
             root._key = String(root.targetKey)
-            flashAnimation.restart()
+            flash.restart()
         }
         root._anchor = root._target
         root._head = root._target + root._followOffset
@@ -258,7 +261,7 @@ Item {
             root._anchor = root._target
             root._head = root._target
             root._tail = root._target
-            flashAnimation.restart()
+            flash.restart()
             return
         }
         // Same selection, new geometry: layout settling, a resize, a scroll.
@@ -273,25 +276,13 @@ Item {
         root._snapTo(center)
     }
 
-    // One blink per genuine switch, matching the shared click-flash contract.
-    // No-op under reduced motion, which also parks the overlay at zero rather
-    // than leaving it wherever the last blink reached.
-    property real flashOpacity: 0
-    NumberAnimation {
-        id: flashAnimation
-        target: root
-        property: "flashOpacity"
-        from: Math.min(1, MotionTokens.clickFlashOpacity * 1.8)
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-    }
+    // One blink per genuine switch, through the shell's shared click-flash
+    // contract; reduced motion is the layer's own business.
     Connections {
         target: MotionTokens
         function onReducedMotionChanged() {
             if (MotionTokens.reducedMotion) {
-                flashAnimation.stop()
-                root.flashOpacity = 0
+                flash.cancel()
                 root._schedule()
             }
         }
@@ -324,11 +315,13 @@ Item {
 
     // Switch blink, drawn above the mark without changing its geometry — the
     // same tinted wash the workspace indicator uses, at the same strength.
-    Rectangle {
+    ClickFlash {
+        id: flash
+
         anchors.fill: parent
-        radius: strip.radius
+        radius: root.markRadius
         color: LazerTheme.flashWash
-        opacity: root.flashOpacity
-        enabled: false
+        surfaceColor: root.flashSurface
+        glowSpread: 6
     }
 }

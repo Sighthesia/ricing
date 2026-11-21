@@ -57,6 +57,7 @@ QtObject {
         glassThemeAdaptive: true,
         themeAdaptation: true,
         ripplePulseEnabled: true,
+        flashGlowEnabled: true,
         transientMediaCover: false,
         fontDefault: "",
         fontFixed: "",
@@ -557,6 +558,9 @@ QtObject {
                 // the notification card and the top bar. No fullscreen variant
                 // any more, so the old mode flag is gone with the overlay.
                 property bool ripplePulseEnabled: true
+                // Halo around every flash wash (click, beat, sweep, rail mark);
+                // off leaves the wash alone.
+                property bool flashGlowEnabled: true
                 // Show album art in media transient messages (off by default since
                 // the adjacent media widget already displays the cover).
                 property bool transientMediaCover: false

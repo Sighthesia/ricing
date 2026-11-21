@@ -170,12 +170,22 @@ QtObject {
     // that. Given the surface, the halo is pulled most of the way toward it, and
     // the light then reads as the surface brightening rather than as white paint.
     function glowFor(baseColor, surfaceColor) {
+        // One gate for every halo host: GlowBleed takes all of its colours from
+        // here, so returning transparent is what turns the light off without
+        // fighting each host's own opacity or visible.
+        if (!root.glowEnabled)
+            return "transparent"
         const lit = lightScheme ? mix(baseColor, paperWhite, 0.94)
                                 : mix(baseColor, paperWhite, 0.65)
         if (!surfaceColor)
             return lit
         return mix(surfaceColor, lit, lightScheme ? 0.35 : 0.85)
     }
+    // Master switch for every flash halo. Defaults on when there is no settings
+    // service, so a standalone theme still paints light.
+    readonly property bool glowEnabled: settingsService
+        ? settingsService.appearance.flashGlowEnabled !== false
+        : true
     readonly property color flashGlow: glowFor(clickFlashWash)
     // The surface a bar widget's light lands on: the bar's own field, which is
     // the wallpaper-extracted surface rather than paper.

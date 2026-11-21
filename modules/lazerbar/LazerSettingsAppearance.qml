@@ -43,6 +43,7 @@ LazerSettingsSection {
     property alias glassThemeAdaptiveToggle: glassThemeAdaptiveToggleControl
     property alias themeAdaptationToggle: themeAdaptationToggleControl
     property alias ripplePulseToggle: ripplePulseToggleControl
+    property alias flashGlowToggle: flashGlowToggleControl
     property alias wallpaperRow: wallpaperRow
     property alias lockClockRow: lockClockRow
     property alias lockClockToggle: lockClockToggleControl
@@ -851,5 +852,15 @@ LazerSettingsSection {
         currentValue: root.settingsObject ? root.settingsObject.ripplePulseEnabled : null
         resetCallback: function() { root.resetKey("ripplePulseEnabled") }
         LazerSettingsToggle { id: ripplePulseToggleControl; checked: root.settingsObject ? root.settingsObject.ripplePulseEnabled : true; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.ripplePulseEnabled = value; root.save() } } }
+    }
+    LazerSettingsRow {
+        id: flashGlowRow
+        width: parent.width - 16; x: 8
+        searchQuery: root.searchQuery
+        labelText: Services.Tr.q("settings.flashGlow"); descriptionText: Services.Tr.q("settings.flashGlow.description")
+        defaultValue: root.defaultOf("flashGlowEnabled")
+        currentValue: root.settingsObject ? root.settingsObject.flashGlowEnabled : null
+        resetCallback: function() { root.resetKey("flashGlowEnabled") }
+        LazerSettingsToggle { id: flashGlowToggleControl; checked: root.settingsObject ? root.settingsObject.flashGlowEnabled !== false : true; onToggled: function(value) { if (root.settingsObject) { root.settingsObject.flashGlowEnabled = value; root.save() } } }
     }
 }

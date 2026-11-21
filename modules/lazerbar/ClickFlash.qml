@@ -77,6 +77,11 @@ Rectangle {
         haloAnimation.restart()
     }
 
+    // Scales this layer's own clocks. Only a host with a debug slow-motion control
+    // passes anything but 1, and it has to pass it here as well or the one flash on
+    // that surface would run at normal speed under a slowed panel.
+    property real durationScale: 1
+
     // Stop the wash without waiting for it to fade.
     function cancel() {
         flashAnimation.stop()
@@ -115,7 +120,7 @@ Rectangle {
 
             from: root.glowPeak
             to: 0
-            duration: MotionTokens.clickFlashDuration
+            duration: MotionTokens.clickFlashDuration * root.durationScale
             easing.type: MotionTokens.clickFlashEasing
             running: false
         }
@@ -128,7 +133,7 @@ Rectangle {
         property: "opacity"
         from: MotionTokens.clickFlashOpacity
         to: 0
-        duration: MotionTokens.clickFlashDuration
+        duration: MotionTokens.clickFlashDuration * root.durationScale
         easing.type: MotionTokens.clickFlashEasing
         running: false
     }

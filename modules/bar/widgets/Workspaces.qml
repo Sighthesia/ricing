@@ -969,6 +969,7 @@ Item {
         markThickness: LazerTheme.barIndicatorHeight
         markRadius: LazerTheme.barIndicatorRadius
         markColor: LazerTheme.osuGreen
+        flashSurface: LazerTheme.barSurface
         targetCenter: root.indicatorCenterX
         targetKey: root.indicatorTargetKey
         targetMoving: root.indicatorTargetMoving

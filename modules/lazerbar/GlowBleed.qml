@@ -171,8 +171,9 @@ Item {
             // A halo that is not painting holds no decoded patch. The spectrum
             // mounts one of these per bar and only the few under the beat front
             // are ever lit, so an always-decoded patch would be paid for 48 times
-            // over to draw nothing. Clearing the source releases the texture.
-            source: (root.visible && root.opacity > 0.001)
+            // over to draw nothing. Clearing the source releases the texture, and
+            // a transparent tone (the master glow switch) has nothing to draw.
+            source: (root.visible && root.opacity > 0.001 && root.glowColor.a > 0)
                 ? "data:image/svg+xml;utf8," + encodeURIComponent(Glow.cornerSvg(patch.width, patch.height,
                                                     root.arc, root.glowColor, root.edgeAlpha,
                                                     patch.corner, root.overlap))

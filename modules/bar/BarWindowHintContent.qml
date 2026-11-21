@@ -246,8 +246,9 @@ Item {
     // The indicator's switch blink, exposed for the same reason as the two above and with
     // the same payoff: `restart()` sets `from` synchronously, so a suite can read the recipe
     // on the frame the switch happened rather than waiting out a decay and guessing where
-    // in it a poll landed. This is `Workspaces.flashIndicator`'s animation.
-    readonly property alias flashAnimation: _flashIndicator
+    // in it a poll landed. This is the shell's shared click-flash, the layer `Workspaces`
+    // blinks on its own indicator.
+    readonly property alias flashAnimation: indicatorFlash.flashAnimationItem
     // The focus frame's own glide, for the same reason as the rest. A `Behavior` has no
     // `animation` property of its own, so a suite cannot ask "is the frame still easing?"
     // any other way - and it has to ask, because a `Behavior`-driven `y` reads the
@@ -495,7 +496,7 @@ Item {
             selectionHeadGlide.restart()
             selectionTailGlide.restart()
             if (root.hasTarget)
-                _flashIndicator.restart()
+                indicatorFlash.restart()
         }
     }
     // The leaving frame's own height, from the row counts of the frame being held
@@ -2019,7 +2020,7 @@ Item {
             // the wake sat at 204.0px, the travel itself, for the whole flight and closed in
             // about 670ms, a bar drawn five and a half times its resting length.
             _tailY = top
-            _flashIndicator.restart()
+            indicatorFlash.restart()
             return
         }
         if (Math.abs(top - _anchorY) < 0.5)
@@ -2335,26 +2336,19 @@ Item {
         visible: root.markerHasTarget
         opacity: root.markerHasTarget ? 1 : 0
 
-        // Switch blink: the same tinted-glow blink the workspace indicator plays
-        // per genuine target switch.
-        Rectangle {
-            id: indicatorFlashOverlay
+        // Switch blink: the shared click-flash wash over the indicator, on the
+        // same event as the workspace tracker's blink. Its light lands on the
+        // popup's content block (`popupContentSurface` in `BarPopupHost`), which
+        // is what the band and this bar sit on.
+        ClickFlash {
+            id: indicatorFlash
             objectName: "windowHintIndicatorFlash"
             anchors.fill: parent
             radius: parent.radius
             color: LazerTheme.flashWash
-            opacity: 0
-            enabled: false
-        }
-
-        NumberAnimation {
-            id: _flashIndicator
-            target: indicatorFlashOverlay
-            property: "opacity"
-            from: MotionTokens.clickFlashOpacity
-            to: 0
-            duration: MotionTokens.clickFlashDuration * debugTimeScale
-            easing.type: MotionTokens.clickFlashEasing
+            surfaceColor: LazerTheme.settingsSection
+            // Every other clock on this surface carries the debug scale.
+            durationScale: root.debugTimeScale
         }
 
         Behavior on opacity {
@@ -2516,7 +2510,7 @@ Item {
                 crossingToRetarget.restart()
             }
             if (!MotionTokens.reducedMotion)
-                _flashIndicator.restart()
+                indicatorFlash.restart()
         }
     }
 

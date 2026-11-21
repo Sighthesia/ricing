@@ -73,7 +73,7 @@ BarPill {
             return
         root._lastFlashStep = step
         if (!MotionTokens.reducedMotion) {
-            levelFlashAnimation.restart()
+            levelFlash.restart()
             // The bar plays the shell's glow pulse for the same discrete step
             // the level bar flashes for, starting under this control.
             const origin = root.barGlowOrigin()
@@ -117,7 +117,9 @@ BarPill {
         height: LazerTheme.barIndicatorHeight
         radius: LazerTheme.barIndicatorRadius
         color: LazerTheme.shade(LazerTheme.barIcon, 0.14)
-        clip: true
+        // Open, so the fill's halo can leave the track; the fill
+        // never exceeds it, so nothing else spills.
+        clip: false
 
         Rectangle {
             id: brightnessFill
@@ -135,38 +137,17 @@ BarPill {
         }
 
         // Tick wash follows the travelled fill; non-interactive visual layer.
-        Rectangle {
+        ClickFlash {
             id: levelFlash
-            anchors.fill: brightnessFill
+            followItem: brightnessFill
             radius: LazerTheme.barIndicatorRadius
+            // A 3px bar reads as a blob under the default reach; this keeps the
+            // light a rim on the bar while still giving it width.
+            glowSpread: 7
+            surfaceColor: LazerTheme.barSurface
             color: LazerTheme.barTickWash
-            opacity: 0
 
             Behavior on color { ColorAnimation { duration: MotionTokens.fast } }
         }
     }
-
-    // Shared tick flash: white-equivalent wash fading with OutQuint.
-    NumberAnimation {
-        id: levelFlashAnimation
-        target: levelFlash
-        property: "opacity"
-        from: MotionTokens.clickFlashOpacity
-        to: 0
-        duration: MotionTokens.clickFlashDuration
-        easing.type: MotionTokens.clickFlashEasing
-        running: false
-    }
-
-    // Keep the wash dark when reduced motion is toggled mid-flight.
-    Connections {
-        target: MotionTokens
-        function onReducedMotionChanged() {
-            if (MotionTokens.reducedMotion) {
-                levelFlashAnimation.stop()
-                levelFlash.opacity = 0
-            }
-        }
-    }
-
 }

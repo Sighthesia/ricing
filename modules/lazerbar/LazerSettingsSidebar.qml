@@ -91,6 +91,7 @@ Item {
         markThickness: 4
         markRadius: 2
         markColor: LazerTheme.settingsAccent
+        flashSurface: LazerTheme.settingsRail
         targetCenter: root.indicatorY
         targetKey: String(root.selectedIndex)
         targetValid: root.selectedAvailable

@@ -254,6 +254,8 @@ var strings = {
     "settings.terminalClearText.description": { zh: "透明背景下终端文字全亮度绘制，用颜色区分层级", en: "Draw terminal text at full brightness over translucent backgrounds, using color for hierarchy" },
     "settings.ripplePulse": { zh: "辉光脉冲", en: "Glow pulse" },
     "settings.ripplePulse.description": { zh: "通知到达与音量、亮度等瞬态变化时，在通知卡片和顶栏上扫过光环", en: "Sweep a glow across the notification card and the bar on arrivals and transient changes" },
+    "settings.flashGlow": { zh: "闪烁光晕", en: "Flash glow" },
+    "settings.flashGlow.description": { zh: "点击、节拍与指示条变化时，在控件周围投出一圈光", en: "Cast a ring of light around controls on clicks, beats and indicator changes" },
     "settings.themeScheme": { zh: "主题模板", en: "Theme template" },
     "settings.presetScheme": { zh: "配色方案", en: "Color preset" },
     "settings.presetScheme.blocked": { zh: "关闭「壁纸主题色」后生效", en: "Available once wallpaper theme color is off" },
